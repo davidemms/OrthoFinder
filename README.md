@@ -1,4 +1,4 @@
-# OrthoFinder - Accurate inference of orthologous gene groups made easy!
+# OrthoFinder version 0.2.6 - Accurate inference of orthologous gene groups made easy!
 Emms, D.M. and Kelly, S. (in press), OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthologous gene group inference accuracy, Genome Biology 
 
 Available from:
@@ -8,18 +8,26 @@ http://www.stevekellylab.com/software/orthofinder
 https://github.com/davidemms/OrthoFinder
 
 
-OrthoFinder version 0.2.6
-=========================
+Usage
+=====
 OrthoFinder runs as a single command that takes as input a directory of fasta files, one per species, and outputs a file containing the orthologous groups of genes from these species. 
 
-Its first step is to automatically run BLAST all-versus-all queries in an efficient manner by splitting the work up into pieces that can be run in parallel. The BLAST queries are, nevertheless, a time-consuming part of the process and advanced users may wish to provide pre-calculated BLAST results. The algorithm's second step is to infer orthologous groups using the BLAST scores.  
+python orthofinder.py -f fasta_directory -t number_of_processes
+
+For example, if you want to run it using 16 processors in parallel on the example dataset move to the directory containing orthofinder.py and call:
+
+python orthofinder.py -f ExampleDataset -t 16
+
+Once complete your results will be in ExampleDataset/Results_\<date\>/OrthologoueGroups.txt
+
+For details on running it from pre-computed BLAST search results see below.
 
 Installing Dependencies
 =======================
-OrthoFinder requires the following to be installed and in the system path:
+OrthoFinder is written to run on linux and requires the following to be installed and in the system path:
 1. python 2.x (version 3 isn't currently supported) together with the scipy libraries stack 
 2. BLAST+ 
-3. The MCL graph clustering algorithm (on Windows cygwin is required to build MCL) 
+3. The MCL graph clustering algorithm 
 
 Brief instructions are given below although users may wish to refer to the installation notes provided with these packages for more detailed instructions. BLAST+ and MCL must be in the system path so that the can be OrthoFinder can run them, instructions are provided below.
 
@@ -32,22 +40,13 @@ BLAST+
 ------
 Executables are found here ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ (instructions are currently at http://www.ncbi.nlm.nih.gov/guide/howto/run-blast-local/ and in more detail in the BLAST+ user manual). As websites can change, an alternative is to search online for "install BLAST+". 
 
-Linux and Mac:
-1. Instructions are provided for installing BLAST+ on various flavours of Linux and on Macs on the 'Standalone BLAST Setup for Unix' page of the BLAST+ Help manual currently at http://www.ncbi.nlm.nih.gov/books/NBK1762/. 
+1. Instructions are provided for installing BLAST+ on various flavours of Linux on the 'Standalone BLAST Setup for Unix' page of the BLAST+ Help manual currently at http://www.ncbi.nlm.nih.gov/books/NBK1762/. 
 2. Follow the instructions under "Configuration" in the BLAST+ help manual to add BLAST+ to the PATH environment variable.
-
-Windows:
-1. Download the latest version of of the ncbi-blast installer. The current version number is  2.2.29 and so the file names are ncbi-blast-2.2.29+-win32.exe or ncbi-blast-2.2.29+-win64.exe depending on whether your computer is 32 or 64 bit (look in the Windows 'system properties' dialog if you are unsure).
-2. Run the installer (the default options are fine).
-3. Add the path to the folder containing the BLAST+ executables to the path environment variable. The installer will probably have done this for you (instructions are provided in the 'Configuration' section of the Windows installation of BLAST page in the user BLAST manual). If you used the default installation location then the executables should be in a folder called 'C:\Program Files\NCBI\blast-x.x.xx+\bin' or 'C:\Program Files (x86)\NCBI\blast-x.x.xx+\bin' where x.x.xx is the version number you installed.
 
 MCL
 ---
-Linux:
 mcl is available in the repositories for some linux distributions and so can be installed in the same way as any other package. E.g. on Ubuntu "sudo apt-get install mcl". Alternatively it can be built from source which will likely require the build-essential or equivalent package on the Linux distribution being used. Instructions are provided on the MCL webpage.  
 
-Windows:
-To build MCL on Windows requires cygwin as described on the mcl webpage. The packages gcc-core and core need to be selected from devel sublist from the cygwin "Select Packages" setup.exe.
 
 Setting up and running OrthoFinder
 ==================================
@@ -56,16 +55,16 @@ Once the required dependencies have been installed, OrthoFinder can be setup and
 2. Open a terminal and cd to the directory where OrthoFinder_v0.2.6.tar.gz was saved
 3. tar xzf OrthoFinder_v0.2.6.tar.gz
 4. cd OrthoFinder_v0.2.6
-5. python orthofinder.py -f ExampleDatasets/FungiSmall/
+5. python orthofinder.py -f ExampleDataset/
 6. If everything was successful the output generated will end with a line giving the location of the results file containing the orthologous groups.
 
 The command for running OrthoFinder on any dataset is:
 
-python orthofinder.py -f directory_containing_fasta_files -t number_of_blast_processes
+python orthofinder.py -f directory_containing_fasta_files -t number_of_processes
 
 where:
 directory_containing_fasta_files is a directory containing the fasta files (with filename extensions .fa or .fasta) for the species of interest, one species per fasta file. It is best to use a fasta file with only the longest transcript variant per gene.
-number_of_blast_processes is an optional argument that can be used to run the initial BLAST all-versus-all queries in parallel. As the BLAST queries are by far the time-consuming step it is best to use at least as many BLAST processes as there are CPUs on the machine. 
+number_of_processes is an optional argument that can be used to run the initial BLAST all-versus-all queries in parallel. As the BLAST queries are by far the time-consuming step it is best to use at least as many BLAST processes as there are CPUs on the machine. 
 
 Using pre-computed BLAST results
 ================================
