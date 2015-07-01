@@ -733,7 +733,7 @@ def PrintCitation():
 def PrintHelp():
     print("")    
     print("Usage:\n")    
-    print("python orthofinder -f fasta_directory [-t max_number_of_blast_threads][-o non_default_output_filename][-x speciesInfoFilename]")
+    print("python orthofinder -f fasta_directory [-t max_number_of_threads][-o non_default_output_filename][-x speciesInfoFilename]")
     print("python orthofinder -b precalculated_blast_results_directory [-o non_default_output_filename][-x speciesInfoFilename]")
     print("python orthofinder -h")
     print("\n")
@@ -747,7 +747,7 @@ def PrintHelp():
           "the BLAST results files, fasta files with IDs for the accessions, SequenceIDs.txt and "
           "SpeciesIDs.txt in the formats described in the README file.\n")
     
-    print("-t max_number_of_blast_threads, --threads max_number_of_blast_threads")
+    print("-t max_number_of_threads, --threads max_number_of_threads")
     print("   The maximum number of BLAST processes to be run simultaneously. The "
           "deafult is %d but this should be increased by the user to at least the "
           "number of cores on the computer so as to minimise the time taken to perform "
@@ -772,9 +772,7 @@ def AssignIDsToSequences(fastaDirectory, outputDirectory):
     speciesFilename = outputDirectory + "SpeciesIDs.txt"
     id = 0
     iSpecies = 0
-    allFastaFilenames = glob.glob(fastaDirectory + "*.fasta")
-    allFastaFilenames.extend(glob.glob(fastaDirectory + "*.fa"))
-    allFastaFilenames = sorted(allFastaFilenames)
+    allFastaFilenames = sorted([f for f in os.listdir(fastaDirectory) if os.path.isfile(os.path.join(fastaDirectory,f))])
     returnFilenames = []
     with open(idsFilename, 'wb') as idsFile, open(speciesFilename, 'wb') as speciesFile:
         for fastaFilename in allFastaFilenames:
@@ -784,7 +782,7 @@ def AssignIDsToSequences(fastaDirectory, outputDirectory):
             fastaFilename = fastaFilename.rstrip()
             speciesFile.write("%d: %s\n" % (iSpecies, fastaFilename))
             baseFilename, extension = os.path.splitext(fastaFilename)
-            with open(fastaFilename, 'rb') as fastaFile:
+            with open(fastaDirectory + os.sep + fastaFilename, 'rb') as fastaFile:
                 for line in fastaFile:
                     if len(line) > 0 and line[0] == ">":
                         newID = "%d_%d" % (iSpecies, id)
@@ -797,7 +795,7 @@ def AssignIDsToSequences(fastaDirectory, outputDirectory):
             iSpecies += 1
             id = 0
             outputFasta.close()
-    outputFasta.close()
+    if len(allFastaFilenames) > 0: outputFasta.close()
     return returnFilenames, allFastaFilenames, idsFilename
 
 def AnalyseSequences(workingDirectory, nSeqs, nSpecies, speciesStartingIndices, graphFilename):
