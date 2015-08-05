@@ -1,5 +1,5 @@
-# OrthoFinder version 0.2.6 - Accurate inference of orthologous gene groups made easy!
-Emms, D.M. and Kelly, S. (in press), OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthologous gene group inference accuracy, Genome Biology 
+# OrthoFinder version 0.2.7 - Accurate inference of orthologous gene groups made easy!
+Emms, D.M. and Kelly, S. (2015) Emms, D.M. and Kelly, S. (2015) OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy, Genome Biology 16:157
 
 Available from:
 

@@ -18,8 +18,8 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #  
 #  When publishing work that uses OrthoFinder please cite:
-#      Emms, D.M. and Kelly, S. (in press), OrthoFinder: solving fundamental biases in whole genome comparisons dramatically 
-#      improves orthologous gene group inference accuracy, Genome Biology
+#      Emms, D.M. and Kelly, S. (2015) OrthoFinder: solving fundamental biases in whole genome comparisons dramatically 
+#      improves orthogroup inference accuracy, Genome Biology 16:157
 #
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
@@ -43,7 +43,7 @@ import xml.etree.ElementTree as ET              # Y
 from xml.etree.ElementTree import SubElement    # Y
 from xml.dom import minidom                     # Y
 
-version = "0.2.6"
+version = "0.2.7"
 if sys.platform.startswith("linux"):
     with open(os.devnull, "w") as f:
         subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f) # get round problem with python multiprocessing library that can set all cpu affinities to a single cpu
@@ -728,7 +728,7 @@ def CanRunMCL():
         return False
         
 def PrintCitation():
-    print("\nWhen publishing work that uses OrthoFinder please cite:\n   D.M. Emms & S. Kelly (in press), OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthologous gene group inference accuracy, Genome Biology.\n")   
+    print("\nWhen publishing work that uses OrthoFinder please cite:\n   D.M. Emms & S. Kelly (2015), OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy, Genome Biology 16:157.\n")   
     
 def PrintHelp():
     print("")    
