@@ -25,16 +25,18 @@ For details on running it from pre-computed BLAST search results see below.
 Installing Dependencies
 =======================
 OrthoFinder is written to run on linux and requires the following to be installed and in the system path:
-1. python 2.x (version 3 isn't currently supported) together with the scipy libraries stack 
+
+1. Python 2.7 (version 3 isn't currently supported) together with the scipy libraries stack 
+
 2. BLAST+ 
+
 3. The MCL graph clustering algorithm 
 
 Brief instructions are given below although users may wish to refer to the installation notes provided with these packages for more detailed instructions. BLAST+ and MCL must be in the system path so that the can be OrthoFinder can run them, instructions are provided below.
 
 python and scipy
 ----------------
-Up-to-date and clear instructions are provided here: http://www.scipy.org/install.html.
-As websites can change, an alternative is to search online for "install scipy".
+Up-to-date and clear instructions are provided here: http://www.scipy.org/install.html, be sure to chose a version using python 2.7. As websites can change, an alternative is to search online for "install scipy".
 
 BLAST+
 ------
