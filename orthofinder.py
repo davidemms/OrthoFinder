@@ -39,11 +39,12 @@ import os.path                                  # Y
 import numpy.core.numeric as numeric            # install
 import cPickle as pic                           # Y
 import time                                     # Y
+from collections import defaultdict             # Y
 import xml.etree.ElementTree as ET              # Y
 from xml.etree.ElementTree import SubElement    # Y
 from xml.dom import minidom                     # Y
 
-version = "0.2.7"
+version = "0.2.8"
 if sys.platform.startswith("linux"):
     with open(os.devnull, "w") as f:
         subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f) # get round problem with python multiprocessing library that can set all cpu affinities to a single cpu
@@ -59,7 +60,7 @@ def RunCommandReport(command):
     util.PrintTime("Running command: %s" % " ".join(command))
     RunCommand(command)
     util.PrintTime("Finished command: %s" % " ".join(command))
-    
+   
 class util:
     @staticmethod
     def GetDirectoryName(baseDirName, dateString, i):
@@ -337,7 +338,6 @@ class MCL:
         command = ["mcl", graphFilename, "-I", "1.5", "-o", clustersFilename]
         RunCommand(command)
         util.PrintTime("Ran MCL")  
-
 
 """
 scnorm
@@ -696,14 +696,14 @@ class WaterfallMethod:
 OrthoFinder
 -------------------------------------------------------------------------------
 """   
-nBlastDefault = 10
+nBlastDefault = 16
 
-def CanRunCommand(command):
+def CanRunCommand(command, qAllowStderr = False):
     util.PrintNoNewLine("Test can run \"%s\"" % command)       # print without newline
     capture = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout = [x for x in capture.stdout]
     stderr = [x for x in capture.stderr]
-    if (len(stdout) > 0 and len(stderr) == 0):
+    if len(stdout) > 0 and (qAllowStderr or len(stderr) == 0):
         print(" - ok")
         return True
     else:
@@ -728,40 +728,37 @@ def CanRunMCL():
         return False
         
 def PrintCitation():
-    print("\nWhen publishing work that uses OrthoFinder please cite:\n   D.M. Emms & S. Kelly (2015), OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy, Genome Biology 16:157.\n")   
+    print("""\nWhen publishing work that uses OrthoFinder please cite:
+    D.M. Emms & S. Kelly (2015), OrthoFinder: solving fundamental biases in whole genome comparisons
+    dramatically improves orthogroup inference accuracy, Genome Biology 16:157.\n""")   
     
 def PrintHelp():
     print("")    
     print("Usage:\n")    
-    print("python orthofinder -f fasta_directory [-t max_number_of_threads][-o non_default_output_filename][-x speciesInfoFilename]")
-    print("python orthofinder -b precalculated_blast_results_directory [-o non_default_output_filename][-x speciesInfoFilename]")
-    print("python orthofinder -h")
+    print("python orthofinder.py -f fasta_directory [-t max_number_of_threads][-x speciesInfoFilename]")
+    print("python orthofinder.py -b precalculated_blast_results_directory [-x speciesInfoFilename]")
+    print("python orthofinder.py -h")
     print("\n")
+    
     print("Arguments:\n")
-    print("-f fasta_directory, --fasta fasta_directory")
-    print("   Predict orthologous groups for the genes in the fasta files in the fasta_directory\n")
+    print("""-f fasta_directory, --fasta fasta_directory
+   Predict orthogroups for the genes in the fasta files in the fasta_directory\n""")
     
-    print("-b precalculated_blast_results_directory, --blast precalculated_blast_results_directory")
-    print("   Predict orthologous groups using the pre-calcualted BLAST results "
-          "in precalculated_blast_results_directory. The directory must contain "
-          "the BLAST results files, fasta files with IDs for the accessions, SequenceIDs.txt and "
-          "SpeciesIDs.txt in the formats described in the README file.\n")
+    print("""-b precalculated_blast_results_directory, --blast precalculated_blast_results_directory
+   Predict orthogroups using the pre-calcualted BLAST results in precalculated_blast_results_directory.
+   The directory must contain the BLAST results files, fasta files with IDs for the accessions, 
+   SequenceIDs.txt and SpeciesIDs.txt in the formats described in the README file.\n""")
     
-    print("-t max_number_of_threads, --threads max_number_of_threads")
-    print("   The maximum number of BLAST processes to be run simultaneously. The "
-          "deafult is %d but this should be increased by the user to at least the "
-          "number of cores on the computer so as to minimise the time taken to perform "
-          "the BLAST all-versus-all queries\n" % nBlastDefault)
+    print("""-t max_number_of_threads, --threads max_number_of_threads
+   The maximum number of BLAST processes to be run simultaneously. The deafult is %d but this 
+   should be increased by the user to at least the number of cores on the computer so as to 
+   minimise the time taken to perform the BLAST all-versus-all queries.\n""" % nBlastDefault)
     
-    print("-x speciesInfoFilename, --orthoxml speciesInfoFilename")
-    print("   Output the orthologous groups using the orthoxml format."
-          )
-          
-    print("-o non_default_output_filename, --out non_default_output_filename")
-    print("   A non-default filename to use for the orthologous groups file.\n")
+    print("""-x speciesInfoFilename, --orthoxml speciesInfoFilename
+   Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.\n""")
     
-    print("-h, --help")
-    print("   Print this help text\n")
+    print("""-h, --help
+   Print this help text\n""")
     PrintCitation()
 
 def Fail():
@@ -802,12 +799,12 @@ def AnalyseSequences(workingDirectory, nSeqs, nSpecies, speciesStartingIndices, 
     wfAlg = WaterfallMethod(workingDirectory, workingDirectory, nSeqs, nSpecies, speciesStartingIndices)
     wfAlg.RunWaterfallMethod(graphFilename)
 
-def WriteOrthogroupFiles(clustersFilename, idsFilename, ogsTextFilename):
-    predictedOGs = MCL.GetPredictedOGs(clustersFilename)    
+def WriteOrthogroupFiles(ogs, idsFilename, resultsBaseFilename):
+    outputFN = resultsBaseFilename + ".txt"
     try:
         idExtract = FirstWordExtractor(idsFilename)
         idDict = idExtract.GetIDToNameDict()
-        MCL.CreateOGs(predictedOGs, ogsTextFilename, idDict)
+        MCL.CreateOGs(ogs, outputFN, idDict)
     except RuntimeError as error:
         print(error.message)
         if error.message.startswith("ERROR"):
@@ -818,13 +815,57 @@ def WriteOrthogroupFiles(clustersFilename, idsFilename, ogsTextFilename):
             try:
                 idExtract = FullAccession(idsFilename)
                 idDict = idExtract.GetIDToNameDict()
-                MCL.CreateOGs(predictedOGs, ogsTextFilename, idDict)   
+                MCL.CreateOGs(ogs, outputFN, idDict)   
             except:
                 print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename, idsFilename))
                 Fail()
-    print("Orthologous groups have been written to:\n   %s" % ogsTextFilename)
-    return idDict, predictedOGs
-       
+    return idDict
+
+def CreateOrthogroupTable(ogs, 
+                          idToNameDict, 
+                          speciesFilename, 
+                          resultsBaseFilename):
+    
+    speciesNamesDict = dict()
+    with open(speciesFilename, 'rb') as speciesNamesFile:
+        for line in speciesNamesFile:
+            short, full = line.rstrip().split(": ")
+            speciesNamesDict[int(short)] = full    
+    nSpecies = len(speciesNamesDict)
+    speciesOrder = range(nSpecies)    
+    
+    
+    ogs_names = [[idToNameDict[seq] for seq in og] for og in ogs]
+    ogs_ints = [[map(int, sequence.split("_")) for sequence in og] for og in ogs]
+
+    # write out
+    outputFilename = resultsBaseFilename + ".csv"
+    singleGeneFilename = resultsBaseFilename + "_UnassignedGenes.csv"
+    with open(outputFilename, 'wb') as outputFile, open(singleGeneFilename, 'wb') as singleGeneFile:
+        fileWriter = csv.writer(outputFile, delimiter="\t")
+        singleGeneWriter = csv.writer(singleGeneFile, delimiter="\t")
+        for writer in [fileWriter, singleGeneWriter]:
+            row = [""] + [speciesNamesDict[index] for index in speciesOrder]
+            writer.writerow(row)
+        
+        for iOg, (og, og_names) in enumerate(zip(ogs_ints, ogs_names)):
+            ogDict = defaultdict(list)
+            rows = ["OG%07d" % iOg]
+            thisOutputWriter = fileWriter
+            # separate it into sequences from each species
+            if len(og) == 1:
+                rows.extend(['' for x in xrange(nSpecies)])
+                rows[og[0][0] + 1] = og_names[0]
+                thisOutputWriter = singleGeneWriter
+            else:
+                for (iSpecies, iSequence), name in zip(og, og_names):
+                    ogDict[speciesOrder.index(iSpecies)].append(name)
+                for iSpecies in xrange(nSpecies):
+                    rows.append(", ".join(ogDict[iSpecies]))
+            thisOutputWriter.writerow(rows)
+    print("""Orthologous groups have been written to tab-delimited files:\n   %s\n   %s""" % (outputFilename, singleGeneFilename))
+    print("""And in OrthoMCL format:\n   %s""" % (outputFilename[:-3] + "txt"))
+            
 def GetOrderedBlastCommands(fastaFilenames, blastDBs, workingDirectory):
     """ Using the nSeq1 x nSeq2 as a rough estimate of the amount of work required for a given species-pair, returns the commands 
     ordered so that the commands predicted to take the longest come first. This allows the load to be balanced better when processing 
@@ -845,11 +886,10 @@ Main
 """   
 
 if __name__ == "__main__":
-    print("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % version)
+    print("\nOrthoFinder version %s Copyright (C) 2014 David Emms\n" % version)
     print("""    This program comes with ABSOLUTELY NO WARRANTY.
-    This is free software, and you are welcome to redistribute it
-    under certain conditions.
-    For details please see the License.md that came with this software.""")
+    This is free software, and you are welcome to redistribute it under certain conditions.
+    For details please see the License.md that came with this software.\n""")
     if len(sys.argv) == 1 or sys.argv[1] == "--help" or sys.argv[1] == "help" or sys.argv[1] == "-h":
         PrintHelp()
         sys.exit()
@@ -857,40 +897,36 @@ if __name__ == "__main__":
     # default arguments 
     nBlast = nBlastDefault
     usePreviousBlast = False
-    defaultResultsFile = True
     qXML = False
-    resultsFilename = ""            # ...../OrthologousGroups.txt
+    resultsBaseFilename = ""            # ...../OrthologousGroups.txt
     workingDirectory = ""           # location for all fasta files, blast results, species IDs and outputs for runnning of algorithm
     qOnlyPrepare = False
-
+    
     # Parse command line arguments
     args = sys.argv[1:]    
-    arg = args.pop(0)
-    firstArgument = arg
+    firstArg = args.pop(0)
     # Compulsory arguments
-    if arg == "-f" or arg == "--fasta" or arg == "-p":
-        if arg == "-p":
+    if firstArg == "-f" or firstArg == "--fasta" or firstArg == "-p" or firstArg =="prepare":
+        if firstArg == "-p":
             qOnlyPrepare = True
         if len(args) == 0:
             print("Missing option for command line argument -f")
             Fail()
-        arg = args.pop(0)
-        originalFastaDirectory = arg
+        originalFastaDirectory = args.pop(0)
         if originalFastaDirectory[-1] != os.sep:
             originalFastaDirectory += os.sep
-    elif arg == "-b" or arg == "--blast":
+    elif firstArg == "-b" or firstArg == "--blast":
         if len(args) == 0:
             print("Missing option for command line argument -p")
             Fail()
         usePreviousBlast = True
-        arg = args.pop(0)
-        workingDirectory = arg
+        workingDirectory = args.pop(0)
     else:
-        print("First argument should either be -h to display usage information, "
+        print("ERROR: First argument should either be -h to display usage information, "
               "-f to run OrthoFinder from the beginning including BLAST all-versus-all queries or "
               "-b to run OrthoFinder using pre-calcualted BLAST results prepared in the format specified "
               "in the README file.\n")
-        PrintHelp()
+#        PrintHelp()
         Fail()
 
     # Optional arguments
@@ -908,13 +944,6 @@ if __name__ == "__main__":
                 Fail()    
             if usePreviousBlast:
                 print("Ignoring arguments -t")
-        elif arg == "-o" or arg == "--out":
-            if len(args) == 0:
-                print("Missing option for command line argument -o")
-                Fail()
-            arg = args.pop(0)
-            resultsFilename = arg  
-            defaultResultsFile = False    
         elif arg == "-x" or arg == "--orthoxml":  
             if len(args) == 0:
                 print("Missing option for command line argument -t")
@@ -925,7 +954,7 @@ if __name__ == "__main__":
             PrintHelp()
             sys.exit()
         elif arg == "-b" or arg == "--blast" or arg == "-f" or arg == "--fasta":
-            print("Incompatible or repeated options: %s and %s\n" % (firstArgument,arg))
+            print("Incompatible or repeated options: %s and %s\n" % (firstArg, arg))
             Fail()
         else:
             print("Unrecognised argument: %s\n" % arg)
@@ -933,19 +962,9 @@ if __name__ == "__main__":
     
     # if using previous results, check everything is ok
     if usePreviousBlast:
-        if workingDirectory[-1] != os.sep:
-            workingDirectory += os.sep  
-            
-        if defaultResultsFile:
-            directory = workingDirectory     # this could be .
-            while len(directory) > 0 and directory[-1] == os.sep:
-                directory = directory[:-1]
-            suffix = os.path.split(directory)[-1]
-            if suffix != '.':
-                resultsFilename = workingDirectory + "OrthologousGroups_%s" % suffix
-            else:
-                resultsFilename = "OrthologousGroups"
-            resultsFilename = util.GetUnusedFilename(resultsFilename, ".txt")
+        workingDirectory = os.path.abspath(workingDirectory) + os.sep
+        resultsDir = workingDirectory
+        resultsBaseFilename = util.GetUnusedFilename(resultsDir + "OrthologousGroups", ".csv")[:-4]         # remove .csv from base filename
         
         # check BLAST results directory exists
         if not os.path.exists(workingDirectory):
@@ -994,8 +1013,7 @@ if __name__ == "__main__":
         resultsDir = util.CreateNewWorkingDirectory(originalFastaDirectory + "Results_")
         workingDirectory = resultsDir + "WorkingDirectory" + os.sep
         os.mkdir(workingDirectory)
-        if defaultResultsFile:
-            resultsFilename = resultsDir + "OrthologousGroups.txt"
+        resultsBaseFilename = resultsDir + "OrthologousGroups"
      
      
     # check for BLAST+ and MCL - else instruct how to install and add to path
@@ -1132,10 +1150,12 @@ if __name__ == "__main__":
     print("\n6. Creating files for Orthologous Groups")
     print(  "----------------------------------------")
     PrintCitation()
-    idsDict, predictedOGs = WriteOrthogroupFiles(clustersFilename_pairs, idsFilename, resultsFilename)
+    ogs = MCL.GetPredictedOGs(clustersFilename_pairs)
+    idsDict = WriteOrthogroupFiles(ogs, idsFilename, resultsBaseFilename)
+    CreateOrthogroupTable(ogs, idsDict, workingDirectory + "SpeciesIDs.txt", resultsBaseFilename)
     if qXML:
         numbersOfSequences = list(np.diff(speciesStartingIndices))
         numbersOfSequences.append(nSeqs - speciesStartingIndices[-1])
-        orthoxmlFilename = os.path.splitext(resultsFilename)[0] + ".orthoxml"
-        MCL.WriteOrthoXML(speciesInfo, predictedOGs, numbersOfSequences, idsDict, orthoxmlFilename)
+        orthoxmlFilename = resultsBaseFilename + ".orthoxml"
+        MCL.WriteOrthoXML(speciesInfo, ogs, numbersOfSequences, idsDict, orthoxmlFilename)
     print("\n")

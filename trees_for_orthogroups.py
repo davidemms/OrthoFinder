@@ -198,14 +198,16 @@ class TreesForOrthogroups(object):
         commandsSet = [(alignCmd, treeCms) for alignCmd, treeCms in zip(alignCommands, treeCommands)]
             
         # 4
-        print("\nExample commands that will be run:")
-        for cmdSet in commandsSet[:10]:
-            for cmd in cmdSet:
-                print(cmd)
-        print("")
+        if len(commandsSet) > 0:
+            print("\nExample commands that will be run:")
+            for cmdSet in commandsSet[:10]:
+                for cmd in cmdSet:
+                    print(cmd)
+            print("")
             
         RunParallelCommandSets(nProcesses, commandsSet)
         
+        orthofinder.PrintCitation()
         print("\nFasta files for orthogroups have been written to:\n   %s\n" % (self.baseOutputDir + "Sequences/"))
         print("Multiple sequences alignments have been written to:\n   %s\n" % (self.baseOutputDir + "Alignments/"))
         print("Gene trees have been written to:\n   %s\n" % (self.baseOutputDir + "Trees/"))
