@@ -63,10 +63,10 @@ Setting up and running OrthoFinder
 ==================================
 Once the required dependencies have been installed, OrthoFinder can be setup and run on the small example data included in the package as follows:
 
-1. Save OrthoFinder_v0.2.6.tar.gz 
-2. Open a terminal and cd to the directory where OrthoFinder_v0.2.6.tar.gz was saved
-3. tar xzf OrthoFinder_v0.2.6.tar.gz
-4. cd OrthoFinder_v0.2.6
+1. Save OrthoFinder_v0.2.8.tar.gz 
+2. Open a terminal and cd to the directory where OrthoFinder_v0.2.8.tar.gz was saved
+3. tar xzf OrthoFinder_v0.2.8.tar.gz
+4. cd OrthoFinder_v0.2.8
 5. python orthofinder.py -f ExampleDataset/
 6. If everything was successful the output generated will end with a line giving the location of the results file containing the orthologous groups.
 
