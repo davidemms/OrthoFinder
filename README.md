@@ -62,6 +62,7 @@ mcl is available in the repositories for some linux distributions and so can be 
 Setting up and running OrthoFinder
 ==================================
 Once the required dependencies have been installed, OrthoFinder can be setup and run on the small example data included in the package as follows:
+
 1. Save OrthoFinder_v0.2.6.tar.gz 
 2. Open a terminal and cd to the directory where OrthoFinder_v0.2.6.tar.gz was saved
 3. tar xzf OrthoFinder_v0.2.6.tar.gz
