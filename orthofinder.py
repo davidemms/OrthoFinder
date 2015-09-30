@@ -261,7 +261,7 @@ class MCL:
     def CreateOGs(predictedOGs, outputFilename, idDict):
         with open(outputFilename, 'wb') as outputFile:
             for iOg, og in enumerate(predictedOGs):
-                outputFile.write("OG%06d:" % iOg)
+                outputFile.write("OG%07d:" % iOg)
                 for seq in og:
                     outputFile.write(" " + idDict[seq])
                 outputFile.write("\n")
