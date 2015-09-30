@@ -62,10 +62,11 @@ mcl is available in the repositories for some linux distributions and so can be 
 Setting up and running OrthoFinder
 ==================================
 Once the required dependencies have been installed, OrthoFinder can be setup and run on the small example data included in the package as follows:
-1. Save OrthoFinder_v0.2.6.tar.gz 
-2. Open a terminal and cd to the directory where OrthoFinder_v0.2.6.tar.gz was saved
-3. tar xzf OrthoFinder_v0.2.6.tar.gz
-4. cd OrthoFinder_v0.2.6
+
+1. Save OrthoFinder_v0.2.8.tar.gz 
+2. Open a terminal and cd to the directory where OrthoFinder_v0.2.8.tar.gz was saved
+3. tar xzf OrthoFinder_v0.2.8.tar.gz
+4. cd OrthoFinder_v0.2.8
 5. python orthofinder.py -f ExampleDataset/
 6. If everything was successful the output generated will end with a line giving the location of the results file containing the orthologous groups.
 
@@ -166,11 +167,11 @@ Output orthologous groups using the orthoxml format
 ===================================================
 Orthologous groups can be output using the orthoxml format. This is requested by adding '-x speciesInfoFilename' to the command used to call orthofinder, where speciesInfoFilename should be the filename (including the path if necessary) of a user prepared file providing the information about the species that is required by the orthoxml format. This file should contain one line per species and each line should contain the following 5 fields separated by tabs:
 
-fasta filename: the filename (without path) of the fasta file for the species described on this line
-species name: the name of the species
-NCBI Taxon ID: the NCBI taxon ID for the species
-source database name: the name of the database from which the fasta file was obtained (e.g. Ensembl)
-database fasta filename: the name given to the fasta file by the database (e.g. Homo_sapiens.NCBI36.52.pep.all.fa)
+1. **fasta filename**: the filename (without path) of the fasta file for the species described on this line
+2. **species name**: the name of the species
+3. **NCBI Taxon ID**: the NCBI taxon ID for the species
+4. **source database name**: the name of the database from which the fasta file was obtained (e.g. Ensembl)
+5. **database fasta filename**: the name given to the fasta file by the database (e.g. Homo_sapiens.NCBI36.52.pep.all.fa)
 
 so a single line of the file could look like this (where each field has been separated by a tab rather than just spaces):
 ```
