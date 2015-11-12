@@ -14,7 +14,7 @@ import glob
 
 import orthofinder    
 
-version = "0.2.8"
+version = "0.2.9"
 nProcessesDefault = 16
     
 
@@ -109,7 +109,7 @@ class TreesForOrthogroups(object):
         self.orthofinderWorkingDir = orthofinderWorkingDir
     
     def Align_linsi(self, fasta, alignedFasta, alignmentReport, nThreads=1):
-        return "mafft-linsi --anysymbol --thread %d %s > %s 2> %s" % (nThreads, fasta, alignedFasta, alignmentReport)   
+        return "mafft --localpair --maxiterate 1000 --anysymbol --thread %d %s > %s 2> %s" % (nThreads, fasta, alignedFasta, alignmentReport)   
         
     def Align_mafft(self, fasta, alignedFasta, alignmentReport, nThreads=1):
         """ For larger numbers of sequences (>500 perhaps)"""
@@ -165,9 +165,9 @@ class TreesForOrthogroups(object):
             print("ERROR: Cannot run mafft")
             print("Please check MAFFT is installed and that the executables are in the system path\n")
             return False
-        if not orthofinder.CanRunCommand("mafft-linsi %s" % testFN, qAllowStderr=True):
-            print("ERROR: Cannot run mafft-linsi")
-            print("Please check mafft-linsi is installed and that the executables are in the system path\n")
+        if not orthofinder.CanRunCommand("mafft %s" % testFN, qAllowStderr=True):
+            print("ERROR: Cannot run mafft")
+            print("Please check mafft is installed and that the executables are in the system path\n")
             return False
         if not orthofinder.CanRunCommand("FastTree %s" % testFN, qAllowStderr=True):
             print("ERROR: Cannot run FastTree")
