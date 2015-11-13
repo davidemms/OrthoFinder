@@ -14,7 +14,7 @@ import glob
 
 import orthofinder    
 
-version = "0.2.9"
+version = "0.3.0"
 nProcessesDefault = 16
     
 
@@ -232,8 +232,23 @@ def PrintHelp():
 
 def GetIDsDict(orthofinderWorkingDir):
     # sequence IDs
-    idExtract = orthofinder.FirstWordExtractor(orthofinderWorkingDir + "SequenceIDs.txt")
-    idDict = idExtract.GetIDToNameDict()
+    idsFilename = orthofinderWorkingDir + "SequenceIDs.txt"
+    try:
+        idExtract = orthofinder.FirstWordExtractor(idsFilename)
+        idDict = idExtract.GetIDToNameDict()
+    except RuntimeError as error:
+        print(error.message)
+        if error.message.startswith("ERROR"):
+            print("ERROR: %s contains a duplicate ID. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, idsFilename))
+            orthofinder.Fail()
+        else:
+            print("Tried to use only the first part of the accession in order to list the sequences in each orthologous group more concisely but these were not unique. Will use the full accession line instead.")     
+            try:
+                idExtract = orthofinder.FullAccession(idsFilename)
+                idDict = idExtract.GetIDToNameDict()
+            except:
+                print("ERROR: %s contains a duplicate ID. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, idsFilename))
+                orthofinder.Fail()
     
     # species names
     speciesDict = dict()

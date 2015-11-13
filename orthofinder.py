@@ -44,7 +44,7 @@ import xml.etree.ElementTree as ET              # Y
 from xml.etree.ElementTree import SubElement    # Y
 from xml.dom import minidom                     # Y
 
-version = "0.2.9"
+version = "0.3.0"
 if sys.platform.startswith("linux"):
     with open(os.devnull, "w") as f:
         subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f) # get round problem with python multiprocessing library that can set all cpu affinities to a single cpu
@@ -799,7 +799,7 @@ def AnalyseSequences(workingDirectory, nSeqs, nSpecies, speciesStartingIndices, 
     wfAlg = WaterfallMethod(workingDirectory, workingDirectory, nSeqs, nSpecies, speciesStartingIndices)
     wfAlg.RunWaterfallMethod(graphFilename)
 
-def WriteOrthogroupFiles(ogs, idsFilename, resultsBaseFilename):
+def WriteOrthogroupFiles(ogs, idsFilename, resultsBaseFilename, clustersFilename_pairs):
     outputFN = resultsBaseFilename + ".txt"
     try:
         idExtract = FirstWordExtractor(idsFilename)
@@ -808,7 +808,7 @@ def WriteOrthogroupFiles(ogs, idsFilename, resultsBaseFilename):
     except RuntimeError as error:
         print(error.message)
         if error.message.startswith("ERROR"):
-            print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename, idsFilename))
+            print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
             Fail()
         else:
             print("Tried to use only the first part of the accession in order to list the sequences in each orthologous group more concisely but these were not unique. Will use the full accession line instead.")     
@@ -817,7 +817,7 @@ def WriteOrthogroupFiles(ogs, idsFilename, resultsBaseFilename):
                 idDict = idExtract.GetIDToNameDict()
                 MCL.CreateOGs(ogs, outputFN, idDict)   
             except:
-                print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename, idsFilename))
+                print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
                 Fail()
     return idDict
 
@@ -1151,7 +1151,7 @@ if __name__ == "__main__":
     print(  "----------------------------------------")
     PrintCitation()
     ogs = MCL.GetPredictedOGs(clustersFilename_pairs)
-    idsDict = WriteOrthogroupFiles(ogs, idsFilename, resultsBaseFilename)
+    idsDict = WriteOrthogroupFiles(ogs, idsFilename, resultsBaseFilename, clustersFilename_pairs)
     CreateOrthogroupTable(ogs, idsDict, workingDirectory + "SpeciesIDs.txt", resultsBaseFilename)
     if qXML:
         numbersOfSequences = list(np.diff(speciesStartingIndices))
