@@ -44,7 +44,7 @@ import xml.etree.ElementTree as ET              # Y
 from xml.etree.ElementTree import SubElement    # Y
 from xml.dom import minidom                     # Y
 
-version = "0.3.0"
+version = "0.3.1"
 if sys.platform.startswith("linux"):
     with open(os.devnull, "w") as f:
         subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f) # get round problem with python multiprocessing library that can set all cpu affinities to a single cpu
@@ -526,8 +526,7 @@ class BlastFileProcessor(object):
                         currentSequenceLength += len(row.rstrip())
             sequenceLengths[iCurrentSpecies][iCurrentSequence] = currentSequenceLength
         return sequenceLengths
-        
-            
+                   
     def GetBLAST6Scores(self, iSpecies, jSpecies): 
         nSeqs_i = self.NumberOfSequences(iSpecies)
         nSeqs_j = self.NumberOfSequences(jSpecies)
@@ -541,8 +540,14 @@ class BlastFileProcessor(object):
                 qSameSequence = (species1ID == species2ID and sequence1ID == sequence2ID)
                 if qSameSequence:
                     continue
-                if score > B[sequence1ID, sequence2ID]: 
-                    B[sequence1ID, sequence2ID] = score   
+                try:
+                    if score > B[sequence1ID, sequence2ID]: 
+                        B[sequence1ID, sequence2ID] = score   
+                except:
+                    def ord(n):
+                        return str(n)+("th" if 4<=n%100<=20 else {1:"st",2:"nd",3:"rd"}.get(n%10, "th"))
+                    print("\nError in input files, expected only %d sequences in species %d and %d sequences in species %d but found a hit in the BLAST%d_%d.txt between sequence %d_%d (i.e. %s sequence in species) and sequence %d_%d (i.e. %s sequence in species)" %  (nSeqs_i, iSpecies, nSeqs_j, jSpecies, iSpecies, jSpecies, iSpecies, sequence1ID, ord(sequence1ID+1), jSpecies, sequence2ID, ord(sequence2ID+1)))
+                    Fail()
         return B     
     
 
@@ -1135,6 +1140,8 @@ if __name__ == "__main__":
     p = multiprocessing.Process(target=AnalyseSequences, args=(workingDirectory, nSeqs, nSpecies, speciesStartingIndices, graphFilename))
     p.start()
     p.join()
+    if p.exitcode != 0:
+        Fail()
     
     
     
