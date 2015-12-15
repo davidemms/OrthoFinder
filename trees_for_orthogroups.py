@@ -14,7 +14,7 @@ import glob
 
 import orthofinder    
 
-version = "0.3.1"
+version = "0.3.2"
 nProcessesDefault = 16
     
 

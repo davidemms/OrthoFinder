@@ -531,25 +531,42 @@ class BlastFileProcessor(object):
         nSeqs_i = self.NumberOfSequences(iSpecies)
         nSeqs_j = self.NumberOfSequences(jSpecies)
         B = sparse.lil_matrix((nSeqs_i, nSeqs_j))
-        with open(self.filesDirectory + "Blast%d_%d.txt" % (iSpecies, jSpecies), 'rb') as blastfile:
-            blastreader = csv.reader(blastfile, delimiter='\t')
-            for row in blastreader:    
-                species1ID, sequence1ID = map(int, row[0].split(self.sep, 1)) 
-                species2ID, sequence2ID = map(int, row[1].split(self.sep, 1))     
-                score = float(row[11])   
-                qSameSequence = (species1ID == species2ID and sequence1ID == sequence2ID)
-                if qSameSequence:
-                    continue
-                try:
-                    if score > B[sequence1ID, sequence2ID]: 
-                        B[sequence1ID, sequence2ID] = score   
-                except:
-                    def ord(n):
-                        return str(n)+("th" if 4<=n%100<=20 else {1:"st",2:"nd",3:"rd"}.get(n%10, "th"))
-                    print("\nError in input files, expected only %d sequences in species %d and %d sequences in species %d but found a hit in the BLAST%d_%d.txt between sequence %d_%d (i.e. %s sequence in species) and sequence %d_%d (i.e. %s sequence in species)" %  (nSeqs_i, iSpecies, nSeqs_j, jSpecies, iSpecies, jSpecies, iSpecies, sequence1ID, ord(sequence1ID+1), jSpecies, sequence2ID, ord(sequence2ID+1)))
-                    Fail()
-        return B     
-    
+        row = ""
+        try:
+            with open(self.filesDirectory + "Blast%d_%d.txt" % (iSpecies, jSpecies), 'rb') as blastfile:
+                blastreader = csv.reader(blastfile, delimiter='\t')
+                for row in blastreader:    
+                    # Get hit and query IDs
+                    try:
+                        species1ID, sequence1ID = map(int, row[0].split(self.sep, 1)) 
+                        species2ID, sequence2ID = map(int, row[1].split(self.sep, 1))     
+                    except (IndexError, ValueError):
+                        sys.stderr.write("\nERROR: Query or hit sequence ID was missing or incorrectly formatted.\n")
+                        raise
+                    # Get bit score for pair
+                    try:
+                        score = float(row[11])   
+                    except (IndexError, ValueError):
+                        sys.stderr.write("\nERROR: 12th field in BLAST results file line should be the bit-score for the hit\n")
+                        raise
+                    qSameSequence = (species1ID == species2ID and sequence1ID == sequence2ID)
+                    if qSameSequence:
+                        continue
+                    # store bit score
+                    try:
+                        if score > B[sequence1ID, sequence2ID]: 
+                            B[sequence1ID, sequence2ID] = score   
+                    except IndexError:
+                        def ord(n):
+                            return str(n)+("th" if 4<=n%100<=20 else {1:"st",2:"nd",3:"rd"}.get(n%10, "th"))
+                        sys.stderr.write("\nError in input files, expected only %d sequences in species %d and %d sequences in species %d but found a hit in the Blast%d_%d.txt between sequence %d_%d (i.e. %s sequence in species) and sequence %d_%d (i.e. %s sequence in species)\n" %  (nSeqs_i, iSpecies, nSeqs_j, jSpecies, iSpecies, jSpecies, iSpecies, sequence1ID, ord(sequence1ID+1), jSpecies, sequence2ID, ord(sequence2ID+1)))
+                        raise
+        except Exception:
+            sys.stderr.write("Malformatted line in BLAST results file. Fields in offending line were:\n")
+            sys.stderr.write(str(row) + "\n")
+            sys.stderr.write("Error in Blast%d_%d.txt\n" % (iSpecies, jSpecies))
+            Fail()
+        return B       
 
 """
 WaterfallMethod
@@ -580,7 +597,7 @@ class WaterfallMethod:
             self.DumpMatrixArray("B", Bi, iSpecies)
             BH = self.thisBfp.GetBH_s(Bi, iSpecies)
             self.DumpMatrixArray("BH", BH, iSpecies)
-            util.PrintTime("Initial processing of species %d" % iSpecies)
+            util.PrintTime("Initial processing of species %d complete" % iSpecies)
         
         for iSpecies in xrange(self.thisBfp.nSpecies):
             # calculate RBH for species i
