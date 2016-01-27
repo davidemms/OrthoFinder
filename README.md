@@ -33,7 +33,7 @@ OrthoFinder generates three output files
 
 **2) OrthologousGroups.txt** is a tab seperated text file that is identical in foramt to the output file from OrthoMCL. This enables OrthoFinder to easily slot into esiting bioinforamtic pipelines
 
-**3) OrthologousGroups_UnassignedGenes.csv** is is a comma seperated text file that is identical in format to OrthologousGroups.csv but contains all of the genes that were not assigned to any orthogroup.
+**3) OrthologousGroups_UnassignedGenes.csv** is a comma seperated text file that is identical in format to OrthologousGroups.csv but contains all of the genes that were not assigned to any orthogroup.
 
 
 Installing Dependencies
