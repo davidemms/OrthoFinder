@@ -23,6 +23,8 @@ For example, if you want to run it using 16 processors in parallel on the exampl
 
 Once complete your results will be in ExampleDataset/Results_\<date\>/OrthologoueGroups.txt
 
+For details on running OrthoFinder from pre-computed BLAST search results see below.
+
 Output File Format
 ==================
 OrthoFinder generates three output files 
@@ -33,7 +35,6 @@ OrthoFinder generates three output files
 
 3) **OrthologousGroups_UnassignedGenes.csv** is is a comma seperated text file that is identical in format to **OrthologousGroups.csv** but contains all of the genes that were not assigned to any orthogroup.
 
-For details on running OrthoFinder from pre-computed BLAST search results see below.
 
 Installing Dependencies
 =======================
