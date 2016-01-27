@@ -21,7 +21,7 @@ For example, if you want to run it using 16 processors in parallel on the exampl
 
 **python orthofinder.py -f ExampleDataset -t 16**
 
-Once complete your results will be in ExampleDataset/Results_\<date\>/OrthologoueGroups.txt
+Once complete your results will be in ExampleDataset/Results_\<date\>/
 
 For details on running OrthoFinder from pre-computed BLAST search results see below.
 
