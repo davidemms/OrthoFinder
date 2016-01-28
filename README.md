@@ -9,7 +9,9 @@ https://github.com/davidemms/OrthoFinder
 
 What's New
 ==========
-Sept. 2015: Added the **trees_for_orthogroups.py** utility to automatically calculate multiple sequence alignments and gene trees for the orthogroups calcualted using OrthoFinder.
+**Jan. 2016**: Added the ability to **add and remove species**.
+
+**Sept. 2015**: Added the **trees_for_orthogroups.py** utility to automatically calculate multiple sequence alignments and gene trees for the orthogroups calcualted using OrthoFinder.
 
 Usage
 =====
