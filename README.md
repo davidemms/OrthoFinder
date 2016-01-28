@@ -23,7 +23,11 @@ For example, if you want to run it using 16 processors in parallel on the exampl
 
 Once complete your results will be in ExampleDataset/Results_\<date\>/
 
-For details on running OrthoFinder from pre-computed BLAST search results see below.
+See below for details on:
+- adding extra species to a previous analysis
+- quickly running OrthoFinder on a subset of species from a previous analysis
+- running OrthoFinder from pre-computed BLAST search results
+- preparing files in the format required by OrthoFinder so you can run the BLAST searches yourself
 
 Output File Format
 ==================
@@ -87,11 +91,33 @@ where:
 directory_containing_fasta_files is a directory containing the fasta files (with filename extensions .fa or .fasta) for the species of interest, one species per fasta file. It is best to use a fasta file with only the longest transcript variant per gene.
 number_of_processes is an optional argument that can be used to run the initial BLAST all-versus-all queries in parallel. As the BLAST queries are by far the time-consuming step it is best to use at least as many BLAST processes as there are CPUs on the machine. 
 
+Adding extra species
+====================
+OrthoFinder allows you to add extra species to an analysis without re-running the time-consuming BLAST searches:
+
+**python orthofinder.py -b previous_orthofinder_directory_containing_blast_results -f new_fasta_directory**
+
+Will add each species from the new_fasta_directory to existing set of species, reuse all the previous BLAST results, perform only the new BLAST searches required for the new species and recalculate the orthogroups.
+
+Removing Species
+================
+OrthoFinder allows you to remove species from a previous analysis. In the WorkingDirectory from a previous analysis there is a file called SpeciesIDs.txt. Comment out any species to be removed from the analysis using a '#' character and then run OrthoFinder using: 
+
+**python orthofinder.py -b previous_orthofinder_directory_containing_blast_results**
+
+Preparing files without running BLAST or calculating orthogroups
+================================================================
+The '-p' option will prepare the files in the format required by OrthoFinder and print the set of BLAST searches that need to be performed. This is useful if you want to manage the BLAST searches yourself. For example, you may want to distribute them across multiple machines. When the BLAST searches have been completed then orthogroups can be calcualted as described in the section, "Using pre-computed BLAST results".
+
 Using pre-computed BLAST results
 ================================
-It is possible to run OrthoFinder with pre-computed BLAST results provided they are in the format specified below. The command is simply:
+It is possible to run OrthoFinder with pre-computed BLAST results provided they are in the correct format. The command is simply:
 
 **python orthofinder.py -b directory_with_processed_fasta_and_blast_results**
+
+The correctly formatted files can be prepared as described in the section, "Preparing files without running BLAST or calculating orthogroups". The files from a successful run of OrthoFinder are also in the required format and so can be used for follow-on analyses. 
+
+These above two methods are strongly recommended for preparing files for use with the "-b" option. For completeness, the required files and their formats are described below.
 
 The files that must be in directory_with_processed_fasta_and_blast_results are:
 - a fasta file for each species
@@ -167,7 +193,7 @@ The SpeciesIDs.txt file gives the translation from the IDs for the species to th
 3: Mycoplasma_hyopneumoniae_AE017243.faa
 ```
 
-Orthobench with pre-computer BLAST results 
+Orthobench with pre-computed BLAST results 
 ------------------------------------------
 The BLAST pre-calculated BLAST results files etc. for the Orthobench dataset are available for download as are the original fasta files. 
 

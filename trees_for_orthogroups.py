@@ -14,7 +14,7 @@ import glob
 
 import orthofinder    
 
-version = "0.3.2"
+version = "0.4.0"
 nProcessesDefault = 16
     
 
@@ -213,21 +213,23 @@ class TreesForOrthogroups(object):
         print("Gene trees have been written to:\n   %s\n" % (self.baseOutputDir + "Trees/"))
  
 def PrintHelp():
-    print("Usage:\n")    
-    print("python AlignmentsAndTrees.py orthofinder_results_directory [-t max_number_of_threads]")
-    print("python AlignmentsAndTrees.py -h")
+    print("Usage")    
+    print("-----")
+    print("python trees_for_orthogroups.py orthofinder_results_directory [-t max_number_of_threads]")
+    print("python trees_for_orthogroups.py -h")
     print("\n")
     
-    print("Arguments:\n")
+    print("Arguments")
+    print("---------")
     print("""orthofinder_results_directory
-   Generate multiple sequence alignments and trees for the orthogroups in orthofinder_results_directory.\n""")
+    Generate multiple sequence alignments and trees for the orthogroups in orthofinder_results_directory.\n""")
     
     print("""-t max_number_of_threads, --threads max_number_of_threads
-   The maximum number of processes to be run simultaneously. The deafult is %d but this 
-   should be increased by the user to the maximum number of cores available.\n""" % nProcessesDefault)
+    The maximum number of processes to be run simultaneously. The deafult is %d but this 
+    should be increased by the user to the maximum number of cores available.\n""" % nProcessesDefault)
         
     print("""-h, --help
-   Print this help text\n""")
+   Print this help text""")
     orthofinder.PrintCitation()   
 
 def GetIDsDict(orthofinderWorkingDir):
@@ -260,6 +262,70 @@ def GetIDsDict(orthofinderWorkingDir):
     idDict = {seqID:speciesDict[seqID.split("_")[0]] + "_" + name for seqID, name in idDict.items()}
     return idDict    
 
+def GetOGsFile(userArg):
+    """returns the WorkingDirectory, ResultsDirectory and clusters_id_pairs filename"""
+    qSpecifiedResultsFile = False
+    if userArg == None:
+        print("ERROR: orthofinder_results_directory has not been specified")
+        orthofinder.Fail()
+    if os.path.isfile(userArg):
+        fn = os.path.split(userArg)[1]
+        if ("clusters_OrthoFinder_" not in fn) or ("txt_id_pairs.txt" not in fn):
+            print("ERROR:\n    %s\nis neither a directory or a clusters_OrthoFinder_*.txt_id_pairs.txt file." % userArg)
+            orthofinder.Fail()
+        qSpecifiedResultsFile = True
+        # user has specified specific results file
+    elif userArg[-1] != os.path.sep: 
+        userArg += os.path.sep
+    
+    # find required files
+    if qSpecifiedResultsFile:
+        orthofinderWorkingDir = os.path.split(userArg)[0] + os.sep
+        if not IsWorkingDirectory(orthofinderWorkingDir):
+            print("ERROR: cannot find files from OrthoFinder run in directory:\n   %s" % orthofinderWorkingDir)
+            orthofinder.Fail()
+    else:
+        orthofinderWorkingDir = os.path.split(userArg)[0] if qSpecifiedResultsFile else userArg
+        if not IsWorkingDirectory(orthofinderWorkingDir):
+            orthofinderWorkingDir = userArg + "WorkingDirectory" + os.sep   
+            if not IsWorkingDirectory(orthofinderWorkingDir):
+                print("ERROR: cannot find files from OrthoFinder run in directory:\n   %s\nor\n   %s\n" % (userArg, orthofinderWorkingDir))
+                orthofinder.Fail()
+            
+    if qSpecifiedResultsFile:
+        print("Generating trees for orthogroups in file:\n    %s" % userArg)
+        return orthofinderWorkingDir, orthofinderWorkingDir, userArg
+    else:     
+        # identify orthogroups file
+        clustersFiles = glob.glob(orthofinderWorkingDir + "clusters_OrthoFinder_*.txt_id_pairs.txt")
+        orthogroupFiles = glob.glob(orthofinderWorkingDir + "OrthologousGroups*.txt") 
+        if orthofinderWorkingDir != userArg:
+            orthogroupFiles += glob.glob(userArg + "OrthologousGroups*.txt")
+        # User may have specified a WorkingDirectory and results could be in directory above
+        if len(orthogroupFiles) < len(clustersFiles):
+            orthogroupFiles += glob.glob(userArg + ".." + os.sep + "OrthologousGroups*.txt")
+        clustersFiles = sorted(clustersFiles)
+        orthogroupFiles = sorted(orthogroupFiles)
+        if len(clustersFiles) > 1 or len(orthogroupFiles) > 1:
+            print("ERROR: Results from multiple OrthoFinder runs found\n")
+            print("Tab-delimiter OrthologousGroups*.txt files:")
+            for fn in orthogroupFiles:
+                print("    " + fn)
+            print("With corresponding cluster files:")
+            for fn in clustersFiles:
+                print("    " + fn)
+            print("\nPlease run with only one set of results in directories or specifiy the specific clusters_OrthoFinder_*.txt_id_pairs.txt file on the command line")
+            orthofinder.Fail()        
+            
+        if len(clustersFiles) != 1 or len(orthogroupFiles) != 1:
+            print("ERROR: Results not found in <orthofinder_results_directory> or <orthofinder_results_directory>/WorkingDirectory")
+            print("\nCould not find:\n    OrthologousGroups*.txt\nor\n    clusters_OrthoFinder_*.txt_id_pairs.txt")
+            orthofinder.Fail()
+            
+        print("Generating trees for orthogroups in file:\n    %s" % orthogroupFiles[0])
+        print("and corresponding clusters file:\n    %s" % clustersFiles[0])
+        return orthofinderWorkingDir, userArg, clustersFiles[0]
+
 if __name__ == "__main__":
     print("\nOrthoFinder Alignments and Trees version %s Copyright (C) 2015 David Emms\n" % version)
     print("""    This program comes with ABSOLUTELY NO WARRANTY.
@@ -276,7 +342,7 @@ if __name__ == "__main__":
         orthofinder.Fail()
 
     # Get arguments    
-    orthofinderResultsDir = None
+    userDir = None
     nProcesses = None
     
     args = sys.argv[1:]    
@@ -293,19 +359,10 @@ if __name__ == "__main__":
                 print("Incorrect argument for number of threads: %s" % arg)
                 orthofinder.Fail()   
         else:
-            orthofinderResultsDir = arg
+            userDir = arg
     
     # Check arguments
-    if orthofinderResultsDir == None:
-        print("ERROR: orthofinder_results_directory has not been specified")
-        orthofinder.Fail()
-    if orthofinderResultsDir[-1] != os.path.sep: orthofinderResultsDir += os.path.sep
-    
-    orthogroupsFile = orthofinderResultsDir + "OrthologousGroups.txt"
-    print("Generating trees for orthogroups in file:\n   %s\n" % orthogroupsFile)
-    if not os.path.exists(orthogroupsFile):
-        print("ERROR: Orthogroups file was not found in orthofinder_results_directory. Could not find:\n   %s\n" % orthogroupsFile)
-        orthofinder.Fail()
+    orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = GetOGsFile(userDir)
 
     if nProcesses == None:
         print("""Number of parallel processes has not been specified, will use the default value.  
@@ -313,14 +370,6 @@ if __name__ == "__main__":
         nProcesses = nProcessesDefault
     print("Using %d threads for alignments and trees\n" % nProcesses)
     
-    orthofinderWorkingDir = orthofinderResultsDir
-    if not IsWorkingDirectory(orthofinderWorkingDir):
-        orthofinderWorkingDir = orthofinderResultsDir + "WorkingDirectory" + os.sep   
-        if not IsWorkingDirectory(orthofinderWorkingDir):
-            print("ERROR: cannot find files from OrthoFinder run in either:\n   %s\nor\n   %s\n" % (orthofinderResultsDir, orthofinderWorkingDir))
-    
-    files = glob.glob(orthofinderWorkingDir + "clusters_OrthoFinder_*.txt_id_pairs.txt")
-    clustersFilename_pairs = files[0]
     ogs = orthofinder.MCL.GetPredictedOGs(clustersFilename_pairs)     
     idDict = GetIDsDict(orthofinderWorkingDir)
     

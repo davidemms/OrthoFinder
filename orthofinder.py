@@ -44,7 +44,8 @@ import xml.etree.ElementTree as ET              # Y
 from xml.etree.ElementTree import SubElement    # Y
 from xml.dom import minidom                     # Y
 
-version = "0.3.1"
+version = "0.4.0"
+fastaExtensions = {"fa", "faa", "fasta", "fas"}
 if sys.platform.startswith("linux"):
     with open(os.devnull, "w") as f:
         subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f) # get round problem with python multiprocessing library that can set all cpu affinities to a single cpu
@@ -88,7 +89,7 @@ class util:
         while os.path.exists(newFilename):
             iAppend += 1
             newFilename = baseFilename + ("_%d" % iAppend) + ext
-        return newFilename
+        return newFilename, iAppend
     
     @staticmethod
     def PrintTime(message):
@@ -213,20 +214,20 @@ class MCL:
         return predictedOGs
         
     @staticmethod
-    def GetSingleID(speciesStartingIndices, seq):   
+    def GetSingleID(speciesStartingIndices, seq, speciesToUse):    
         iSpecies, iSeq = map(int, seq.split("_"))
-        offset = speciesStartingIndices[iSpecies]
+        offset = speciesStartingIndices[speciesToUse.index(iSpecies)]
         return iSeq + offset
         
     @staticmethod
-    def GetIDPair(speciesStartingIndices, singleID):   
+    def GetIDPair(speciesStartingIndices, singleID, speciesToUse):   
         for i, startingIndex in enumerate(speciesStartingIndices):
             if startingIndex > singleID:
-                return "%d_%d" % (i-1, singleID - speciesStartingIndices[i-1])
-        return "%d_%d" % (len(speciesStartingIndices)-1, singleID - speciesStartingIndices[len(speciesStartingIndices)-1]) 
+                return "%d_%d" % (speciesToUse[i-1], singleID - speciesStartingIndices[i-1])
+        return "%d_%d" % (speciesToUse[-1], singleID - speciesStartingIndices[len(speciesStartingIndices)-1]) 
     
     @staticmethod
-    def ConvertSingleIDsToIDPair(speciesStartingIndices, clustersFilename, newFilename):
+    def ConvertSingleIDsToIDPair(speciesStartingIndices, clustersFilename, newFilename, speciesToUse):
         with open(clustersFilename, 'rb') as clusterFile, open(newFilename, "wb") as output:
             header = True
             for line in clusterFile:
@@ -250,7 +251,7 @@ class MCL:
                     # continuation of group
                     ids = line.split()
                     for id in ids:
-                        idsString += MCL.GetIDPair(speciesStartingIndices, int(id)) + " "
+                        idsString += MCL.GetIDPair(speciesStartingIndices, int(id), speciesToUse) + " "
                     output.write(initialText + "      " + idsString)
                     if appendDollar:
                         output.write("$\n")
@@ -275,7 +276,7 @@ class MCL:
         return reparsed.toprettyxml(indent="  ")
     
     @staticmethod            
-    def WriteOrthoXML(speciesInfo, predictedOGs, numbersOfSequences, idDict, orthoxmlFilename):
+    def WriteOrthoXML(speciesInfo, predictedOGs, numbersOfSequences, idDict, orthoxmlFilename, speciesToUse):
         """ speciesInfo: ordered array for which each element has
             fastaFilename, speciesName, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile
         """
@@ -326,7 +327,7 @@ class MCL:
 #                SubElement(groupNode, 'property')                  # skip
             for seq in og:
                 geneNode = SubElement(groupNode, 'geneRef')
-                geneNode.set('id', str(MCL.GetSingleID(speciesStartingIndices, seq)))
+                geneNode.set('id', str(MCL.GetSingleID(speciesStartingIndices, seq, speciesToUse)))
 #                    SubElement(geneNode, 'score')                  # skip
         with open(orthoxmlFilename, 'wb') as orthoxmlFile:
 #            ET.ElementTree(root).write(orthoxmlFile)
@@ -403,8 +404,9 @@ BlastFileProcessor
 -------------------------------------------------------------------------------
 """   
 class BlastFileProcessor(object): 
-    def __init__(self, filesDirectory, nSeqs, nSpecies, speciesStartingIndices):     
+    def __init__(self, filesDirectory, speciesToUse, nSeqs, nSpecies, speciesStartingIndices):     
         self.filesDirectory = filesDirectory
+        self.speciesToUse = speciesToUse
         self.nSeqs = nSeqs
         self.nSpecies = nSpecies
         self.speciesStartingIndices = speciesStartingIndices
@@ -471,12 +473,22 @@ class BlastFileProcessor(object):
     
     @staticmethod        
     def GetNumberOfSequencesInFile(filename):
-        count = 0
+        lastIDLine = ""
+        sequenceStartingIndices = []
+        currentSpecies = 0
+        sequenceStartingIndices.append(0)
         with open(filename) as file:
+            count = 0
             for line in file:
                 if len(line) > 1 and line[0] == ">":
                     count+=1
-        return count
+                    lastIDLine = line
+                    thisSpecies = int(line[1:].split("_", 1)[0])
+                    if thisSpecies != currentSpecies:
+                        sequenceStartingIndices.append(count-1)
+                        currentSpecies = thisSpecies 
+        nSpecies = int(lastIDLine[1:].split("_")[0]) + 1
+        return count, nSpecies, sequenceStartingIndices
         
     def GetIDPairFromString(self, line):
         return map(int, line.split(self.sep))
@@ -485,46 +497,40 @@ class BlastFileProcessor(object):
         return (self.speciesStartingIndices[iSpecies+1] if iSpecies != self.nSpecies-1 else self.nSeqs) - self.speciesStartingIndices[iSpecies] 
   
     @staticmethod   
-    def GetNumberOfSequencesInFileFromDir(inputDirectory):
-        lastIDLine = ""
-        sequenceStartingIndices = []
-        currentSpecies = 0
-        sequenceStartingIndices.append(0)
+    def GetNumberOfSequencesInFileFromDir(inputDirectory, speciesToUse):
+        sequenceStartingIndices = [0]
         count = 0
-        for fastaFilename in util.SortFastaFilenames(glob.glob(inputDirectory + "Species*.fa")):
+        for i, iFasta in enumerate(speciesToUse):
+            fastaFilename = inputDirectory + "Species%d.fa" % iFasta
             with open(fastaFilename) as file:
                 for line in file:
                     if len(line) > 1 and line[0] == ">":
                         count+=1
-                        lastIDLine = line
-                        thisSpecies = int(line[1:].split("_", 1)[0])
-                        if thisSpecies != currentSpecies:
-                            sequenceStartingIndices.append(count-1)
-                            currentSpecies = thisSpecies 
-        nSpecies = int(lastIDLine[1:].split("_")[0]) + 1
+            sequenceStartingIndices.append(count)
+        sequenceStartingIndices = sequenceStartingIndices[:-1]
+        nSpecies = len(speciesToUse)
         return count, nSpecies, sequenceStartingIndices
         
-    def GetSequenceLengths(self):            
-        currentSequenceLength = 0
-        iCurrentSequence = -1
-        iCurrentSpecies= -1
-        qFirstLine = True
+    def GetSequenceLengths(self):                
         sequenceLengths = []
-        for i in xrange(self.nSpecies):
-            sequenceLengths.append(np.zeros(self.NumberOfSequences(i)))
-        for fastaFilename in util.SortFastaFilenames(glob.glob(self.filesDirectory + "Species*.fa")):
+        for iSpecies, iFasta in enumerate(self.speciesToUse):
+            sequenceLengths.append(np.zeros(self.NumberOfSequences(iSpecies)))
+            fastaFilename = self.filesDirectory + "Species%d.fa" % iFasta
+            currentSequenceLength = 0
+            iCurrentSequence = -1
+            qFirstLine = True
             with open(fastaFilename) as file:
                 for row in file:
                     if len(row) > 1 and row[0] == ">":    
                         if qFirstLine:
                             qFirstLine = False
                         else:
-                            sequenceLengths[iCurrentSpecies][iCurrentSequence] = currentSequenceLength
+                            sequenceLengths[iSpecies][iCurrentSequence] = currentSequenceLength
                             currentSequenceLength = 0
-                        iCurrentSpecies, iCurrentSequence = self.GetIDPairFromString(row[1:])
+                        _, iCurrentSequence = self.GetIDPairFromString(row[1:])
                     else:
                         currentSequenceLength += len(row.rstrip())
-            sequenceLengths[iCurrentSpecies][iCurrentSequence] = currentSequenceLength
+            sequenceLengths[iSpecies][iCurrentSequence] = currentSequenceLength
         return sequenceLengths
                    
     def GetBLAST6Scores(self, iSpecies, jSpecies): 
@@ -533,7 +539,7 @@ class BlastFileProcessor(object):
         B = sparse.lil_matrix((nSeqs_i, nSeqs_j))
         row = ""
         try:
-            with open(self.filesDirectory + "Blast%d_%d.txt" % (iSpecies, jSpecies), 'rb') as blastfile:
+            with open(self.filesDirectory + "Blast%d_%d.txt" % (self.speciesToUse[iSpecies], self.speciesToUse[jSpecies]), 'rb') as blastfile:
                 blastreader = csv.reader(blastfile, delimiter='\t')
                 for row in blastreader:    
                     # Get hit and query IDs
@@ -541,7 +547,7 @@ class BlastFileProcessor(object):
                         species1ID, sequence1ID = map(int, row[0].split(self.sep, 1)) 
                         species2ID, sequence2ID = map(int, row[1].split(self.sep, 1))     
                     except (IndexError, ValueError):
-                        sys.stderr.write("\nERROR: Query or hit sequence ID was missing or incorrectly formatted.\n")
+                        sys.stderr.write("\nERROR: Query or hit sequence ID in BLAST results file was missing or incorrectly formatted.\n")
                         raise
                     # Get bit score for pair
                     try:
@@ -559,12 +565,15 @@ class BlastFileProcessor(object):
                     except IndexError:
                         def ord(n):
                             return str(n)+("th" if 4<=n%100<=20 else {1:"st",2:"nd",3:"rd"}.get(n%10, "th"))
-                        sys.stderr.write("\nError in input files, expected only %d sequences in species %d and %d sequences in species %d but found a hit in the Blast%d_%d.txt between sequence %d_%d (i.e. %s sequence in species) and sequence %d_%d (i.e. %s sequence in species)\n" %  (nSeqs_i, iSpecies, nSeqs_j, jSpecies, iSpecies, jSpecies, iSpecies, sequence1ID, ord(sequence1ID+1), jSpecies, sequence2ID, ord(sequence2ID+1)))
-                        raise
+#                        sys.stderr.write("\nError in input files, expected only %d sequences in species %d and %d sequences in species %d but found a hit in the Blast%d_%d.txt between sequence %d_%d (i.e. %s sequence in species) and sequence %d_%d (i.e. %s sequence in species)\n" %  (nSeqs_i, iSpecies, nSeqs_j, jSpecies, iSpecies, jSpecies, iSpecies, sequence1ID, ord(sequence1ID+1), jSpecies, sequence2ID, ord(sequence2ID+1)))
+                        sys.stderr.write("\nERROR: Inconsistent input files.\n")
+                        kSpecies, nSeqs_k, sequencekID = (iSpecies,  nSeqs_i, sequence1ID) if sequence1ID >= nSeqs_i else (jSpecies,  nSeqs_j, sequence2ID)
+                        sys.stderr.write("Species%d.fa contains only %d sequences " % (kSpecies,  nSeqs_k)) 
+                        sys.stderr.write("but found a query/hit in the Blast%d_%d.txt for sequence %d_%d (i.e. %s sequence in species %d).\n" %  (iSpecies, jSpecies, kSpecies, sequencekID, ord(sequencekID+1), kSpecies))
+                        Fail()
         except Exception:
-            sys.stderr.write("Malformatted line in BLAST results file. Fields in offending line were:\n")
-            sys.stderr.write(str(row) + "\n")
-            sys.stderr.write("Error in Blast%d_%d.txt\n" % (iSpecies, jSpecies))
+            sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (self.filesDirectory, iSpecies, jSpecies))
+            sys.stderr.write("\t".join(row) + "\n")
             Fail()
         return B       
 
@@ -573,9 +582,10 @@ WaterfallMethod
 -------------------------------------------------------------------------------
 """   
 class WaterfallMethod:
-    def __init__(self, inputDirectory, workingDirectory, nSeqs, nSpecies, speciesStartingIndices):
-        self.thisBfp = BlastFileProcessor(inputDirectory, nSeqs, nSpecies, speciesStartingIndices)    
-        self.outputDir = workingDirectory 
+    def __init__(self, inputDirectory, outputDirectory, speciesToUse, nSeqs, nSpecies, speciesStartingIndices):
+        self.thisBfp = BlastFileProcessor(inputDirectory, speciesToUse, nSeqs, nSpecies, speciesStartingIndices)    
+        self.outputDir = outputDirectory 
+        self.speciesToUse = speciesToUse
         if not os.path.exists(self.outputDir):
            os.mkdir(self.outputDir)  
         self.picProtocol = 1
@@ -754,34 +764,86 @@ def PrintCitation():
     D.M. Emms & S. Kelly (2015), OrthoFinder: solving fundamental biases in whole genome comparisons
     dramatically improves orthogroup inference accuracy, Genome Biology 16:157.\n""")   
     
-def PrintHelp():
+def PrintHelp():  
+    print("Simple Usage") 
+    print("------------")
+    print("python orthofinder.py -f fasta_directory [-t max_number_of_threads]")
+    print("    Infers orthologous groups for the proteomes contained in fasta_directory running")
+    print("    max_number_of_threads in parallel for the BLAST searches.")
     print("")    
-    print("Usage:\n")    
-    print("python orthofinder.py -f fasta_directory [-t max_number_of_threads][-x speciesInfoFilename]")
-    print("python orthofinder.py -b precalculated_blast_results_directory [-x speciesInfoFilename]")
-    print("python orthofinder.py -h")
-    print("\n")
+    print("Advanced Usage")
+    print("--------------")
+    print("python orthofinder.py -f fasta_directory -p")
+    print("    1. Prepares files for BLAST and prints the BLAST commands. Does not perform BLAST searches")
+    print("    or infer othologous groups. Useful if you want to prepare the files in the form required by")
+    print("    OrthoFinder but want to perform the BLAST searches using a job scheduler/on a cluster and")
+    print("    then infer orthologous groups using option 2.")
+    print("")
+    print("python orthofinder.py -b precalculated_blast_results_directory ")
+    print("    2. Infers orthologous groups using pre-calculated BLAST results. These can be after BLAST")
+    print("    searches have been completed following the use of option 1 or using the WorkingDirectory")
+    print("    from a previous OrthoFinder run. Species can be commented out with a '#' in the SpeciesIDs.txt")
+    print("    file to exclude them from the analysis. See README file for details.")
+    print("")
+    print("python orthofinder.py -b precalculated_blast_results_directory -f fasta_directory")
+    print("    3. Add species from fasta_directory to a previous OrthoFinder run where precalculated_blast_results_directory")
+    print("    is the directory containing the BLAST results files etc. from the previous run.")
+    print("")
+#    print("python orthofinder.py -s precalculated_blast_results_directory")
+#    print("    4. Use a subset of species from a previous OrthoFinder run. The precalculated_blast_results_directory")
+#    print("    should contain the BLAST results files etc. plus an extra, user-supplied file 'SpeciesSubset.txt'")
+#    print("    specifying which species should be included. See README file for details.")
+#    print("")
     
-    print("Arguments:\n")
+#    print("Arguments:\n")
+#    print("""-f fasta_directory, --fasta fasta_directory
+#   Predict orthogroups for the genes in the fasta files in the fasta_directory\n""")
+#    
+#    print("""-b precalculated_blast_results_directory, --blast precalculated_blast_results_directory
+#   Predict orthogroups using the pre-calcualted BLAST results in precalculated_blast_results_directory.
+#   The directory must contain the BLAST results files, fasta files with IDs for the accessions, 
+#   SequenceIDs.txt and SpeciesIDs.txt in the formats described in the README file.\n""")
+#    
+#    print("""-t max_number_of_threads, --threads max_number_of_threads
+#   The maximum number of BLAST processes to be run simultaneously. The deafult is %d but this 
+#   should be increased by the user to at least the number of cores on the computer so as to 
+#   minimise the time taken to perform the BLAST all-versus-all queries.\n""" % nBlastDefault)
+#    
+#    print("""-x speciesInfoFilename, --orthoxml speciesInfoFilename
+#   Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.\n""")
+        
+    print("Arguments")
+    print("---------")
     print("""-f fasta_directory, --fasta fasta_directory
-   Predict orthogroups for the genes in the fasta files in the fasta_directory\n""")
+    Predict orthogroups for the proteins in the fasta files in the fasta_directory\n""")
     
     print("""-b precalculated_blast_results_directory, --blast precalculated_blast_results_directory
-   Predict orthogroups using the pre-calcualted BLAST results in precalculated_blast_results_directory.
-   The directory must contain the BLAST results files, fasta files with IDs for the accessions, 
-   SequenceIDs.txt and SpeciesIDs.txt in the formats described in the README file.\n""")
+    Predict orthogroups using the pre-calcualted BLAST results in precalculated_blast_results_directory.\n""")
     
     print("""-t max_number_of_threads, --threads max_number_of_threads
-   The maximum number of BLAST processes to be run simultaneously. The deafult is %d but this 
-   should be increased by the user to at least the number of cores on the computer so as to 
-   minimise the time taken to perform the BLAST all-versus-all queries.\n""" % nBlastDefault)
+    The maximum number of BLAST processes to be run simultaneously. The deafult is %d but this 
+    should be increased by the user to at least the number of cores on the computer so as to 
+    minimise the time taken to perform the BLAST all-versus-all queries.\n""" % nBlastDefault)
     
     print("""-x speciesInfoFilename, --orthoxml speciesInfoFilename
-   Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.\n""")
+    Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.\n""")
+    
+    print("""-p , --prepare
+    Only prepare the files in the format required by OrthoFinder and print out the BLAST searches that
+    need to be performed but don't run BLAST or infer orthologous groups\n""" )
     
     print("""-h, --help
-   Print this help text\n""")
+    Print this help text""")
     PrintCitation()
+
+def GetDirectoryArgument(arg, args):
+    if len(args) == 0:
+        print("Missing option for command line argument %s" % arg)
+        Fail()
+    directory = os.path.abspath(args.pop(0))
+    if directory[-1] != os.sep:
+        directory += os.sep
+    return directory
 
 def Fail():
     sys.exit()
@@ -789,12 +851,21 @@ def Fail():
 def AssignIDsToSequences(fastaDirectory, outputDirectory):
     idsFilename = outputDirectory + "SequenceIDs.txt"
     speciesFilename = outputDirectory + "SpeciesIDs.txt"
-    id = 0
+    iSeq = 0
     iSpecies = 0
-    allFastaFilenames = sorted([f for f in os.listdir(fastaDirectory) if os.path.isfile(os.path.join(fastaDirectory,f))])
+    # check if SpeciesIDs.txt already exists
+    if os.path.exists(speciesFilename):
+        with open(speciesFilename, 'rb') as infile:
+            for line in infile: pass
+        if line.startswith("#"): line = line[1:]
+        iSpecies = int(line.split(":")[0]) + 1
+    originalFastaFilenames = sorted([f for f in os.listdir(fastaDirectory) if os.path.isfile(os.path.join(fastaDirectory,f))])
+    originalFastaFilenames = [f for f in originalFastaFilenames if len(f.rsplit(".", 1)) == 2 and f.rsplit(".", 1)[1].lower() in fastaExtensions]
     returnFilenames = []
-    with open(idsFilename, 'wb') as idsFile, open(speciesFilename, 'wb') as speciesFile:
-        for fastaFilename in allFastaFilenames:
+    newSpeciesIDs = []
+    with open(idsFilename, 'ab') as idsFile, open(speciesFilename, 'ab') as speciesFile:
+        for fastaFilename in originalFastaFilenames:
+            newSpeciesIDs.append(iSpecies)
             outputFastaFilename = outputDirectory + "Species%d.fa" % iSpecies
             outputFasta = open(outputFastaFilename, 'wb')
             returnFilenames.append(outputFastaFilename)            
@@ -804,29 +875,36 @@ def AssignIDsToSequences(fastaDirectory, outputDirectory):
             with open(fastaDirectory + os.sep + fastaFilename, 'rb') as fastaFile:
                 for line in fastaFile:
                     if len(line) > 0 and line[0] == ">":
-                        newID = "%d_%d" % (iSpecies, id)
+                        newID = "%d_%d" % (iSpecies, iSeq)
                         idsFile.write("%s: %s" % (newID, line[1:]))
                         outputFasta.write(">%s\n" % newID)    
-                        id += 1
+                        iSeq += 1
                     else:
                         outputFasta.write(line)
                 outputFasta.write("\n")
             iSpecies += 1
-            id = 0
+            iSeq = 0
             outputFasta.close()
-    if len(allFastaFilenames) > 0: outputFasta.close()
-    return returnFilenames, allFastaFilenames, idsFilename
+    if len(originalFastaFilenames) > 0: outputFasta.close()
+    return returnFilenames, originalFastaFilenames, idsFilename, speciesFilename, newSpeciesIDs
 
-def AnalyseSequences(workingDirectory, nSeqs, nSpecies, speciesStartingIndices, graphFilename):
-    wfAlg = WaterfallMethod(workingDirectory, workingDirectory, nSeqs, nSpecies, speciesStartingIndices)
+def AnalyseSequences(inputDir, outputDir, speciesToUse, nSeqs, nSpecies, speciesStartingIndices, graphFilename):
+    wfAlg = WaterfallMethod(inputDir, outputDir, speciesToUse, nSeqs, nSpecies, speciesStartingIndices)
     wfAlg.RunWaterfallMethod(graphFilename)
 
-def WriteOrthogroupFiles(ogs, idsFilename, resultsBaseFilename, clustersFilename_pairs):
+def WriteOrthogroupFiles(ogs, idsFilenames, resultsBaseFilename, clustersFilename_pairs):
     outputFN = resultsBaseFilename + ".txt"
     try:
-        idExtract = FirstWordExtractor(idsFilename)
-        idDict = idExtract.GetIDToNameDict()
-        MCL.CreateOGs(ogs, outputFN, idDict)
+        fullDict = dict()
+        for idsFilename in idsFilenames:
+            idExtract = FirstWordExtractor(idsFilename)
+            idDict = idExtract.GetIDToNameDict()
+            fullDict.update(idDict)
+        MCL.CreateOGs(ogs, outputFN, fullDict)
+    except KeyError as e:
+        sys.stderr.write("ERROR: Sequence ID not found in %s\n" % idsFilename)
+        sys.stderr.write(str(e) + "\n")
+        Fail()        
     except RuntimeError as error:
         print(error.message)
         if error.message.startswith("ERROR"):
@@ -835,27 +913,38 @@ def WriteOrthogroupFiles(ogs, idsFilename, resultsBaseFilename, clustersFilename
         else:
             print("Tried to use only the first part of the accession in order to list the sequences in each orthologous group more concisely but these were not unique. Will use the full accession line instead.")     
             try:
-                idExtract = FullAccession(idsFilename)
-                idDict = idExtract.GetIDToNameDict()
-                MCL.CreateOGs(ogs, outputFN, idDict)   
+                fullDict = dict()
+                for idsFilename in idsFilenames:
+                    idExtract = FullAccession(idsFilename)
+                    idDict = idExtract.GetIDToNameDict()
+                    fullDict.update(idDict)
+                MCL.CreateOGs(ogs, outputFN, fullDict)   
             except:
                 print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
                 Fail()
-    return idDict
+    return fullDict
+
+def GetSpeciesToUse(speciesIDsFN):
+    speciesToUse = []
+    with open(speciesIDsFN, 'rb') as speciesF:
+        for line in speciesF:
+            if len(line) == 0 or line[0] == "#": continue
+            speciesToUse.append(int(line.split(":")[0]))
+    return speciesToUse
 
 def CreateOrthogroupTable(ogs, 
                           idToNameDict, 
                           speciesFilename, 
+                          speciesToUse,
                           resultsBaseFilename):
     
     speciesNamesDict = dict()
     with open(speciesFilename, 'rb') as speciesNamesFile:
         for line in speciesNamesFile:
+            if line.startswith("#"): continue
             short, full = line.rstrip().split(": ")
             speciesNamesDict[int(short)] = full    
-    nSpecies = len(speciesNamesDict)
-    speciesOrder = range(nSpecies)    
-    
+    nSpecies = len(speciesNamesDict) 
     
     ogs_names = [[idToNameDict[seq] for seq in og] for og in ogs]
     ogs_ints = [[map(int, sequence.split("_")) for sequence in og] for og in ogs]
@@ -867,7 +956,7 @@ def CreateOrthogroupTable(ogs,
         fileWriter = csv.writer(outputFile, delimiter="\t")
         singleGeneWriter = csv.writer(singleGeneFile, delimiter="\t")
         for writer in [fileWriter, singleGeneWriter]:
-            row = [""] + [speciesNamesDict[index] for index in speciesOrder]
+            row = [""] + [speciesNamesDict[index] for index in speciesToUse]
             writer.writerow(row)
         
         for iOg, (og, og_names) in enumerate(zip(ogs_ints, ogs_names)):
@@ -877,28 +966,32 @@ def CreateOrthogroupTable(ogs,
             # separate it into sequences from each species
             if len(og) == 1:
                 rows.extend(['' for x in xrange(nSpecies)])
-                rows[og[0][0] + 1] = og_names[0]
+                rows[speciesToUse.index(og[0][0]) + 1] = og_names[0]
                 thisOutputWriter = singleGeneWriter
             else:
                 for (iSpecies, iSequence), name in zip(og, og_names):
-                    ogDict[speciesOrder.index(iSpecies)].append(name)
+                    ogDict[speciesToUse.index(iSpecies)].append(name)
                 for iSpecies in xrange(nSpecies):
                     rows.append(", ".join(ogDict[iSpecies]))
             thisOutputWriter.writerow(rows)
     print("""Orthologous groups have been written to tab-delimited files:\n   %s\n   %s""" % (outputFilename, singleGeneFilename))
     print("""And in OrthoMCL format:\n   %s""" % (outputFilename[:-3] + "txt"))
             
-def GetOrderedBlastCommands(fastaFilenames, blastDBs, workingDirectory):
+#def GetOrderedBlastCommands(fastaFilenames, blastDBs, workingDirectory):
+def GetOrderedBlastCommands(previousFastaFiles, newFastaFiles, workingDir):
     """ Using the nSeq1 x nSeq2 as a rough estimate of the amount of work required for a given species-pair, returns the commands 
     ordered so that the commands predicted to take the longest come first. This allows the load to be balanced better when processing 
     the BLAST commands.
     """
-    nSeqs = [BlastFileProcessor.GetNumberOfSequencesInFile(fastaFN) for fastaFN in fastaFilenames]
-    nSpecies = len(fastaFilenames)
-    speciesPairs = [(i, j) for i, j in itertools.product(xrange(nSpecies), xrange(nSpecies))]
+    iSpeciesPrevious = [int(fn[fn.rfind("Species") + 7:].split(".")[0]) for fn in previousFastaFiles]
+    iSpeciesNew = [int(fn[fn.rfind("Species") + 7:].split(".")[0]) for fn in newFastaFiles]
+    nSeqs = {i:BlastFileProcessor.GetNumberOfSequencesInFile(workingDir + "Species%d.fa" % i)[0] for i in (iSpeciesPrevious+iSpeciesNew)}
+    speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew)] + \
+                   [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesPrevious)] + \
+                   [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew)] 
     taskSizes = [nSeqs[i]*nSeqs[j] for i,j in speciesPairs]
     taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
-    commands = [["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", fastaFilenames[iFasta], "-db", blastDBs[iDB], "-out", "%sBlast%d_%d.txt" % (workingDirectory, iFasta, iDB)]
+    commands = [["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", workingDir + "Species%d.fa" % iFasta, "-db", workingDir + "BlastDBSpecies%d" % iDB, "-out", "%sBlast%d_%d.txt" % (workingDir, iFasta, iDB)]
                     for iFasta, iDB in speciesPairs]               
 
     return commands
@@ -916,45 +1009,39 @@ if __name__ == "__main__":
         PrintHelp()
         sys.exit()
              
-    # default arguments 
+    # Control
     nBlast = nBlastDefault
-    usePreviousBlast = False
+    qUsePrecalculatedBlast = False  # remove, just store BLAST to do
+    qUseFastaFiles = False  # local to argument checking
     qXML = False
-    resultsBaseFilename = ""            # ...../OrthologousGroups.txt
-    workingDirectory = ""           # location for all fasta files, blast results, species IDs and outputs for runnning of algorithm
     qOnlyPrepare = False
+#    qUseSubset = False # forget once arguments parsed and have decided what the BLAST files are (Effectively part of BLASTFileProcessor)
+                     
+    # Files         
+    fastaDir = None             # Where to find the original fasta files        # replace with list of files
+    resultsDir = None           # Where to put the redults files
+    workingDir_previous = None  # where to find original Blast, processed fasta etc
+    workingDir = ""             # where to put all new files 
+    previousFastaFiles = []
+    newFastaFiles = []
+    speciesToUse = []
     
-    # Parse command line arguments
-    args = sys.argv[1:]    
-    firstArg = args.pop(0)
-    # Compulsory arguments
-    if firstArg == "-f" or firstArg == "--fasta" or firstArg == "-p" or firstArg =="prepare":
-        if firstArg == "-p":
-            qOnlyPrepare = True
-        if len(args) == 0:
-            print("Missing option for command line argument -f")
-            Fail()
-        originalFastaDirectory = args.pop(0)
-        if originalFastaDirectory[-1] != os.sep:
-            originalFastaDirectory += os.sep
-    elif firstArg == "-b" or firstArg == "--blast":
-        if len(args) == 0:
-            print("Missing option for command line argument -p")
-            Fail()
-        usePreviousBlast = True
-        workingDirectory = args.pop(0)
-    else:
-        print("ERROR: First argument should either be -h to display usage information, "
-              "-f to run OrthoFinder from the beginning including BLAST all-versus-all queries or "
-              "-b to run OrthoFinder using pre-calcualted BLAST results prepared in the format specified "
-              "in the README file.\n")
-#        PrintHelp()
-        Fail()
-
-    # Optional arguments
-    while len(args) != 0:
-        arg = args.pop(0)
-        if arg == "-t" or arg == "--threads":
+    args = sys.argv[1:]
+    while len(args) > 0:
+        arg = args.pop(0)    
+        if arg == "-f" or arg == "--fasta":
+            if qUseFastaFiles:
+                print("Repeated argument: -f/--fasta")
+                Fail()
+            qUseFastaFiles = True
+            fastaDir = GetDirectoryArgument(arg, args)
+        elif arg == "-b" or arg == "--blast":
+            if qUsePrecalculatedBlast:
+                print("Repeated argument: -b/--blast")
+                Fail()
+            qUsePrecalculatedBlast = True
+            workingDir_previous = GetDirectoryArgument(arg, args)
+        elif arg == "-t" or arg == "--threads":
             if len(args) == 0:
                 print("Missing option for command line argument -t")
                 Fail()
@@ -964,96 +1051,111 @@ if __name__ == "__main__":
             except:
                 print("Incorrect argument for number of BLAST threads: %s" % arg)
                 Fail()    
-            if usePreviousBlast:
-                print("Ignoring arguments -t")
         elif arg == "-x" or arg == "--orthoxml":  
+            if qXML:
+                print("Repeated argument: -x/--orthoxml")
+                Fail()
+            qXML = True
             if len(args) == 0:
-                print("Missing option for command line argument -t")
+                print("Missing option for command line argument %s" % arg)
                 Fail()
             speciesInfoFilename = args.pop(0)
-            qXML = True
+#        elif arg == "-s" or arg == "--subset":  
+#            if qUseSubset:
+#                print("Repeated argument: -s/--subset")
+#                Fail()
+#            qUseSubset = True
+#            qUsePrecalculatedBlast = True
+#            workingDir_previous = GetDirectoryArgument(arg, args)
+        elif arg == "-p" or arg == "--prepare":
+            qOnlyPrepare = True
         elif arg == "-h" or arg == "--help":
             PrintHelp()
             sys.exit()
-        elif arg == "-b" or arg == "--blast" or arg == "-f" or arg == "--fasta":
-            print("Incompatible or repeated options: %s and %s\n" % (firstArg, arg))
-            Fail()
         else:
             print("Unrecognised argument: %s\n" % arg)
-            Fail()
+            Fail()            
+    
+    # check argument combinations   
+    if qUseFastaFiles and qUsePrecalculatedBlast:
+        print("Adding new species in %s to existing analysis in %s" % (fastaDir, workingDir_previous))
     
     # if using previous results, check everything is ok
-    if usePreviousBlast:
-        workingDirectory = os.path.abspath(workingDirectory) + os.sep
-        resultsDir = workingDirectory
-        resultsBaseFilename = util.GetUnusedFilename(resultsDir + "OrthologousGroups", ".csv")[:-4]         # remove .csv from base filename
+    if qUsePrecalculatedBlast:
+        speciesIdsFilename = workingDir_previous + "SpeciesIDs.txt"
+        if not os.path.exists(speciesIdsFilename):
+            print("%s file must be provided if using previously calculated BLAST results" % speciesIdsFilename)
+            Fail()
+        speciesToUse = GetSpeciesToUse(speciesIdsFilename)
+        workingDir = os.path.abspath(workingDir) + os.sep
+        if resultsDir == None: 
+            workingDir = workingDir_previous
+            resultsDir = workingDir_previous
+        else:
+            workingDir = os.path.abspath(workingDir) + os.sep + "WorkingDirectory" + os.sep
         
         # check BLAST results directory exists
-        if not os.path.exists(workingDirectory):
-            print("Previous/Pre-calculated BLAST results directory does not exist: %s\n" % workingDirectory)
+        if not os.path.exists(workingDir_previous):
+            print("Previous/Pre-calculated BLAST results directory does not exist: %s\n" % workingDir_previous)
             Fail()
      
         # check fasta files are present 
-        orderedFastaFilenames = util.SortFastaFilenames(glob.glob(workingDirectory + "Species*.fa"))
-        if len(orderedFastaFilenames) == 0:
-            print("No processed fasta files in the supplied previous working directory: %s\n" % workingDirectory)
+        previousFastaFiles = util.SortFastaFilenames(glob.glob(workingDir_previous + "Species*.fa"))
+        if len(previousFastaFiles) == 0:
+            print("No processed fasta files in the supplied previous working directory: %s\n" % workingDir_previous)
             Fail()
-        tokens = orderedFastaFilenames[-1][:-3].split("Species")
+        tokens = previousFastaFiles[-1][:-3].split("Species")
         lastFastaNumberString = tokens[-1]
         iLastFasta = 0
-        nFasta = len(orderedFastaFilenames)
+        nFasta = len(previousFastaFiles)
         try:
             iLastFasta = int(lastFastaNumberString)
         except:
-            print("Filenames for processed fasta files are incorrect: %s\n" % orderedFastaFilenames[-1])
+            print("Filenames for processed fasta files are incorrect: %s\n" % previousFastaFiles[-1])
             Fail()
         if nFasta != iLastFasta + 1:
-            print("Not all expected fasta files are present. Index of last fasta file is %s but found %d fasta files.\n" % (lastFastaNumberString, len(orderedFastaFilenames)))
+            print("Not all expected fasta files are present. Index of last fasta file is %s but found %d fasta files.\n" % (lastFastaNumberString, len(previousFastaFiles)))
             Fail()
         
         # check BLAST files
-        for iSpecies in xrange(nFasta):
-            for jSpecies in xrange(nFasta):
-                filename = "%sBlast%d_%d.txt" % (workingDirectory, iSpecies, jSpecies) 
+        qHaveBlast = True
+        for iSpecies in speciesToUse:
+            for jSpecies in speciesToUse:
+                filename = "%sBlast%d_%d.txt" % (workingDir_previous, iSpecies, jSpecies) 
                 if not os.path.exists(filename):
-                    print("BLAST results files is missing: %s" % filename)
-                    Fail()
+                    print("BLAST results file is missing: %s" % filename)
+                    qHaveBlast = False
+        if not qHaveBlast: Fail()
                     
         # check SequenceIDs.txt and SpeciesIDs.txt files are present
-        idsFilename = workingDirectory + "SequenceIDs.txt"
+        idsFilename = workingDir_previous + "SequenceIDs.txt"
         if not os.path.exists(idsFilename):
             print("%s file must be provided if using previous calculated BLAST results" % idsFilename)
             Fail()
-        speciesIdsFilename = workingDirectory + "SpeciesIDs.txt"
-        if not os.path.exists(speciesIdsFilename):
-            print("%s file must be provided if using previous calculated BLAST results" % speciesIdsFilename)
-            Fail()
-               
-        print("Using previously calculated BLAST results in %s" % workingDirectory)       
+        print("Using previously calculated BLAST results in %s" % workingDir_previous)       
     else:
         # - create working directory
-        resultsDir = util.CreateNewWorkingDirectory(originalFastaDirectory + "Results_")
-        workingDirectory = resultsDir + "WorkingDirectory" + os.sep
-        os.mkdir(workingDirectory)
-        resultsBaseFilename = resultsDir + "OrthologousGroups"
+        if resultsDir == None: resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results_")
+        workingDir = resultsDir + "WorkingDirectory" + os.sep
+        os.mkdir(workingDir)
      
      
     # check for BLAST+ and MCL - else instruct how to install and add to path
     print("\n1. Checking required programs are installed")
     print("-------------------------------------------")
-    if (not usePreviousBlast) and (not CanRunBLAST()):
+    if (not qUsePrecalculatedBlast) and (not CanRunBLAST()):
         Fail()
     if not CanRunMCL():
         Fail()
         
-        
     # - rename sequences with unique, simple identifiers
     print("\n2. Temporarily renaming sequences with unique, simple identifiers")
     print( "------------------------------------------------------------------")
-    if usePreviousBlast:
+    if not qUseFastaFiles:
         print("Skipping")
     else:
-        orderedFastaFilenames, originalFastaFilenames, idsFilename = AssignIDsToSequences(originalFastaDirectory, workingDirectory)
+        newFastaFiles, userFastaFilenames, idsFilename, speciesIdsFilename, newSpeciesIDs = AssignIDsToSequences(fastaDir, workingDir)
+        speciesToUse = speciesToUse + newSpeciesIDs
         print("Done")
      
     
@@ -1062,17 +1164,16 @@ if __name__ == "__main__":
         print( "-------------------------------------")        
         # do this now so that we can alert user to any errors prior to running the algorithm
         # speciesInfo:  name, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile
-        if usePreviousBlast:
-            originalFastaFilenames = orderedFastaFilenames
-        speciesInfo = [[] for i_ in xrange(len(originalFastaFilenames))]
-        originalFastaFilenames_justNames = [name for path, name in map(os.path.split, originalFastaFilenames)]
-        fastaFileIndices = {filename:iSpecies for iSpecies, filename in enumerate(originalFastaFilenames_justNames)}
+        userFastaFilenames = previousFastaFiles + userFastaFilenames
+        speciesInfo = [[] for i_ in speciesToUse]
+        userFastaFilenames_justNames = [name for path, name in map(os.path.split, userFastaFilenames)]
+        fastaFileIndices = {filename:iSpecies for iSpecies, filename in enumerate(userFastaFilenames_justNames)}
         with open(speciesInfoFilename, 'rb') as speciesInfoFile:
             reader = csv.reader(speciesInfoFile, delimiter = "\t")
             for iLine, line in enumerate(reader):
                 if len(line) != 5:
                     # allow for an extra empty line at the end
-                    if len(line) == 0 and iLine == len(originalFastaFilenames_justNames):
+                    if len(line) == 0 and iLine == len(userFastaFilenames_justNames):
                         continue
                     print("ERROR")
                     print("Species information file %s line %d is incorrectly formatted." % (speciesInfoFilename, iLine + 1))        
@@ -1088,7 +1189,7 @@ if __name__ == "__main__":
                     print("ERROR")
                     print("%s from line %d of the species information file was not one of the" % (fastaFilename, iLine+1))
                     print("input fasta files. The input fasta files were:")
-                    for filename in originalFastaFilenames_justNames:
+                    for filename in userFastaFilenames_justNames:
                         print(filename)
                     print("Please provide information for each of these species in the species information file")
                     Fail() 
@@ -1108,53 +1209,53 @@ if __name__ == "__main__":
      
     print("\n3. Dividing up work for BLAST for parallel processing")
     print(  "-----------------------------------------------------")
-    if usePreviousBlast:
+    if not qUseFastaFiles:
         print("Skipping")
     else:
-        splitFastaFiles = orderedFastaFilenames
-        # run BLAST
         print("\n3a. Creating BLAST databases")
         print(  "----------------------------")
-        blastDBs = [workingDirectory + "BlastDBSpecies%d" % i for i in xrange(len(orderedFastaFilenames))]
-        for fastaFilename, blastDB in zip(orderedFastaFilenames, blastDBs):
-            command = ["makeblastdb", "-dbtype", "prot", "-in", fastaFilename, "-out", blastDB]
+        for iSp in speciesToUse:
+            command = ["makeblastdb", "-dbtype", "prot", "-in", workingDir + "Species%d.fa" % iSp, "-out", workingDir + "BlastDBSpecies%d" % iSp]
             RunCommand(command)    
-            
-    print("\n4. Running BLAST all-versus-all")
-    print(  "-------------------------------")
-    if usePreviousBlast:
+    
+    if qOnlyPrepare:
+        print("\n4. BLAST commands that must be run")
+        print(  "----------------------------------")
+    else:        
+        print("\n4. Running BLAST all-versus-all")
+        print(  "-------------------------------")
+    if not qUseFastaFiles:
         print("Skipping")
     else:
-        print("Maximum number of BLAST processer: %d" % nBlast)
-        util.PrintTime("This may take some time....")  
-        commands = GetOrderedBlastCommands(splitFastaFiles, blastDBs, workingDirectory)
-#        commands = [["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", thisFasta, "-db", thisDB, "-out", "%sBlast%d_%d.txt" % (workingDirectory, iFasta, iDB)]
-#                    for (iFasta, thisFasta), (iDB, thisDB) in itertools.product(enumerate(splitFastaFiles), enumerate(blastDBs))]
+        if qUsePrecalculatedBlast:
+            print("Only running new BLAST searches")
+        commands = GetOrderedBlastCommands(previousFastaFiles, newFastaFiles, workingDir)
         if qOnlyPrepare:
             for command in commands:
                 print(" ".join(command))
             sys.exit()
+        print("Maximum number of BLAST processer: %d" % nBlast)
+        util.PrintTime("This may take some time....")  
         pool = multiprocessing.Pool(nBlast) 
         pool.map(RunCommandReport, commands)   
         print("Done!")  
         # remove BLAST databases
-        for db in blastDBs:
-            for f in glob.glob(db + "*"):
-                os.remove(f)
+        for f in glob.glob(workingDir + "BlastDBSpecies*"):
+            os.remove(f)
 
 
     # Run Algorithm, cluster and output cluster files with original accessions
     print("\n5. Running OrthoFinder algorithm")
     print(  "--------------------------------")
     fileIdentifierString = "OrthoFinder_v%s" % version
-    graphFilename = workingDirectory + "%s_graph.txt" % fileIdentifierString
-    nSeqs, nSpecies, speciesStartingIndices = BlastFileProcessor.GetNumberOfSequencesInFileFromDir(workingDirectory)
+    graphFilename = workingDir + "%s_graph.txt" % fileIdentifierString
+    nSeqs, nSpecies, speciesStartingIndices = BlastFileProcessor.GetNumberOfSequencesInFileFromDir(workingDir_previous if qUsePrecalculatedBlast else workingDir, speciesToUse)
     # it's important to free up the memory from python used for processing the genomes
     # before launching MCL becuase both use sizeable ammounts of memory. The only
     # way I can find to do this is to launch the memory intensive python code 
     # as separate process that exitsbefore MCL is launched.
-#    AnalyseSequences(workingDirectory, nSeqs, nSpecies, speciesStartingIndices, graphFilename)  # without launching a new process
-    p = multiprocessing.Process(target=AnalyseSequences, args=(workingDirectory, nSeqs, nSpecies, speciesStartingIndices, graphFilename))
+#    AnalyseSequences(workingDir, nSeqs, nSpecies, speciesStartingIndices, graphFilename)  # without launching a new process
+    p = multiprocessing.Process(target=AnalyseSequences, args=(workingDir_previous if qUsePrecalculatedBlast else workingDir, workingDir, speciesToUse, nSeqs, nSpecies, speciesStartingIndices, graphFilename))
     p.start()
     p.join()
     if p.exitcode != 0:
@@ -1164,10 +1265,10 @@ if __name__ == "__main__":
     
     # 5b. MCL     
     inflation = 1.5
-    clustersFilename = workingDirectory + "clusters_%s_I%0.1f.txt" % (fileIdentifierString, inflation)
+    clustersFilename, iResultsVersion = util.GetUnusedFilename(workingDir + "clusters_%s_I%0.1f" % (fileIdentifierString, inflation), ".txt")
     MCL.RunMCL(graphFilename, clustersFilename, inflation)
     clustersFilename_pairs = clustersFilename + "_id_pairs.txt"
-    MCL.ConvertSingleIDsToIDPair(speciesStartingIndices, clustersFilename, clustersFilename_pairs)  
+    MCL.ConvertSingleIDsToIDPair(speciesStartingIndices, clustersFilename, clustersFilename_pairs, speciesToUse)  
     # delete single ID filename
 #        os.remove(clustersFilename)   
     
@@ -1175,11 +1276,13 @@ if __name__ == "__main__":
     print(  "----------------------------------------")
     PrintCitation()
     ogs = MCL.GetPredictedOGs(clustersFilename_pairs)
-    idsDict = WriteOrthogroupFiles(ogs, idsFilename, resultsBaseFilename, clustersFilename_pairs)
-    CreateOrthogroupTable(ogs, idsDict, workingDirectory + "SpeciesIDs.txt", resultsBaseFilename)
+    resultsBaseFilename = util.GetUnusedFilename(resultsDir + "OrthologousGroups", ".csv")[:-4]         # remove .csv from base filename
+    resultsBaseFilename = resultsDir + "OrthologousGroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion)
+    idsDict = WriteOrthogroupFiles(ogs, [idsFilename], resultsBaseFilename, clustersFilename_pairs)
+    CreateOrthogroupTable(ogs, idsDict, speciesIdsFilename, speciesToUse, resultsBaseFilename)
     if qXML:
         numbersOfSequences = list(np.diff(speciesStartingIndices))
         numbersOfSequences.append(nSeqs - speciesStartingIndices[-1])
         orthoxmlFilename = resultsBaseFilename + ".orthoxml"
-        MCL.WriteOrthoXML(speciesInfo, ogs, numbersOfSequences, idsDict, orthoxmlFilename)
+        MCL.WriteOrthoXML(speciesInfo, ogs, numbersOfSequences, idsDict, orthoxmlFilename, speciesToUse)
     print("\n")
