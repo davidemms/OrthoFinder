@@ -21,9 +21,20 @@ For example, if you want to run it using 16 processors in parallel on the exampl
 
 **python orthofinder.py -f ExampleDataset -t 16**
 
-Once complete your results will be in ExampleDataset/Results_\<date\>/OrthologoueGroups.txt
+Once complete your results will be in ExampleDataset/Results_\<date\>/
 
-For details on running it from pre-computed BLAST search results see below.
+For details on running OrthoFinder from pre-computed BLAST search results see below.
+
+Output File Format
+==================
+OrthoFinder generates three output files 
+
+**1) OrthologousGroups.csv** is a comma separated text file. Each row comprises a single orthogroup and contains all the genes that belong to that orthogroup. The genes are organized into separate columns where each column corresponds to a single species.
+
+**2) OrthologousGroups.txt** is a tab separated text file that is identical in format to the output file from OrthoMCL. This enables OrthoFinder to easily slot into existing bioinformatic pipelines.
+
+**3) OrthologousGroups_UnassignedGenes.csv** is a comma separated text file that is identical in format to OrthologousGroups.csv but contains all of the genes that were not assigned to any orthogroup.
+
 
 Installing Dependencies
 =======================
