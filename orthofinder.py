@@ -337,7 +337,7 @@ class MCL:
                         
     @staticmethod                       
     def RunMCL(graphFilename, clustersFilename, inflation = 1.5):
-        command = ["mcl", graphFilename, "-I", "1.5", "-o", clustersFilename]
+        command = ["mcl", graphFilename, "-I", "1.5", "-o", clustersFilename, "-te", str(nBlast)]                                            
         RunCommand(command)
         util.PrintTime("Ran MCL")  
 
@@ -592,64 +592,79 @@ class WaterfallMethod:
         self.picProtocol = 1
         self.totalDump = 0.
         self.totalLoad = 0.
-        
+        from pathos.multiprocessing import ProcessingPool
+        self.pool_pathos = ProcessingPool(nodes=nBlast)
+
+    def parallel_score_and_dump (self, iSpecies):
+        Lengths = self.thisBfp.GetSequenceLengths()
+        #Bi = self.pool_pathos.map(lambda x, y: self.NormaliseScores(self.thisBfp.GetBLAST6Scores(iSpecies, y), x, iSpecies, y), [Lengths]*nSpecies, xrange(nSpecies))
+        Bi = []
+        for jSpecies in xrange(self.thisBfp.nSpecies):
+            Bij = self.thisBfp.GetBLAST6Scores(iSpecies, jSpecies)  
+            Bij = self.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
+            Bi.append(Bij)
+        self.DumpMatrixArray("B", Bi, iSpecies)
+        BH = self.thisBfp.GetBH_s(Bi, iSpecies)
+        self.DumpMatrixArray("BH", BH, iSpecies)
+        util.PrintTime("Initial processing of species %d complete" % iSpecies)
+    
+    def parallel_connect(self, iSpecies):
+        BHix = self.LoadMatrixArray("BH", iSpecies)
+        BHxi = self.LoadMatrixArray("BH", iSpecies, row=False)
+        RBHi = self.thisBfp.MatricesAndTr_s(BHix, BHxi)   # twice as much work as before (only did upper triangular before)
+        B = self.LoadMatrixArray("B", iSpecies)
+        connect = self.ConnectAllBetterThanAnOrtholog_s(RBHi, B, iSpecies) 
+        self.DumpMatrixArray("connect", connect, iSpecies) 
+
+    def parallel_graph_write(self, iSpec):
+        with open(graphFilename + (".%06d" % iSpec), 'wb') as graphFile:
+            # calculate the 2-way connections for one query species
+            connect2 = []
+            for jSpec in xrange(self.thisBfp.nSpecies):
+                m1 = self.LoadMatrix("connect", iSpec, jSpec)
+                m2tr = numeric.transpose(self.LoadMatrix("connect", jSpec, iSpec))
+                connect2.append(m1 + m2tr)
+            B = self.LoadMatrixArray("B", iSpec)
+            B_connect = self.thisBfp.MatricesAnd_s(connect2, B)
+            
+            W = [b.sorted_indices().tolil() for b in B_connect]
+            for query in xrange(self.thisBfp.NumberOfSequences(iSpec)):
+                offset = self.thisBfp.speciesStartingIndices[iSpec]
+                graphFile.write("%d    " % (offset + query))
+                for jSpec in xrange(self.thisBfp.nSpecies):
+                    row = W[jSpec].getrowview(query)
+                    jOffset = self.thisBfp.speciesStartingIndices[jSpec]
+                    for j, value in zip(row.rows[0], row.data[0]):
+                        graphFile.write("%d:%.3f " % (j + jOffset, value))
+                graphFile.write("$\n")
+
+            util.PrintTime("Written final scores for species %d to graph file" % iSpec)
+
     def RunWaterfallMethod(self, graphFilename):
         util.PrintTime("Started")   
-        Lengths = self.thisBfp.GetSequenceLengths()
         util.PrintTime("Got sequence lengths")
         util.PrintTime("Initial processing of each species")
         # process up to the best hits for each species
-        for iSpecies in xrange(self.thisBfp.nSpecies):
-            Bi = []
-            for jSpecies in xrange(self.thisBfp.nSpecies):
-                Bij = self.thisBfp.GetBLAST6Scores(iSpecies, jSpecies)  
-                Bij = self.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
-                Bi.append(Bij)
-            self.DumpMatrixArray("B", Bi, iSpecies)
-            BH = self.thisBfp.GetBH_s(Bi, iSpecies)
-            self.DumpMatrixArray("BH", BH, iSpecies)
-            util.PrintTime("Initial processing of species %d complete" % iSpecies)
-        
-        for iSpecies in xrange(self.thisBfp.nSpecies):
-            # calculate RBH for species i
-            BHix = self.LoadMatrixArray("BH", iSpecies)
-            BHxi = self.LoadMatrixArray("BH", iSpecies, row=False)
-            RBHi = self.thisBfp.MatricesAndTr_s(BHix, BHxi)   # twice as much work as before (only did upper triangular before)
-            B = self.LoadMatrixArray("B", iSpecies)
-            connect = self.ConnectAllBetterThanAnOrtholog_s(RBHi, B, iSpecies) 
-            self.DumpMatrixArray("connect", connect, iSpecies) 
+
+        nSpecies = self.thisBfp.nSpecies
+        self.pool_pathos.map(self.parallel_score_and_dump, xrange(nSpecies))
+
+        self.pool_pathos.map(self.parallel_connect, xrange(nSpecies))
         util.PrintTime("Connected putatitive homologs") 
-        
+       
         with open(graphFilename, 'wb') as graphFile:
             graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (self.thisBfp.nSeqs, self.thisBfp.nSeqs)) 
-            graphFile.write("\n(mclmatrix\nbegin\n\n")  
-            for iSpec in xrange(self.thisBfp.nSpecies):
-                # calculate the 2-way connections for one query species
-                connect2 = []
-                for jSpec in xrange(self.thisBfp.nSpecies):
-                    m1 = self.LoadMatrix("connect", iSpec, jSpec)
-                    m2tr = numeric.transpose(self.LoadMatrix("connect", jSpec, iSpec))
-                    connect2.append(m1 + m2tr)
-                B = self.LoadMatrixArray("B", iSpec)
-                B_connect = self.thisBfp.MatricesAnd_s(connect2, B)
-                util.PrintTime("Writen final scores for species %d to graph file" % iSpec)
-                
-                W = [b.sorted_indices().tolil() for b in B_connect]
-                for query in xrange(self.thisBfp.NumberOfSequences(iSpec)):
-                    offset = self.thisBfp.speciesStartingIndices[iSpec]
-                    graphFile.write("%d    " % (offset + query))
-                    for jSpec in xrange(self.thisBfp.nSpecies):
-                        row = W[jSpec].getrowview(query)
-                        jOffset = self.thisBfp.speciesStartingIndices[jSpec]
-                        for j, value in zip(row.rows[0], row.data[0]):
-                            graphFile.write("%d:%.3f " % (j + jOffset, value))
-                    graphFile.write("$\n")
-                        
+            graphFile.write("\n(mclmatrix\nbegin\n\n")
+
+        self.pool_pathos.map(self.parallel_graph_write, xrange(nSpecies))
+
+        os.system("cat {0}* > {0}.tmp; mv {0}.tmp {0}; rm {0}.*".format(graphFilename))
+        with open(graphFilename, 'a+') as graphFile:
             graphFile.write(")\n")
 
         # delete pic files
         self.DeleteMatrices()
-        
+
     def DeleteMatrices(self):
         for f in glob.glob(self.outputDir + "B*_*.pic"):
             os.remove(f)
@@ -1076,7 +1091,7 @@ if __name__ == "__main__":
         else:
             print("Unrecognised argument: %s\n" % arg)
             Fail()            
-    
+
     # check argument combinations   
     if qUseFastaFiles and qUsePrecalculatedBlast:
         print("Adding new species in %s to existing analysis in %s" % (fastaDir, workingDir_previous))
