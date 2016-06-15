@@ -280,7 +280,7 @@ class TestCommandLine(unittest.TestCase):
                 if "Blast" in os.path.split(fn)[1]:
                     self.CompareBlast(goldDir + os.path.split(fn)[1], fn)
                 else:
-                    self.CompareFile(goldDir + os.path.split(fn)[1], fn)               
+                    self.CompareFile(goldDir + os.path.split(fn)[1].replace(version, "0.4.0"), fn)               
     
     def test_addTwoSpecies(self):
         expectedExtraFiles = [exampleBlastDir + fn for fn in ("Blast0_3.txt Blast3_0.txt Blast1_3.txt Blast3_1.txt Blast2_3.txt Blast3_2.txt Blast3_3.txt Species3.fa \
@@ -299,7 +299,7 @@ class TestCommandLine(unittest.TestCase):
                 if "Blast" in os.path.split(fn)[1]:
                     self.CompareBlast(goldDir + os.path.split(fn)[1], fn)
                 else:
-                    self.CompareFile(goldDir + os.path.split(fn)[1], fn)           
+                    self.CompareFile(goldDir + os.path.split(fn)[1].replace(version, "0.4.0"), fn)           
                 
     def test_removeFirstSpecies(self):
         self.RemoveSpeciesTest(baseDir + "Input/ExampleDataset_removeFirst/",
