@@ -1,0 +1,1 @@
+(Mycoplasma_gallisepticum_uid409_AE015450_gi|284811911|gb|AAP56480.2|:0.78846,Mycoplasma_agalactiae_5632_FP671138_gi|290753051|emb|CBH41027.1|:1.40806,Mycoplasma_genitalium_uid97_L43967_gi|3844953|gb|AAC71593.1|:0.55984);

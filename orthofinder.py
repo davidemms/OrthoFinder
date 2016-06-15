@@ -29,7 +29,7 @@ import sys                                      # Y
 import subprocess                               # Y
 import os                                       # Y
 import glob                                     # Y
-import multiprocessing                          # optional  (problems on OpenBSD)
+import multiprocessing as mp                    # optional  (problems on OpenBSD)
 import itertools                                # Y
 import datetime                                 # Y
 from scipy.optimize import curve_fit            # install
@@ -44,8 +44,9 @@ from collections import defaultdict             # Y
 import xml.etree.ElementTree as ET              # Y
 from xml.etree.ElementTree import SubElement    # Y
 from xml.dom import minidom                     # Y
+import Queue
 
-version = "0.4.0"
+version = "0.5.0"
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
 if sys.platform.startswith("linux"):
     with open(os.devnull, "w") as f:
@@ -62,6 +63,16 @@ def RunCommandReport(command):
     util.PrintTime("Running command: %s" % " ".join(command))
     RunCommand(command)
     util.PrintTime("Finished command: %s" % " ".join(command))
+
+def Worker_RunCommand(cmd_queue):
+    while True:
+        try:
+            command = cmd_queue.get(True, 1)
+            util.PrintTime("Running command: %s" % " ".join(command))
+            subprocess.call(command)
+            util.PrintTime("Finished command: %s" % " ".join(command))
+        except Queue.Empty:
+            return 
    
 class util:
     @staticmethod
@@ -136,6 +147,7 @@ class FullAccession(IDExtractor):
         self.nameToIDDict = dict()
         with open(idsFilename, 'rb') as idsFile:
             for line in idsFile:
+                if line.startswith("#"): continue
                 id, accession = line.rstrip().split(": ", 1)
                 if id in self.idToNameDict:
                     raise RuntimeError("ERROR: A duplicate id was found in the fasta files: % s" % id)
@@ -169,7 +181,6 @@ class FirstWordExtractor(IDExtractor):
         
     def GetNameToIDDict(self):
         return self.nameToIDDict
-
 """
 MCL
 -------------------------------------------------------------------------------
@@ -263,9 +274,9 @@ class MCL:
     def CreateOGs(predictedOGs, outputFilename, idDict):
         with open(outputFilename, 'wb') as outputFile:
             for iOg, og in enumerate(predictedOGs):
-                outputFile.write("OG%07d:" % iOg)
-                for seq in og:
-                    outputFile.write(" " + idDict[seq])
+                outputFile.write("OG%07d: " % iOg)
+                accessions = sorted([idDict[seq] for seq in og])
+                outputFile.write(" ".join(accessions))
                 outputFile.write("\n")
       
     @staticmethod            
@@ -337,7 +348,7 @@ class MCL:
                         
     @staticmethod                       
     def RunMCL(graphFilename, clustersFilename, inflation = 1.5):
-        command = ["mcl", graphFilename, "-I", "1.5", "-o", clustersFilename]
+        command = ["mcl", graphFilename, "-I", "1.5", "-o", clustersFilename, "-te", str(nBlast)]
         RunCommand(command)
         util.PrintTime("Ran MCL")  
 
@@ -534,7 +545,7 @@ class BlastFileProcessor(object):
             sequenceLengths[iSpecies][iCurrentSequence] = currentSequenceLength
         return sequenceLengths
                    
-    def GetBLAST6Scores(self, iSpecies, jSpecies): 
+    def GetBLAST6Scores(self, iSpecies, jSpecies, qExcludeSelfHits = True): 
         nSeqs_i = self.NumberOfSequences(iSpecies)
         nSeqs_j = self.NumberOfSequences(jSpecies)
         B = sparse.lil_matrix((nSeqs_i, nSeqs_j))
@@ -556,8 +567,7 @@ class BlastFileProcessor(object):
                     except (IndexError, ValueError):
                         sys.stderr.write("\nERROR: 12th field in BLAST results file line should be the bit-score for the hit\n")
                         raise
-                    qSameSequence = (species1ID == species2ID and sequence1ID == sequence2ID)
-                    if qSameSequence:
+                    if (qExcludeSelfHits and species1ID == species2ID and sequence1ID == sequence2ID):
                         continue
                     # store bit score
                     try:
@@ -962,19 +972,19 @@ def CreateOrthogroupTable(ogs,
         
         for iOg, (og, og_names) in enumerate(zip(ogs_ints, ogs_names)):
             ogDict = defaultdict(list)
-            rows = ["OG%07d" % iOg]
+            row = ["OG%07d" % iOg]
             thisOutputWriter = fileWriter
             # separate it into sequences from each species
             if len(og) == 1:
-                rows.extend(['' for x in xrange(nSpecies)])
-                rows[speciesToUse.index(og[0][0]) + 1] = og_names[0]
+                row.extend(['' for x in xrange(nSpecies)])
+                row[speciesToUse.index(og[0][0]) + 1] = og_names[0]
                 thisOutputWriter = singleGeneWriter
             else:
                 for (iSpecies, iSequence), name in zip(og, og_names):
                     ogDict[speciesToUse.index(iSpecies)].append(name)
                 for iSpecies in xrange(nSpecies):
-                    rows.append(", ".join(ogDict[iSpecies]))
-            thisOutputWriter.writerow(rows)
+                    row.append(", ".join(sorted(ogDict[iSpecies])))
+            thisOutputWriter.writerow(row)
     print("""Orthologous groups have been written to tab-delimited files:\n   %s\n   %s""" % (outputFilename, singleGeneFilename))
     print("""And in OrthoMCL format:\n   %s""" % (outputFilename[:-3] + "txt"))
             
@@ -1235,11 +1245,22 @@ if __name__ == "__main__":
             for command in commands:
                 print(" ".join(command))
             sys.exit()
-        print("Maximum number of BLAST processer: %d" % nBlast)
+        print("Maximum number of BLAST processes: %d" % nBlast)
         util.PrintTime("This may take some time....")  
-        pool = multiprocessing.Pool(nBlast) 
-        pool.map(RunCommandReport, commands)   
+#        pool = mp.Pool(nBlast) 
+#        pool.map(RunCommandReport, commands)
+        cmd_queue = mp.Queue()
+        for cmd in commands:
+            cmd_queue.put(cmd)  
+        runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, )) for i_ in xrange(nBlast)]
+        for proc in runningProcesses:
+            proc.start()
+        for proc in runningProcesses:
+            while proc.is_alive():
+                proc.join()
+        
         print("Done!")  
+        
         # remove BLAST databases
         for f in glob.glob(workingDir + "BlastDBSpecies*"):
             os.remove(f)
@@ -1256,7 +1277,7 @@ if __name__ == "__main__":
     # way I can find to do this is to launch the memory intensive python code 
     # as separate process that exitsbefore MCL is launched.
 #    AnalyseSequences(workingDir, nSeqs, nSpecies, speciesStartingIndices, graphFilename)  # without launching a new process
-    p = multiprocessing.Process(target=AnalyseSequences, args=(workingDir_previous if qUsePrecalculatedBlast else workingDir, workingDir, speciesToUse, nSeqs, nSpecies, speciesStartingIndices, graphFilename))
+    p = mp.Process(target=AnalyseSequences, args=(workingDir_previous if qUsePrecalculatedBlast else workingDir, workingDir, speciesToUse, nSeqs, nSpecies, speciesStartingIndices, graphFilename))
     p.start()
     p.join()
     if p.exitcode != 0:

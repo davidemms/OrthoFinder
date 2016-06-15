@@ -1,0 +1,1 @@
+(Mycoplasma_genitalium_uid97_L43967_gi|3844630|gb|AAC71237.1|:1.01397,Mycoplasma_agalactiae_5632_FP671138_gi|290752463|emb|CBH40435.1|:0.55872,Mycoplasma_hyopneumoniae_AE017243_gi|71851887|gb|AAZ44495.1|:0.58121);

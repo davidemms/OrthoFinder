@@ -1,0 +1,1 @@
+((Mycoplasma_agalactiae_5632_FP671138_gi|290752917|emb|CBH40892.1|:0.0,Mycoplasma_agalactiae_5632_FP671138_gi|290752563|emb|CBH40535.1|:0.0):0.20141,(Mycoplasma_agalactiae_5632_FP671138_gi|290752919|emb|CBH40894.1|:0.0,Mycoplasma_agalactiae_5632_FP671138_gi|290752739|emb|CBH40714.1|:0.0,Mycoplasma_agalactiae_5632_FP671138_gi|290752561|emb|CBH40533.1|:0.0):0.20141);

@@ -226,3 +226,7 @@ The 'trees_for_orthogroups.py' utility will automatically generate multiple sequ
 where "ExampleDataset/Results_\<date\>" is the results directory from running OrthoFinder.
 
 This will use MAFFT to generate the multiple sequence alignments and FastTree to generate the gene trees. Both of these programs need to be installed and in the system path.
+
+Regression Tests
+================
+A set of regression tests are included in the directory **Tests**, they can be run by calling the script **test_orthofinder.py**. They currently require version 2.2.28 of NCBI BLAST and the script will exit with an error message if this is not the case. 

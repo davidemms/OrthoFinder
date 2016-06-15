@@ -1,0 +1,3 @@
+0: Mycoplasma_agalactiae_5632_FP671138.faa
+#1: Mycoplasma_gallisepticum_uid409_AE015450.faa
+2: Mycoplasma_genitalium_uid97_L43967.faa
