@@ -118,16 +118,20 @@ The '-p' option will prepare the files in the format required by OrthoFinder and
 Parallelising OrthoFinder Algorithm (-a option)
 ===============================================
 There are two separate options for controlling the parallelisation of OrthoFinder: 
-1. -t number_of_blast_processes
+
+1. '-t number_of_blast_processes'
 This option should always be used. The BLAST searches are by far the most time-consuming task and so as many should be run in parallel as there are cores available.
 
-2. -a number_of_orthofinder_threads
+
+2. '-a number_of_orthofinder_threads'
 The remainder of the algorithm once the BLAST searches have been performed is relatively fast and efficient and so this option has less effect. It is most useful when running OrthoFinder using pre-calculated BLAST results since the time savings will be more noticeable in this case. This is also the number of threads used when running MCL.
 
 RAM availability is an important consideration when using this option. Each thread loads all BLAST hits between the sequences in one species and all sequences in all other species. To give some very approximate numbers, each thread might require:
 
 0.02 GB per species for small genomes (e.g. bacteria)
+
 0.04 GB per species for larger genomes (e.g. vertebrates)
+
 0.2 GB per species for even larger genomes (e.g. plants)
 
 I.e. running an analysis on 10 vertebrate species with 5 threads for the OrthoFinder algorithm (-a 5) might require 10x0.04 = 0.4 GB per thread and so 5 x 0.4 = 2 GB of RAM in total. If you have the BLAST results already then the total size of the Blast0_*txt files gives a good approximation of the memory requirements per thread.
