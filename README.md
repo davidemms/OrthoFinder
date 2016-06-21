@@ -9,6 +9,8 @@ https://github.com/davidemms/OrthoFinder
 
 What's New
 ==========
+**Jun. 2016**: **Parallelised** the remainder of the OrthoFinder algorithm. 
+
 **Jan. 2016**: Added the ability to **add and remove species**.
 
 **Sept. 2015**: Added the **trees_for_orthogroups.py** utility to automatically calculate multiple sequence alignments and gene trees for the orthogroups calcualted using OrthoFinder.
@@ -87,17 +89,17 @@ Once the required dependencies have been installed, OrthoFinder can be setup and
 
 The command for running OrthoFinder on any dataset is:
 
-**python orthofinder.py -f directory_containing_fasta_files -t number_of_processes**
+**python orthofinder.py -f directory_containing_fasta_files [-t number_of_blast_processes] [-a number_of_orthofinder_threads]**
 
 where:
 directory_containing_fasta_files is a directory containing the fasta files (with filename extensions .fa or .fasta) for the species of interest, one species per fasta file. It is best to use a fasta file with only the longest transcript variant per gene.
-number_of_processes is an optional argument that can be used to run the initial BLAST all-versus-all queries in parallel. As the BLAST queries are by far the time-consuming step it is best to use at least as many BLAST processes as there are CPUs on the machine. 
+number_of_processes is an optional argument that can be used to run the initial BLAST all-versus-all queries in parallel. As the BLAST queries are by far the time-consuming step it is best to use at least as many BLAST processes as there are CPUs on the machine. Additionally, the -a option can be used to parallelise the remainder of the OrthoFinder algorithm although see below for advice on the RAM requirements for this. 
 
 Adding extra species
 ====================
 OrthoFinder allows you to add extra species to an analysis without re-running the time-consuming BLAST searches:
 
-**python orthofinder.py -b previous_orthofinder_directory_containing_blast_results -f new_fasta_directory**
+**python orthofinder.py -b previous_orthofinder_directory_containing_blast_results -f new_fasta_directory [-t number_of_blast_processes] [-a number_of_orthofinder_threads]**
 
 Will add each species from the new_fasta_directory to existing set of species, reuse all the previous BLAST results, perform only the new BLAST searches required for the new species and recalculate the orthogroups.
 
@@ -105,11 +107,32 @@ Removing Species
 ================
 OrthoFinder allows you to remove species from a previous analysis. In the WorkingDirectory from a previous analysis there is a file called SpeciesIDs.txt. Comment out any species to be removed from the analysis using a '#' character and then run OrthoFinder using: 
 
-**python orthofinder.py -b previous_orthofinder_directory_containing_blast_results**
+**python orthofinder.py -b previous_orthofinder_directory_containing_blast_results [-a number_of_orthofinder_threads]**
 
 Preparing files without running BLAST or calculating orthogroups
 ================================================================
-The '-p' option will prepare the files in the format required by OrthoFinder and print the set of BLAST searches that need to be performed. This is useful if you want to manage the BLAST searches yourself. For example, you may want to distribute them across multiple machines. When the BLAST searches have been completed then orthogroups can be calcualted as described in the section, "Using pre-computed BLAST results".
+The '-p' option will prepare the files in the format required by OrthoFinder and print the set of BLAST searches that need to be performed. This is useful if you want to manage the BLAST searches yourself. For example, you may want to distribute them across multiple machines. When the BLAST searches have been completed then orthogroups can be calculated as described in the section, "Using pre-computed BLAST results". E.g.
+
+**python orthofinder.py -f directory_containing_fasta_files -p**
+
+Parallelising OrthoFinder Algorithm (-a option)
+===============================================
+There are two separate options for controlling the parallelisation of OrthoFinder: 
+1. -t number_of_blast_processes
+This option should always be used. The BLAST searches are by far the most time-consuming task and so as many should be run in parallel as there are cores available.
+
+2. -a number_of_orthofinder_threads
+The remainder of the algorithm once the BLAST searches have been performed is relatively fast and efficient and so this option has less effect. It is most useful when running OrthoFinder using pre-calculated BLAST results since the time savings will be more noticeable in this case. This is also the number of threads used when running MCL.
+
+RAM availability is an important consideration when using this option. Each thread loads all BLAST hits between the sequences in one species and all sequences in all other species. To give some very approximate numbers, each thread might require:
+
+0.02 GB per species for small genomes (e.g. bacteria)
+0.04 GB per species for larger genomes (e.g. vertebrates)
+0.2 GB per species for even larger genomes (e.g. plants)
+
+I.e. running an analysis on 10 vertebrate species with 5 threads for the OrthoFinder algorithm (-a 5) might require 10x0.04 = 0.4 GB per thread and so 5 x 0.4 = 2 GB of RAM in total. If you have the BLAST results already then the total size of the Blast0_*txt files gives a good approximation of the memory requirements per thread.
+
+Additionally, the speed at which files can be read is likely to be the limiting factor when using more than 5-10 threads on current architectures so you may not see any increases in speed beyond this. 
 
 Using pre-computed BLAST results
 ================================

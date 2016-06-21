@@ -29,7 +29,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "0.5.0"
+version = "0.6.0"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -45,25 +45,26 @@ expectedHelp="""OrthoFinder version %s Copyright (C) 2014 David Emms
 
 Simple Usage
 ------------
-python orthofinder.py -f fasta_directory [-t max_number_of_threads]
+python orthofinder.py -f fasta_directory [-t number_of_blast_threads] [-a number_of_orthofinder_threads]
     Infers orthologous groups for the proteomes contained in fasta_directory running
-    max_number_of_threads in parallel for the BLAST searches.
+    number_of_blast_threads in parallel for the BLAST searches and subsequently running
+    number_of_orthofinder_threads in parallel for the OrthoFinder algorithm.
 
 Advanced Usage
 --------------
 python orthofinder.py -f fasta_directory -p
     1. Prepares files for BLAST and prints the BLAST commands. Does not perform BLAST searches
-    or infer othologous groups. Useful if you want to prepare the files in the form required by
+    or infer orthologous groups. Useful if you want to prepare the files in the form required by
     OrthoFinder but want to perform the BLAST searches using a job scheduler/on a cluster and
     then infer orthologous groups using option 2.
 
-python orthofinder.py -b precalculated_blast_results_directory 
+python orthofinder.py -b precalculated_blast_results_directory [-a number_of_orthofinder_threads]
     2. Infers orthologous groups using pre-calculated BLAST results. These can be after BLAST
     searches have been completed following the use of option 1 or using the WorkingDirectory
     from a previous OrthoFinder run. Species can be commented out with a '#' in the SpeciesIDs.txt
     file to exclude them from the analysis. See README file for details.
 
-python orthofinder.py -b precalculated_blast_results_directory -f fasta_directory
+python orthofinder.py -b precalculated_blast_results_directory -f fasta_directory [-t number_of_blast_threads] [-a number_of_orthofinder_threads]
     3. Add species from fasta_directory to a previous OrthoFinder run where precalculated_blast_results_directory
     is the directory containing the BLAST results files etc. from the previous run.
 
@@ -75,10 +76,18 @@ Arguments
 -b precalculated_blast_results_directory, --blast precalculated_blast_results_directory
     Predict orthogroups using the pre-calcualted BLAST results in precalculated_blast_results_directory.
 
--t max_number_of_threads, --threads max_number_of_threads
-    The maximum number of BLAST processes to be run simultaneously. The deafult is 16 but this 
-    should be increased by the user to at least the number of cores on the computer so as to 
-    minimise the time taken to perform the BLAST all-versus-all queries.
+-t number_of_blast_threads, --threads number_of_blast_threads
+    The number of BLAST processes to be run simultaneously. This should be increased by the user to at least 
+    the number of cores on the computer so as to minimise the time taken to perform the BLAST all-versus-all 
+    queries. [Default is 16]
+
+-a number_of_orthofinder_threads, --algthreads number_of_orthofinder_threads
+    The number of threads to use for the OrthoFinder algorithm and MCL after BLAST searches have been completed. 
+    Running the OrthoFinder algorithm with a number of threads simultaneously increases the RAM 
+    requirements proportionally so be aware of the amount of RAM you have available (and see README file). 
+    Additionally, as the algorithm implementation is very fast, file reading is likely to be the 
+    limiting factor above about 5-10 threads and additional threads may have little effect other than 
+    increase RAM requirements. [Default is 1]
 
 -x speciesInfoFilename, --orthoxml speciesInfoFilename
     Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.
@@ -163,6 +172,13 @@ class TestCommandLine(unittest.TestCase):
         with CleanUp([], [], [currentResultsDir, ]):
             stdout, stderr = self.RunOrthoFinder("-f %s" % exampleFastaDir)
             self.CheckStandardRun(stdout, stderr, goldResultsDir_smallExample, expectedCSVFile)
+            
+    def test_fromfasta_threads(self):
+        currentResultsDir = exampleFastaDir + "Results_%s/" % datetime.date.today().strftime("%b%d") 
+        expectedCSVFile = currentResultsDir + "OrthologousGroups.csv"
+        with CleanUp([], [], [currentResultsDir, ]):
+            stdout, stderr = self.RunOrthoFinder("-f %s -t 4 -a 3" % exampleFastaDir)
+            self.CheckStandardRun(stdout, stderr, goldResultsDir_smallExample, expectedCSVFile)
            
     @unittest.skipIf(__skipLongTests__, "Only performing quick tests")     
     def test_fromfasta_full(self):
@@ -226,6 +242,14 @@ class TestCommandLine(unittest.TestCase):
         newFiles = [exampleBlastDir + fn for fn in newFiles]
         with CleanUp(newFiles, []):        
             stdout, stderr = self.RunOrthoFinder("--blast %s" % exampleBlastDir)
+            self.CheckStandardRun(stdout, stderr, goldResultsDir_smallExample, expectedCSVFile)
+        
+    def test_fromblast_algthreads(self):
+        expectedCSVFile = exampleBlastDir + "OrthologousGroups.csv"
+        newFiles = ("OrthologousGroups.csv OrthologousGroups_UnassignedGenes.csv OrthologousGroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()
+        newFiles = [exampleBlastDir + fn for fn in newFiles]
+        with CleanUp(newFiles, []):
+            stdout, stderr = self.RunOrthoFinder("-b %s -a 3" % exampleBlastDir)
             self.CheckStandardRun(stdout, stderr, goldResultsDir_smallExample, expectedCSVFile)
     
 #    @unittest.skipIf(__skipLongTests__, "Only performing quick tests")       

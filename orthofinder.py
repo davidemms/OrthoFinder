@@ -39,15 +39,16 @@ import scipy.sparse as sparse                   # install
 import os.path                                  # Y
 import numpy.core.numeric as numeric            # install
 import cPickle as pic                           # Y
-import time                                     # Y
-from collections import defaultdict             # Y
+from collections import defaultdict, namedtuple # Y
 import xml.etree.ElementTree as ET              # Y
 from xml.etree.ElementTree import SubElement    # Y
 from xml.dom import minidom                     # Y
 import Queue
+import resource
 
-version = "0.5.0"
+version = "0.6.0"
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
+picProtocol = 1
 if sys.platform.startswith("linux"):
     with open(os.devnull, "w") as f:
         subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f) # get round problem with python multiprocessing library that can set all cpu affinities to a single cpu
@@ -64,16 +65,15 @@ def RunCommandReport(command):
     RunCommand(command)
     util.PrintTime("Finished command: %s" % " ".join(command))
 
-def Worker_RunCommand(cmd_queue):
+def Worker_RunCommand(cmd_queue, nTotal):
     while True:
         try:
-            command = cmd_queue.get(True, 1)
-            util.PrintTime("Running command: %s" % " ".join(command))
+            iCommand, command = cmd_queue.get(True, 1)
+            util.PrintTime("Running Blast %d of %d" % (iCommand, nTotal))
             subprocess.call(command)
-            util.PrintTime("Finished command: %s" % " ".join(command))
+            util.PrintTime("Finished Blast %d of %d" % (iCommand, nTotal))
         except Queue.Empty:
-            return 
-   
+            return           
 class util:
     @staticmethod
     def GetDirectoryName(baseDirName, dateString, i):
@@ -105,7 +105,7 @@ class util:
     
     @staticmethod
     def PrintTime(message):
-        print(str(datetime.datetime.now()) + " : " + message)  
+        print(str(datetime.datetime.now()).rsplit(".", 1)[0] + " : " + message)  
            
     @staticmethod
     def SortArrayPairByFirst(useForSortAr, keepAlignedAr, qLargestFirst=False):
@@ -126,6 +126,9 @@ class util:
             speciesIndices.append(int(f[start+7:-3]))
         indices, sortedFasta = util.SortArrayPairByFirst(speciesIndices, fastaFilenames)
         return sortedFasta    
+        
+def Fail():
+    sys.exit()
     
 """
 IDExtractor
@@ -239,7 +242,7 @@ class MCL:
         return "%d_%d" % (speciesToUse[-1], singleID - speciesStartingIndices[len(speciesStartingIndices)-1]) 
     
     @staticmethod
-    def ConvertSingleIDsToIDPair(speciesStartingIndices, clustersFilename, newFilename, speciesToUse):
+    def ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, newFilename):
         with open(clustersFilename, 'rb') as clusterFile, open(newFilename, "wb") as output:
             header = True
             for line in clusterFile:
@@ -263,7 +266,7 @@ class MCL:
                     # continuation of group
                     ids = line.split()
                     for id in ids:
-                        idsString += MCL.GetIDPair(speciesStartingIndices, int(id), speciesToUse) + " "
+                        idsString += MCL.GetIDPair(seqsInfo.seqStartingIndices, int(id), seqsInfo.speciesToUse) + " "
                     output.write(initialText + "      " + idsString)
                     if appendDollar:
                         output.write("$\n")
@@ -347,10 +350,90 @@ class MCL:
         print("Orthologous groups have been written to orthoxml file:\n   %s" % orthoxmlFilename)
                         
     @staticmethod                       
-    def RunMCL(graphFilename, clustersFilename, inflation = 1.5):
-        command = ["mcl", graphFilename, "-I", "1.5", "-o", clustersFilename, "-te", str(nBlast)]
+    def RunMCL(graphFilename, clustersFilename, nProcesses, inflation = 1.5):
+        nProcesses = 4 if nProcesses > 4 else nProcesses    # MCL appears to take *longer* as more than 4 processes are used
+        command = ["mcl", graphFilename, "-I", "1.5", "-o", clustersFilename, "-te", str(nProcesses)]
         RunCommand(command)
         util.PrintTime("Ran MCL")  
+
+    @staticmethod 
+    def WriteOrthogroupFiles(ogs, idsFilenames, resultsBaseFilename, clustersFilename_pairs):
+        outputFN = resultsBaseFilename + ".txt"
+        try:
+            fullDict = dict()
+            for idsFilename in idsFilenames:
+                idExtract = FirstWordExtractor(idsFilename)
+                idDict = idExtract.GetIDToNameDict()
+                fullDict.update(idDict)
+            MCL.CreateOGs(ogs, outputFN, fullDict)
+        except KeyError as e:
+            sys.stderr.write("ERROR: Sequence ID not found in %s\n" % idsFilename)
+            sys.stderr.write(str(e) + "\n")
+            Fail()        
+        except RuntimeError as error:
+            print(error.message)
+            if error.message.startswith("ERROR"):
+                print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
+                Fail()
+            else:
+                print("Tried to use only the first part of the accession in order to list the sequences in each orthologous group more concisely but these were not unique. Will use the full accession line instead.")     
+                try:
+                    fullDict = dict()
+                    for idsFilename in idsFilenames:
+                        idExtract = FullAccession(idsFilename)
+                        idDict = idExtract.GetIDToNameDict()
+                        fullDict.update(idDict)
+                    MCL.CreateOGs(ogs, outputFN, fullDict)   
+                except:
+                    print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
+                    Fail()
+        return fullDict
+
+    @staticmethod 
+    def CreateOrthogroupTable(ogs, 
+                              idToNameDict, 
+                              speciesFilename, 
+                              speciesToUse,
+                              resultsBaseFilename):
+        
+        speciesNamesDict = dict()
+        with open(speciesFilename, 'rb') as speciesNamesFile:
+            for line in speciesNamesFile:
+                if line.startswith("#"): continue
+                short, full = line.rstrip().split(": ")
+                speciesNamesDict[int(short)] = full    
+        nSpecies = len(speciesNamesDict) 
+        
+        ogs_names = [[idToNameDict[seq] for seq in og] for og in ogs]
+        ogs_ints = [[map(int, sequence.split("_")) for sequence in og] for og in ogs]
+    
+        # write out
+        outputFilename = resultsBaseFilename + ".csv"
+        singleGeneFilename = resultsBaseFilename + "_UnassignedGenes.csv"
+        with open(outputFilename, 'wb') as outputFile, open(singleGeneFilename, 'wb') as singleGeneFile:
+            fileWriter = csv.writer(outputFile, delimiter="\t")
+            singleGeneWriter = csv.writer(singleGeneFile, delimiter="\t")
+            for writer in [fileWriter, singleGeneWriter]:
+                row = [""] + [speciesNamesDict[index] for index in speciesToUse]
+                writer.writerow(row)
+            
+            for iOg, (og, og_names) in enumerate(zip(ogs_ints, ogs_names)):
+                ogDict = defaultdict(list)
+                row = ["OG%07d" % iOg]
+                thisOutputWriter = fileWriter
+                # separate it into sequences from each species
+                if len(og) == 1:
+                    row.extend(['' for x in xrange(nSpecies)])
+                    row[speciesToUse.index(og[0][0]) + 1] = og_names[0]
+                    thisOutputWriter = singleGeneWriter
+                else:
+                    for (iSpecies, iSequence), name in zip(og, og_names):
+                        ogDict[speciesToUse.index(iSpecies)].append(name)
+                    for iSpecies in xrange(nSpecies):
+                        row.append(", ".join(sorted(ogDict[iSpecies])))
+                thisOutputWriter.writerow(row)
+        print("""Orthologous groups have been written to tab-delimited files:\n   %s\n   %s""" % (outputFilename, singleGeneFilename))
+        print("""And in OrthoMCL format:\n   %s""" % (outputFilename[:-3] + "txt"))
 
 """
 scnorm
@@ -410,26 +493,104 @@ class scnorm:
         lj_matrix = sparse.csr_matrix((lj_vals, (rangeh, rangeh)))
         return sparse.lil_matrix(10**(-params[1]) * li_matrix * b * lj_matrix)
 
+"""
+RunInfo
+-------------------------------------------------------------------------------
+"""     
+
+SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices")
+FileInfo = namedtuple("FileInfo", "inputDir outputDir graphFilename")
+
+def GetIDPairFromString(line):
+    return map(int, line.split("_"))
+
+def NumberOfSequences(seqsInfo, iSpecies):
+    return (seqsInfo.seqStartingIndices[iSpecies+1] if iSpecies != seqsInfo.nSpecies-1 else seqsInfo.nSeqs) - seqsInfo.seqStartingIndices[iSpecies] 
+
+def GetSequenceLengths(seqsInfo, fileInfo):                
+    sequenceLengths = []
+    for iSpecies, iFasta in enumerate(seqsInfo.speciesToUse):
+        sequenceLengths.append(np.zeros(NumberOfSequences(seqsInfo, iSpecies)))
+        fastaFilename = fileInfo.inputDir + "Species%d.fa" % iFasta
+        currentSequenceLength = 0
+        iCurrentSequence = -1
+        qFirstLine = True
+        with open(fastaFilename) as infile:
+            for row in infile:
+                if len(row) > 1 and row[0] == ">":    
+                    if qFirstLine:
+                        qFirstLine = False
+                    else:
+                        sequenceLengths[iSpecies][iCurrentSequence] = currentSequenceLength
+                        currentSequenceLength = 0
+                    _, iCurrentSequence = GetIDPairFromString(row[1:])
+                else:
+                    currentSequenceLength += len(row.rstrip())
+        sequenceLengths[iSpecies][iCurrentSequence] = currentSequenceLength
+    return sequenceLengths
+  
+# Redundant?  
+def GetNumberOfSequencesInFile(filename):
+    count = 0
+    with open(filename) as infile:
+        for line in infile:
+            if line.startswith(">"): count+=1
+    return count
+
+# Get Info from seqs IDs file?
+def GetSeqsInfo(inputDirectory, speciesToUse):
+    seqStartingIndices = [0]
+    nSeqs = 0
+    for i, iFasta in enumerate(speciesToUse):
+        fastaFilename = inputDirectory + "Species%d.fa" % iFasta
+        with open(fastaFilename) as infile:
+            for line in infile:
+                if len(line) > 1 and line[0] == ">":
+                    nSeqs+=1
+        seqStartingIndices.append(nSeqs)
+    seqStartingIndices = seqStartingIndices[:-1]
+    nSpecies = len(speciesToUse)
+    return SequencesInfo(nSeqs=nSeqs, nSpecies=nSpecies, speciesToUse=speciesToUse, seqStartingIndices=seqStartingIndices)
+ 
+def GetSpeciesToUse(speciesIDsFN):
+    speciesToUse = []
+    with open(speciesIDsFN, 'rb') as speciesF:
+        for line in speciesF:
+            if len(line) == 0 or line[0] == "#": continue
+            speciesToUse.append(int(line.split(":")[0]))
+    return speciesToUse
+
+
+""" Question: Do I want to do all BLASTs or just the required ones? It's got to be all BLASTs I think. They could potentially be 
+run after the clustering has finished."""
+def GetOrderedBlastCommands(seqsInfo, previousFastaFiles, newFastaFiles, workingDir):
+    """ Using the nSeq1 x nSeq2 as a rough estimate of the amount of work required for a given species-pair, returns the commands 
+    ordered so that the commands predicted to take the longest come first. This allows the load to be balanced better when processing 
+    the BLAST commands.
+    """
+    iSpeciesPrevious = [int(fn[fn.rfind("Species") + 7:].split(".")[0]) for fn in previousFastaFiles]
+    iSpeciesNew = [int(fn[fn.rfind("Species") + 7:].split(".")[0]) for fn in newFastaFiles]
+    nSeqs = {i:GetNumberOfSequencesInFile(workingDir + "Species%d.fa" % i) for i in (iSpeciesPrevious+iSpeciesNew)}
+    speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew)] + \
+                   [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesPrevious)] + \
+                   [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew)] 
+    taskSizes = [nSeqs[i]*nSeqs[j] for i,j in speciesPairs]
+    taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
+    commands = [["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", workingDir + "Species%d.fa" % iFasta, "-db", workingDir + "BlastDBSpecies%d" % iDB, "-out", "%sBlast%d_%d.txt" % (workingDir, iFasta, iDB)]
+                    for iFasta, iDB in speciesPairs]               
+    return commands 
  
 """
 BlastFileProcessor
 -------------------------------------------------------------------------------
 """   
-class BlastFileProcessor(object): 
-    def __init__(self, filesDirectory, speciesToUse, nSeqs, nSpecies, speciesStartingIndices):     
-        self.filesDirectory = filesDirectory
-        self.speciesToUse = speciesToUse
-        self.nSeqs = nSeqs
-        self.nSpecies = nSpecies
-        self.speciesStartingIndices = speciesStartingIndices
-        self.sep = "_"
-        self.tol = 1e-3
-        
-    def GetBH_s(self, pairwiseScoresMatrices, iSpecies):
-        nSeqs_i = self.NumberOfSequences(iSpecies)
+class BlastFileProcessor(object):        
+    @staticmethod
+    def GetBH_s(pairwiseScoresMatrices, seqsInfo, iSpecies, tol=1e-3):
+        nSeqs_i = NumberOfSequences(seqsInfo, iSpecies)
         bestHitForSequence = -1*np.ones(nSeqs_i)
-        H = [None for i_ in xrange(self.nSpecies)] # create array of Nones to be replace by matrices
-        for j in xrange(self.nSpecies):
+        H = [None for i_ in xrange(seqsInfo.nSpecies)] # create array of Nones to be replace by matrices
+        for j in xrange(seqsInfo.nSpecies):
             if iSpecies == j:
                 # identify orthologs then come back to paralogs
                 continue
@@ -443,7 +604,7 @@ class BlastFileProcessor(object):
                 m = max(values.data[0])
                 bestHitForSequence[kRow] = m if m > bestHitForSequence[kRow] else bestHitForSequence[kRow]
                 # get all above this value with tolerance
-                temp = [index for index, value in zip(values.rows[0], values.data[0]) if value > m - self.tol]
+                temp = [index for index, value in zip(values.rows[0], values.data[0]) if value > m - tol]
                 J.extend(temp)
                 I.extend(kRow * np.ones(len(temp), dtype=np.dtype(int)))
             H[j] = sparse.csr_matrix((np.ones(len(I)), (I, J)), shape=W.get_shape())
@@ -455,109 +616,26 @@ class BlastFileProcessor(object):
             values=W.getrowview(kRow)
             if values.nnz == 0:
                 continue
-            temp = [index for index, value in zip(values.rows[0], values.data[0]) if value > bestHitForSequence[kRow] - self.tol]
+            temp = [index for index, value in zip(values.rows[0], values.data[0]) if value > bestHitForSequence[kRow] - tol]
             J.extend(temp)
             I.extend(kRow * np.ones(len(temp), dtype=np.dtype(int)))
         H[iSpecies] = sparse.csr_matrix((np.ones(len(I)), (I, J)), shape=W.get_shape())
         return H
-       
-    def MatrixAnd(self, H):       
-        for i in xrange(self.nSpecies):
-            for j in xrange(i + 1):
-                H[i][j] = H[i][j].multiply(H[j][i].transpose())
-                if i != j:
-                    H[j][i] = H[i][j].transpose() 
-        return H
-       
-    @staticmethod             
-    def MatricesAnd_s(Xarr, Yarr):
-        Zarr = []
-        for x, y in zip(Xarr, Yarr):
-            Zarr.append(x.multiply(y))
-        return Zarr
-        
-    @staticmethod             
-    def MatricesAndTr_s(Xarr, Yarr):
-        Zarr = []
-        for x, y in zip(Xarr, Yarr):
-            Zarr.append(x.multiply(y.transpose()))
-        return Zarr
-    
-    @staticmethod        
-    def GetNumberOfSequencesInFile(filename):
-        lastIDLine = ""
-        sequenceStartingIndices = []
-        currentSpecies = 0
-        sequenceStartingIndices.append(0)
-        with open(filename) as file:
-            count = 0
-            for line in file:
-                if len(line) > 1 and line[0] == ">":
-                    count+=1
-                    lastIDLine = line
-                    thisSpecies = int(line[1:].split("_", 1)[0])
-                    if thisSpecies != currentSpecies:
-                        sequenceStartingIndices.append(count-1)
-                        currentSpecies = thisSpecies 
-        nSpecies = int(lastIDLine[1:].split("_")[0]) + 1
-        return count, nSpecies, sequenceStartingIndices
-        
-    def GetIDPairFromString(self, line):
-        return map(int, line.split(self.sep))
-        
-    def NumberOfSequences(self, iSpecies):
-        return (self.speciesStartingIndices[iSpecies+1] if iSpecies != self.nSpecies-1 else self.nSeqs) - self.speciesStartingIndices[iSpecies] 
-  
-    @staticmethod   
-    def GetNumberOfSequencesInFileFromDir(inputDirectory, speciesToUse):
-        sequenceStartingIndices = [0]
-        count = 0
-        for i, iFasta in enumerate(speciesToUse):
-            fastaFilename = inputDirectory + "Species%d.fa" % iFasta
-            with open(fastaFilename) as file:
-                for line in file:
-                    if len(line) > 1 and line[0] == ">":
-                        count+=1
-            sequenceStartingIndices.append(count)
-        sequenceStartingIndices = sequenceStartingIndices[:-1]
-        nSpecies = len(speciesToUse)
-        return count, nSpecies, sequenceStartingIndices
-        
-    def GetSequenceLengths(self):                
-        sequenceLengths = []
-        for iSpecies, iFasta in enumerate(self.speciesToUse):
-            sequenceLengths.append(np.zeros(self.NumberOfSequences(iSpecies)))
-            fastaFilename = self.filesDirectory + "Species%d.fa" % iFasta
-            currentSequenceLength = 0
-            iCurrentSequence = -1
-            qFirstLine = True
-            with open(fastaFilename) as file:
-                for row in file:
-                    if len(row) > 1 and row[0] == ">":    
-                        if qFirstLine:
-                            qFirstLine = False
-                        else:
-                            sequenceLengths[iSpecies][iCurrentSequence] = currentSequenceLength
-                            currentSequenceLength = 0
-                        _, iCurrentSequence = self.GetIDPairFromString(row[1:])
-                    else:
-                        currentSequenceLength += len(row.rstrip())
-            sequenceLengths[iSpecies][iCurrentSequence] = currentSequenceLength
-        return sequenceLengths
-                   
-    def GetBLAST6Scores(self, iSpecies, jSpecies, qExcludeSelfHits = True): 
-        nSeqs_i = self.NumberOfSequences(iSpecies)
-        nSeqs_j = self.NumberOfSequences(jSpecies)
+                                       
+    @staticmethod
+    def GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies, qExcludeSelfHits = True, sep = "_"): 
+        nSeqs_i = NumberOfSequences(seqsInfo, iSpecies)
+        nSeqs_j = NumberOfSequences(seqsInfo, jSpecies)
         B = sparse.lil_matrix((nSeqs_i, nSeqs_j))
         row = ""
         try:
-            with open(self.filesDirectory + "Blast%d_%d.txt" % (self.speciesToUse[iSpecies], self.speciesToUse[jSpecies]), 'rb') as blastfile:
+            with open(fileInfo.inputDir + "Blast%d_%d.txt" % (seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies]), 'rb') as blastfile:
                 blastreader = csv.reader(blastfile, delimiter='\t')
                 for row in blastreader:    
                     # Get hit and query IDs
                     try:
-                        species1ID, sequence1ID = map(int, row[0].split(self.sep, 1)) 
-                        species2ID, sequence2ID = map(int, row[1].split(self.sep, 1))     
+                        species1ID, sequence1ID = map(int, row[0].split(sep, 1)) 
+                        species2ID, sequence2ID = map(int, row[1].split(sep, 1))     
                     except (IndexError, ValueError):
                         sys.stderr.write("\nERROR: Query or hit sequence ID in BLAST results file was missing or incorrectly formatted.\n")
                         raise
@@ -583,116 +661,90 @@ class BlastFileProcessor(object):
                         sys.stderr.write("but found a query/hit in the Blast%d_%d.txt for sequence %d_%d (i.e. %s sequence in species %d).\n" %  (iSpecies, jSpecies, kSpecies, sequencekID, ord(sequencekID+1), kSpecies))
                         Fail()
         except Exception:
-            sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (self.filesDirectory, iSpecies, jSpecies))
+            sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (seqsInfo.inputdir, iSpecies, jSpecies))
             sys.stderr.write("\t".join(row) + "\n")
             Fail()
         return B       
 
 """
+Matrices
+-------------------------------------------------------------------------------
+""" 
+
+def DumpMatrix(name, m, fileInfo, iSpecies, jSpecies):
+    with open(fileInfo.outputDir + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'wb') as picFile:
+        pic.dump(m, picFile, protocol=picProtocol)
+    
+def DumpMatrixArray(name, matrixArray, fileInfo, iSpecies):
+    for jSpecies, m in enumerate(matrixArray):
+        DumpMatrix(name, m, fileInfo, iSpecies, jSpecies)
+
+def DeleteMatrices(fileInfo):
+    for f in glob.glob(fileInfo.outputDir + "B*_*.pic"):
+        os.remove(f)
+    for f in glob.glob(fileInfo.outputDir + "connect*_*.pic"):
+        os.remove(f)
+
+def LoadMatrix(name, fileInfo, iSpecies, jSpecies): 
+    with open(fileInfo.outputDir + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'rb') as picFile:  
+        M = pic.load(picFile)
+    return M
+        
+def LoadMatrixArray(name, fileInfo, seqsInfo, iSpecies, row=True):
+    matrixArray = []
+    for jSpecies in xrange(seqsInfo.nSpecies):
+        if row == True:
+            matrixArray.append(LoadMatrix(name, fileInfo, iSpecies, jSpecies))
+        else:
+            matrixArray.append(LoadMatrix(name, fileInfo, jSpecies, iSpecies))
+    return matrixArray
+              
+def MatricesAnd_s(Xarr, Yarr):
+    Zarr = []
+    for x, y in zip(Xarr, Yarr):
+        Zarr.append(x.multiply(y))
+    return Zarr
+                
+def MatricesAndTr_s(Xarr, Yarr):
+    Zarr = []
+    for x, y in zip(Xarr, Yarr):
+        Zarr.append(x.multiply(y.transpose()))
+    return Zarr    
+    
+"""
 WaterfallMethod
 -------------------------------------------------------------------------------
-"""   
-class WaterfallMethod:
-    def __init__(self, inputDirectory, outputDirectory, speciesToUse, nSeqs, nSpecies, speciesStartingIndices):
-        self.thisBfp = BlastFileProcessor(inputDirectory, speciesToUse, nSeqs, nSpecies, speciesStartingIndices)    
-        self.outputDir = outputDirectory 
-        self.speciesToUse = speciesToUse
-        if not os.path.exists(self.outputDir):
-           os.mkdir(self.outputDir)  
-        self.picProtocol = 1
-        self.totalDump = 0.
-        self.totalLoad = 0.
-        
-    def RunWaterfallMethod(self, graphFilename):
-        util.PrintTime("Started")   
-        Lengths = self.thisBfp.GetSequenceLengths()
-        util.PrintTime("Got sequence lengths")
-        util.PrintTime("Initial processing of each species")
-        # process up to the best hits for each species
-        for iSpecies in xrange(self.thisBfp.nSpecies):
-            Bi = []
-            for jSpecies in xrange(self.thisBfp.nSpecies):
-                Bij = self.thisBfp.GetBLAST6Scores(iSpecies, jSpecies)  
-                Bij = self.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
-                Bi.append(Bij)
-            self.DumpMatrixArray("B", Bi, iSpecies)
-            BH = self.thisBfp.GetBH_s(Bi, iSpecies)
-            self.DumpMatrixArray("BH", BH, iSpecies)
-            util.PrintTime("Initial processing of species %d complete" % iSpecies)
-        
-        for iSpecies in xrange(self.thisBfp.nSpecies):
-            # calculate RBH for species i
-            BHix = self.LoadMatrixArray("BH", iSpecies)
-            BHxi = self.LoadMatrixArray("BH", iSpecies, row=False)
-            RBHi = self.thisBfp.MatricesAndTr_s(BHix, BHxi)   # twice as much work as before (only did upper triangular before)
-            B = self.LoadMatrixArray("B", iSpecies)
-            connect = self.ConnectAllBetterThanAnOrtholog_s(RBHi, B, iSpecies) 
-            self.DumpMatrixArray("connect", connect, iSpecies) 
-        util.PrintTime("Connected putatitive homologs") 
-        
-        with open(graphFilename, 'wb') as graphFile:
-            graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (self.thisBfp.nSeqs, self.thisBfp.nSeqs)) 
-            graphFile.write("\n(mclmatrix\nbegin\n\n")  
-            for iSpec in xrange(self.thisBfp.nSpecies):
-                # calculate the 2-way connections for one query species
-                connect2 = []
-                for jSpec in xrange(self.thisBfp.nSpecies):
-                    m1 = self.LoadMatrix("connect", iSpec, jSpec)
-                    m2tr = numeric.transpose(self.LoadMatrix("connect", jSpec, iSpec))
-                    connect2.append(m1 + m2tr)
-                B = self.LoadMatrixArray("B", iSpec)
-                B_connect = self.thisBfp.MatricesAnd_s(connect2, B)
-                util.PrintTime("Writen final scores for species %d to graph file" % iSpec)
-                
-                W = [b.sorted_indices().tolil() for b in B_connect]
-                for query in xrange(self.thisBfp.NumberOfSequences(iSpec)):
-                    offset = self.thisBfp.speciesStartingIndices[iSpec]
-                    graphFile.write("%d    " % (offset + query))
-                    for jSpec in xrange(self.thisBfp.nSpecies):
-                        row = W[jSpec].getrowview(query)
-                        jOffset = self.thisBfp.speciesStartingIndices[jSpec]
-                        for j, value in zip(row.rows[0], row.data[0]):
-                            graphFile.write("%d:%.3f " % (j + jOffset, value))
-                    graphFile.write("$\n")
-                        
-            graphFile.write(")\n")
+""" 
 
-        # delete pic files
-        self.DeleteMatrices()
+def WriteGraph_perSpecies(args):
+    seqsInfo, fileInfo, iSpec = args            
+    # calculate the 2-way connections for one query species
+    with open(fileInfo.graphFilename + "_%d" % iSpec, 'wb') as graphFile:
+        connect2 = []
+        for jSpec in xrange(seqsInfo.nSpecies):
+            m1 = LoadMatrix("connect", fileInfo, iSpec, jSpec)
+            m2tr = numeric.transpose(LoadMatrix("connect", fileInfo, jSpec, iSpec))
+            connect2.append(m1 + m2tr)
+        B = LoadMatrixArray("B", fileInfo, seqsInfo, iSpec)
+        B_connect = MatricesAnd_s(connect2, B)
         
-    def DeleteMatrices(self):
-        for f in glob.glob(self.outputDir + "B*_*.pic"):
-            os.remove(f)
-        for f in glob.glob(self.outputDir + "connect*_*.pic"):
-            os.remove(f)
-
-    def DumpMatrix(self, name, m, iSpecies, jSpecies):
-        start = time.time()
-        with open(self.outputDir + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'wb') as picFile:
-            pic.dump(m, picFile, protocol=self.picProtocol)
-        self.totalDump += (time.time() - start)
-        
-    def DumpMatrixArray(self, name, matrixArray, iSpecies):
-        for jSpecies, m in enumerate(matrixArray):
-            self.DumpMatrix(name, m, iSpecies, jSpecies)
-
-    def LoadMatrix(self, name, iSpecies, jSpecies):   
-        start = time.time()
-        with open(self.outputDir + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'rb') as picFile:  
-            M = pic.load(picFile)
-        self.totalLoad += (time.time() - start)
-        return M
+        W = [b.sorted_indices().tolil() for b in B_connect]
+        for query in xrange(NumberOfSequences(seqsInfo, iSpec)):
+            offset = seqsInfo.seqStartingIndices[iSpec]
+            graphFile.write("%d    " % (offset + query))
+            for jSpec in xrange(seqsInfo.nSpecies):
+                row = W[jSpec].getrowview(query)
+                jOffset = seqsInfo.seqStartingIndices[jSpec]
+                for j, value in zip(row.rows[0], row.data[0]):
+                    graphFile.write("%d:%.3f " % (j + jOffset, value))
+            graphFile.write("$\n")
+        if iSpec == (seqsInfo.nSpecies - 1): graphFile.write(")\n")
+        util.PrintTime("Writen final scores for species %d to graph file" % iSpec)
             
-    def LoadMatrixArray(self, name, iSpecies, row=True):
-        matrixArray = []
-        for jSpecies in xrange(self.thisBfp.nSpecies):
-            if row == True:
-                matrixArray.append(self.LoadMatrix(name, iSpecies, jSpecies))
-            else:
-                matrixArray.append(self.LoadMatrix(name, jSpecies, iSpecies))
-        return matrixArray
-        
-    def NormaliseScores(self, B, Lengths, iSpecies, jSpecies):              
+            
+class WaterfallMethod:    
+    @staticmethod
+    def NormaliseScores(B, Lengths, iSpecies, jSpecies):              
         Li, Lj, scores = scnorm.GetLengthArraysForMatrix(B, Lengths[iSpecies], Lengths[jSpecies])
         Lf = Li * Lj     
         topLf, topScores = scnorm.GetTopPercentileOfScores(Lf, scores, 95)   
@@ -702,10 +754,96 @@ class WaterfallMethod:
         else:
             print("WARNING: Too few hits between species %d and species %d to normalise the scores, these hits will be ignored" % (iSpecies, jSpecies))
             return sparse.lil_matrix(B.get_shape())
+            
+    @staticmethod
+    def ProcessBlastHits(seqsInfo, fileInfo, Lengths, iSpecies):
+        util.PrintTime("Starting species %d" % iSpecies)
+        # process up to the best hits for each species
+        Bi = []
+        for jSpecies in xrange(seqsInfo.nSpecies):
+            Bij = BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies)  
+            Bij = WaterfallMethod.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
+            Bi.append(Bij)
+        DumpMatrixArray("B", Bi, fileInfo, iSpecies)
+        BH = BlastFileProcessor.GetBH_s(Bi, seqsInfo, iSpecies)
+        DumpMatrixArray("BH", BH, fileInfo, iSpecies)
+        util.PrintTime("Initial processing of species %d complete" % iSpecies)
+        
+    @staticmethod 
+    def Worker_ProcessBlastHits(cmd_queue):
+        while True:
+            try:
+                args = cmd_queue.get(True, 1)
+                WaterfallMethod.ProcessBlastHits(*args)
+            except Queue.Empty:
+                return 
 
-    def GetMostDistant_s(self, RBH, B, iSpec):
-        mostDistant = numeric.transpose(np.ones(self.thisBfp.NumberOfSequences(iSpec))*1e9)
-        for kSpec in xrange(self.thisBfp.nSpecies):
+    @staticmethod
+    def ConnectCognates(seqsInfo, fileInfo, iSpecies): 
+        # calculate RBH for species i
+        BHix = LoadMatrixArray("BH", fileInfo, seqsInfo, iSpecies)
+        BHxi = LoadMatrixArray("BH", fileInfo, seqsInfo, iSpecies, row=False)
+        RBHi = MatricesAndTr_s(BHix, BHxi)   # twice as much work as before (only did upper triangular before)
+        B = LoadMatrixArray("B", fileInfo, seqsInfo, iSpecies)
+        connect = WaterfallMethod.ConnectAllBetterThanAnOrtholog_s(RBHi, B, seqsInfo, iSpecies) 
+        DumpMatrixArray("connect", connect, fileInfo, iSpecies)
+            
+    @staticmethod 
+    def Worker_ConnectCognates(cmd_queue):
+        while True:
+            try:
+                args = cmd_queue.get(True, 1)
+                WaterfallMethod.ConnectCognates(*args)
+            except Queue.Empty:
+                return  
+                                   
+    @staticmethod
+    def WriteGraphParallel(seqsInfo, fileInfo):
+        with open(fileInfo.graphFilename + "_header", 'wb') as graphFile:
+            graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (seqsInfo.nSeqs, seqsInfo.nSeqs)) 
+            graphFile.write("\n(mclmatrix\nbegin\n\n") 
+        pool = mp.Pool()
+        pool.map(WriteGraph_perSpecies, [(seqsInfo, fileInfo, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
+        subprocess.call("cat " + fileInfo.graphFilename + "_header " + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename, shell=True)
+        # Cleanup
+        os.remove(fileInfo.graphFilename + "_header")
+        for iSp in xrange(seqsInfo.nSpecies): os.remove(fileInfo.graphFilename + "_%d" % iSp)
+        DeleteMatrices(fileInfo) 
+        
+#    @staticmethod
+#    def WriteGraph(seqsInfo, fileInfo):
+#        with open(fileInfo.graphFilename, 'wb') as graphFile:
+#            graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (seqsInfo.nSeqs, seqsInfo.nSeqs)) 
+#            graphFile.write("\n(mclmatrix\nbegin\n\n")  
+#            for iSpec in xrange(seqsInfo.nSpecies):
+#                # calculate the 2-way connections for one query species
+#                connect2 = []
+#                for jSpec in xrange(seqsInfo.nSpecies):
+#                    m1 = LoadMatrix("connect", fileInfo, iSpec, jSpec)
+#                    m2tr = numeric.transpose(LoadMatrix("connect", fileInfo, jSpec, iSpec))
+#                    connect2.append(m1 + m2tr)
+#                B = LoadMatrixArray("B", fileInfo, seqsInfo, iSpec)
+#                B_connect = MatricesAnd_s(connect2, B)
+#                
+#                W = [b.sorted_indices().tolil() for b in B_connect]
+#                for query in xrange(NumberOfSequences(seqsInfo, iSpec)):
+#                    offset = seqsInfo.seqStartingIndices[iSpec]
+#                    graphFile.write("%d    " % (offset + query))
+#                    for jSpec in xrange(seqsInfo.nSpecies):
+#                        row = W[jSpec].getrowview(query)
+#                        jOffset = seqsInfo.seqStartingIndices[jSpec]
+#                        for j, value in zip(row.rows[0], row.data[0]):
+#                            graphFile.write("%d:%.3f " % (j + jOffset, value))
+#                    graphFile.write("$\n")
+#                util.PrintTime("Writen final scores for species %d to graph file" % iSpec)
+#            graphFile.write(")\n")
+#        # delete pic files
+#        DeleteMatrices(fileInfo)                
+                
+    @staticmethod
+    def GetMostDistant_s(RBH, B, seqsInfo, iSpec):
+        mostDistant = numeric.transpose(np.ones(NumberOfSequences(seqsInfo, iSpec))*1e9)
+        for kSpec in xrange(seqsInfo.nSpecies):
             B[kSpec] = B[kSpec].tocsr()
             if iSpec == kSpec:
                 continue
@@ -714,10 +852,11 @@ class WaterfallMethod:
                 mostDistant[I] = np.minimum(B[kSpec][I, J], mostDistant[I])
         return mostDistant
     
-    def ConnectAllBetterThanCutoff_s(self, B, mostDistant, iSpec):
+    @staticmethod
+    def ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec):
         connect = []
-        nSeqs_i = self.thisBfp.NumberOfSequences(iSpec)
-        for jSpec in xrange(self.thisBfp.nSpecies):
+        nSeqs_i = NumberOfSequences(seqsInfo, iSpec)
+        for jSpec in xrange(seqsInfo.nSpecies):
             M=B[jSpec].tolil()
             if iSpec != jSpec:
                 IIJJ = [(i,j) for i, (valueRow, indexRow) in enumerate(zip(M.data, M.rows)) for j, v in zip(indexRow, valueRow) if v >= mostDistant[i]]
@@ -726,13 +865,14 @@ class WaterfallMethod:
             II = [i for (i, j) in IIJJ]
             JJ = [j for (i, j) in IIJJ]
             onesArray = np.ones(len(IIJJ))
-            mat = sparse.csr_matrix( (onesArray,  (II, JJ)), shape=(nSeqs_i,  self.thisBfp.NumberOfSequences(jSpec)))
+            mat = sparse.csr_matrix( (onesArray,  (II, JJ)), shape=(nSeqs_i,  NumberOfSequences(seqsInfo, jSpec)))
             connect.append(mat)
         return connect
-      
-    def ConnectAllBetterThanAnOrtholog_s(self, RBH, B, iSpec):        
-        mostDistant = self.GetMostDistant_s(RBH, B, iSpec) 
-        connect = self.ConnectAllBetterThanCutoff_s(B, mostDistant, iSpec)
+    
+    @staticmethod
+    def ConnectAllBetterThanAnOrtholog_s(RBH, B, seqsInfo, iSpec):        
+        mostDistant = WaterfallMethod.GetMostDistant_s(RBH, B, seqsInfo, iSpec) 
+        connect = WaterfallMethod.ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec)
         return connect
 
 """
@@ -740,6 +880,7 @@ OrthoFinder
 -------------------------------------------------------------------------------
 """   
 nBlastDefault = 16
+nAlgDefault = 1
 
 def CanRunCommand(command, qAllowStderr = False):
     util.PrintNoNewLine("Test can run \"%s\"" % command)       # print without newline
@@ -778,51 +919,29 @@ def PrintCitation():
 def PrintHelp():  
     print("Simple Usage") 
     print("------------")
-    print("python orthofinder.py -f fasta_directory [-t max_number_of_threads]")
+    print("python orthofinder.py -f fasta_directory [-t number_of_blast_threads] [-a number_of_orthofinder_threads]")
     print("    Infers orthologous groups for the proteomes contained in fasta_directory running")
-    print("    max_number_of_threads in parallel for the BLAST searches.")
+    print("    number_of_blast_threads in parallel for the BLAST searches and subsequently running")
+    print("    number_of_orthofinder_threads in parallel for the OrthoFinder algorithm.")
     print("")    
     print("Advanced Usage")
     print("--------------")
     print("python orthofinder.py -f fasta_directory -p")
     print("    1. Prepares files for BLAST and prints the BLAST commands. Does not perform BLAST searches")
-    print("    or infer othologous groups. Useful if you want to prepare the files in the form required by")
+    print("    or infer orthologous groups. Useful if you want to prepare the files in the form required by")
     print("    OrthoFinder but want to perform the BLAST searches using a job scheduler/on a cluster and")
     print("    then infer orthologous groups using option 2.")
     print("")
-    print("python orthofinder.py -b precalculated_blast_results_directory ")
+    print("python orthofinder.py -b precalculated_blast_results_directory [-a number_of_orthofinder_threads]")
     print("    2. Infers orthologous groups using pre-calculated BLAST results. These can be after BLAST")
     print("    searches have been completed following the use of option 1 or using the WorkingDirectory")
     print("    from a previous OrthoFinder run. Species can be commented out with a '#' in the SpeciesIDs.txt")
     print("    file to exclude them from the analysis. See README file for details.")
     print("")
-    print("python orthofinder.py -b precalculated_blast_results_directory -f fasta_directory")
+    print("python orthofinder.py -b precalculated_blast_results_directory -f fasta_directory [-t number_of_blast_threads] [-a number_of_orthofinder_threads]")
     print("    3. Add species from fasta_directory to a previous OrthoFinder run where precalculated_blast_results_directory")
     print("    is the directory containing the BLAST results files etc. from the previous run.")
-    print("")
-#    print("python orthofinder.py -s precalculated_blast_results_directory")
-#    print("    4. Use a subset of species from a previous OrthoFinder run. The precalculated_blast_results_directory")
-#    print("    should contain the BLAST results files etc. plus an extra, user-supplied file 'SpeciesSubset.txt'")
-#    print("    specifying which species should be included. See README file for details.")
-#    print("")
-    
-#    print("Arguments:\n")
-#    print("""-f fasta_directory, --fasta fasta_directory
-#   Predict orthogroups for the genes in the fasta files in the fasta_directory\n""")
-#    
-#    print("""-b precalculated_blast_results_directory, --blast precalculated_blast_results_directory
-#   Predict orthogroups using the pre-calcualted BLAST results in precalculated_blast_results_directory.
-#   The directory must contain the BLAST results files, fasta files with IDs for the accessions, 
-#   SequenceIDs.txt and SpeciesIDs.txt in the formats described in the README file.\n""")
-#    
-#    print("""-t max_number_of_threads, --threads max_number_of_threads
-#   The maximum number of BLAST processes to be run simultaneously. The deafult is %d but this 
-#   should be increased by the user to at least the number of cores on the computer so as to 
-#   minimise the time taken to perform the BLAST all-versus-all queries.\n""" % nBlastDefault)
-#    
-#    print("""-x speciesInfoFilename, --orthoxml speciesInfoFilename
-#   Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.\n""")
-        
+    print("")        
     print("Arguments")
     print("---------")
     print("""-f fasta_directory, --fasta fasta_directory
@@ -831,10 +950,18 @@ def PrintHelp():
     print("""-b precalculated_blast_results_directory, --blast precalculated_blast_results_directory
     Predict orthogroups using the pre-calcualted BLAST results in precalculated_blast_results_directory.\n""")
     
-    print("""-t max_number_of_threads, --threads max_number_of_threads
-    The maximum number of BLAST processes to be run simultaneously. The deafult is %d but this 
-    should be increased by the user to at least the number of cores on the computer so as to 
-    minimise the time taken to perform the BLAST all-versus-all queries.\n""" % nBlastDefault)
+    print("""-t number_of_blast_threads, --threads number_of_blast_threads
+    The number of BLAST processes to be run simultaneously. This should be increased by the user to at least 
+    the number of cores on the computer so as to minimise the time taken to perform the BLAST all-versus-all 
+    queries. [Default is %d]\n""" % nBlastDefault)
+    
+    print("""-a number_of_orthofinder_threads, --algthreads number_of_orthofinder_threads
+    The number of threads to use for the OrthoFinder algorithm and MCL after BLAST searches have been completed. 
+    Running the OrthoFinder algorithm with a number of threads simultaneously increases the RAM 
+    requirements proportionally so be aware of the amount of RAM you have available (and see README file). 
+    Additionally, as the algorithm implementation is very fast, file reading is likely to be the 
+    limiting factor above about 5-10 threads and additional threads may have little effect other than 
+    increase RAM requirements. [Default is %d]\n""" % nAlgDefault)
     
     print("""-x speciesInfoFilename, --orthoxml speciesInfoFilename
     Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.\n""")
@@ -842,10 +969,15 @@ def PrintHelp():
     print("""-p , --prepare
     Only prepare the files in the format required by OrthoFinder and print out the BLAST searches that
     need to be performed but don't run BLAST or infer orthologous groups\n""" )
-    
+        
     print("""-h, --help
     Print this help text""")
-    PrintCitation()
+    PrintCitation() 
+    
+"""
+Main
+-------------------------------------------------------------------------------
+"""   
 
 def GetDirectoryArgument(arg, args):
     if len(args) == 0:
@@ -855,9 +987,6 @@ def GetDirectoryArgument(arg, args):
     if directory[-1] != os.sep:
         directory += os.sep
     return directory
-
-def Fail():
-    sys.exit()
     
 def AssignIDsToSequences(fastaDirectory, outputDirectory):
     idsFilename = outputDirectory + "SequenceIDs.txt"
@@ -899,118 +1028,6 @@ def AssignIDsToSequences(fastaDirectory, outputDirectory):
     if len(originalFastaFilenames) > 0: outputFasta.close()
     return returnFilenames, originalFastaFilenames, idsFilename, speciesFilename, newSpeciesIDs
 
-def AnalyseSequences(inputDir, outputDir, speciesToUse, nSeqs, nSpecies, speciesStartingIndices, graphFilename):
-    wfAlg = WaterfallMethod(inputDir, outputDir, speciesToUse, nSeqs, nSpecies, speciesStartingIndices)
-    wfAlg.RunWaterfallMethod(graphFilename)
-
-def WriteOrthogroupFiles(ogs, idsFilenames, resultsBaseFilename, clustersFilename_pairs):
-    outputFN = resultsBaseFilename + ".txt"
-    try:
-        fullDict = dict()
-        for idsFilename in idsFilenames:
-            idExtract = FirstWordExtractor(idsFilename)
-            idDict = idExtract.GetIDToNameDict()
-            fullDict.update(idDict)
-        MCL.CreateOGs(ogs, outputFN, fullDict)
-    except KeyError as e:
-        sys.stderr.write("ERROR: Sequence ID not found in %s\n" % idsFilename)
-        sys.stderr.write(str(e) + "\n")
-        Fail()        
-    except RuntimeError as error:
-        print(error.message)
-        if error.message.startswith("ERROR"):
-            print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
-            Fail()
-        else:
-            print("Tried to use only the first part of the accession in order to list the sequences in each orthologous group more concisely but these were not unique. Will use the full accession line instead.")     
-            try:
-                fullDict = dict()
-                for idsFilename in idsFilenames:
-                    idExtract = FullAccession(idsFilename)
-                    idDict = idExtract.GetIDToNameDict()
-                    fullDict.update(idDict)
-                MCL.CreateOGs(ogs, outputFN, fullDict)   
-            except:
-                print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
-                Fail()
-    return fullDict
-
-def GetSpeciesToUse(speciesIDsFN):
-    speciesToUse = []
-    with open(speciesIDsFN, 'rb') as speciesF:
-        for line in speciesF:
-            if len(line) == 0 or line[0] == "#": continue
-            speciesToUse.append(int(line.split(":")[0]))
-    return speciesToUse
-
-def CreateOrthogroupTable(ogs, 
-                          idToNameDict, 
-                          speciesFilename, 
-                          speciesToUse,
-                          resultsBaseFilename):
-    
-    speciesNamesDict = dict()
-    with open(speciesFilename, 'rb') as speciesNamesFile:
-        for line in speciesNamesFile:
-            if line.startswith("#"): continue
-            short, full = line.rstrip().split(": ")
-            speciesNamesDict[int(short)] = full    
-    nSpecies = len(speciesNamesDict) 
-    
-    ogs_names = [[idToNameDict[seq] for seq in og] for og in ogs]
-    ogs_ints = [[map(int, sequence.split("_")) for sequence in og] for og in ogs]
-
-    # write out
-    outputFilename = resultsBaseFilename + ".csv"
-    singleGeneFilename = resultsBaseFilename + "_UnassignedGenes.csv"
-    with open(outputFilename, 'wb') as outputFile, open(singleGeneFilename, 'wb') as singleGeneFile:
-        fileWriter = csv.writer(outputFile, delimiter="\t")
-        singleGeneWriter = csv.writer(singleGeneFile, delimiter="\t")
-        for writer in [fileWriter, singleGeneWriter]:
-            row = [""] + [speciesNamesDict[index] for index in speciesToUse]
-            writer.writerow(row)
-        
-        for iOg, (og, og_names) in enumerate(zip(ogs_ints, ogs_names)):
-            ogDict = defaultdict(list)
-            row = ["OG%07d" % iOg]
-            thisOutputWriter = fileWriter
-            # separate it into sequences from each species
-            if len(og) == 1:
-                row.extend(['' for x in xrange(nSpecies)])
-                row[speciesToUse.index(og[0][0]) + 1] = og_names[0]
-                thisOutputWriter = singleGeneWriter
-            else:
-                for (iSpecies, iSequence), name in zip(og, og_names):
-                    ogDict[speciesToUse.index(iSpecies)].append(name)
-                for iSpecies in xrange(nSpecies):
-                    row.append(", ".join(sorted(ogDict[iSpecies])))
-            thisOutputWriter.writerow(row)
-    print("""Orthologous groups have been written to tab-delimited files:\n   %s\n   %s""" % (outputFilename, singleGeneFilename))
-    print("""And in OrthoMCL format:\n   %s""" % (outputFilename[:-3] + "txt"))
-            
-#def GetOrderedBlastCommands(fastaFilenames, blastDBs, workingDirectory):
-def GetOrderedBlastCommands(previousFastaFiles, newFastaFiles, workingDir):
-    """ Using the nSeq1 x nSeq2 as a rough estimate of the amount of work required for a given species-pair, returns the commands 
-    ordered so that the commands predicted to take the longest come first. This allows the load to be balanced better when processing 
-    the BLAST commands.
-    """
-    iSpeciesPrevious = [int(fn[fn.rfind("Species") + 7:].split(".")[0]) for fn in previousFastaFiles]
-    iSpeciesNew = [int(fn[fn.rfind("Species") + 7:].split(".")[0]) for fn in newFastaFiles]
-    nSeqs = {i:BlastFileProcessor.GetNumberOfSequencesInFile(workingDir + "Species%d.fa" % i)[0] for i in (iSpeciesPrevious+iSpeciesNew)}
-    speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew)] + \
-                   [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesPrevious)] + \
-                   [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew)] 
-    taskSizes = [nSeqs[i]*nSeqs[j] for i,j in speciesPairs]
-    taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
-    commands = [["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", workingDir + "Species%d.fa" % iFasta, "-db", workingDir + "BlastDBSpecies%d" % iDB, "-out", "%sBlast%d_%d.txt" % (workingDir, iFasta, iDB)]
-                    for iFasta, iDB in speciesPairs]               
-
-    return commands
-"""
-Main
--------------------------------------------------------------------------------
-"""   
-
 if __name__ == "__main__":
     print("\nOrthoFinder version %s Copyright (C) 2014 David Emms\n" % version)
     print("""    This program comes with ABSOLUTELY NO WARRANTY.
@@ -1022,6 +1039,7 @@ if __name__ == "__main__":
              
     # Control
     nBlast = nBlastDefault
+    nProcessAlg = nAlgDefault
     qUsePrecalculatedBlast = False  # remove, just store BLAST to do
     qUseFastaFiles = False  # local to argument checking
     qXML = False
@@ -1059,6 +1077,16 @@ if __name__ == "__main__":
             arg = args.pop(0)
             try:
                 nBlast = int(arg)
+            except:
+                print("Incorrect argument for number of BLAST threads: %s" % arg)
+                Fail()    
+        elif arg == "-a" or arg == "--algthreads":
+            if len(args) == 0:
+                print("Missing option for command line argument -a")
+                Fail()
+            arg = args.pop(0)
+            try:
+                nProcessAlg = int(arg)
             except:
                 print("Incorrect argument for number of BLAST threads: %s" % arg)
                 Fail()    
@@ -1149,7 +1177,10 @@ if __name__ == "__main__":
         if resultsDir == None: resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results_")
         workingDir = resultsDir + "WorkingDirectory" + os.sep
         os.mkdir(workingDir)
-     
+    if qUsePrecalculatedBlast:
+        print("%d threads for BLAST searches" % nBlast)
+    if not qOnlyPrepare:
+        print("%d threads for OrthoFinder algorithm" % nProcessAlg)
      
     # check for BLAST+ and MCL - else instruct how to install and add to path
     print("\n1. Checking required programs are installed")
@@ -1168,7 +1199,7 @@ if __name__ == "__main__":
         newFastaFiles, userFastaFilenames, idsFilename, speciesIdsFilename, newSpeciesIDs = AssignIDsToSequences(fastaDir, workingDir)
         speciesToUse = speciesToUse + newSpeciesIDs
         print("Done")
-     
+    seqsInfo = GetSeqsInfo(workingDir_previous if qUsePrecalculatedBlast else workingDir, speciesToUse)
     
     if qXML:   
         print("\n2b. Reading species information file")
@@ -1240,19 +1271,17 @@ if __name__ == "__main__":
     else:
         if qUsePrecalculatedBlast:
             print("Only running new BLAST searches")
-        commands = GetOrderedBlastCommands(previousFastaFiles, newFastaFiles, workingDir)
+        commands = GetOrderedBlastCommands(seqsInfo, previousFastaFiles, newFastaFiles,  workingDir)
         if qOnlyPrepare:
             for command in commands:
                 print(" ".join(command))
             sys.exit()
         print("Maximum number of BLAST processes: %d" % nBlast)
         util.PrintTime("This may take some time....")  
-#        pool = mp.Pool(nBlast) 
-#        pool.map(RunCommandReport, commands)
         cmd_queue = mp.Queue()
-        for cmd in commands:
-            cmd_queue.put(cmd)  
-        runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, )) for i_ in xrange(nBlast)]
+        for iCmd, cmd in enumerate(commands):
+            cmd_queue.put((iCmd, cmd))           
+        runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, len(commands))) for i_ in xrange(nBlast)]
         for proc in runningProcesses:
             proc.start()
         for proc in runningProcesses:
@@ -1271,28 +1300,45 @@ if __name__ == "__main__":
     print(  "--------------------------------")
     fileIdentifierString = "OrthoFinder_v%s" % version
     graphFilename = workingDir + "%s_graph.txt" % fileIdentifierString
-    nSeqs, nSpecies, speciesStartingIndices = BlastFileProcessor.GetNumberOfSequencesInFileFromDir(workingDir_previous if qUsePrecalculatedBlast else workingDir, speciesToUse)
     # it's important to free up the memory from python used for processing the genomes
     # before launching MCL becuase both use sizeable ammounts of memory. The only
     # way I can find to do this is to launch the memory intensive python code 
     # as separate process that exitsbefore MCL is launched.
-#    AnalyseSequences(workingDir, nSeqs, nSpecies, speciesStartingIndices, graphFilename)  # without launching a new process
-    p = mp.Process(target=AnalyseSequences, args=(workingDir_previous if qUsePrecalculatedBlast else workingDir, workingDir, speciesToUse, nSeqs, nSpecies, speciesStartingIndices, graphFilename))
-    p.start()
-    p.join()
-    if p.exitcode != 0:
-        Fail()
+    fileInfo = FileInfo(inputDir=workingDir_previous if qUsePrecalculatedBlast else workingDir, outputDir = workingDir, graphFilename=graphFilename)
+    if not os.path.exists(fileInfo.outputDir):
+       os.mkdir(fileInfo.outputDir)  
+    Lengths = GetSequenceLengths(seqsInfo, fileInfo)
     
+    # Process BLAST hits
+    util.PrintTime("Initial processing of each species")
+    cmd_queue = mp.Queue()
+    for iSpecies in xrange(seqsInfo.nSpecies):
+        cmd_queue.put((seqsInfo, fileInfo, Lengths, iSpecies))
+    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, )) for i_ in xrange(nProcessAlg)]
+    for proc in runningProcesses:
+        proc.start()
+    for proc in runningProcesses:
+        while proc.is_alive():
+            proc.join()
     
+    cmd_queue = mp.Queue()
+    for iSpecies in xrange(seqsInfo.nSpecies):
+        cmd_queue.put((seqsInfo, fileInfo, iSpecies))
+    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, )) for i_ in xrange(nProcessAlg)]
+    for proc in runningProcesses:
+        proc.start()
+    for proc in runningProcesses:
+        while proc.is_alive():
+            proc.join()
+    util.PrintTime("Connected putatitive homologs") 
+    WaterfallMethod.WriteGraphParallel(seqsInfo, fileInfo)
     
     # 5b. MCL     
     inflation = 1.5
     clustersFilename, iResultsVersion = util.GetUnusedFilename(workingDir + "clusters_%s_I%0.1f" % (fileIdentifierString, inflation), ".txt")
-    MCL.RunMCL(graphFilename, clustersFilename, inflation)
+    MCL.RunMCL(graphFilename, clustersFilename, nProcessAlg, inflation)
     clustersFilename_pairs = clustersFilename + "_id_pairs.txt"
-    MCL.ConvertSingleIDsToIDPair(speciesStartingIndices, clustersFilename, clustersFilename_pairs, speciesToUse)  
-    # delete single ID filename
-#        os.remove(clustersFilename)   
+    MCL.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
     
     print("\n6. Creating files for Orthologous Groups")
     print(  "----------------------------------------")
@@ -1300,11 +1346,11 @@ if __name__ == "__main__":
     ogs = MCL.GetPredictedOGs(clustersFilename_pairs)
     resultsBaseFilename = util.GetUnusedFilename(resultsDir + "OrthologousGroups", ".csv")[:-4]         # remove .csv from base filename
     resultsBaseFilename = resultsDir + "OrthologousGroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion)
-    idsDict = WriteOrthogroupFiles(ogs, [idsFilename], resultsBaseFilename, clustersFilename_pairs)
-    CreateOrthogroupTable(ogs, idsDict, speciesIdsFilename, speciesToUse, resultsBaseFilename)
+    idsDict = MCL.WriteOrthogroupFiles(ogs, [idsFilename], resultsBaseFilename, clustersFilename_pairs)
+    MCL.CreateOrthogroupTable(ogs, idsDict, speciesIdsFilename, speciesToUse, resultsBaseFilename)
     if qXML:
-        numbersOfSequences = list(np.diff(speciesStartingIndices))
-        numbersOfSequences.append(nSeqs - speciesStartingIndices[-1])
+        numbersOfSequences = list(np.diff(seqsInfo.seqStartingIndices))
+        numbersOfSequences.append(seqsInfo.nSeqs - seqsInfo.seqStartingIndices[-1])
         orthoxmlFilename = resultsBaseFilename + ".orthoxml"
         MCL.WriteOrthoXML(speciesInfo, ogs, numbersOfSequences, idsDict, orthoxmlFilename, speciesToUse)
     print("\n")
