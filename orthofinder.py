@@ -44,9 +44,8 @@ import xml.etree.ElementTree as ET              # Y
 from xml.etree.ElementTree import SubElement    # Y
 from xml.dom import minidom                     # Y
 import Queue
-import resource
 
-version = "0.6.0"
+version = "0.6.1"
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
 picProtocol = 1
 if sys.platform.startswith("linux"):
@@ -59,11 +58,6 @@ Utilities
 """
 def RunCommand(command):
     subprocess.call(command)
-        
-def RunCommandReport(command):
-    util.PrintTime("Running command: %s" % " ".join(command))
-    RunCommand(command)
-    util.PrintTime("Finished command: %s" % " ".join(command))
 
 def Worker_RunCommand(cmd_queue, nTotal):
     while True:
@@ -350,9 +344,9 @@ class MCL:
         print("Orthologous groups have been written to orthoxml file:\n   %s" % orthoxmlFilename)
                         
     @staticmethod                       
-    def RunMCL(graphFilename, clustersFilename, nProcesses, inflation = 1.5):
+    def RunMCL(graphFilename, clustersFilename, nProcesses, inflation):
         nProcesses = 4 if nProcesses > 4 else nProcesses    # MCL appears to take *longer* as more than 4 processes are used
-        command = ["mcl", graphFilename, "-I", "1.5", "-o", clustersFilename, "-te", str(nProcesses)]
+        command = ["mcl", graphFilename, "-I", str(inflation), "-o", clustersFilename, "-te", str(nProcesses)]
         RunCommand(command)
         util.PrintTime("Ran MCL")  
 
@@ -881,6 +875,7 @@ OrthoFinder
 """   
 nBlastDefault = 16
 nAlgDefault = 1
+mclInflation = 1.5
 
 def CanRunCommand(command, qAllowStderr = False):
     util.PrintNoNewLine("Test can run \"%s\"" % command)       # print without newline
@@ -962,6 +957,9 @@ def PrintHelp():
     Additionally, as the algorithm implementation is very fast, file reading is likely to be the 
     limiting factor above about 5-10 threads and additional threads may have little effect other than 
     increase RAM requirements. [Default is %d]\n""" % nAlgDefault)
+    
+    print("""-I inflation_parameter, --inflation inflation_parameter
+    Specify a non-default inflation parameter for MCL. [Default is %0.1f]\n""" % mclInflation)
     
     print("""-x speciesInfoFilename, --orthoxml speciesInfoFilename
     Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.\n""")
@@ -1089,6 +1087,16 @@ if __name__ == "__main__":
                 nProcessAlg = int(arg)
             except:
                 print("Incorrect argument for number of BLAST threads: %s" % arg)
+                Fail()   
+        elif arg == "-I" or arg == "--inflation":
+            if len(args) == 0:
+                print("Missing option for command line argument -I")
+                Fail()
+            arg = args.pop(0)
+            try:
+                mclInflation = float(arg)
+            except:
+                print("Incorrect argument for MCL inflation parameter: %s" % arg)
                 Fail()    
         elif arg == "-x" or arg == "--orthoxml":  
             if qXML:
@@ -1280,7 +1288,7 @@ if __name__ == "__main__":
         util.PrintTime("This may take some time....")  
         cmd_queue = mp.Queue()
         for iCmd, cmd in enumerate(commands):
-            cmd_queue.put((iCmd, cmd))           
+            cmd_queue.put((iCmd+1, cmd))           
         runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, len(commands))) for i_ in xrange(nBlast)]
         for proc in runningProcesses:
             proc.start()
@@ -1334,9 +1342,8 @@ if __name__ == "__main__":
     WaterfallMethod.WriteGraphParallel(seqsInfo, fileInfo)
     
     # 5b. MCL     
-    inflation = 1.5
-    clustersFilename, iResultsVersion = util.GetUnusedFilename(workingDir + "clusters_%s_I%0.1f" % (fileIdentifierString, inflation), ".txt")
-    MCL.RunMCL(graphFilename, clustersFilename, nProcessAlg, inflation)
+    clustersFilename, iResultsVersion = util.GetUnusedFilename(workingDir + "clusters_%s_I%0.1f" % (fileIdentifierString, mclInflation), ".txt")
+    MCL.RunMCL(graphFilename, clustersFilename, nProcessAlg, mclInflation)
     clustersFilename_pairs = clustersFilename + "_id_pairs.txt"
     MCL.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
     

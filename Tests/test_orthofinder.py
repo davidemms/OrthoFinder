@@ -29,7 +29,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "0.6.0"
+version = "0.6.1"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -251,6 +251,14 @@ class TestCommandLine(unittest.TestCase):
         with CleanUp(newFiles, []):
             stdout, stderr = self.RunOrthoFinder("-b %s -a 3" % exampleBlastDir)
             self.CheckStandardRun(stdout, stderr, goldResultsDir_smallExample, expectedCSVFile)
+        
+    def test_inflation(self):
+        expectedCSVFile = exampleBlastDir + "OrthologousGroups.csv"
+        newFiles = ("OrthologousGroups.csv OrthologousGroups_UnassignedGenes.csv OrthologousGroups.txt clusters_OrthoFinder_v%s_I1.8.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.8.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()
+        newFiles = [exampleBlastDir + fn for fn in newFiles]
+        with CleanUp(newFiles, []):
+            stdout, stderr = self.RunOrthoFinder("-I 1.8 -b %s" % exampleBlastDir)
+            self.CheckStandardRun(stdout, stderr, baseDir + "ExpectedOutput/SmallExampleDataset_I1.8/", expectedCSVFile)
     
 #    @unittest.skipIf(__skipLongTests__, "Only performing quick tests")       
 #    def test_fromblastOrthobench(self):
