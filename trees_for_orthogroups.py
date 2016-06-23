@@ -40,7 +40,7 @@ import glob
 
 import orthofinder    
 
-version = "0.6.0"
+version = "0.6.1"
 nProcessesDefault = 16
     
 
@@ -73,7 +73,7 @@ class FastaWriter(object):
     
     def WriteSeqsToFasta(self, seqs, outFilename):
         with open(outFilename, 'wb') as outFile:
-            for seq in seqs:
+            for seq in self.SortSeqs(seqs):
                 if seq in self.SeqLists:
                     outFile.write(">%s\n" % seq)
                     outFile.write(self.SeqLists[seq])
@@ -82,11 +82,13 @@ class FastaWriter(object):
                                 
     def WriteSeqsToFasta_withNewAccessions(self, seqs, outFilename, idDict):
         with open(outFilename, 'wb') as outFile:
-            for seq in seqs:
+            for seq in self.SortSeqs(seqs):
                 if seq in self.SeqLists:
                     outFile.write(">%s\n" % idDict[seq])
                     outFile.write(self.SeqLists[seq])
                     
+    def SortSeqs(self, seqs):
+        return sorted(seqs, key=lambda x: map(int, x.split("_")))
                     
 def Worker_RunCommand(cmd_queue):
     """ repeatedly takes items to process from the queue until it is empty at which point it returns. Does not take a new task
@@ -283,6 +285,7 @@ def GetIDsDict(orthofinderWorkingDir):
     with open(orthofinderWorkingDir + "SpeciesIDs.txt", 'rb') as idsFile:
         for line in idsFile:
             iSpecies, filename = line.rstrip().split(": ", 1)
+            iSpecies = iSpecies.replace("#", "")
             speciesName = os.path.splitext(os.path.split(filename)[1])[0]
             speciesDict[iSpecies] = speciesName   
     idDict = {seqID:speciesDict[seqID.split("_")[0]] + "_" + name for seqID, name in idDict.items()}

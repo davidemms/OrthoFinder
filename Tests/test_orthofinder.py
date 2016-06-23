@@ -89,6 +89,9 @@ Arguments
     limiting factor above about 5-10 threads and additional threads may have little effect other than 
     increase RAM requirements. [Default is 1]
 
+-I inflation_parameter, --inflation inflation_parameter
+    Specify a non-default inflation parameter for MCL. [Default is 1.5]
+
 -x speciesInfoFilename, --orthoxml speciesInfoFilename
     Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.
 
@@ -402,14 +405,18 @@ class TestCommandLine(unittest.TestCase):
         expectedDirs = "Alignments Trees Sequences".split()
         newDirs = [baseDir + "Input/SmallExampleDataset_forTrees/Results_Jan28/" + d +"/" for d in expectedDirs]
         goldDirs = [baseDir + "ExpectedOutput/SmallExampleDataset_trees/" + d + "/" for d in expectedDirs]
-        with CleanUp([], [], newDirs):        
+        nTrees = 427
+        with CleanUp([], [], newDirs):   
             stdout, stderr = self.RunTrees(baseDir + "Input/SmallExampleDataset_forTrees/Results_Jan28/")
-            for goldD, newD in zip(goldDirs, newDirs):
-                for goldFN in glob.glob(goldD + "*"):
-                    newFN = newD + os.path.split(goldFN)[1]
-                    self.assertTrue(os.path.exists(newFN), msg=goldFN)
-                    if newD[:-1].rsplit("/", 1)[-1] == "Sequences":
-                        self.CompareFile(goldFN, newFN)   
+            for i in xrange(nTrees):
+                self.assertTrue(os.path.exists(newDirs[0] + "/OG%07d.fa" % i), msg=str(i))
+                self.assertTrue(os.path.exists(newDirs[1] + "/OG%07d_tree.txt" % i))
+            goldD = goldDirs[2]
+            newD = newDirs[2]
+            for goldFN in glob.glob(goldD + "*"):
+                newFN = newD + os.path.split(goldFN)[1]
+                self.assertTrue(os.path.exists(newFN), msg=goldFN)
+                self.CompareFile(goldFN, newFN)   
     
     def test_treesAfterOption_b(self):
         expectedDirs = "Alignments Trees Sequences".split()
@@ -437,9 +444,43 @@ class TestCommandLine(unittest.TestCase):
                     if newD[:-1].rsplit("/", 1)[-1] == "Sequences":
                         self.CompareFile(goldFN, newFN)    
         
-#    def test_treesSubset(self):
-#        pass
+    def test_treesSubset_unspecified(self):
+        stdout, stderr = self.RunTrees(baseDir + "/Input/Trees_OneSpeciesRemoved")
+        self.assertTrue("ERROR: Results from multiple OrthoFinder runs found" in stdout)
+        self.assertTrue("Please run with only one set of results in directories or specifiy the specific clusters_OrthoFinder_*.txt_id_pairs.txt file on the command line" in stdout)
+    
+    def test_treesResultsChoice_subset(self):   
+        expectedDirs = "Alignments Trees Sequences".split()
+        newDirs = [baseDir + "/Input/Trees_OneSpeciesRemoved/" + d +"/" for d in expectedDirs]
+        goldDirs = [baseDir + "ExpectedOutput/SmallExampleDataset_trees/" + d + "/" for d in expectedDirs]
+        nTrees = 427
+        with CleanUp([], [], newDirs):   
+            stdout, stderr = self.RunTrees(baseDir + "/Input/Trees_OneSpeciesRemoved/clusters_OrthoFinder_v0.6.1_I1.5_1.txt_id_pairs.txt")
+            for i in xrange(nTrees):
+                self.assertTrue(os.path.exists(newDirs[0] + "/OG%07d.fa" % i), msg=str(i))
+                self.assertTrue(os.path.exists(newDirs[1] + "/OG%07d_tree.txt" % i))
+            goldD = goldDirs[2]
+            newD = newDirs[2]
+            for goldFN in glob.glob(goldD + "*"):
+                newFN = newD + os.path.split(goldFN)[1]
+                self.assertTrue(os.path.exists(newFN), msg=goldFN)
 #    
+    def test_treesResultsChoice_full(self):
+        dirs = ["Trees/", "Alignments/", "Sequences/"]
+        goldDirs = [baseDir + "ExpectedOutput/Trees_OneSpeciesRemoved/" + d for d in dirs]
+        expectedDirs = [baseDir + "/Input/Trees_OneSpeciesRemoved/" + d for d in dirs]
+        nExpected = [536, 536, 1330]
+        fnPattern = [baseDir + "/Input/Trees_OneSpeciesRemoved/" + p for p in ["Trees/OG%07d_tree.txt", "Alignments/OG%07d.fa", "Sequences/OG%07d.fa"]]
+        with CleanUp([], [],  expectedDirs):
+            stdout, stderr = self.RunTrees(baseDir + "/Input/Trees_OneSpeciesRemoved/clusters_OrthoFinder_v0.6.1_I1.5.txt_id_pairs.txt")
+            for goldD, expD, n, fnPat in zip(goldDirs, expectedDirs, nExpected, fnPattern):
+                for i in xrange(n):
+                    self.assertTrue(os.path.exists(fnPat % i))
+                # Only test the contents of a limited number
+                for goldFN in glob.glob(goldD + "*"):
+                    newFN = expD + os.path.split(goldFN)[1]
+                    self.CompareFile(goldFN, newFN) 
+        
 #    def test_treesExtraSpecies(self):
 #        pass
         
@@ -456,7 +497,7 @@ class TestCommandLine(unittest.TestCase):
         return stdout, stderr
         
     def RunTrees(self, commands):
-        capture = subprocess.Popen("python %s %s" % (trees_for_orthogroups, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
+        capture = subprocess.Popen("python %s -t 8 %s" % (trees_for_orthogroups, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
         stdout = "".join([x for x in capture.stdout])
         stderr = "".join([x for x in capture.stderr])
         return stdout, stderr

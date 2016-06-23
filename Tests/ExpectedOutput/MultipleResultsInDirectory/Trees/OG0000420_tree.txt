@@ -1,1 +1,1 @@
-(Mycoplasma_genitalium_uid97_L43967_gi|3844654|gb|AAC71261.1|:0.59067,Mycoplasma_gallisepticum_uid409_AE015450_gi|284812136|gb|AAP56816.2|:0.59067);
+(Mycoplasma_gallisepticum_uid409_AE015450_gi|284812136|gb|AAP56816.2|:0.59067,Mycoplasma_genitalium_uid97_L43967_gi|3844654|gb|AAC71261.1|:0.59067);

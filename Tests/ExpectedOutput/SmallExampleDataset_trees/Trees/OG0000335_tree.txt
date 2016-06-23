@@ -1,1 +1,0 @@
-(Mycoplasma_agalactiae_5632_FP671138_gi|290752443|emb|CBH40414.1|:0.83759,Mycoplasma_hyopneumoniae_AE017243_gi|144227713|gb|AAZ44677.2|:0.83759);
