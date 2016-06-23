@@ -1,4 +1,8 @@
 # OrthoFinder - Accurate inference of orthologous gene groups made easy!
+What Does OrthoFinder Do?
+==========
+OrthoFinder is a program for finding orthogroups from one or more species. An orthogroup is the set of genes that are descended from a single gene in the last common ancestor of the species being clustered. OrthoFinder accounts for gene length biases that are inherent in BLAST scores, normalises for differences in species divergence times, and accounts for orthogroup specific differences in gene evolultion rates. For more details see the OrthoFinder paper below.
+
 **Emms, D.M. and Kelly, S. (2015) OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy, Genome Biology 16:157**
 
 Available from:
