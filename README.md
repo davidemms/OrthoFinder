@@ -5,7 +5,7 @@ OrthoFinder is a program for finding orthogroups from one or more species. An or
 
 **Emms, D.M. and Kelly, S. (2015) OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy, Genome Biology 16:157**
 
-Available from:
+https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2
 
 http://www.stevekellylab.com/software/orthofinder
 
