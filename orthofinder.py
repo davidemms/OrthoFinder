@@ -43,7 +43,9 @@ from collections import defaultdict, namedtuple # Y
 import xml.etree.ElementTree as ET              # Y
 from xml.etree.ElementTree import SubElement    # Y
 from xml.dom import minidom                     # Y
-import Queue
+import Queue                                    # Y
+import warnings                                 # Y
+import time                                     # Y
 
 version = "0.6.1"
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
@@ -67,7 +69,8 @@ def Worker_RunCommand(cmd_queue, nTotal):
             subprocess.call(command)
             util.PrintTime("Finished Blast %d of %d" % (iCommand, nTotal))
         except Queue.Empty:
-            return           
+            return   
+               
 class util:
     @staticmethod
     def GetDirectoryName(baseDirName, dateString, i):
@@ -122,8 +125,38 @@ class util:
         return sortedFasta    
         
 def Fail():
+    print("ERROR: An error occurred, please review previous error messages for more information.")
     sys.exit()
     
+def ManageQueue(runningProcesses, cmd_queue):
+    """Manage a set of runningProcesses working through cmd_queue.
+    If there is an error the exit all processes as quickly as possible and 
+    exit via Fail() methods. Otherwise return when all work is complete
+    """            
+    # set all completed processes to None
+    qError = False
+#    dones = [False for _ in runningProcesses]
+    nProcesses = len(runningProcesses)
+    while True:
+        if runningProcesses.count(None) == len(runningProcesses): break
+        time.sleep(2)
+#        for proc in runningProcesses:
+        for i in xrange(nProcesses):
+            proc = runningProcesses[i]
+            if proc == None: continue
+            if not proc.is_alive():
+                if proc.exitcode != 0:
+                    qError = True
+                    while True:
+                        try:
+                            cmd_queue.get(True, 1)
+                        except Queue.Empty:
+                            break
+                runningProcesses[i] = None
+    if qError:
+        DeleteMatrices(fileInfo)
+        Fail()            
+       
 """
 IDExtractor
 -------------------------------------------------------------------------------
@@ -653,11 +686,11 @@ class BlastFileProcessor(object):
                         kSpecies, nSeqs_k, sequencekID = (iSpecies,  nSeqs_i, sequence1ID) if sequence1ID >= nSeqs_i else (jSpecies,  nSeqs_j, sequence2ID)
                         sys.stderr.write("Species%d.fa contains only %d sequences " % (kSpecies,  nSeqs_k)) 
                         sys.stderr.write("but found a query/hit in the Blast%d_%d.txt for sequence %d_%d (i.e. %s sequence in species %d).\n" %  (iSpecies, jSpecies, kSpecies, sequencekID, ord(sequencekID+1), kSpecies))
-                        Fail()
+                        sys.exit()
         except Exception:
-            sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (seqsInfo.inputdir, iSpecies, jSpecies))
+            sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (fileInfo.inputDir, iSpecies, jSpecies))
             sys.stderr.write("\t".join(row) + "\n")
-            Fail()
+            sys.exit()
         return B       
 
 """
@@ -675,9 +708,9 @@ def DumpMatrixArray(name, matrixArray, fileInfo, iSpecies):
 
 def DeleteMatrices(fileInfo):
     for f in glob.glob(fileInfo.outputDir + "B*_*.pic"):
-        os.remove(f)
+        if os.path.exists(f): os.remove(f)
     for f in glob.glob(fileInfo.outputDir + "connect*_*.pic"):
-        os.remove(f)
+        if os.path.exists(f): os.remove(f)
 
 def LoadMatrix(name, fileInfo, iSpecies, jSpecies): 
     with open(fileInfo.outputDir + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'rb') as picFile:  
@@ -738,7 +771,7 @@ def WriteGraph_perSpecies(args):
             
 class WaterfallMethod:    
     @staticmethod
-    def NormaliseScores(B, Lengths, iSpecies, jSpecies):              
+    def NormaliseScores(B, Lengths, iSpecies, jSpecies):    
         Li, Lj, scores = scnorm.GetLengthArraysForMatrix(B, Lengths[iSpecies], Lengths[jSpecies])
         Lf = Li * Lj     
         topLf, topScores = scnorm.GetTopPercentileOfScores(Lf, scores, 95)   
@@ -751,17 +784,19 @@ class WaterfallMethod:
             
     @staticmethod
     def ProcessBlastHits(seqsInfo, fileInfo, Lengths, iSpecies):
-        util.PrintTime("Starting species %d" % iSpecies)
-        # process up to the best hits for each species
-        Bi = []
-        for jSpecies in xrange(seqsInfo.nSpecies):
-            Bij = BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies)  
-            Bij = WaterfallMethod.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
-            Bi.append(Bij)
-        DumpMatrixArray("B", Bi, fileInfo, iSpecies)
-        BH = BlastFileProcessor.GetBH_s(Bi, seqsInfo, iSpecies)
-        DumpMatrixArray("BH", BH, fileInfo, iSpecies)
-        util.PrintTime("Initial processing of species %d complete" % iSpecies)
+        with warnings.catch_warnings():         
+            warnings.simplefilter("ignore")
+            util.PrintTime("Starting species %d" % iSpecies)
+            # process up to the best hits for each species
+            Bi = []
+            for jSpecies in xrange(seqsInfo.nSpecies):
+                Bij = BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies)  
+                Bij = WaterfallMethod.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
+                Bi.append(Bij)
+            DumpMatrixArray("B", Bi, fileInfo, iSpecies)
+            BH = BlastFileProcessor.GetBH_s(Bi, seqsInfo, iSpecies)
+            DumpMatrixArray("BH", BH, fileInfo, iSpecies)
+            util.PrintTime("Initial processing of species %d complete" % iSpecies)
         
     @staticmethod 
     def Worker_ProcessBlastHits(cmd_queue):
@@ -803,36 +838,6 @@ class WaterfallMethod:
         os.remove(fileInfo.graphFilename + "_header")
         for iSp in xrange(seqsInfo.nSpecies): os.remove(fileInfo.graphFilename + "_%d" % iSp)
         DeleteMatrices(fileInfo) 
-        
-#    @staticmethod
-#    def WriteGraph(seqsInfo, fileInfo):
-#        with open(fileInfo.graphFilename, 'wb') as graphFile:
-#            graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (seqsInfo.nSeqs, seqsInfo.nSeqs)) 
-#            graphFile.write("\n(mclmatrix\nbegin\n\n")  
-#            for iSpec in xrange(seqsInfo.nSpecies):
-#                # calculate the 2-way connections for one query species
-#                connect2 = []
-#                for jSpec in xrange(seqsInfo.nSpecies):
-#                    m1 = LoadMatrix("connect", fileInfo, iSpec, jSpec)
-#                    m2tr = numeric.transpose(LoadMatrix("connect", fileInfo, jSpec, iSpec))
-#                    connect2.append(m1 + m2tr)
-#                B = LoadMatrixArray("B", fileInfo, seqsInfo, iSpec)
-#                B_connect = MatricesAnd_s(connect2, B)
-#                
-#                W = [b.sorted_indices().tolil() for b in B_connect]
-#                for query in xrange(NumberOfSequences(seqsInfo, iSpec)):
-#                    offset = seqsInfo.seqStartingIndices[iSpec]
-#                    graphFile.write("%d    " % (offset + query))
-#                    for jSpec in xrange(seqsInfo.nSpecies):
-#                        row = W[jSpec].getrowview(query)
-#                        jOffset = seqsInfo.seqStartingIndices[jSpec]
-#                        for j, value in zip(row.rows[0], row.data[0]):
-#                            graphFile.write("%d:%.3f " % (j + jOffset, value))
-#                    graphFile.write("$\n")
-#                util.PrintTime("Writen final scores for species %d to graph file" % iSpec)
-#            graphFile.write(")\n")
-#        # delete pic files
-#        DeleteMatrices(fileInfo)                
                 
     @staticmethod
     def GetMostDistant_s(RBH, B, seqsInfo, iSpec):
@@ -1325,9 +1330,7 @@ if __name__ == "__main__":
     runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, )) for i_ in xrange(nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
-    for proc in runningProcesses:
-        while proc.is_alive():
-            proc.join()
+    ManageQueue(runningProcesses, cmd_queue)
     
     cmd_queue = mp.Queue()
     for iSpecies in xrange(seqsInfo.nSpecies):
@@ -1335,9 +1338,8 @@ if __name__ == "__main__":
     runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, )) for i_ in xrange(nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
-    for proc in runningProcesses:
-        while proc.is_alive():
-            proc.join()
+    ManageQueue(runningProcesses, cmd_queue)
+    
     util.PrintTime("Connected putatitive homologs") 
     WaterfallMethod.WriteGraphParallel(seqsInfo, fileInfo)
     

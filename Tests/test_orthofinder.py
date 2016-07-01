@@ -255,6 +255,15 @@ class TestCommandLine(unittest.TestCase):
             stdout, stderr = self.RunOrthoFinder("-b %s -a 3" % exampleBlastDir)
             self.CheckStandardRun(stdout, stderr, goldResultsDir_smallExample, expectedCSVFile)
         
+    def test_blast_results_error(self):
+        with CleanUp([], []):
+            stdout, stderr = self.RunOrthoFinder("-a 2 -b " + baseDir + "Input/SmallExampleDataset_ExampleBadBlast/")
+            self.assertTrue("Traceback" not in stderr)
+            self.assertTrue("Offending line was:" in stderr)
+            self.assertTrue("0_0	0_0	100.00	466" in stderr)
+            self.assertTrue("Connected putatitive homologs" not in stdout)
+            self.assertTrue("ERROR: An error occurred, please review previous error messages for more information." in stdout)
+        
     def test_inflation(self):
         expectedCSVFile = exampleBlastDir + "OrthologousGroups.csv"
         newFiles = ("OrthologousGroups.csv OrthologousGroups_UnassignedGenes.csv OrthologousGroups.txt clusters_OrthoFinder_v%s_I1.8.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.8.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()
@@ -505,6 +514,7 @@ class TestCommandLine(unittest.TestCase):
     def CheckStandardRun(self, stdout, stderr, goldResultsDir, expectedCSVFileLocation):
         # Citation
         self.assertTrue(citation in stdout)
+        self.assertTrue("Connected putatitive homologs" in stdout) # see checks for errors, in that case this shouldn't be here
         
         # Results
         resultsLine = """Orthologous groups have been written to tab-delimited files:
