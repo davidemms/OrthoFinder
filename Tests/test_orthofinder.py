@@ -332,7 +332,6 @@ class TestCommandLine(unittest.TestCase):
         OrthologousGroups.csv OrthologousGroups.txt OrthologousGroups_UnassignedGenes.csv \
         clusters_OrthoFinder_v%s_I1.5.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()]
         expectedChangedFiles = [exampleBlastDir + fn for fn in "SpeciesIDs.txt SequenceIDs.txt".split()]
-        # cleanup afterwards including failed test
         goldDir = baseDir + "ExpectedOutput/AddTwoSpecies/"
         with CleanUp(expectedExtraFiles, expectedChangedFiles):        
             stdout, stderr = self.RunOrthoFinder("-b %s -f %s" % (exampleBlastDir, baseDir + "Input/ExtraFasta2"))
@@ -343,7 +342,25 @@ class TestCommandLine(unittest.TestCase):
                 if "Blast" in os.path.split(fn)[1]:
                     self.CompareBlast(goldDir + os.path.split(fn)[1], fn)
                 else:
-                    self.CompareFile(goldDir + os.path.split(fn)[1].replace(version, "0.4.0"), fn)           
+                    self.CompareFile(goldDir + os.path.split(fn)[1].replace(version, "0.4.0"), fn)    
+                    
+    def test_addTwoSpecies_blastsRequired(self):  
+        expectedExtraFiles = [exampleBlastDir + fn for fn in "Species3.fa Species4.fa".split()]
+        expectedChangedFiles = [exampleBlastDir + fn for fn in "SpeciesIDs.txt SequenceIDs.txt".split()]
+        # cleanup afterwards including failed test
+        with CleanUp(expectedExtraFiles, expectedChangedFiles):        
+            stdout, stderr = self.RunOrthoFinder("-b %s -f %s -p" % (exampleBlastDir, baseDir + "Input/ExtraFasta2"))
+            original = [0, 1, 2]
+            new = [3, 4]
+            for i in new:
+                for j in original:
+                    assert("Blast%d_%d.txt" % (i,j) in stdout)
+                    assert("Blast%d_%d.txt" % (j,i) in stdout)
+                for j in new:
+                    assert("Blast%d_%d.txt" % (i,j) in stdout)
+                    assert("Blast%d_%d.txt" % (j,i) in stdout)
+                
+            assert(stdout.count("blastp") == 2*len(new)*len(original) + len(new)**2)              
                 
     def test_removeFirstSpecies(self):
         self.RemoveSpeciesTest(baseDir + "Input/ExampleDataset_removeFirst/",
