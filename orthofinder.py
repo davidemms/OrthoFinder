@@ -1005,6 +1005,7 @@ def AssignIDsToSequences(fastaDirectory, outputDirectory):
     originalFastaFilenames = sorted([f for f in os.listdir(fastaDirectory) if os.path.isfile(os.path.join(fastaDirectory,f))])
     originalFastaFilenames = [f for f in originalFastaFilenames if len(f.rsplit(".", 1)) == 2 and f.rsplit(".", 1)[1].lower() in fastaExtensions]
     returnFilenames = []
+    previousSpeciesIDs = range(iSpecies)
     newSpeciesIDs = []
     with open(idsFilename, 'ab') as idsFile, open(speciesFilename, 'ab') as speciesFile:
         for fastaFilename in originalFastaFilenames:
@@ -1029,7 +1030,7 @@ def AssignIDsToSequences(fastaDirectory, outputDirectory):
             iSeq = 0
             outputFasta.close()
     if len(originalFastaFilenames) > 0: outputFasta.close()
-    return returnFilenames, originalFastaFilenames, idsFilename, speciesFilename, newSpeciesIDs
+    return returnFilenames, originalFastaFilenames, idsFilename, speciesFilename, newSpeciesIDs, previousSpeciesIDs
 
 if __name__ == "__main__":
     print("\nOrthoFinder version %s Copyright (C) 2014 David Emms\n" % version)
@@ -1209,7 +1210,7 @@ if __name__ == "__main__":
     if not qUseFastaFiles:
         print("Skipping")
     else:
-        newFastaFiles, userFastaFilenames, idsFilename, speciesIdsFilename, newSpeciesIDs = AssignIDsToSequences(fastaDir, workingDir)
+        newFastaFiles, userFastaFilenames, idsFilename, speciesIdsFilename, newSpeciesIDs, previousSpeciesIDs = AssignIDsToSequences(fastaDir, workingDir)
         speciesToUse = speciesToUse + newSpeciesIDs
         print("Done")
     seqsInfo = GetSeqsInfo(workingDir_previous if qUsePrecalculatedBlast else workingDir, speciesToUse)
