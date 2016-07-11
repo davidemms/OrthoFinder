@@ -13,6 +13,8 @@ https://github.com/davidemms/OrthoFinder
 
 What's New
 ==========
+**Jul. 2016**: Provided **standalone binaries** for those without access to python (download the package from OrthoFinder's GitHub **releases tab**).
+
 **Jun. 2016**: **Parallelised** the remainder of the OrthoFinder algorithm. 
 
 **Jan. 2016**: Added the ability to **add and remove species**.
@@ -36,6 +38,12 @@ See below for details on:
 - quickly running OrthoFinder on a subset of species from a previous analysis
 - running OrthoFinder from pre-computed BLAST search results
 - preparing files in the format required by OrthoFinder so you can run the BLAST searches yourself
+
+###Standalone Binaries
+
+If you do not have access to a python 2.X version you can use the standalone binaries in the bin directory instead e.g.:
+
+**bin/orthofinder -f ExampleDataset -t 16**
 
 Output File Format
 ==================
