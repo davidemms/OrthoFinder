@@ -48,7 +48,7 @@ import Queue                                    # Y
 import warnings                                 # Y
 import time                                     # Y
 
-version = "0.6.1"
+version = "0.7.0"
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
 picProtocol = 1
 if sys.platform.startswith("linux"):
