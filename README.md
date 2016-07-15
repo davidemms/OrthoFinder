@@ -1,5 +1,5 @@
-# OrthoFinder - Accurate inference of orthologous gene groups made easy!
-What Does OrthoFinder Do?
+# OrthoFinder — Accurate inference of orthologous gene groups made easy!
+What does OrthoFinder do?
 ==========
 OrthoFinder is a program for finding orthogroups from one or more species. An orthogroup is the set of genes that are descended from a single gene in the last common ancestor of the species being clustered. OrthoFinder accounts for gene length biases that are inherent in BLAST scores, normalises for differences in species divergence times, and accounts for orthogroup specific differences in gene evolultion rates. For more details see the OrthoFinder paper below.
 
@@ -13,6 +13,8 @@ https://github.com/davidemms/OrthoFinder
 
 What's New
 ==========
+**Jul. 2016**: OrthoFinder now outputs **summary statistics** for the orthogroups produced. Statistics are in the files **Statistics_Overall.csv, Statistics_PerSpecies.csv** and **OrthologousGroups_SpeciesOverlaps.csv**.
+
 **Jul. 2016**: Provided **standalone binaries** for those without access to python (download the package from OrthoFinder's GitHub **releases tab**).
 
 **Jun. 2016**: **Parallelised** the remainder of the OrthoFinder algorithm. 
@@ -49,12 +51,25 @@ Output File Format
 ==================
 OrthoFinder generates three output files 
 
-**1) OrthologousGroups.csv** is a comma separated text file. Each row comprises a single orthogroup and contains all the genes that belong to that orthogroup. The genes are organized into separate columns where each column corresponds to a single species.
+**1) OrthologousGroups.csv** is a tab separated text file. Each row comprises a single orthogroup and contains all the genes that belong to that orthogroup. The genes are organized into separate columns where each column corresponds to a single species.
 
 **2) OrthologousGroups.txt** is a tab separated text file that is identical in format to the output file from OrthoMCL. This enables OrthoFinder to easily slot into existing bioinformatic pipelines.
 
-**3) OrthologousGroups_UnassignedGenes.csv** is a comma separated text file that is identical in format to OrthologousGroups.csv but contains all of the genes that were not assigned to any orthogroup.
+**3) OrthologousGroups_UnassignedGenes.csv** is a tab separated text file that is identical in format to OrthologousGroups.csv but contains all of the genes that were not assigned to any orthogroup.
 
+**4) Statistics_Overall.csv** is a tab separated text file giving statistics for the orthogroups.
+
+**5) Statistics_PerSpecies.csv** is a tab separated text file giving statistics for the orthogroups on a species-by-species basis.
+
+**6) OrthologousGroups_SpeciesOverlaps.csv** is a tab separated text file containing a matrix of the number of orthogroups shared by each species-pair (i.e. the number of orthogroups which contain at least one gene from each of the species-pairs)
+
+###Statistics Files
+Most of the terms in the files **Statistics_Overall.csv** and **Statistics_PerSpecies.csv** are self-explanatory, the remainder are defined below:
+- Species-specific orthogroup: An orthogroups that consist entirely of genes from one species.
+- G50: The number of genes in the orthogroup such that 50% of genes are in orthogroups of that size or larger.
+- O50: The smallest number of orthogroups such that 50% of genes are in orthogroups of that size or larger.
+- Single-copy orthogroup: An orthogroup with exactly one gene (and no more) from each species. These orthogroups are ideal for inferring a species tree. Note that trees for all orthogroups can be generated using the trees_for_orthogroups.py script.
+- Unassigned gene: A gene that has not been put into an orthogroup with any other genes.
 
 Installing Dependencies
 =======================
