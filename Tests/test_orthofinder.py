@@ -29,7 +29,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "0.7.0"
+version = "0.7.1"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -322,10 +322,7 @@ class TestCommandLine(unittest.TestCase):
                 self.assertTrue(os.path.exists(fn), msg=fn)
                 # mcl output files contain a variable header, these files are an implementation detail that I don't want to test (I want the final orthogroups to be correct)
                 if "clusters" in os.path.split(fn)[1]: continue
-                if "Blast" in os.path.split(fn)[1]:
-                    self.CompareBlast(goldDir + os.path.split(fn)[1], fn)
-                else:
-                    self.CompareFile(goldDir + os.path.split(fn)[1].replace(version, "0.4.0"), fn)               
+                self.CompareFile(goldDir + os.path.split(fn)[1], fn)                 
     
     def test_addTwoSpecies(self):
         expectedExtraFiles = [exampleBlastDir + fn for fn in ("Blast0_3.txt Blast3_0.txt Blast1_3.txt Blast3_1.txt Blast2_3.txt Blast3_2.txt Blast3_3.txt Species3.fa \
@@ -341,10 +338,7 @@ class TestCommandLine(unittest.TestCase):
                 os.path.split(fn)[1]
                 self.assertTrue(os.path.exists(fn), msg=fn)
                 if "clusters" in os.path.split(fn)[1]: continue
-                if "Blast" in os.path.split(fn)[1]:
-                    self.CompareBlast(goldDir + os.path.split(fn)[1], fn)
-                else:
-                    self.CompareFile(goldDir + os.path.split(fn)[1].replace(version, "0.4.0"), fn)    
+                self.CompareFile(goldDir + os.path.split(fn)[1], fn)  
                     
     def test_addTwoSpecies_blastsRequired(self):  
         expectedExtraFiles = [exampleBlastDir + fn for fn in "Species3.fa Species4.fa".split()]
@@ -538,8 +532,7 @@ class TestCommandLine(unittest.TestCase):
         self.assertTrue("Connected putatitive homologs" in stdout) # see checks for errors, in that case this shouldn't be here
         
         # Results
-        resultsLine = """Orthologous groups have been written to tab-delimited files:
-   %s""" % expectedCSVFileLocation
+        resultsLine = "Fifty percent of all genes were in orthogroups"
         self.assertTrue(resultsLine in stdout)
         self.assertLess(time.time()-os.stat(expectedCSVFileLocation).st_ctime, 60)
         
@@ -573,9 +566,24 @@ class TestCommandLine(unittest.TestCase):
                     self.assertTrue(False, msg=fn_gold) 
         
     def CompareFile(self, fn_gold, fn_actual):
-        if not filecmp.cmp(fn_gold, fn_actual):
-            shutil.copy(fn_actual, baseDir + "FailedOutput/" + os.path.split(fn_actual)[1]) 
-            self.assertTrue(False, msg=fn_gold) 
+        fn_gold = fn_gold.replace(version, "0.4.0")
+        f = os.path.split(fn_actual)[1]                
+        if "Blast" in f:
+            self.CompareBlast(fn_gold, fn_actual)
+        elif "Statistics" in f:
+            self.CompareStatsFile(fn_gold, fn_actual)
+        else: 
+            if not filecmp.cmp(fn_gold, fn_actual):
+                shutil.copy(fn_actual, baseDir + "FailedOutput/" + os.path.split(fn_actual)[1]) 
+                self.assertTrue(False, msg=fn_gold) 
+        
+    def CompareStatsFile(self, fn_gold, fn_actual):
+        with open(fn_gold, 'rb') as f_gold, open(fn_actual, 'rb') as f_actual:
+            for gold, actual in zip(f_gold, f_actual):
+                if "Date" in gold: continue
+                if gold != actual:
+                    shutil.copy(fn_actual, baseDir + "FailedOutput/" + os.path.split(fn_actual)[1]) 
+                    self.assertTrue(False, msg=fn_gold) 
             
 """ 
 Test:

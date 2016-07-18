@@ -48,7 +48,7 @@ import Queue                                    # Y
 import warnings                                 # Y
 import time                                     # Y
 
-version = "0.7.0"
+version = "0.7.1"
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
 picProtocol = 1
 if sys.platform.startswith("linux"):
@@ -62,6 +62,16 @@ Utilities
 def RunCommand(command):
     subprocess.call(command)
 
+def RunBlastDBCommand(command):
+    capture = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout = [x for x in capture.stdout]
+    stderr = [x for x in capture.stderr]
+    nLines_success= 10
+    if len(stdout) > nLines_success or len(stderr) > 0:
+        print("\nWarning:")
+        print("".join(stdout[2:]))
+        if len(stderr) > 0: print(stderr)
+    
 def Worker_RunCommand(cmd_queue, nTotal):
     while True:
         try:
@@ -390,7 +400,7 @@ class MCL:
     @staticmethod                       
     def RunMCL(graphFilename, clustersFilename, nProcesses, inflation):
         nProcesses = 4 if nProcesses > 4 else nProcesses    # MCL appears to take *longer* as more than 4 processes are used
-        command = ["mcl", graphFilename, "-I", str(inflation), "-o", clustersFilename, "-te", str(nProcesses)]
+        command = ["mcl", graphFilename, "-I", str(inflation), "-o", clustersFilename, "-te", str(nProcesses), "-V", "all"]
         RunCommand(command)
         util.PrintTime("Ran MCL")  
 
@@ -414,7 +424,7 @@ class MCL:
                 print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
                 Fail()
             else:
-                print("Tried to use only the first part of the accession in order to list the sequences in each orthologous group more concisely but these were not unique. Will use the full accession line instead.")     
+                print("Tried to use only the first part of the accession in order to list the sequences in each orthologous group\nmore concisely but these were not unique. The full accession line will be used instead.\n")     
                 try:
                     fullDict = dict()
                     for idsFilename in idsFilenames:
@@ -464,8 +474,10 @@ class MCL:
                     for iSpecies in xrange(nSpecies):
                         row.append(", ".join(sorted(ogDict[iSpecies])))
                 thisOutputWriter.writerow(row)
-        print("""Orthologous groups have been written to tab-delimited files:\n   %s\n   %s""" % (outputFilename, singleGeneFilename))
-        print("""And in OrthoMCL format:\n   %s""" % (outputFilename[:-3] + "txt"))
+        print("Output directory:")
+        print("   " + os.path.split(outputFilename)[0] + "/")
+        print("\nOrthogroups:")
+        print("   " + "   ".join([os.path.split(fn)[1] for fn in [outputFilename, singleGeneFilename]]) + "\n   (and " + os.path.split(outputFilename[:-3] + "txt")[1] + " in OrthoMCL format)")
 
 """
 scnorm
@@ -1045,10 +1057,11 @@ def Stats(ogs, speciesNamesDict, iSpecies, resultsDir, iResultsVersion):
         Stats_SizeTable(writer_sum, writer_sp, properOGs, allGenesCounter, iSpecies, speciesPresence)
         Stats_SpeciesOverlaps(filename_overlap, speciesNamesDict, iSpecies, speciesPresence)
         
-    print("\nOrthogroup statistics:\n   %s\n   %s\n   %s" % (filename_sp, filename_sum, filename_overlap))
-    summaryText = """\nOrthoFinder assigned %d genes (%0.1f%% of total) to %d orthogroups. The G50 orthogroup size was %d genes
-and the 050 was %d orthogroups. There were %d orthogroups with all species present and %d of these 
-consisted entirely of single-copy genes.""" % (nAssigned, pAssigned, nOgs, G50, O50, nCompleteOGs, nSingleCopy)
+    print("\nOrthogroup statistics:")
+    print("   " + "   ".join([os.path.split(fn)[1] for fn in [filename_sp, filename_sum, filename_overlap]]))
+    summaryText = """OrthoFinder assigned %d genes (%0.1f%% of total) to %d orthogroups. Fifty percent of all genes were in orthogroups 
+with %d or more genes (G50 was %d) and were contained in the largest %d orthogroups (O50 was %d). There were %d 
+orthogroups with all species present and %d of these consisted entirely of single-copy genes.""" % (nAssigned, pAssigned, nOgs, G50, G50, O50, O50, nCompleteOGs, nSingleCopy)
     return summaryText
           
 
@@ -1368,10 +1381,6 @@ if __name__ == "__main__":
         if resultsDir == None: resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results_")
         workingDir = resultsDir + "WorkingDirectory" + os.sep
         os.mkdir(workingDir)
-    if qUsePrecalculatedBlast:
-        print("%d threads for BLAST searches" % nBlast)
-    if not qOnlyPrepare:
-        print("%d threads for OrthoFinder algorithm" % nProcessAlg)
      
     # check for BLAST+ and MCL - else instruct how to install and add to path
     print("\n1. Checking required programs are installed")
@@ -1389,7 +1398,7 @@ if __name__ == "__main__":
     else:
         newFastaFiles, userFastaFilenames, idsFilename, speciesIdsFilename, newSpeciesIDs = AssignIDsToSequences(fastaDir, workingDir)
         speciesToUse = speciesToUse + newSpeciesIDs
-        print("Done")
+        print("Done!")
     seqsInfo = GetSeqsInfo(workingDir_previous if qUsePrecalculatedBlast else workingDir, speciesToUse)
     
     if qXML:   
@@ -1445,11 +1454,12 @@ if __name__ == "__main__":
     if not qUseFastaFiles:
         print("Skipping")
     else:
-        print("\n3a. Creating BLAST databases")
-        print(  "----------------------------")
-        for iSp in xrange(max(speciesToUse)+1):
+        nDB = max(speciesToUse) + 1
+        for iSp in xrange(nDB):
             command = ["makeblastdb", "-dbtype", "prot", "-in", workingDir + "Species%d.fa" % iSp, "-out", workingDir + "BlastDBSpecies%d" % iSp]
-            RunCommand(command)    
+            util.PrintTime("Creating Blast database %d of %d" % (iSp + 1, nDB))
+            RunBlastDBCommand(command) 
+        print("Done!")
     
     if qOnlyPrepare:
         print("\n4. BLAST commands that must be run")
@@ -1536,6 +1546,8 @@ if __name__ == "__main__":
     speciesNamesDict = SpeciesNameDict(speciesIdsFilename)
     MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesToUse, resultsBaseFilename)
     summaryText = Stats(ogs, speciesNamesDict, speciesToUse, resultsDir, iResultsVersion)
+    print("\n7. Summary")
+    print(  "----------")
     print(summaryText)
     if qXML:
         numbersOfSequences = list(np.diff(seqsInfo.seqStartingIndices))
@@ -1543,3 +1555,4 @@ if __name__ == "__main__":
         orthoxmlFilename = resultsBaseFilename + ".orthoxml"
         MCL.WriteOrthoXML(speciesInfo, ogs, numbersOfSequences, idsDict, orthoxmlFilename, speciesToUse)
     PrintCitation()
+    print("")
