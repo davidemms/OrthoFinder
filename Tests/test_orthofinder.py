@@ -528,7 +528,7 @@ class TestCommandLine(unittest.TestCase):
         
     def RunTrees(self, commands):
         if qBinary:
-            capture = subprocess.Popen("python %s -t 8 %s" % (trees_for_orthogroups_bin, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
+            capture = subprocess.Popen("%s -t 8 %s" % (trees_for_orthogroups_bin, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
         else:
             capture = subprocess.Popen("python %s -t 8 %s" % (trees_for_orthogroups, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
         stdout = "".join([x for x in capture.stdout])
