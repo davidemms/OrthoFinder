@@ -21,8 +21,11 @@ import csv
 __skipLongTests__ = False
 
 baseDir = os.path.dirname(os.path.realpath(__file__)) + os.sep
+qBinary = False
 orthofinder = baseDir + "../orthofinder.py"
+orthofinder_bin = baseDir + "../bin/orthofinder"
 trees_for_orthogroups = baseDir + "../trees_for_orthogroups.py"
+trees_for_orthogroups_bin = baseDir + "../bin/trees_for_orthogroups"
 exampleFastaDir = baseDir + "Input/SmallExampleDataset/"
 exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 
@@ -515,13 +518,19 @@ class TestCommandLine(unittest.TestCase):
         self.CleanCurrentResultsDir()
         
     def RunOrthoFinder(self, commands):
-        capture = subprocess.Popen("python %s %s" % (orthofinder, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
+        if qBinary:
+            capture = subprocess.Popen("%s %s" % (orthofinder_bin, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
+        else:
+            capture = subprocess.Popen("python %s %s" % (orthofinder, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
         stdout = "".join([x for x in capture.stdout])
         stderr = "".join([x for x in capture.stderr])
         return stdout, stderr
         
     def RunTrees(self, commands):
-        capture = subprocess.Popen("python %s -t 8 %s" % (trees_for_orthogroups, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
+        if qBinary:
+            capture = subprocess.Popen("python %s -t 8 %s" % (trees_for_orthogroups_bin, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
+        else:
+            capture = subprocess.Popen("python %s -t 8 %s" % (trees_for_orthogroups, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
         stdout = "".join([x for x in capture.stdout])
         stderr = "".join([x for x in capture.stderr])
         return stdout, stderr
@@ -566,7 +575,7 @@ class TestCommandLine(unittest.TestCase):
                     self.assertTrue(False, msg=fn_gold) 
         
     def CompareFile(self, fn_gold, fn_actual):
-        fn_gold = fn_gold.replace(version, "0.4.0")
+        fn_gold = os.path.split(fn_gold)[0] + "/" + os.path.split(fn_gold)[1].replace(version, "0.4.0")
         f = os.path.split(fn_actual)[1]                
         if "Blast" in f:
             self.CompareBlast(fn_gold, fn_actual)
@@ -586,21 +595,30 @@ class TestCommandLine(unittest.TestCase):
                     self.assertTrue(False, msg=fn_gold) 
             
 """ 
-Test:
+Test to add:
     - Extra results files when already files in directory (and clusters and graph file)
     - multiple -s arguments passed 
     - multiple -f arguments passed
 
-"""        
+"""  
+      
 if __name__ == "__main__":
-    if len(sys.argv) == 2: 
-        # run single test
-        suite = unittest.TestSuite()
-        suite.addTest(TestCommandLine(sys.argv[1]))
-        runner = unittest.TextTestRunner()
-        runner.run(suite)
-    else:
+    if len(sys.argv) == 1:
         # run suite
         suite = unittest.TestLoader().loadTestsFromTestCase(TestCommandLine)
         unittest.TextTestRunner(verbosity=2).run(suite)
+    else:
+        if sys.argv[1] == "-binary" and len(sys.argv) == 2:
+            qBinary = True
+            # run suite
+            print("Running tests using binary file")
+            suite = unittest.TestLoader().loadTestsFromTestCase(TestCommandLine)
+            unittest.TextTestRunner(verbosity=2).run(suite)
+        elif sys.argv[1] == "-binary" and len(sys.argv) == 3:
+            # run single test
+            suite = unittest.TestSuite()
+            suite.addTest(TestCommandLine(sys.argv[2]))
+            runner = unittest.TextTestRunner()
+            runner.run(suite)
+        
     
