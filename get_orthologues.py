@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jun  9 16:00:33 2016
@@ -18,16 +19,13 @@ import subprocess
 import multiprocessing as mp
 import Queue
 
-sys.path = [p for p in sys.path if "trunk" not in p]
 import trees_for_orthogroups as tfo
 import idextractor
 import orthofinder
 
-# temp
-#import matplotlib.pyplot as plt
-#plt.interactive(True)
+#print(orthofinder.__file__)
 
-nThreads = 8
+nThreads = orthofinder.nThreadsDefault
 
 class Seq(object):
     def __init__(self, seqInput):
@@ -52,8 +50,8 @@ class Seq(object):
     def __ne__(self, other):
         return not self.__eq__(other)         
         
-#    def __repr__(self):
-#        return self.ToString()
+    def __repr__(self):
+        return self.ToString()
 #  
 #    def __hash__(self):
 #        return 100000 * self.iSp + self.iSeq
@@ -140,44 +138,61 @@ def lil_max(M):
 # ==============================================================================================================================      
 # ASTRAL
 
-#def CreateTaxaMapFile(directory):
-
 def GetOGsToUse(ogSet):
-    return range(50, min(1000, len(ogSet.ogs)))
+    return range(50, min(10000, len(ogSet.ogs)))
 
 def CreateTaxaMapFile(ogSet, i_ogs_to_use, outputFN):
-    d = defaultdict(list)
+    """Get max number of sequences per species"""
+    sp_max = defaultdict(int)
     for iog in i_ogs_to_use:
+        thisCount = defaultdict(int)
         for seq in ogSet.ogs[iog]:
-            d[seq.iSp].append(seq.ToString())
+            thisCount[seq.iSp] += 1
+        for iSp in thisCount:
+            sp_max[iSp] = max(sp_max[iSp], thisCount[iSp])
     with open(outputFN, 'wb') as outfile:
-        for k, v in d.items():
-            outfile.write(("%d:" % k) + ",".join(v) + "\n")
+        for iSp, m in sp_max.items():
+            outfile.write(("%d:" % iSp) + ",".join(["%d_%d" % (iSp, j) for j in xrange(m)]) + "\n")
+        
+def ConvertTree(treeString):
+    """for trees with sequence names iSp_jSeq replaces the jSeq with 0, 1,..."""
+    tree = ete2.Tree(treeString)
+    sp_counts = defaultdict(int)
+    for seq in tree:
+        iSp, jSeq = seq.name.split("_")
+        kSeq = sp_counts[iSp]
+        sp_counts[iSp] += 1
+        seq.name = "%s_%d" % (iSp, kSeq)
+    return (tree.write() + "\n")
 
 def ConcatenateTrees(i_ogs_to_use, treesPat, outputFN):
     with open(outputFN, 'wb') as outfile:
         for iog in i_ogs_to_use:
             with open(treesPat % iog, 'rb') as infile:
-                for line in infile: outfile.write(line)
+                for line in infile: 
+                  if ";" in line: outfile.write(ConvertTree(line))
     
 def RunAstral(ogSet, treesPat, workingDir):
     dir_astral = workingDir + "ASTRAL/"
-    os.mkdir(dir_astral)
+    #os.mkdir(dir_astral)
     i_ogs_to_use = GetOGsToUse(ogSet)
     tmFN = dir_astral + "Taxa_map.txt"
     CreateTaxaMapFile(ogSet, i_ogs_to_use, tmFN)
     treesFN = dir_astral + "TreesFile.txt"
     ConcatenateTrees(i_ogs_to_use, treesPat, treesFN)
 #    subprocess.call(["java", "-jar", "/home/david/Astral/astral.4.10.6.jar", "-a", tmFN, "-i", treesFN])
-    print(" ".join(["java", "-Xmx6000M", "-jar", "/home/david/software/ASTRAL-multiind/Astral/astral.4.8.0.jar", "-a", tmFN, "-i", treesFN, "-o", workingDir+"SpeciesTree.txt"]))
+    speciesTreeFN = workingDir + "SpeciesTree.txt"
+    print(" ".join(["java", "-Xmx6000M", "-jar", "/home/david/software/ASTRAL-multiind/Astral/astral.4.8.0.jar", "-a", tmFN, "-i", treesFN, "-o", speciesTreeFN]))
+    return speciesTreeFN
 
 # ==============================================================================================================================      
-        
+# DendroBlast   
+
 def Worker_BlastScores(cmd_queue, seqsInfo, fileInfo):
     while True:
         try:
             args = cmd_queue.get(True, 1)
-            B = orthofinder.BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, *args)
+            B = orthofinder.BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, *args, qExcludeSelfHits = False)
             with open(fileInfo.outputDir + "Bit%d_%d.pic" % args, 'wb') as outfile:
                 pic.dump(B, outfile, protocol = orthofinder.picProtocol)
         except Queue.Empty:
@@ -188,6 +203,17 @@ class DendroBLASTTrees(object):
         self.outD = outD
         self.ogSet = ogSet
         self.species = sorted(map(int, self.ogSet.SpeciesDict().keys()))
+        treesDir = outD + "Trees/"
+        treesIDsDir = outD + "Trees/Trees_ids/"
+        workingDir = outD + "WorkingDirectory/"
+        distancesDir = workingDir + "Distances/"
+        dirs = [workingDir, treesDir, distancesDir, treesIDsDir]
+        for d in dirs:
+            if not os.path.exists(d):
+                os.mkdir(d)
+        self.treesPatIDs = treesIDsDir + "OG%07d_tree_id.txt"
+        self.treesPat = treesDir + "OG%07d_tree.txt"
+        self.distPat = distancesDir + "OG%07d.phy"
         # Check files exist
         
     def ReadAndPickle(self): 
@@ -259,7 +285,7 @@ class DendroBLASTTrees(object):
                 for j in xrange(i):
                     m2[i, j] = -np.log(m[i,j] + m[j, i])
                     m2[j, i] = m2[i, j]
-            self.WritePhylipMatrix(m2, [g.ToString() for g in og], self.outD + "Distances_OG%07d.phy" % iog)
+            self.WritePhylipMatrix(m2, [g.ToString() for g in og], self.distPat % iog)
             newMatrices.append(m2)
         return newMatrices
     
@@ -287,7 +313,7 @@ class DendroBLASTTrees(object):
 #                    d_list.append(min(distances) if len(distances) > 0 else None)
         return D, spPairs
     
-    def SpeciesTree(self, D, spPairs, speciesMatrixFN):
+    def PrepareSpeciesTreeCommand(self, D, spPairs):
         n = len(self.species)
         M = np.zeros((n, n))
         for (sp1, sp2), d in zip(spPairs, D):
@@ -296,6 +322,7 @@ class DendroBLASTTrees(object):
             x = np.median(d)
             M[sp1, sp2] = x
             M[sp2, sp1] = x
+        speciesMatrixFN = os.path.split(self.distPat)[0] + "/SpeciesMatrix.phy"
         with open(speciesMatrixFN, 'wb') as outfile:
             outfile.write("%d\n" % n)
 #            speciesDict = self.ogSet.SpeciesDict()
@@ -303,18 +330,16 @@ class DendroBLASTTrees(object):
 #                outfile.write(speciesDict[str(self.species[i])] + " ")
                 outfile.write(str(self.species[i]) + " ")
                 values = " ".join(["%.6g" % (0. + M[i,j]) for j in range(n)])   # hack to avoid printing out "-0"
-                outfile.write(values + "\n")           
+                outfile.write(values + "\n")       
+        treeFN = os.path.split(self.treesPatIDs)[0] + "/SpeciesTree_ids.txt"
+        cmd = " ".join(["fastme", "-i", speciesMatrixFN, "-s", "-n", "-o", treeFN])
+        return cmd, treeFN
                 
-    def InferTrees(self, treesPat):
-        seqDict = self.ogSet.Spec_SeqDict()
+    def PrepareGeneTreeCommand(self):
+        cmds = []
         for iog in xrange(len(self.ogSet.ogs)):
-            fn = self.outD + "Distances_OG%07d.phy" % iog
-            treeFN = treesPat % iog
-            subprocess.call(["fastme", "-i", fn, "-o", treeFN])
-            self.RenameTreeTaxa(treeFN, os.path.splitext(treeFN)[0] + "_names.txt", seqDict)
-        treeFN = self.outD + "SpeciesTree.txt"
-        subprocess.call(["fastme", "-i", self.outD + "SpeciesMatrix.phy", "-s", "-o", treeFN])
-        self.RenameTreeTaxa(treeFN, os.path.splitext(treeFN)[0] + "_names.txt", self.ogSet.SpeciesDict())
+            cmds.append([" ".join(["fastme", "-i", self.distPat % iog, "-s", "-n", "-o", self.treesPatIDs % iog])])
+        return cmds
 
     def RenameTreeTaxa(self, treeFN, newTreeFilename, idsMap):     
 #        with open(treeFN, "rb") as inputTree: treeString = inputTree.next()
@@ -328,36 +353,193 @@ class DendroBLASTTrees(object):
         except:
             pass
     
-    def RunAnalysis(self, treesPat):
+    def RunAnalysis(self):
         ogs, ogMatrices_partial = self.GetOGMatrices()
         ogMatrices = self.WriteOGMatrices(ogs, ogMatrices_partial)
         D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
-        self.SpeciesTree(D, spPairs, self.outD + "SpeciesMatrix.phy")
-        self.InferTrees(treesPat)
-        return D, spPairs
+        cmd_spTree, spTreeFN = self.PrepareSpeciesTreeCommand(D, spPairs)
+        cmds_geneTrees = self.PrepareGeneTreeCommand()
+        tfo.RunParallelCommandSets(nProcesses, [[cmd_spTree]] + cmds_geneTrees, qHideStdout = True)
+        seqDict = self.ogSet.Spec_SeqDict()
+        for iog in xrange(len(self.ogSet.ogs)):
+            self.RenameTreeTaxa(self.treesPatIDs % iog, self.treesPat % iog, seqDict)
+        self.RenameTreeTaxa(spTreeFN, self.outD + "SpeciesTree.txt", self.ogSet.SpeciesDict())          
+        return len(ogs), D, spPairs
+
+# ==============================================================================================================================      
+# DLCPar
+
+def GetTotalLength(tree):
+    return sum([node.dist for node in tree])
+  
+def AllEqualBranchLengths(tree):
+    lengths = [node.dist for node in tree]
+    return (len(lengths) > 1 and len(set(lengths)) == 1)
+
+def RootGeneTreesArbitrarily(treesPat, nOGs, outputDir):
+    filenames = [treesPat % i for i in xrange(nOGs)]
+    outFilenames = [outputDir + os.path.split(treesPat % i)[1] for i in xrange(nOGs)]
+    treeFilenames = [fn for fn in filenames if fn.endswith(".txt")]
+    nErrors = 0
+    with open(outputDir + 'root_errors.txt', 'wb') as errorfile:
+        for treeFN, outFN in zip(treeFilenames, outFilenames):
+            try:    
+                t = ete2.Tree(treeFN)
+                if len(t.get_children()) != 2:
+                    R = t.get_midpoint_outgroup()
+                    # if it's a tree with 3 genes all with zero length branches then root arbitrarily (it's possible this could happen with more than 3 nodes)
+                    if GetTotalLength(t) == 0.0:
+                      for leaf in t:
+                        R = leaf
+                        break
+                      print("%s is a zero length tree, it will be rooted at a arbitrary node" % outFN)
+                    elif AllEqualBranchLengths(t):
+                      # more generally, for any branch length all branches could have that same length
+                      for leaf in t:
+                        R = leaf
+                        break
+                      print("%s has branches all of equal length, it will be rooted at a arbitrary node" % outFN)
+                    t.set_outgroup(R)
+                t.resolve_polytomy()
+                t.write(outfile = outFN)
+            except Exception as err:
+                try:
+                    t = ete2.Tree(treeFN)
+                    for leaf in t:
+                       R = leaf
+                       break
+                    print("%s using an arbitrary node" % outFN)
+                    t.set_outgroup(R)
+                    t.resolve_polytomy()
+                    t.write(outfile = outFN)
+                except:
+                    errorfile.write(treeFN + ": " + str(err) + '\n')
+                    nErrors += 1    
+    if nErrors != 0:
+      print("WARNING: Some trees could not be rooted")
+      print("Usually this is because the tree contains genes from a single species.")    
+
+def WriteGeneSpeciesMap(d, ogSet):
+    fn = d + "GeneMap.smap"
+    iSpecies = ogSet.SpeciesDict().keys()
+    with open(fn, 'wb') as outfile:
+        for iSp in iSpecies:
+            outfile.write("%s_*\t%s\n" % (iSp, iSp))
+    return fn
+
+def RunCommand(cmd):
+    print(cmd)
+#    subprocess.call(cmd, shell=True)
+
+def RunDlcpar(treesPat, ogSet, nOGs, speciesTreeFN, resultsDir):
+    """
+    
+    Implementation:
+    - (skip: label species tree)
+    - sort out trees (midpoint root, resolve plytomies etc)
+    - run
+    
+    """
+    rootedTreeDir = resultsDir + "Trees_arbitraryRoot/"
+    if not os.path.exists(rootedTreeDir): os.mkdir(rootedTreeDir)
+    RootGeneTreesArbitrarily(treesPat, nOGs, rootedTreeDir)
+    geneMapFN = WriteGeneSpeciesMap(rootedTreeDir, ogSet)
+
+    dlcparResultsDir = resultsDir + 'dlcpar_1_1_0.5/'
+    filenames = [rootedTreeDir + os.path.split(treesPat % i)[1] for i in xrange(9999, nOGs)]
+    
+    dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.5 %s -O %s' % (speciesTreeFN, geneMapFN, fn, dlcparResultsDir + os.path.split(fn)[1]) for fn in filenames]
+    # use this to run in parallel
+    pool = mp.Pool(nThreads)
+    pool.map(RunCommand, dlcCommands)
+
+# ==============================================================================================================================      
+# Main
+
+def WriteTestDistancesFile(workingDir):
+    testFN = workingDir + "SimpleTest.phy"
+    with open(testFN, 'wb') as outfile:
+        outfile.write("4\n1_1 0 0 0.2 0.25\n0_2 0 0 0.21 0.28\n3_1 0.21 0.21 0 0\n4_1 0.25 0.28 0 0")
+    return testFN
+
+def CanRunDependencies(workingDir):
+    testFN = WriteTestDistancesFile(workingDir)
+    outFN = workingDir + "SimpleTest.tre"
+    if os.path.exists(outFN): os.remove(outFN)        
+    if not orthofinder.CanRunCommand("fastme -i %s -o %s" % (testFN, outFN), qAllowStderr=False):
+        print("ERROR: Cannot run fastme")
+        print("Please check FastME is installed and that the executables are in the system path\n")
+        return False
+    os.remove(testFN)
+    os.remove(outFN)
+    return True    
         
 def PrintHelp():
-    pass
+    print("Usage")    
+    print("-----")
+    print("get_orthologues.py orthofinder_results_directory [-t max_number_of_threads]")
+    print("get_orthologues.py -h")
+    print("\n")
+    
+    print("Arguments")
+    print("---------")
+    print("""orthofinder_results_directory
+    Generate gene trees for the orthogroups, generated rooted species tree and infer ortholgues.\n""")
+    
+    print("""-t max_number_of_threads, --threads max_number_of_threads
+    The maximum number of processes to be run simultaneously. The deafult is %d but this 
+    should be increased by the user to the maximum number of cores available.\n""" % orthofinder.nThreadsDefault)
+        
+    print("""-h, --help
+   Print this help text""")
+    orthofinder.PrintCitation()   
     
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] == "--help" or sys.argv[1] == "-h":
         PrintHelp()
         sys.exit()
         
-    resultsDir = sys.argv[1]
-    resultsDir = "/home/david/projects/Orthology/OrthoFinder/Trees/Tests/Vertebrata/"
-    orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = tfo.GetOGsFile(resultsDir)
-#    resultsDir = "/home/david/vtemp/ExampleDataset/Results_Jun23/"
-#    workingDir_of = resultsDir + "WorkingDirectory/"
-#    if not os.path.exists(workingDir_of): workingDir_of = resultsDir
+    # get arguments
+    userDir = None
+    nProcesses = None
     
-    workingDir = orthofinder.util.CreateNewWorkingDirectory(orthofinderWorkingDir + "WorkingDir_DB")
+    args = sys.argv[1:]    
+    while len(args) != 0:
+        arg = args.pop(0)
+        if arg == "-t" or arg == "--threads":
+            if len(args) == 0:
+                print("Missing option for command line argument -t")
+                orthofinder.Fail()
+            arg = args.pop(0)
+            try:
+                nProcesses = int(arg)
+            except:
+                print("Incorrect argument for number of threads: %s" % arg)
+                orthofinder.Fail()   
+        else:
+            userDir = arg
+        
+    # Check arguments
+    orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = tfo.GetOGsFile(userDir)
+
+    if nProcesses == None:
+        print("""Number of parallel processes has not been specified, will use the default value.  
+   Number of parallel processes can be specified using the -t option\n""")
+        nProcesses = orthofinder.nThreadsDefault
+    print("Using %d threads for alignments and trees\n" % nProcesses)
+    
+    if not CanRunDependencies(orthofinderWorkingDir): orthofinder.Fail()   
+    
+    resultsDir = orthofinder.util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_")
     ogSet = OrthoGroupsSet(orthofinderWorkingDir, clustersFilename_pairs, idExtractor = idextractor.FirstWordExtractor)
     
-    db = DendroBLASTTrees(ogSet, workingDir)
+    db = DendroBLASTTrees(ogSet, resultsDir)
     db.ReadAndPickle()
-    treesPat = workingDir + "Tree_OG%07d.txt"
-    D, spPairs = db.RunAnalysis(treesPat)
-    RunAstral(ogSet, treesPat, workingDir)
+    nOGs, D, spPairs = db.RunAnalysis()
+        
+#    speciesTreeFN = RunAstral(ogSet, db.treesPat, resultsDir)
+    
+#    RunDlcpar(db.treesPat, ogSet, nOGs, speciesTreeFN, resultsDir)
     
     # Next, infer orthologues - dlcpar
+    print("\nDone!")

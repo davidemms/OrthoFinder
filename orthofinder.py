@@ -878,7 +878,7 @@ class WaterfallMethod:
 OrthoFinder
 -------------------------------------------------------------------------------
 """   
-nBlastDefault = 16
+nThreadsDefault = 16
 nAlgDefault = 1
 mclInflation = 1.5
 
@@ -953,7 +953,7 @@ def PrintHelp():
     print("""-t number_of_blast_threads, --threads number_of_blast_threads
     The number of BLAST processes to be run simultaneously. This should be increased by the user to at least 
     the number of cores on the computer so as to minimise the time taken to perform the BLAST all-versus-all 
-    queries. [Default is %d]\n""" % nBlastDefault)
+    queries. [Default is %d]\n""" % nThreadsDefault)
     
     print("""-a number_of_orthofinder_threads, --algthreads number_of_orthofinder_threads
     The number of threads to use for the OrthoFinder algorithm and MCL after BLAST searches have been completed. 
@@ -1042,7 +1042,7 @@ if __name__ == "__main__":
         sys.exit()
              
     # Control
-    nBlast = nBlastDefault
+    nBlast = nThreadsDefault
     nProcessAlg = nAlgDefault
     qUsePrecalculatedBlast = False  # remove, just store BLAST to do
     qUseFastaFiles = False  # local to argument checking

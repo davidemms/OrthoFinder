@@ -40,14 +40,16 @@ import glob
 
 import orthofinder    
 
-version = "0.6.1"
-nProcessesDefault = 16
-    
+version = "0.6.1"   
 
-def RunCommandSet(commandSet):
+def RunCommandSet(commandSet, qHideStdout):
     orthofinder.util.PrintTime("Runing command: %s" % commandSet[-1])
-    for cmd in commandSet:
-        subprocess.call(cmd, shell=True)
+    if qHideStdout:
+        for cmd in commandSet:
+            subprocess.call(cmd, shell=True, stdout=subprocess.PIPE)
+    else:
+        for cmd in commandSet:
+            subprocess.call(cmd, shell=True)
     orthofinder.util.PrintTime("Finshed command: %s" % commandSet[-1])
     
 class FastaWriter(object):
@@ -90,7 +92,7 @@ class FastaWriter(object):
     def SortSeqs(self, seqs):
         return sorted(seqs, key=lambda x: map(int, x.split("_")))
                     
-def Worker_RunCommand(cmd_queue):
+def Worker_RunCommand(cmd_queue, qHideStdout):
     """ repeatedly takes items to process from the queue until it is empty at which point it returns. Does not take a new task
         if it can't acquire queueLock as this indicates the queue is being rearranged.
         
@@ -98,24 +100,27 @@ def Worker_RunCommand(cmd_queue):
     """
     while True:
         try:
-            commandSet = cmd_queue.get(True, 10)
-            RunCommandSet(commandSet)
+            commandSet = cmd_queue.get(True, 1)
+            RunCommandSet(commandSet, qHideStdout)
         except Queue.Empty:
             return   
     
-def RunParallelCommandSets(nProcesses, commands):
-    
+def RunParallelCommandSets(nProcesses, commands, qHideStdout = False):
+    """nProcesss - the number of processes to run in parallel
+    commands - list of lists of commands where the commands in the inner list are completed in order (the i_th won't run until
+    the i-1_th has finished).
+    """
     # Setup the workers and run
     cmd_queue = mp.Queue()
     for cmd in commands:
         cmd_queue.put(cmd)
-    runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue,)) for i_ in xrange(nProcesses)]
+    runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, qHideStdout)) for i_ in xrange(nProcesses)]
     for proc in runningProcesses:
         proc.start()
     
     for proc in runningProcesses:
         while proc.is_alive():
-            proc.join(60.)
+            proc.join(10.)
             time.sleep(2)    
 
 def WriteTestFile(workingDir):
@@ -254,7 +259,7 @@ def PrintHelp():
     
     print("""-t max_number_of_threads, --threads max_number_of_threads
     The maximum number of processes to be run simultaneously. The deafult is %d but this 
-    should be increased by the user to the maximum number of cores available.\n""" % nProcessesDefault)
+    should be increased by the user to the maximum number of cores available.\n""" % orthofinder.nThreadsDefault)
         
     print("""-h, --help
    Print this help text""")
@@ -396,7 +401,7 @@ if __name__ == "__main__":
     if nProcesses == None:
         print("""Number of parallel processes has not been specified, will use the default value.  
    Number of parallel processes can be specified using the -t option\n""")
-        nProcesses = nProcessesDefault
+        nProcesses = orthofinder.nThreadsDefault
     print("Using %d threads for alignments and trees\n" % nProcesses)
     
     ogs = orthofinder.MCL.GetPredictedOGs(clustersFilename_pairs)     
