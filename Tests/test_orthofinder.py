@@ -507,6 +507,24 @@ class TestCommandLine(unittest.TestCase):
                 for goldFN in glob.glob(goldD + "*"):
                     newFN = expD + os.path.split(goldFN)[1]
                     self.CompareFile(goldFN, newFN) 
+                    
+    def test_ProblemCharacters_issue28(self):
+        """Deal with problematic characters in accession names
+        """
+        # Can't have ( ) : ,
+        inputDir = baseDir + "Input/DisallowedCharacters/"
+        with CleanUp([], [], [inputDir + x for x in "Trees/ Sequences/ Alignments/".split()]):        
+            stdout, stderr = self.RunTrees(inputDir)
+            fn = inputDir + "Trees/OG0000000_tree.txt"
+            self.assertTrue(os.path.exists(fn))
+            with open(fn, 'rb') as infile:
+                l = infile.readline()
+            # Tree exists: open braces, comma, close, end of tree
+            self.assertTrue("(" in l)
+            self.assertTrue(")" in l)
+            self.assertTrue("," in l)
+            self.assertTrue(";" in l)
+        
         
 #    def test_treesExtraSpecies(self):
 #        pass
@@ -603,22 +621,29 @@ Test to add:
 """  
       
 if __name__ == "__main__":
+    test = None
     if len(sys.argv) == 1:
         # run suite
         suite = unittest.TestLoader().loadTestsFromTestCase(TestCommandLine)
         unittest.TextTestRunner(verbosity=2).run(suite)
     else:
-        if sys.argv[1] == "-binary" and len(sys.argv) == 2:
-            qBinary = True
-            # run suite
-            print("Running tests using binary file")
-            suite = unittest.TestLoader().loadTestsFromTestCase(TestCommandLine)
-            unittest.TextTestRunner(verbosity=2).run(suite)
-        elif sys.argv[1] == "-binary" and len(sys.argv) == 3:
-            # run single test
-            suite = unittest.TestSuite()
-            suite.addTest(TestCommandLine(sys.argv[2]))
-            runner = unittest.TextTestRunner()
-            runner.run(suite)
+        if len(sys.argv) > 1:
+            if sys.argv[1] == "-binary": 
+                qBinary = True
+                print("Running tests using binary file")
+                if len(sys.argv) > 2:
+                    test = sys.argv[2]
+            else:
+                test = sys.argv[1]
+                
+    if test == None:
+        suite = unittest.TestLoader().loadTestsFromTestCase(TestCommandLine)
+        unittest.TextTestRunner(verbosity=2).run(suite)
+    else:
+        suite = unittest.TestSuite()
+        suite.addTest(TestCommandLine(test))
+        runner = unittest.TextTestRunner()
+        runner.run(suite)
+
         
     

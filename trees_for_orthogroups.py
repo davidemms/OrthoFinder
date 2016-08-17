@@ -116,7 +116,7 @@ def RunParallelCommandSets(nProcesses, commands):
     for proc in runningProcesses:
         while proc.is_alive():
             proc.join(60.)
-            time.sleep(2)    
+            time.sleep(1)    
 
 def WriteTestFile(workingDir):
     testFN = workingDir + "SimpleTest.fa"

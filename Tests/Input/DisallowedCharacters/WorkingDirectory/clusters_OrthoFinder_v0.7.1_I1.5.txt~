@@ -1,0 +1,15 @@
+# cline: mcl /home/david/vtemp/DisallowedCharacters/Results_Aug17/WorkingDirectory/OrthoFinder_v0.7.1_graph.txt "-I" "1.5" "-o" "/home/david/vtemp/DisallowedCharacters/Results_Aug17/WorkingDirectory/clusters_OrthoFinder_v0.7.1_I1.5.txt" "-te" "1" "-V" "all"
+(mclheader
+mcltype matrix
+dimensions 1970x1177
+)
+(mclmatrix
+begin
+0    259 534 535 1000 1001 1113 1127 1128 1239 1291 1552 1553 1653 $
+1    2 3 147 223 499 1134 1152 1170 1426 $
+2    109 430 807 1258 1268 1427 $
+3    124 520 859 1008 1661 1837 $
+4    173 808 822 1022 1325 1403 $
+5    174 591 823 1023 1324 1822 $
+6    294 296 472 650 652 1295 $
+)

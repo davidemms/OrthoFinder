@@ -210,6 +210,8 @@ class FirstWordExtractor(IDExtractor):
             for line in idsFile:
                 id, rest = line.split(": ", 1)
                 accession = rest.split(None, 1)[0]
+                # Replace problematic characters
+                accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_")
                 if accession in self.nameToIDDict:
                     raise RuntimeError("A duplicate accession was found using just first part: % s" % accession)
                 if id in self.idToNameDict:
