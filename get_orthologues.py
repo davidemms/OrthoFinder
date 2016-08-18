@@ -9,19 +9,18 @@ Created on Thu Jun  9 16:00:33 2016
 import sys
 import os
 import ete2
-import glob
 import numpy as np
 from collections import Counter, defaultdict
 import cPickle as pic
-#import sys
 import itertools
-import subprocess
 import multiprocessing as mp
 import Queue
 
 import trees_for_orthogroups as tfo
 import idextractor
 import orthofinder
+import root_from_duplications as rfd
+import process_trees as pt
 
 #print(orthofinder.__file__)
 
@@ -84,7 +83,8 @@ class OrthoGroupsSet(object):
         return self.seqIDsEx.GetIDToNameDict()
         
     def SpeciesDict(self):
-        return self.speciesIDsEx.GetIDToNameDict()
+        d = self.speciesIDsEx.GetIDToNameDict()
+        return {k:v.rsplit(".",1)[0] for k,v in d.items()}
         
     def Spec_SeqDict(self, qSplitBar=True):
         if self._Spec_SeqIDs != None:
@@ -174,13 +174,12 @@ def ConcatenateTrees(i_ogs_to_use, treesPat, outputFN):
     
 def RunAstral(ogSet, treesPat, workingDir):
     dir_astral = workingDir + "ASTRAL/"
-    #os.mkdir(dir_astral)
+    os.mkdir(dir_astral)
     i_ogs_to_use = GetOGsToUse(ogSet)
     tmFN = dir_astral + "Taxa_map.txt"
     CreateTaxaMapFile(ogSet, i_ogs_to_use, tmFN)
     treesFN = dir_astral + "TreesFile.txt"
     ConcatenateTrees(i_ogs_to_use, treesPat, treesFN)
-#    subprocess.call(["java", "-jar", "/home/david/Astral/astral.4.10.6.jar", "-a", tmFN, "-i", treesFN])
     speciesTreeFN = workingDir + "SpeciesTree.txt"
     print(" ".join(["java", "-Xmx6000M", "-jar", "/home/david/software/ASTRAL-multiind/Astral/astral.4.8.0.jar", "-a", tmFN, "-i", treesFN, "-o", speciesTreeFN]))
     return speciesTreeFN
@@ -204,10 +203,10 @@ class DendroBLASTTrees(object):
         self.ogSet = ogSet
         self.species = sorted(map(int, self.ogSet.SpeciesDict().keys()))
         treesDir = outD + "Trees/"
-        treesIDsDir = outD + "Trees/Trees_ids/"
-        workingDir = outD + "WorkingDirectory/"
-        distancesDir = workingDir + "Distances/"
-        dirs = [workingDir, treesDir, distancesDir, treesIDsDir]
+        self.workingDir = outD + "WorkingDirectory/"
+        treesIDsDir = self.workingDir + "Trees_ids/"
+        distancesDir = self.workingDir + "Distances/"
+        dirs = [self.workingDir, treesDir, distancesDir, treesIDsDir]
         for d in dirs:
             if not os.path.exists(d):
                 os.mkdir(d)
@@ -246,7 +245,6 @@ class DendroBLASTTrees(object):
         ogMatrices = [np.zeros((n, n)) for n in nGenes]
         for iiSp, sp1 in enumerate(self.species):
             orthofinder.util.PrintTime(str(sp1))
-#            Bs = [self.ogSet.BitScores(iiSp, jjSp) for jjSp in xrange(len(self.species))]
             Bs = [orthofinder.LoadMatrix("Bit", self.ogSet.fileInfo, iiSp, jjSp) for jjSp in xrange(len(self.species))]
             mins = np.ones((nSeqs[sp1], 1), dtype=np.float64)*9e99 
             maxes = np.zeros((nSeqs[sp1], 1), dtype=np.float64)
@@ -254,25 +252,11 @@ class DendroBLASTTrees(object):
                 mins = np.minimum(mins, lil_min(B))
                 maxes = np.maximum(maxes, lil_max(B))
             orthofinder.util.PrintTime("got mins and maxes")
-#            print(mins)
-#            print(maxes)
-#            sys.exit()
             for jjSp, B  in enumerate(Bs):
                 for og, m in zip(ogsPerSpecies, ogMatrices):
                     for gi, i in og[iiSp]:
                         for gj, j in og[jjSp]:
-#                            try:
                                 m[i, j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) /  maxes[gi.iSeq]
-#                                if gi.ToString() == "3_201" and gj.ToString() == "0_817": print((B[gi.iSeq, gj.iSeq], mins[gi.iSeq], maxes[gi.iSeq]))
-#                                if gi.ToString() == "0_817" and gj.ToString() == "3_201": 
-#                                    print((B[gi.iSeq, gj.iSeq], mins[gi.iSeq], maxes[gi.iSeq]))
-#                                    print(m[i, j])
-#                            except RuntimeWarning:
-#                                print(m.shape)
-#                                print(B.shape)
-#                                print((B[gi.iSeq, gj.iSeq], mins[gi.iSeq]))
-#                                print((i, j, gi.iSeq, gj.iSeq))
-#                                raise
         return ogs, ogMatrices
     
     def WriteOGMatrices(self, ogs, ogMatrices):
@@ -332,24 +316,25 @@ class DendroBLASTTrees(object):
                 values = " ".join(["%.6g" % (0. + M[i,j]) for j in range(n)])   # hack to avoid printing out "-0"
                 outfile.write(values + "\n")       
         treeFN = os.path.split(self.treesPatIDs)[0] + "/SpeciesTree_ids.txt"
-        cmd = " ".join(["fastme", "-i", speciesMatrixFN, "-s", "-n", "-o", treeFN])
+        cmd = " ".join(["fastme", "-i", speciesMatrixFN, "-o", treeFN, "-s"])
         return cmd, treeFN
                 
     def PrepareGeneTreeCommand(self):
         cmds = []
         for iog in xrange(len(self.ogSet.ogs)):
-            cmds.append([" ".join(["fastme", "-i", self.distPat % iog, "-s", "-n", "-o", self.treesPatIDs % iog])])
+            cmds.append([" ".join(["fastme", "-i", self.distPat % iog, "-o", self.treesPatIDs % iog, "-s"])])
         return cmds
 
-    def RenameTreeTaxa(self, treeFN, newTreeFilename, idsMap):     
+    def RenameTreeTaxa(self, treeFN, newTreeFilename, idsMap, qFixNegatives=False):     
 #        with open(treeFN, "rb") as inputTree: treeString = inputTree.next()
         try:
-            tree = ete2.Tree(treeFN, format=1)
+            tree = ete2.Tree(treeFN)
             for node in tree.get_leaves():
                 node.name = idsMap[node.name]
-#            outputTreeString = tree.write(format=1)
-#            with open(newTreeFilename, 'wb') as outFile: outFile.write(outputTreeString)     
-            tree.write(format=1, outfile = newTreeFilename)  
+            if qFixNegatives:
+                for n in tree.traverse():
+                    if n.dist < 0.0: n.dist = 0.0
+            tree.write(outfile = newTreeFilename, format=4)  
         except:
             pass
     
@@ -357,14 +342,14 @@ class DendroBLASTTrees(object):
         ogs, ogMatrices_partial = self.GetOGMatrices()
         ogMatrices = self.WriteOGMatrices(ogs, ogMatrices_partial)
         D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
-        cmd_spTree, spTreeFN = self.PrepareSpeciesTreeCommand(D, spPairs)
+        cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs)
         cmds_geneTrees = self.PrepareGeneTreeCommand()
         tfo.RunParallelCommandSets(nProcesses, [[cmd_spTree]] + cmds_geneTrees, qHideStdout = True)
         seqDict = self.ogSet.Spec_SeqDict()
         for iog in xrange(len(self.ogSet.ogs)):
-            self.RenameTreeTaxa(self.treesPatIDs % iog, self.treesPat % iog, seqDict)
-        self.RenameTreeTaxa(spTreeFN, self.outD + "SpeciesTree.txt", self.ogSet.SpeciesDict())          
-        return len(ogs), D, spPairs
+            self.RenameTreeTaxa(self.treesPatIDs % iog, self.treesPat % iog, seqDict, qFixNegatives=True)
+        self.RenameTreeTaxa(spTreeFN_ids, self.workingDir + "SpeciesTree_unrooted.txt", self.ogSet.SpeciesDict(), qFixNegatives=True)          
+        return len(ogs), D, spPairs, spTreeFN_ids
 
 # ==============================================================================================================================      
 # DLCPar
@@ -427,11 +412,7 @@ def WriteGeneSpeciesMap(d, ogSet):
             outfile.write("%s_*\t%s\n" % (iSp, iSp))
     return fn
 
-def RunCommand(cmd):
-    print(cmd)
-#    subprocess.call(cmd, shell=True)
-
-def RunDlcpar(treesPat, ogSet, nOGs, speciesTreeFN, resultsDir):
+def RunDlcpar(treesPat, ogSet, nOGs, speciesTreeFN, workingDir):
     """
     
     Implementation:
@@ -440,18 +421,20 @@ def RunDlcpar(treesPat, ogSet, nOGs, speciesTreeFN, resultsDir):
     - run
     
     """
-    rootedTreeDir = resultsDir + "Trees_arbitraryRoot/"
+    rootedTreeDir = workingDir + "Trees_ids_arbitraryRoot/"
     if not os.path.exists(rootedTreeDir): os.mkdir(rootedTreeDir)
     RootGeneTreesArbitrarily(treesPat, nOGs, rootedTreeDir)
     geneMapFN = WriteGeneSpeciesMap(rootedTreeDir, ogSet)
 
-    dlcparResultsDir = resultsDir + 'dlcpar_1_1_0.5/'
-    filenames = [rootedTreeDir + os.path.split(treesPat % i)[1] for i in xrange(9999, nOGs)]
+    dlcparResultsDir = workingDir + 'dlcpar/'
+    if not os.path.exists(dlcparResultsDir): os.mkdir(dlcparResultsDir)
+    filenames = [rootedTreeDir + os.path.split(treesPat % i)[1] for i in xrange(nOGs)]
     
-    dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.5 %s -O %s' % (speciesTreeFN, geneMapFN, fn, dlcparResultsDir + os.path.split(fn)[1]) for fn in filenames]
+    dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.5 %s -O %s' % (speciesTreeFN, geneMapFN, fn, dlcparResultsDir + os.path.splitext(os.path.split(fn)[1])[0]) for fn in filenames]
+#    print(dlcCommands[0])
     # use this to run in parallel
-    pool = mp.Pool(nThreads)
-    pool.map(RunCommand, dlcCommands)
+    tfo.RunParallelCommandSets(nThreads, [[c] for c in dlcCommands], qHideStdout = True)
+    return dlcparResultsDir
 
 # ==============================================================================================================================      
 # Main
@@ -463,6 +446,7 @@ def WriteTestDistancesFile(workingDir):
     return testFN
 
 def CanRunDependencies(workingDir):
+    # FastME
     testFN = WriteTestDistancesFile(workingDir)
     outFN = workingDir + "SimpleTest.tre"
     if os.path.exists(outFN): os.remove(outFN)        
@@ -472,6 +456,11 @@ def CanRunDependencies(workingDir):
         return False
     os.remove(testFN)
     os.remove(outFN)
+    # DLCPar
+    if not orthofinder.CanRunCommand("dlcpar_search --version", qAllowStderr=False):
+        print("ERROR: Cannot run dlcpar_search")
+        print("Please check DLCpar is installed and that the executables are in the system path\n")
+        return False
     return True    
         
 def PrintHelp():
@@ -535,11 +524,19 @@ if __name__ == "__main__":
     
     db = DendroBLASTTrees(ogSet, resultsDir)
     db.ReadAndPickle()
-    nOGs, D, spPairs = db.RunAnalysis()
+    nOGs, D, spPairs, spTreeFN_ids = db.RunAnalysis()
         
+    roots, clusters, rootedSpeciesTreeFN = rfd.GetRoot(spTreeFN_ids, os.path.split(db.treesPatIDs)[0] + "/", rfd.GeneToSpecies_dash, nProcesses, treeFmt = 1)
+    db.RenameTreeTaxa(rootedSpeciesTreeFN, resultsDir + "SpeciesTree_rooted.txt", db.ogSet.SpeciesDict(), qFixNegatives=True)
+    
+    spDict = ogSet.SpeciesDict()
+    for r in roots:
+        print([spDict[s] for s in r])
 #    speciesTreeFN = RunAstral(ogSet, db.treesPat, resultsDir)
+
+    dlcparResultsDir = RunDlcpar(db.treesPatIDs, ogSet, nOGs, rootedSpeciesTreeFN, db.workingDir)
     
-#    RunDlcpar(db.treesPat, ogSet, nOGs, speciesTreeFN, resultsDir)
+    # Orthologue lists
+    pt.get_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, db.workingDir)
     
-    # Next, infer orthologues - dlcpar
     print("\nDone!")
