@@ -244,14 +244,13 @@ class DendroBLASTTrees(object):
         nSeqs = self.NumberOfSequences(self.species)
         ogMatrices = [np.zeros((n, n)) for n in nGenes]
         for iiSp, sp1 in enumerate(self.species):
-            orthofinder.util.PrintTime(str(sp1))
+            orthofinder.util.PrintTime("Species %d" % sp1)
             Bs = [orthofinder.LoadMatrix("Bit", self.ogSet.fileInfo, iiSp, jjSp) for jjSp in xrange(len(self.species))]
             mins = np.ones((nSeqs[sp1], 1), dtype=np.float64)*9e99 
             maxes = np.zeros((nSeqs[sp1], 1), dtype=np.float64)
             for B, sp2 in zip(Bs, self.species):
                 mins = np.minimum(mins, lil_min(B))
                 maxes = np.maximum(maxes, lil_max(B))
-            orthofinder.util.PrintTime("got mins and maxes")
             for jjSp, B  in enumerate(Bs):
                 for og, m in zip(ogsPerSpecies, ogMatrices):
                     for gi, i in og[iiSp]:
@@ -344,6 +343,8 @@ class DendroBLASTTrees(object):
         D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
         cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs)
         cmds_geneTrees = self.PrepareGeneTreeCommand()
+        print("\n3. Inferring gene and species trees")
+        print(  "-----------------------------------")
         tfo.RunParallelCommandSets(nProcesses, [[cmd_spTree]] + cmds_geneTrees, qHideStdout = True)
         seqDict = self.ogSet.Spec_SeqDict()
         for iog in xrange(len(self.ogSet.ogs)):
@@ -509,34 +510,46 @@ if __name__ == "__main__":
             userDir = arg
         
     # Check arguments
+    print("0. Getting Orthologues")
+    print("----------------------")
     orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = tfo.GetOGsFile(userDir)
 
     if nProcesses == None:
-        print("""Number of parallel processes has not been specified, will use the default value.  
-   Number of parallel processes can be specified using the -t option\n""")
+        print("""\nNumber of parallel processes has not been specified, will use the default value.  
+Number of parallel processes can be specified using the -t option.""")
         nProcesses = orthofinder.nThreadsDefault
-    print("Using %d threads for alignments and trees\n" % nProcesses)
+    print("Using %d threads for alignments and trees" % nProcesses)
     
+    print("\n1. Checking required programs are installed")
+    print(  "-------------------------------------------")
     if not CanRunDependencies(orthofinderWorkingDir): orthofinder.Fail()   
     
+    print("\n2. Reading sequence similarity scores")
+    print(  "-------------------------------------")
     resultsDir = orthofinder.util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_")
     ogSet = OrthoGroupsSet(orthofinderWorkingDir, clustersFilename_pairs, idExtractor = idextractor.FirstWordExtractor)
     
     db = DendroBLASTTrees(ogSet, resultsDir)
     db.ReadAndPickle()
     nOGs, D, spPairs, spTreeFN_ids = db.RunAnalysis()
-        
+     
+    print("\n4. Best outgroup(s) for species tree")
+    print(  "------------------------------------")   
     roots, clusters, rootedSpeciesTreeFN = rfd.GetRoot(spTreeFN_ids, os.path.split(db.treesPatIDs)[0] + "/", rfd.GeneToSpecies_dash, nProcesses, treeFmt = 1)
     db.RenameTreeTaxa(rootedSpeciesTreeFN, resultsDir + "SpeciesTree_rooted.txt", db.ogSet.SpeciesDict(), qFixNegatives=True)
     
     spDict = ogSet.SpeciesDict()
     for r in roots:
-        print([spDict[s] for s in r])
+        print(", ".join([spDict[s] for s in r]))
 #    speciesTreeFN = RunAstral(ogSet, db.treesPat, resultsDir)
 
+    print("\n5. Reconciling gene and species trees")
+    print(  "-------------------------------------")   
     dlcparResultsDir = RunDlcpar(db.treesPatIDs, ogSet, nOGs, rootedSpeciesTreeFN, db.workingDir)
     
     # Orthologue lists
+    print("\n6. Inferring orthologues from gene trees")
+    print(  "----------------------------------------")   
     pt.get_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, db.workingDir)
     
     print("\nDone!")

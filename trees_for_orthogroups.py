@@ -43,14 +43,14 @@ import orthofinder
 version = "0.6.1"   
 
 def RunCommandSet(commandSet, qHideStdout):
-    orthofinder.util.PrintTime("Runing command: %s" % commandSet[-1])
+#    orthofinder.util.PrintTime("Runing command: %s" % commandSet[-1])
     if qHideStdout:
         for cmd in commandSet:
             subprocess.call(cmd, shell=True, stdout=subprocess.PIPE)
     else:
         for cmd in commandSet:
             subprocess.call(cmd, shell=True)
-    orthofinder.util.PrintTime("Finshed command: %s" % commandSet[-1])
+#    orthofinder.util.PrintTime("Finshed command: %s" % commandSet[-1])
     
 class FastaWriter(object):
     def __init__(self, fastaFileDir):
@@ -92,7 +92,7 @@ class FastaWriter(object):
     def SortSeqs(self, seqs):
         return sorted(seqs, key=lambda x: map(int, x.split("_")))
                     
-def Worker_RunCommand(cmd_queue, qHideStdout):
+def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qHideStdout):
     """ repeatedly takes items to process from the queue until it is empty at which point it returns. Does not take a new task
         if it can't acquire queueLock as this indicates the queue is being rearranged.
         
@@ -100,7 +100,10 @@ def Worker_RunCommand(cmd_queue, qHideStdout):
     """
     while True:
         try:
-            commandSet = cmd_queue.get(True, 1)
+            i, commandSet = cmd_queue.get(True, 1)
+            nDone = i - nProcesses + 1
+            if nDone >= 0 and divmod(nDone, 100)[1] == 0:
+                print("Done %d of %d" % (nDone, nToDo))
             RunCommandSet(commandSet, qHideStdout)
         except Queue.Empty:
             return   
@@ -112,9 +115,9 @@ def RunParallelCommandSets(nProcesses, commands, qHideStdout = False):
     """
     # Setup the workers and run
     cmd_queue = mp.Queue()
-    for cmd in commands:
-        cmd_queue.put(cmd)
-    runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, qHideStdout)) for i_ in xrange(nProcesses)]
+    for i, cmd in enumerate(commands):
+        cmd_queue.put((i, cmd))
+    runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, nProcesses, i+1, qHideStdout)) for i_ in xrange(nProcesses)]
     for proc in runningProcesses:
         proc.start()
     

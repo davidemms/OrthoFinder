@@ -395,10 +395,10 @@ def ParsimonyRoot(allSpecies, clades, supported_clusters, qPrint=True):
         if score == m:
             if len(clade) > len(allSpecies)/2:
                 root.append(allSpecies.difference(clade))
-                if qPrint: print(root[-1])
+                if qPrint: print(", ".join(root[-1]))
             else:
                 root.append(clade)
-                if qPrint: print(root[-1])
+                if qPrint: print(", ".join(root[-1]))
             if qPrint: print("")
     return root
 
