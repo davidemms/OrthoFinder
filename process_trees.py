@@ -1,6 +1,7 @@
 import re
 import os
 import sys
+import csv
 import glob
 import itertools
 import numpy as np
@@ -86,10 +87,23 @@ def multiply(specmin, specmax, matrixDir):
     return product, M
 
 def WriteOrthologues(folder, spec1, spec2, orthologues, speciesDict, sequenceDict):
-    with open(folder + '%s__v__%s.csv' % (speciesDict[str(spec1)], speciesDict[str(spec2)]), 'wb') as outfile:
-        outfile.write(speciesDict[str(spec1)] + "\t" + speciesDict[str(spec2)] + "\n")
+    d1 = resultsDir + "Orthologues_" + speciesDict[str(spec1)] + "/"
+    d2 = resultsDir + "Orthologues_" + speciesDict[str(spec2)] + "/"
+    with open(d1 + '%s__v__%s.csv' % (speciesDict[str(spec1)], speciesDict[str(spec2)]), 'wb') as outfile1, open(d2 + '%s__v__%s.csv' % (speciesDict[str(spec2)], speciesDict[str(spec1)]), 'wb') as outfile2:
+        writer1 = csv.writer(outfile1)
+        writer2 = csv.writer(outfile2)
+        writer1.writerow((speciesDict[str(spec1)], speciesDict[str(spec2)]))
+        writer2.writerow((speciesDict[str(spec2)], speciesDict[str(spec1)]))
         for genes1, genes2 in orthologues:
-            outfile.write(", ".join([sequenceDict["%d_%d" % (spec1, o)] for o in genes1]) + '\t' + ", ".join([sequenceDict["%d_%d" % (spec2, o)] for o in genes2]) + '\n')
+            writer1.writerow((", ".join([sequenceDict["%d_%d" % (spec1, o)] for o in genes1]), ", ".join([sequenceDict["%d_%d" % (spec2, o)] for o in genes2])))
+            writer2.writerow((", ".join([sequenceDict["%d_%d" % (spec2, o)] for o in genes2]), ", ".join([sequenceDict["%d_%d" % (spec1, o)] for o in genes1])))
+
+#def WriteOrthologues_OneFile(folder, spec1, speciesIDs, orthologues, speciesDict, sequenceDict):
+#    with open(folder + 'Orthologues_%s.csv' % speciesDict[str(spec1)], 'wb') as outfile:
+#        writer = csv.writer(outfile)
+#        writer.writerow([speciesDict[str(spec1)]] + [speciesDict[str(j)] for j in speciesIDs if j != spec1])
+#        """Need to be able to go through the genes in turn for a single speices and get the ortholgues of that gene"""
+#        """Note that if other genes are in the same row then they aren't necessarily orthologues"""
 
 def GetOrthologues(orig_matrix, orig_matrix_csc, index):
     orthologues = orig_matrix.getrowview(index).nonzero()[1]
@@ -109,20 +123,31 @@ def find_all(matrix, orig_matrix):
         done.update(orthologuesSp1)
         orthologues.append((orthologuesSp1, orthologuesSp2))
     return orthologues
-
+    
+#def AllOrthologuesForSpecies(index1, speciesIDs, matrixDir):
+#    orthologues = []
+#    for index2 in xrange(len(speciesIDs)):
+#        product, M = multiply(index1, index2, matrixDir)
+#        orthologues.append(find_all(product, M))
+        
 def species_find_all(speciesDict, sequenceDict, matrixDir, resultsDir):
     # Calls multiply and find_all on each species pair, and appends the numbers from find_all's output to the relevant csv lists.
     speciesIDs = sorted(map(int, speciesDict.keys()))
-    nspecies = len(speciesIDs)        
-    for index1, index2 in itertools.product(xrange(nspecies), xrange(nspecies)):
+    nspecies = len(speciesIDs)           
+    for index1 in xrange(nspecies):
+        d = resultsDir + "Orthologues_" + speciesDict[str(speciesIDs[index1])]
+        if not os.path.exists(d): os.mkdir(d)
+    for index1, index2 in itertools.product(xrange(nspecies), xrange(nspecies)):      
         if index1 >= index2: continue
         product, M = multiply(index1, index2, matrixDir)
         print("Ortholgues for species pair (%d, %d)" % (index2, index1))
         orthologues = find_all(product, M)
-        WriteOrthologues(resultsDir, speciesIDs[index2], speciesIDs[index1], orthologues, speciesDict, sequenceDict)    
+        WriteOrthologues(resultsDir, speciesIDs[index2], speciesIDs[index1], orthologues, speciesDict, sequenceDict)   
+#    for index1 in xrange(nspecies):
+#        orthologues = AllOrthologuesForSpecies(index1, speciesIDs, matrixDir)
+#        WriteOrthologues_OneFile(resultsDir, speciesIDs, speciesIDs[index1], orthologues, speciesDict, sequenceDict)    
     
 def get_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir):
-    
     # -> Matrices
     matrixDir = workingDir + "matrices_orthologues/"
     orthodict, orthodictFN = make_dicts(dlcparResultsDir, matrixDir)
