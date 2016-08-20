@@ -187,10 +187,13 @@ def RunAstral(ogSet, treesPat, workingDir):
 # ==============================================================================================================================      
 # DendroBlast   
 
-def Worker_BlastScores(cmd_queue, seqsInfo, fileInfo):
+def Worker_BlastScores(cmd_queue, seqsInfo, fileInfo, nProcesses, nToDo):
     while True:
         try:
-            args = cmd_queue.get(True, 1)
+            i, args = cmd_queue.get(True, 1)
+            nDone = i - nProcesses + 1
+            if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
+                print("Done %d of %d" % (nDone, nToDo))
             B = orthofinder.BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, *args, qExcludeSelfHits = False)
             with open(fileInfo.outputDir + "Bit%d_%d.pic" % args, 'wb') as outfile:
                 pic.dump(B, outfile, protocol = orthofinder.picProtocol)
@@ -217,10 +220,12 @@ class DendroBLASTTrees(object):
         
     def ReadAndPickle(self): 
         cmd_queue = mp.Queue()
+        i = 0
         for iSp in xrange(len(self.ogSet.seqsInfo.speciesToUse)):
             for jSp in xrange(len(self.ogSet.seqsInfo.speciesToUse)):
-                cmd_queue.put((iSp, jSp))           
-        runningProcesses = [mp.Process(target=Worker_BlastScores, args=(cmd_queue, self.ogSet.seqsInfo, self.ogSet.fileInfo)) for i_ in xrange(nThreads)]
+                cmd_queue.put((i, (iSp, jSp)))           
+                i+=1
+        runningProcesses = [mp.Process(target=Worker_BlastScores, args=(cmd_queue, self.ogSet.seqsInfo, self.ogSet.fileInfo, nThreads, i)) for i_ in xrange(nThreads)]
         for proc in runningProcesses:
             proc.start()
         for proc in runningProcesses:
@@ -244,7 +249,7 @@ class DendroBLASTTrees(object):
         nSeqs = self.NumberOfSequences(self.species)
         ogMatrices = [np.zeros((n, n)) for n in nGenes]
         for iiSp, sp1 in enumerate(self.species):
-            orthofinder.util.PrintTime("Species %d" % sp1)
+            orthofinder.util.PrintTime("Processing species %d" % sp1)
             Bs = [orthofinder.LoadMatrix("Bit", self.ogSet.fileInfo, iiSp, jjSp) for jjSp in xrange(len(self.species))]
             mins = np.ones((nSeqs[sp1], 1), dtype=np.float64)*9e99 
             maxes = np.zeros((nSeqs[sp1], 1), dtype=np.float64)
@@ -513,6 +518,10 @@ if __name__ == "__main__":
     print("0. Getting Orthologues")
     print("----------------------")
     orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = tfo.GetOGsFile(userDir)
+    ogSet = OrthoGroupsSet(orthofinderWorkingDir, clustersFilename_pairs, idExtractor = idextractor.FirstWordExtractor)
+    if len(ogSet.speciesToUse) < 4: 
+        print("ERROR: Not enough species to infer species tree")
+        orthofinder.Fail()
 
     if nProcesses == None:
         print("""\nNumber of parallel processes has not been specified, will use the default value.  
@@ -527,7 +536,6 @@ Number of parallel processes can be specified using the -t option.""")
     print("\n2. Reading sequence similarity scores")
     print(  "-------------------------------------")
     resultsDir = orthofinder.util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_")
-    ogSet = OrthoGroupsSet(orthofinderWorkingDir, clustersFilename_pairs, idExtractor = idextractor.FirstWordExtractor)
     
     db = DendroBLASTTrees(ogSet, resultsDir)
     db.ReadAndPickle()
@@ -536,20 +544,21 @@ Number of parallel processes can be specified using the -t option.""")
     print("\n4. Best outgroup(s) for species tree")
     print(  "------------------------------------")   
     roots, clusters, rootedSpeciesTreeFN = rfd.GetRoot(spTreeFN_ids, os.path.split(db.treesPatIDs)[0] + "/", rfd.GeneToSpecies_dash, nProcesses, treeFmt = 1)
-    db.RenameTreeTaxa(rootedSpeciesTreeFN, resultsDir + "SpeciesTree_rooted.txt", db.ogSet.SpeciesDict(), qFixNegatives=True)
     
     spDict = ogSet.SpeciesDict()
-    for r in roots:
+    for i, (r, speciesTree_fn) in enumerate(zip(roots, rootedSpeciesTreeFN)):
+	resultsDir_new = resultsDir + "Root%d/" % i
+	os.mkdir(resultsDir_new)
+        db.RenameTreeTaxa(speciesTree_fn, resultsDir_new + "SpeciesTree_%d_rooted.txt" % i, db.ogSet.SpeciesDict(), qFixNegatives=True)
         print(", ".join([spDict[s] for s in r]))
 #    speciesTreeFN = RunAstral(ogSet, db.treesPat, resultsDir)
 
-    print("\n5. Reconciling gene and species trees")
-    print(  "-------------------------------------")   
-    dlcparResultsDir = RunDlcpar(db.treesPatIDs, ogSet, nOGs, rootedSpeciesTreeFN, db.workingDir)
+    	print("\n5. Reconciling gene and species trees")
+    	print(  "-------------------------------------")   
+    	dlcparResultsDir = RunDlcpar(db.treesPatIDs, ogSet, nOGs, speciesTree_fn, db.workingDir)
     
-    # Orthologue lists
-    print("\n6. Inferring orthologues from gene trees")
-    print(  "----------------------------------------")   
-    pt.get_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, db.workingDir)
+    	# Orthologue lists
+    	print("\n6. Inferring orthologues from gene trees")
+    	print(  "----------------------------------------")   
+    	pt.get_orthologue_lists(ogSet, resultsDir_new, dlcparResultsDir, db.workingDir)
     
-    print("\nDone!")

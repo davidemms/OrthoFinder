@@ -102,7 +102,7 @@ def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qHideStdout):
         try:
             i, commandSet = cmd_queue.get(True, 1)
             nDone = i - nProcesses + 1
-            if nDone >= 0 and divmod(nDone, 100)[1] == 0:
+            if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
                 print("Done %d of %d" % (nDone, nToDo))
             RunCommandSet(commandSet, qHideStdout)
         except Queue.Empty:

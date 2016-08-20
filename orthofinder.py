@@ -688,7 +688,7 @@ class BlastFileProcessor(object):
                         sys.stderr.write("but found a query/hit in the Blast%d_%d.txt for sequence %d_%d (i.e. %s sequence in species %d).\n" %  (iSpecies, jSpecies, kSpecies, sequencekID, ord(sequencekID+1), kSpecies))
                         sys.exit()
         except Exception:
-            sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (fileInfo.inputDir, iSpecies, jSpecies))
+            sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (fileInfo.inputDir, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies]))
             sys.stderr.write("\t".join(row) + "\n")
             sys.exit()
         return B       

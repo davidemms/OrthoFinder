@@ -395,11 +395,11 @@ def ParsimonyRoot(allSpecies, clades, supported_clusters, qPrint=True):
         if score == m:
             if len(clade) > len(allSpecies)/2:
                 root.append(allSpecies.difference(clade))
-                if qPrint: print(", ".join(root[-1]))
+#                if qPrint: print(", ".join(root[-1]))
             else:
                 root.append(clade)
-                if qPrint: print(", ".join(root[-1]))
-            if qPrint: print("")
+#                if qPrint: print(", ".join(root[-1]))
+#            if qPrint: print("")
     return root
 
 def PlotTree(speciesTree, treesDir, supported_clusters, qSimplePrint=True):
@@ -438,12 +438,15 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, treeFmt=None
     clusters = []
     for l in list_of_lists:
         clusters.extend(l)
-    roots = ParsimonyRoot(species, dict_clades.keys(), clusters, qPrint=False)
-    speciesTree_rootedFN = os.path.splitext(speciesTreeFN)[0] + "_rooted.txt"
-    speciesTree = RootAtClade(speciesTree, roots[0])
+    roots = list(set(ParsimonyRoot(species, dict_clades.keys(), clusters, qPrint=True)))
+    speciesTrees_rootedFNs =[]
+    for i, r in enumerate(roots):
+    	speciesTree = RootAtClade(speciesTree, r) 
+    	speciesTree_rootedFN = os.path.splitext(speciesTreeFN)[0] + "_%d_rooted.txt" % i 
 #    speciesTree = LabelNodes()
-    speciesTree.write(outfile=speciesTree_rootedFN, format=4)
-    return roots, clusters, speciesTree_rootedFN
+    	speciesTree.write(outfile=speciesTree_rootedFN, format=4)
+	speciesTrees_rootedFNs.append(speciesTree_rootedFN)
+    return roots, clusters, speciesTrees_rootedFNs
       
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -485,7 +488,8 @@ if __name__ == "__main__":
         ParsimonyRoot(species, dict_clades.keys(), clusters)
         if args.verbose: PlotTree(speciesTree, args.input_tree, clusters)
     else:
-        root, clusters = GetRoot(args.Species_tree, args.input_tree, GeneToSpecies, nProcs, treeFmt = 1)
+        root, clusters, _ = GetRoot(args.Species_tree, args.input_tree, GeneToSpecies, nProcs, treeFmt = 1)
+	for r in root: print(r)
         speciesTree = ete2.Tree(args.Species_tree, format=1)
         if args.verbose: PlotTree(speciesTree, args.input_tree, clusters, qSimplePrint=False)
  

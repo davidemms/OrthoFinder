@@ -47,7 +47,6 @@ def GetSpeciesGenesInfo(ogSet):
     seqsInfo = orthofinder.GetSeqsInfo(ogSet.workingDirOF, speciesLabels)
     genenumbers = list(np.diff(seqsInfo.seqStartingIndices))
     genenumbers.append(seqsInfo.nSeqs - seqsInfo.seqStartingIndices[-1])
-    genenumbers = [genenumbers[i] for i in speciesLabels] 
     return speciesLabels, genenumbers
         
 def one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, outputDir):
