@@ -374,7 +374,7 @@ def RootAtClade(tree, accs_in_clade):
     tree.set_outgroup(node)
     return tree
     
-def ParsimonyRoot(allSpecies, clades, supported_clusters, qPrint=True):
+def ParsimonyRoot(allSpecies, clades, supported_clusters):
     c = Counter(supported_clusters)
     contradictions = dict()
     for clade in clades:
@@ -386,21 +386,17 @@ def ParsimonyRoot(allSpecies, clades, supported_clusters, qPrint=True):
         contradictions[clade] = against
     m = min(contradictions.values())
     n = len(supported_clusters)
-    if qPrint:
-        print("Observed %d duplications" % n)
-        print("%d support the best root and %d contradict it" % (n-m, m))
-        print("Best root(s)")
-    root = []
+    nSupport = n-m
+    roots = []
     for clade, score in contradictions.items():
         if score == m:
             if len(clade) > len(allSpecies)/2:
-                root.append(allSpecies.difference(clade))
-#                if qPrint: print(", ".join(root[-1]))
+                roots.append(allSpecies.difference(clade))
+            elif len(clade) == len(allSpecies)/ 2:
+                if allSpecies.difference(clade) not in roots: roots.append(clade) 
             else:
-                root.append(clade)
-#                if qPrint: print(", ".join(root[-1]))
-#            if qPrint: print("")
-    return root
+                roots.append(clade)
+    return roots, nSupport
 
 def PlotTree(speciesTree, treesDir, supported_clusters, qSimplePrint=True):
     c = Counter(supported_clusters)
@@ -438,15 +434,16 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, treeFmt=None
     clusters = []
     for l in list_of_lists:
         clusters.extend(l)
-    roots = list(set(ParsimonyRoot(species, dict_clades.keys(), clusters, qPrint=True)))
+    roots, nSupport = ParsimonyRoot(species, dict_clades.keys(), clusters)
+    roots = list(set(roots))
     speciesTrees_rootedFNs =[]
     for i, r in enumerate(roots):
-    	speciesTree = RootAtClade(speciesTree, r) 
-    	speciesTree_rootedFN = os.path.splitext(speciesTreeFN)[0] + "_%d_rooted.txt" % i 
+        speciesTree = RootAtClade(speciesTree, r) 
+        speciesTree_rootedFN = os.path.splitext(speciesTreeFN)[0] + "_%d_rooted.txt" % i 
 #    speciesTree = LabelNodes()
-    	speciesTree.write(outfile=speciesTree_rootedFN, format=4)
-	speciesTrees_rootedFNs.append(speciesTree_rootedFN)
-    return roots, clusters, speciesTrees_rootedFNs
+        speciesTree.write(outfile=speciesTree_rootedFN, format=4)
+        speciesTrees_rootedFNs.append(speciesTree_rootedFN)
+    return roots, clusters, speciesTrees_rootedFNs, nSupport
       
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -485,11 +482,16 @@ if __name__ == "__main__":
         for fn in glob.glob(args.input_tree + "/*"):
             c = SupportedHierachies_wrapper(fn, GeneToSpecies, species, dict_clades, clade_names)
             clusters.extend(c)
-        ParsimonyRoot(species, dict_clades.keys(), clusters)
+        roots, nSupport = ParsimonyRoot(species, dict_clades.keys(), clusters)
+        if len(roots) > 1: print("Observed %d duplications. %d support the best roots and %d contradict them." % (len(clusters), nSupport, len(clusters) - nSupport))
+        else: print("Observed %d duplications. %d support the best root and %d contradict it." % (len(clusters), nSupport, len(clusters) - nSupport))
+        print("Best outgroup(s) for species tree:")
+        for r in roots: 
+            print(r)
         if args.verbose: PlotTree(speciesTree, args.input_tree, clusters)
     else:
         root, clusters, _ = GetRoot(args.Species_tree, args.input_tree, GeneToSpecies, nProcs, treeFmt = 1)
-	for r in root: print(r)
+        for r in root: print(r)
         speciesTree = ete2.Tree(args.Species_tree, format=1)
         if args.verbose: PlotTree(speciesTree, args.input_tree, clusters, qSimplePrint=False)
  

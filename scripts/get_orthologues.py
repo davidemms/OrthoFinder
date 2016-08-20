@@ -16,8 +16,8 @@ import itertools
 import multiprocessing as mp
 import Queue
 
+sys.path.append(os.path.split(os.path.abspath(__file__))[0] + "/..")
 import trees_for_orthogroups as tfo
-import idextractor
 import orthofinder
 import root_from_duplications as rfd
 import process_trees as pt
@@ -61,11 +61,11 @@ class Seq(object):
 # ==============================================================================================================================
         
 class OrthoGroupsSet(object):
-    def __init__(self, orthofinderWorkingDir, clustersFilename_pairs, idExtractor = idextractor.FirstWordExtractor):
+    def __init__(self, orthofinderWorkingDir, clustersFilename_pairs, idExtractor = orthofinder.FirstWordExtractor):
         self.workingDirOF = orthofinderWorkingDir
         self.seqIDsFN = orthofinderWorkingDir + "SequenceIDs.txt"
         self.speciesIDsFN = orthofinderWorkingDir + "SpeciesIDs.txt"
-        self.speciesIDsEx = idextractor.FullAccession(self.speciesIDsFN)
+        self.speciesIDsEx = orthofinder.FullAccession(self.speciesIDsFN)
         self._Spec_SeqIDs = None
         self._extractor = idExtractor
         self.clustersFN = clustersFilename_pairs
@@ -193,7 +193,7 @@ def Worker_BlastScores(cmd_queue, seqsInfo, fileInfo, nProcesses, nToDo):
             i, args = cmd_queue.get(True, 1)
             nDone = i - nProcesses + 1
             if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
-                print("Done %d of %d" % (nDone, nToDo))
+                orthofinder.util.PrintTime("Done %d of %d" % (nDone, nToDo))
             B = orthofinder.BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, *args, qExcludeSelfHits = False)
             with open(fileInfo.outputDir + "Bit%d_%d.pic" % args, 'wb') as outfile:
                 pic.dump(B, outfile, protocol = orthofinder.picProtocol)
@@ -201,9 +201,10 @@ def Worker_BlastScores(cmd_queue, seqsInfo, fileInfo, nProcesses, nToDo):
             return 
                 
 class DendroBLASTTrees(object):
-    def __init__(self, ogSet, outD):
+    def __init__(self, ogSet, outD, nProcesses):
         self.outD = outD
         self.ogSet = ogSet
+        self.nProcesses = nProcesses
         self.species = sorted(map(int, self.ogSet.SpeciesDict().keys()))
         treesDir = outD + "Trees/"
         self.workingDir = outD + "WorkingDirectory/"
@@ -233,7 +234,7 @@ class DendroBLASTTrees(object):
                 proc.join() 
                 
     def NumberOfSequences(self, species):
-        ids = ogSet.SequenceDict()
+        ids = self.ogSet.SequenceDict()
         counts = Counter([g.split("_")[0] for g in ids.keys()])
         counts = {int(k):v for k,v in counts.items() if int(k) in species}
         return counts
@@ -350,7 +351,7 @@ class DendroBLASTTrees(object):
         cmds_geneTrees = self.PrepareGeneTreeCommand()
         print("\n3. Inferring gene and species trees")
         print(  "-----------------------------------")
-        tfo.RunParallelCommandSets(nProcesses, [[cmd_spTree]] + cmds_geneTrees, qHideStdout = True)
+        tfo.RunParallelCommandSets(self.nProcesses, [[cmd_spTree]] + cmds_geneTrees, qHideStdout = True)
         seqDict = self.ogSet.Spec_SeqDict()
         for iog in xrange(len(self.ogSet.ogs)):
             self.RenameTreeTaxa(self.treesPatIDs % iog, self.treesPat % iog, seqDict, qFixNegatives=True)
@@ -383,13 +384,11 @@ def RootGeneTreesArbitrarily(treesPat, nOGs, outputDir):
                       for leaf in t:
                         R = leaf
                         break
-                      print("%s is a zero length tree, it will be rooted at a arbitrary node" % outFN)
                     elif AllEqualBranchLengths(t):
                       # more generally, for any branch length all branches could have that same length
                       for leaf in t:
                         R = leaf
                         break
-                      print("%s has branches all of equal length, it will be rooted at a arbitrary node" % outFN)
                     t.set_outgroup(R)
                 t.resolve_polytomy()
                 t.write(outfile = outFN)
@@ -399,7 +398,6 @@ def RootGeneTreesArbitrarily(treesPat, nOGs, outputDir):
                     for leaf in t:
                        R = leaf
                        break
-                    print("%s using an arbitrary node" % outFN)
                     t.set_outgroup(R)
                     t.resolve_polytomy()
                     t.write(outfile = outFN)
@@ -488,7 +486,83 @@ def PrintHelp():
     print("""-h, --help
    Print this help text""")
     orthofinder.PrintCitation()   
+
+def GetResultsFilesString(rootedSpeciesTreeFN):
+    st = ""
+    baseResultsDir = os.path.abspath(os.path.split(rootedSpeciesTreeFN[0])[0] + "./../Trees/")
+    st += "Gene trees:\n   %s\n" % baseResultsDir
+    if len(rootedSpeciesTreeFN) == 1:
+        resultsDir = os.path.split(rootedSpeciesTreeFN[0])[0]
+        st += "Rooted species tree:\n   %s\n" % rootedSpeciesTreeFN[0]
+        st += "Species-by-species orthologues:\n   %s\n" % resultsDir
+    else:
+        st += "\nMultiple potential outgroups were identified for the species tree. Each case has been analysed separately.\n" 
+        st+=  "Please review the rooted species trees and use the results corresponding to the correct one.\n\n"        
+        for tFN in rootedSpeciesTreeFN:
+            resultsDir = os.path.split(tFN)[0] + "/"
+            st += "Rooted species tree:\n   %s\n" % tFN
+            st += "Species-by-species orthologues directory:\n   %s\n\n" % resultsDir
+    return st
+            
+
+def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs, nProcesses):
+    ogSet = OrthoGroupsSet(orthofinderWorkingDir, clustersFilename_pairs, idExtractor = orthofinder.FirstWordExtractor)
+    if len(ogSet.speciesToUse) < 4: 
+        print("ERROR: Not enough species to infer species tree")
+        orthofinder.Fail()
+
+    print("\n1. Checking required programs are installed")
+    print(  "-------------------------------------------")
+    if not CanRunDependencies(orthofinderWorkingDir): orthofinder.Fail()   
     
+    print("\n2. Reading sequence similarity scores")
+    print(  "-------------------------------------")
+    resultsDir = orthofinder.util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_")
+    
+    db = DendroBLASTTrees(ogSet, resultsDir, nProcesses)
+    db.ReadAndPickle()
+    nOGs, D, spPairs, spTreeFN_ids = db.RunAnalysis()
+     
+    print("\n4. Best outgroup(s) for species tree")
+    print(  "------------------------------------")   
+    spDict = ogSet.SpeciesDict()
+    roots, clusters, rootedSpeciesTreeFN, nSupport = rfd.GetRoot(spTreeFN_ids, os.path.split(db.treesPatIDs)[0] + "/", rfd.GeneToSpecies_dash, nProcesses, treeFmt = 1)
+    if len(roots) > 1:
+        print("Observed %d duplications. %d support the best roots and %d contradict them." % (len(clusters), nSupport, len(clusters) - nSupport))
+        print("Best outgroups for species tree:")  
+    else:
+        print("Observed %d duplications. %d support the best root and %d contradict it." % (len(clusters), nSupport, len(clusters) - nSupport))
+        print("Best outgroup for species tree:")  
+    for r in roots: print("  " + (", ".join([spDict[s] for s in r]))  )
+    
+#    speciesTreeFN = RunAstral(ogSet, db.treesPat, resultsDir)
+    qMultiple = len(roots) > 1
+    if qMultiple: print("\nAnalysing each of the potential species tree roots.")
+    resultsSpeciesTrees = []
+    for i, (r, speciesTree_fn) in enumerate(zip(roots, rootedSpeciesTreeFN)):
+        if qMultiple: 
+            resultsDir_new = resultsDir + "Orthologues_for_potential_outgroup_%d/" % i
+        else:
+            resultsDir_new = resultsDir + "Orthologues/"
+        os.mkdir(resultsDir_new)
+        resultsSpeciesTrees.append(resultsDir_new + "SpeciesTree_rooted.txt")
+        db.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True)
+
+        print("\n5%s. Reconciling gene and species trees" % ("-%d"%i if qMultiple else "")) 
+        print(  "-------------------------------------" + ("--" if qMultiple else ""))   
+        print("Root: " + (", ".join([spDict[s] for s in r])))
+        dlcparResultsDir = RunDlcpar(db.treesPatIDs, ogSet, nOGs, speciesTree_fn, db.workingDir)
+
+        # Orthologue lists
+        print("\n6%s. Inferring orthologues from gene trees" % ("-%d"%i if qMultiple else ""))
+        print(  "----------------------------------------" + ("--" if qMultiple else ""))      
+        pt.get_orthologue_lists(ogSet, resultsDir_new, dlcparResultsDir, db.workingDir)     
+     
+    print("\n7. Writing results files")
+    print(  "------------------------")   
+    
+    return GetResultsFilesString(resultsSpeciesTrees)
+     
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] == "--help" or sys.argv[1] == "-h":
         PrintHelp()
@@ -517,48 +591,16 @@ if __name__ == "__main__":
     # Check arguments
     print("0. Getting Orthologues")
     print("----------------------")
-    orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = tfo.GetOGsFile(userDir)
-    ogSet = OrthoGroupsSet(orthofinderWorkingDir, clustersFilename_pairs, idExtractor = idextractor.FirstWordExtractor)
-    if len(ogSet.speciesToUse) < 4: 
-        print("ERROR: Not enough species to infer species tree")
-        orthofinder.Fail()
-
     if nProcesses == None:
         print("""\nNumber of parallel processes has not been specified, will use the default value.  
 Number of parallel processes can be specified using the -t option.""")
         nProcesses = orthofinder.nThreadsDefault
     print("Using %d threads for alignments and trees" % nProcesses)
     
-    print("\n1. Checking required programs are installed")
-    print(  "-------------------------------------------")
-    if not CanRunDependencies(orthofinderWorkingDir): orthofinder.Fail()   
+    orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = tfo.GetOGsFile(userDir)
+    resultsString = GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs, nProcesses)
+    print(resultsString)
+    orthofinder.PrintCitation()
     
-    print("\n2. Reading sequence similarity scores")
-    print(  "-------------------------------------")
-    resultsDir = orthofinder.util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_")
     
-    db = DendroBLASTTrees(ogSet, resultsDir)
-    db.ReadAndPickle()
-    nOGs, D, spPairs, spTreeFN_ids = db.RunAnalysis()
-     
-    print("\n4. Best outgroup(s) for species tree")
-    print(  "------------------------------------")   
-    roots, clusters, rootedSpeciesTreeFN = rfd.GetRoot(spTreeFN_ids, os.path.split(db.treesPatIDs)[0] + "/", rfd.GeneToSpecies_dash, nProcesses, treeFmt = 1)
-    
-    spDict = ogSet.SpeciesDict()
-    for i, (r, speciesTree_fn) in enumerate(zip(roots, rootedSpeciesTreeFN)):
-	resultsDir_new = resultsDir + "Root%d/" % i
-	os.mkdir(resultsDir_new)
-        db.RenameTreeTaxa(speciesTree_fn, resultsDir_new + "SpeciesTree_%d_rooted.txt" % i, db.ogSet.SpeciesDict(), qFixNegatives=True)
-        print(", ".join([spDict[s] for s in r]))
-#    speciesTreeFN = RunAstral(ogSet, db.treesPat, resultsDir)
-
-    	print("\n5. Reconciling gene and species trees")
-    	print(  "-------------------------------------")   
-    	dlcparResultsDir = RunDlcpar(db.treesPatIDs, ogSet, nOGs, speciesTree_fn, db.workingDir)
-    
-    	# Orthologue lists
-    	print("\n6. Inferring orthologues from gene trees")
-    	print(  "----------------------------------------")   
-    	pt.get_orthologue_lists(ogSet, resultsDir_new, dlcparResultsDir, db.workingDir)
     

@@ -47,6 +47,9 @@ import Queue                                    # Y
 import warnings                                 # Y
 import time                                     # Y
 
+sys.path.append(os.path.split(os.path.abspath(__file__))[0] + "/scripts")
+import get_orthologues
+
 version = "0.6.1"
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
 picProtocol = 1
@@ -179,6 +182,8 @@ class FullAccession(IDExtractor):
             for line in idsFile:
                 if line.startswith("#"): continue
                 id, accession = line.rstrip().split(": ", 1)
+                # Replace problematic characters
+                accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_")
                 if id in self.idToNameDict:
                     raise RuntimeError("ERROR: A duplicate id was found in the fasta files: % s" % id)
                 self.idToNameDict[id] = accession                
@@ -199,6 +204,8 @@ class FirstWordExtractor(IDExtractor):
             for line in idsFile:
                 id, rest = line.split(": ", 1)
                 accession = rest.split(None, 1)[0]
+                # Replace problematic characters
+                accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_")
                 if accession in self.nameToIDDict:
                     raise RuntimeError("A duplicate accession was found using just first part: % s" % accession)
                 if id in self.idToNameDict:
@@ -459,8 +466,9 @@ class MCL:
                     for iSpecies in xrange(nSpecies):
                         row.append(", ".join(sorted(ogDict[iSpecies])))
                 thisOutputWriter.writerow(row)
-        print("""Orthologous groups have been written to tab-delimited files:\n   %s\n   %s""" % (outputFilename, singleGeneFilename))
-        print("""And in OrthoMCL format:\n   %s""" % (outputFilename[:-3] + "txt"))
+        resultsFilesString = "Orthologous groups have been written to tab-delimited files:\n   %s\n   %s\n" % (outputFilename, singleGeneFilename)
+        resultsFilesString += "And in OrthoMCL format:\n   %s" % (outputFilename[:-3] + "txt")
+        return resultsFilesString
 
 """
 scnorm
@@ -1048,6 +1056,7 @@ if __name__ == "__main__":
     qUseFastaFiles = False  # local to argument checking
     qXML = False
     qOnlyPrepare = False
+    qOrthologues = True
 #    qUseSubset = False # forget once arguments parsed and have decided what the BLAST files are (Effectively part of BLASTFileProcessor)
                      
     # Files         
@@ -1122,6 +1131,7 @@ if __name__ == "__main__":
 #            workingDir_previous = GetDirectoryArgument(arg, args)
         elif arg == "-p" or arg == "--prepare":
             qOnlyPrepare = True
+            qOrthologues = False
         elif arg == "-h" or arg == "--help":
             PrintHelp()
             sys.exit()
@@ -1192,9 +1202,9 @@ if __name__ == "__main__":
         workingDir = resultsDir + "WorkingDirectory" + os.sep
         os.mkdir(workingDir)
     if qUsePrecalculatedBlast:
-        print("%d threads for BLAST searches" % nBlast)
+        print("%d thread(s) for BLAST searches" % nBlast)
     if not qOnlyPrepare:
-        print("%d threads for OrthoFinder algorithm" % nProcessAlg)
+        print("%d thread(s) for OrthoFinder algorithm" % nProcessAlg)
      
     # check for BLAST+ and MCL - else instruct how to install and add to path
     print("\n1. Checking required programs are installed")
@@ -1302,8 +1312,6 @@ if __name__ == "__main__":
             while proc.is_alive():
                 proc.join()
         
-        print("Done!")  
-        
         # remove BLAST databases
         for f in glob.glob(workingDir + "BlastDBSpecies*"):
             os.remove(f)
@@ -1352,15 +1360,23 @@ if __name__ == "__main__":
     
     print("\n6. Creating files for Orthologous Groups")
     print(  "----------------------------------------")
-    PrintCitation()
+    if not qOrthologues: PrintCitation()
     ogs = MCL.GetPredictedOGs(clustersFilename_pairs)
     resultsBaseFilename = util.GetUnusedFilename(resultsDir + "OrthologousGroups", ".csv")[:-4]         # remove .csv from base filename
     resultsBaseFilename = resultsDir + "OrthologousGroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion)
     idsDict = MCL.WriteOrthogroupFiles(ogs, [idsFilename], resultsBaseFilename, clustersFilename_pairs)
-    MCL.CreateOrthogroupTable(ogs, idsDict, speciesIdsFilename, speciesToUse, resultsBaseFilename)
+    orthogroupsResultsFilesString = MCL.CreateOrthogroupTable(ogs, idsDict, speciesIdsFilename, speciesToUse, resultsBaseFilename)
+    print(orthogroupsResultsFilesString)
     if qXML:
         numbersOfSequences = list(np.diff(seqsInfo.seqStartingIndices))
         numbersOfSequences.append(seqsInfo.nSeqs - seqsInfo.seqStartingIndices[-1])
         orthoxmlFilename = resultsBaseFilename + ".orthoxml"
         MCL.WriteOrthoXML(speciesInfo, ogs, numbersOfSequences, idsDict, orthoxmlFilename, speciesToUse)
-    print("\n")
+    
+    if qOrthologues:
+        print("\nRunning Orthologue Prediction")
+        print(  "=============================")
+        orthologuesResultsFilesString = get_orthologues.GetOrthologues(workingDir, resultsDir, clustersFilename_pairs, nBlast)
+        print(orthogroupsResultsFilesString)
+        print(orthologuesResultsFilesString.rstrip())
+    PrintCitation()

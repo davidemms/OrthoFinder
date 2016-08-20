@@ -10,6 +10,7 @@ from ete2 import Tree
 from scipy import sparse
 from collections import defaultdict
 
+sys.path.append(os.path.split(__file__)[0] + "/..")
 import orthofinder 
 
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
@@ -54,7 +55,7 @@ def one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, output
         try to mostly deal with iSpecies which is the ordinal number not the label it is given
     """
     #Creates all matrices and appends them to matrixlist.
-    sys.stdout.write("Processing orthologues for species %d" % iSpecies)
+    orthofinder.util.PrintTime("Processing orthologues for species %d" % iSpecies)
     matrixlist = []
     numspecies = len(speciesLabels)
     speciesLabelsReverse = {label:i for i, label in enumerate(speciesLabels)}
@@ -63,7 +64,6 @@ def one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, output
             matrixlist.append(sparse.lil_matrix((genenumbers[iSpecies], genenumbers[j]), dtype=np.dtype(np.int8)))
         else:
             matrixlist.append(None)
-    print(' - done')
     #Fill matrices with orthodata
     iSpecieslist = [x for x in orthodict if x.startswith('%d_' % speciesLabels[iSpecies])]
     for count, queryGene in enumerate(iSpecieslist):
@@ -144,7 +144,6 @@ def get_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir):
     
     
 if __name__ == "__main__":
-    import idextractor
     import get_orthologues as go
     d = "/home/david/projects/Orthology/OrthoFinder/Development/Orthologues/ExampleDataset_Results/"
     orthofinderWorkingDir = d + "WorkingDirectory/"
@@ -153,7 +152,7 @@ if __name__ == "__main__":
     dlcparResultsDir = resultsDir + "/WorkingDirectory/dlcpar/"
     workingDir = resultsDir + "/WorkingDirectory/"
     
-    ogSet = go.OrthoGroupsSet(orthofinderWorkingDir, clustersFilename_pairs, idExtractor = idextractor.FirstWordExtractor)
+    ogSet = go.OrthoGroupsSet(orthofinderWorkingDir, clustersFilename_pairs, idExtractor = orthofinder.FirstWordExtractor)
     
     get_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir)
         
