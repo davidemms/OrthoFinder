@@ -51,6 +51,7 @@ import Queue                                    # Y
 import warnings                                 # Y
 import time                                     # Y
 
+
 version = "1.0.0"
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
 picProtocol = 1
@@ -1228,7 +1229,6 @@ def AssignIDsToSequences(fastaDirectory, outputDirectory):
     return returnFilenames, originalFastaFilenames, idsFilename, speciesFilename, newSpeciesIDs, previousSpeciesIDs
 
 if __name__ == "__main__":
-    sys.path.append(os.path.split(os.path.abspath(__file__))[0] + "/scripts")
     import get_orthologues
     
     print("\nOrthoFinder version %s Copyright (C) 2014 David Emms\n" % version)

@@ -10,7 +10,6 @@ from ete2 import Tree
 from scipy import sparse
 from collections import defaultdict
 
-sys.path.append(os.path.split(__file__)[0] + "/..")
 import orthofinder 
 
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):

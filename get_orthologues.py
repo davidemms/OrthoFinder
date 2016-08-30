@@ -17,7 +17,7 @@ import itertools
 import multiprocessing as mp
 import Queue
 
-sys.path.append(os.path.split(os.path.abspath(__file__))[0] + "/..")
+#sys.path.append(os.path.split(os.path.abspath(__file__))[0] + "/..")
 import trees_for_orthogroups as tfo
 import orthofinder
 import root_from_duplications as rfd
