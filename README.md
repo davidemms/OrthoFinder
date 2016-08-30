@@ -1,7 +1,9 @@
-# OrthoFinder — Accurate inference of orthologous gene groups made easy!
+# OrthoFinder — Accurate inference of orthologous gene groups, orthologues, gene trees and rooted species tree made easy!
 What does OrthoFinder do?
 ==========
 OrthoFinder is a program for finding orthogroups from one or more species. An orthogroup is the set of genes that are descended from a single gene in the last common ancestor of the species being clustered. OrthoFinder accounts for gene length biases that are inherent in BLAST scores, normalises for differences in species divergence times, and accounts for orthogroup specific differences in gene evolultion rates. For more details see the OrthoFinder paper below.
+
+NEW!!! OrthoFinder now also automatically infers the gene tree for each orthogroup, the rooted species tree, all orthologues between all species and calculates summary statistics. This is all performed automatically with the same simple command and the same input as before!
 
 **Emms, D.M. and Kelly, S. (2015) OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy, Genome Biology 16:157**
 
@@ -13,6 +15,9 @@ https://github.com/davidemms/OrthoFinder
 
 What's New
 ==========
+**Sep. 2016**: OrthoFinder now infers the gene tree for each orthogroup, the rooted species tree, all orthologues between all species and calculates summary statis
+    tics.
+
 **Jul. 2016**: OrthoFinder now outputs **summary statistics** for the orthogroups produced. Statistics are in the files **Statistics_Overall.csv, Statistics_PerSpecies.csv** and **OrthologousGroups_SpeciesOverlaps.csv**.
 
 **Jul. 2016**: Provided **standalone binaries** for those without access to python (download the package from OrthoFinder's GitHub **releases tab**).
@@ -25,7 +30,7 @@ What's New
 
 Usage
 =====
-OrthoFinder runs as a single command that takes as input a directory of fasta files, one per species, and outputs a file containing the orthologous groups of genes from these species. 
+OrthoFinder runs as a single command that takes as input a directory of fasta files of proteomes (amino acid sequences), one per species, and outputs a file containing the orthogroups of genes from these species, a gene tree for each orthogroups, the rooted species tree and all orthologues between all the species: 
 
 **python orthofinder.py -f fasta_directory -t number_of_processes**
 
@@ -43,13 +48,14 @@ See below for details on:
 
 ###Standalone Binaries
 
-If you do not have access to a python 2.X version you can use the standalone binaries in the bin directory instead e.g.:
+If you do not have access to a python 2.X version or haven't installed the python ete2 library you can use the standalone binaries in the bin directory instead e.g.:
 
 **bin/orthofinder -f ExampleDataset -t 16**
 
 Output File Format
 ==================
-OrthoFinder generates three output files 
+###Orthogroups
+OrthoFinder generates three output files for orthogroups: 
 
 **1) OrthologousGroups.csv** is a tab separated text file. Each row comprises a single orthogroup and contains all the genes that belong to that orthogroup. The genes are organized into separate columns where each column corresponds to a single species.
 
@@ -71,17 +77,28 @@ Most of the terms in the files **Statistics_Overall.csv** and **Statistics_PerSp
 - Single-copy orthogroup: An orthogroup with exactly one gene (and no more) from each species. These orthogroups are ideal for inferring a species tree. Note that trees for all orthogroups can be generated using the trees_for_orthogroups.py script.
 - Unassigned gene: A gene that has not been put into an orthogroup with any other genes.
 
+###Orthologues, Gene Trees & Rooted Species Tree
+The orthologues, gene trees and rooted species tree are in a sub-directory called Orthologues_\<date\>
+
 Installing Dependencies
 =======================
 OrthoFinder is written to run on linux and requires the following to be installed and in the system path:
 
-1. Python 2.7 (version 3 isn't currently supported) together with the scipy libraries stack 
+1. Python 2.7 together with the scipy libraries stack (If you don't have python 2.7 you can still use the standalone binaries) 
 
 2. BLAST+ 
 
 3. The MCL graph clustering algorithm 
 
-To use the trees_for_orthogroups.py utility there are two additional dependencies which should be installed and in the system path:
+After the orthogroups have been calculated OrthoFinder will infer gene trees, the rooted species tree and orthologues if the the following are available in the system path:
+
+1. FastME
+
+2. DLCpar-search
+
+3. The python ete2 library (If you don't have this you can still use the standalone binaries instead)
+
+To use the trees_for_orthogroups.py utility, which infers trees using multiple sequence alignments, there are two additional dependencies which should be installed and in the system path:
 
 1. MAFFT
 
@@ -104,6 +121,13 @@ MCL
 ---
 mcl is available in the repositories for some linux distributions and so can be installed in the same way as any other package. E.g. on Ubuntu "sudo apt-get install mcl". Alternatively it can be built from source which will likely require the build-essential or equivalent package on the Linux distribution being used. Instructions are provided on the MCL webpage.  
 
+FastME
+------
+This is a single executable file that can be obtained from: http://www.atgc-montpellier.fr/fastme/binaries.php 
+
+DLCpar
+------
+DLCpar can be obtained from: http://compbio.mit.edu/dlcpar/
 
 Setting up and running OrthoFinder
 ==================================

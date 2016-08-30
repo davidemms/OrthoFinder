@@ -25,6 +25,9 @@
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
 
+nThreadsDefault = 16
+nAlgDefault = 1
+
 import sys                                      # Y
 import subprocess                               # Y
 import os                                       # Y
@@ -48,7 +51,7 @@ import Queue                                    # Y
 import warnings                                 # Y
 import time                                     # Y
 
-version = "0.7.1"
+version = "1.0.0"
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
 picProtocol = 1
 if sys.platform.startswith("linux"):
@@ -190,6 +193,8 @@ class FullAccession(IDExtractor):
             for line in idsFile:
                 if line.startswith("#"): continue
                 id, accession = line.rstrip().split(": ", 1)
+                # Replace problematic characters
+                accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_")
                 if id in self.idToNameDict:
                     raise RuntimeError("ERROR: A duplicate id was found in the fasta files: % s" % id)
                 self.idToNameDict[id] = accession                
@@ -476,10 +481,9 @@ class MCL:
                     for iSpecies in xrange(nSpecies):
                         row.append(", ".join(sorted(ogDict[iSpecies])))
                 thisOutputWriter.writerow(row)
-        print("Output directory:")
-        print("   " + os.path.split(outputFilename)[0] + "/")
-        print("\nOrthogroups:")
-        print("   " + "   ".join([os.path.split(fn)[1] for fn in [outputFilename, singleGeneFilename]]) + "\n   (and " + os.path.split(outputFilename[:-3] + "txt")[1] + " in OrthoMCL format)")
+        resultsFilesString = "Orthologous groups have been written to tab-delimited files:\n   %s\n   %s\n" % (outputFilename, singleGeneFilename)
+        resultsFilesString += "And in OrthoMCL format:\n   %s" % (outputFilename[:-3] + "txt")
+        return resultsFilesString
 
 """
 scnorm
@@ -707,7 +711,7 @@ class BlastFileProcessor(object):
                         sys.stderr.write("but found a query/hit in the Blast%d_%d.txt for sequence %d_%d (i.e. %s sequence in species %d).\n" %  (iSpecies, jSpecies, kSpecies, sequencekID, ord(sequencekID+1), kSpecies))
                         sys.exit()
         except Exception:
-            sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (fileInfo.inputDir, iSpecies, jSpecies))
+            sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (fileInfo.inputDir, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies]))
             sys.stderr.write("\t".join(row) + "\n")
             sys.exit()
         return B       
@@ -1058,21 +1062,19 @@ def Stats(ogs, speciesNamesDict, iSpecies, resultsDir, iResultsVersion):
         # Sizes
         Stats_SizeTable(writer_sum, writer_sp, properOGs, allGenesCounter, iSpecies, speciesPresence)
         Stats_SpeciesOverlaps(filename_overlap, speciesNamesDict, iSpecies, speciesPresence)
-        
-    print("\nOrthogroup statistics:")
-    print("   " + "   ".join([os.path.split(fn)[1] for fn in [filename_sp, filename_sum, filename_overlap]]))
+
+    statsFiles = "Orthogroup statistics:\n"
+    statsFiles += "   " + "   ".join([os.path.split(fn)[1] for fn in [filename_sp, filename_sum, filename_overlap]]) + "\n"
     summaryText = """OrthoFinder assigned %d genes (%0.1f%% of total) to %d orthogroups. Fifty percent of all genes were in orthogroups 
 with %d or more genes (G50 was %d) and were contained in the largest %d orthogroups (O50 was %d). There were %d 
 orthogroups with all species present and %d of these consisted entirely of single-copy genes.""" % (nAssigned, pAssigned, nOgs, G50, G50, O50, O50, nCompleteOGs, nSingleCopy)
-    return summaryText
+    return summaryText, statsFiles
           
 
 """
 OrthoFinder
 -------------------------------------------------------------------------------
 """   
-nBlastDefault = 16
-nAlgDefault = 1
 mclInflation = 1.5
 
 def CanRunCommand(command, qAllowStderr = False):
@@ -1146,7 +1148,7 @@ def PrintHelp():
     print("""-t number_of_blast_threads, --threads number_of_blast_threads
     The number of BLAST processes to be run simultaneously. This should be increased by the user to at least 
     the number of cores on the computer so as to minimise the time taken to perform the BLAST all-versus-all 
-    queries. [Default is %d]\n""" % nBlastDefault)
+    queries. [Default is %d]\n""" % nThreadsDefault)
     
     print("""-a number_of_orthofinder_threads, --algthreads number_of_orthofinder_threads
     The number of threads to use for the OrthoFinder algorithm and MCL after BLAST searches have been completed. 
@@ -1198,6 +1200,7 @@ def AssignIDsToSequences(fastaDirectory, outputDirectory):
     originalFastaFilenames = sorted([f for f in os.listdir(fastaDirectory) if os.path.isfile(os.path.join(fastaDirectory,f))])
     originalFastaFilenames = [f for f in originalFastaFilenames if len(f.rsplit(".", 1)) == 2 and f.rsplit(".", 1)[1].lower() in fastaExtensions]
     returnFilenames = []
+    previousSpeciesIDs = range(iSpecies)
     newSpeciesIDs = []
     with open(idsFilename, 'ab') as idsFile, open(speciesFilename, 'ab') as speciesFile:
         for fastaFilename in originalFastaFilenames:
@@ -1222,9 +1225,12 @@ def AssignIDsToSequences(fastaDirectory, outputDirectory):
             iSeq = 0
             outputFasta.close()
     if len(originalFastaFilenames) > 0: outputFasta.close()
-    return returnFilenames, originalFastaFilenames, idsFilename, speciesFilename, newSpeciesIDs
+    return returnFilenames, originalFastaFilenames, idsFilename, speciesFilename, newSpeciesIDs, previousSpeciesIDs
 
 if __name__ == "__main__":
+    sys.path.append(os.path.split(os.path.abspath(__file__))[0] + "/scripts")
+    import get_orthologues
+    
     print("\nOrthoFinder version %s Copyright (C) 2014 David Emms\n" % version)
     print("""    This program comes with ABSOLUTELY NO WARRANTY.
     This is free software, and you are welcome to redistribute it under certain conditions.
@@ -1234,12 +1240,13 @@ if __name__ == "__main__":
         sys.exit()
              
     # Control
-    nBlast = nBlastDefault
+    nBlast = nThreadsDefault
     nProcessAlg = nAlgDefault
     qUsePrecalculatedBlast = False  # remove, just store BLAST to do
     qUseFastaFiles = False  # local to argument checking
     qXML = False
     qOnlyPrepare = False
+    qOrthologues = True
 #    qUseSubset = False # forget once arguments parsed and have decided what the BLAST files are (Effectively part of BLASTFileProcessor)
                      
     # Files         
@@ -1314,6 +1321,7 @@ if __name__ == "__main__":
 #            workingDir_previous = GetDirectoryArgument(arg, args)
         elif arg == "-p" or arg == "--prepare":
             qOnlyPrepare = True
+            qOrthologues = False
         elif arg == "-h" or arg == "--help":
             PrintHelp()
             sys.exit()
@@ -1383,6 +1391,10 @@ if __name__ == "__main__":
         if resultsDir == None: resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results_")
         workingDir = resultsDir + "WorkingDirectory" + os.sep
         os.mkdir(workingDir)
+    if qUsePrecalculatedBlast:
+        print("%d thread(s) for BLAST searches" % nBlast)
+    if not qOnlyPrepare:
+        print("%d thread(s) for OrthoFinder algorithm" % nProcessAlg)
      
     # check for BLAST+ and MCL - else instruct how to install and add to path
     print("\n1. Checking required programs are installed")
@@ -1398,7 +1410,7 @@ if __name__ == "__main__":
     if not qUseFastaFiles:
         print("Skipping")
     else:
-        newFastaFiles, userFastaFilenames, idsFilename, speciesIdsFilename, newSpeciesIDs = AssignIDsToSequences(fastaDir, workingDir)
+        newFastaFiles, userFastaFilenames, idsFilename, speciesIdsFilename, newSpeciesIDs, previousSpeciesIDs = AssignIDsToSequences(fastaDir, workingDir)
         speciesToUse = speciesToUse + newSpeciesIDs
         print("Done!")
     seqsInfo = GetSeqsInfo(workingDir_previous if qUsePrecalculatedBlast else workingDir, speciesToUse)
@@ -1491,8 +1503,6 @@ if __name__ == "__main__":
             while proc.is_alive():
                 proc.join()
         
-        print("Done!")  
-        
         # remove BLAST databases
         for f in glob.glob(workingDir + "BlastDBSpecies*"):
             os.remove(f)
@@ -1541,20 +1551,28 @@ if __name__ == "__main__":
     
     print("\n6. Creating files for Orthologous Groups")
     print(  "----------------------------------------")
+    if not qOrthologues: PrintCitation()
     ogs = MCL.GetPredictedOGs(clustersFilename_pairs)
     resultsBaseFilename = util.GetUnusedFilename(resultsDir + "OrthologousGroups", ".csv")[:-4]         # remove .csv from base filename
     resultsBaseFilename = resultsDir + "OrthologousGroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion)
     idsDict = MCL.WriteOrthogroupFiles(ogs, [idsFilename], resultsBaseFilename, clustersFilename_pairs)
     speciesNamesDict = SpeciesNameDict(speciesIdsFilename)
-    MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesToUse, resultsBaseFilename)
-    summaryText = Stats(ogs, speciesNamesDict, speciesToUse, resultsDir, iResultsVersion)
-    print("\n7. Summary")
-    print(  "----------")
-    print(summaryText)
+    orthogroupsResultsFilesString = MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesToUse, resultsBaseFilename)
+    print(orthogroupsResultsFilesString)
+    summaryText, statsFile = Stats(ogs, speciesNamesDict, speciesToUse, resultsDir, iResultsVersion)
     if qXML:
         numbersOfSequences = list(np.diff(seqsInfo.seqStartingIndices))
         numbersOfSequences.append(seqsInfo.nSeqs - seqsInfo.seqStartingIndices[-1])
         orthoxmlFilename = resultsBaseFilename + ".orthoxml"
         MCL.WriteOrthoXML(speciesInfo, ogs, numbersOfSequences, idsDict, orthoxmlFilename, speciesToUse)
-    PrintCitation()
+    
+    if qOrthologues:
+        print("\nRunning Orthologue Prediction")
+        print(  "=============================")
+        orthologuesResultsFilesString = get_orthologues.GetOrthologues(workingDir, resultsDir, clustersFilename_pairs, nBlast)
+        print(orthogroupsResultsFilesString)
+        print(orthologuesResultsFilesString.rstrip())
+    print(statsFile)
     print("")
+    print(summaryText)
+    PrintCitation()
