@@ -1,7 +1,7 @@
 # OrthoFinder — Accurate inference of orthogroups, orthologues, gene trees and rooted species tree made easy!
 What does OrthoFinder do?
 ==========
-OrthoFinder is a fast, accurate and comprehensive analysis tool for comparative genomics. It finds orthologs, orthogroups, infers gene trees for all orthogroups and infers a species tree for the species being analysed. OrthoFinder also identifies the root of the species tree and provides lots of statistics for use in comparative genomic analyses. OrthoFinder is very simple to use and all you need to run it is a set of protein sequence files (one per species) in FASTA format .
+OrthoFinder is a fast, accurate and comprehensive analysis tool for comparative genomics. It finds orthologs, orthogroups, infers gene trees for all orthogroups and infers a species tree for the species being analysed. OrthoFinder also identifies the root of the species tree and provides lots of useful statistics for comparative genomic analyses. OrthoFinder is very simple to use and all you need to run it is a set of protein sequence files (one per species) in FASTA format .
 
 For more details see the OrthoFinder paper below.
 
