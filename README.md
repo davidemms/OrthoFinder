@@ -54,7 +54,7 @@ If you do not have access to a python 2.X version or haven't installed the pytho
 Output File Format
 ==================
 ###Orthogroups
-An orthogroup is the set of genes that are descended from a single gene in the last common ancestor of the species being analysed. OrthoGroups are like gene families, but are constructed via the application of robust phylogenetic criteria.   
+An orthogroup is the set of genes that are descended from a single gene in the last common ancestor of the species being analysed. Orthogroups are like gene families, but are constructed via the application of robust phylogenetic criteria.   
 
 OrthoFinder generates three output files for orthogroups: 
 
