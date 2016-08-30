@@ -1,9 +1,9 @@
 # OrthoFinder — Accurate inference of orthologous gene groups, orthologues, gene trees and rooted species tree made easy!
 What does OrthoFinder do?
 ==========
-OrthoFinder is a program for finding orthogroups from one or more species. An orthogroup is the set of genes that are descended from a single gene in the last common ancestor of the species being clustered. OrthoFinder accounts for gene length biases that are inherent in BLAST scores, normalises for differences in species divergence times, and accounts for orthogroup specific differences in gene evolultion rates. For more details see the OrthoFinder paper below.
+OrthoFinder is a fast, accurate and comprehensive analysis tool for comparative genomics. It finds orthologs, orthogroups, infers gene trees for all orthogroups and infers a species tree for the species being analysed. OrthoFinder also identifies the root of the species tree and provides lots of statistics for use in comparative genomic analyses. OrthoFinder is very simple to use and all you need to run it is a set of protein sequence FASTA files (one per species).
 
-NEW!!! OrthoFinder now also automatically infers the gene tree for each orthogroup, the rooted species tree, all orthologues between all species and calculates summary statistics. This is all performed automatically with the same simple command and the same input as before!
+For more details see the OrthoFinder paper below.
 
 **Emms, D.M. and Kelly, S. (2015) OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy, Genome Biology 16:157**
 
@@ -15,8 +15,7 @@ https://github.com/davidemms/OrthoFinder
 
 What's New
 ==========
-**Sep. 2016**: OrthoFinder now infers the gene tree for each orthogroup, the rooted species tree, all orthologues between all species and calculates summary statis
-    tics.
+**Sep. 2016**: OrthoFinder now infers the gene tree for each orthogroup, the rooted species tree, all orthologues between all species and calculates summary statistics.
 
 **Jul. 2016**: OrthoFinder now outputs **summary statistics** for the orthogroups produced. Statistics are in the files **Statistics_Overall.csv, Statistics_PerSpecies.csv** and **OrthologousGroups_SpeciesOverlaps.csv**.
 
@@ -30,7 +29,7 @@ What's New
 
 Usage
 =====
-OrthoFinder runs as a single command that takes as input a directory of fasta files of proteomes (amino acid sequences), one per species, and outputs a file containing the orthogroups of genes from these species, a gene tree for each orthogroups, the rooted species tree and all orthologues between all the species: 
+OrthoFinder runs as a single command that takes as input a directory of FASTA files of proteomes (amino acid sequences), one per species, and outputs a file containing the orthogroups of genes from these species, a gene tree for each orthogroups, the rooted species tree and all orthologues between all the species: 
 
 **python orthofinder.py -f fasta_directory -t number_of_processes**
 
