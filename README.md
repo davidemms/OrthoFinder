@@ -1,4 +1,4 @@
-# OrthoFinder — Accurate inference of orthologous gene groups, orthologues, gene trees and rooted species tree made easy!
+# OrthoFinder — Accurate inference of orthogroups, orthologues, gene trees and rooted species tree made easy!
 What does OrthoFinder do?
 ==========
 OrthoFinder is a fast, accurate and comprehensive analysis tool for comparative genomics. It finds orthologs, orthogroups, infers gene trees for all orthogroups and infers a species tree for the species being analysed. OrthoFinder also identifies the root of the species tree and provides lots of statistics for use in comparative genomic analyses. OrthoFinder is very simple to use and all you need to run it is a set of protein sequence files (one per species) in FASTA format .
@@ -54,6 +54,8 @@ If you do not have access to a python 2.X version or haven't installed the pytho
 Output File Format
 ==================
 ###Orthogroups
+An orthogroup is the set of genes that are descended from a single gene in the last common ancestor of the species being analysed. OrthoGroups are like gene families, but are constructed via the application of robust phylogenetic criteria.   
+
 OrthoFinder generates three output files for orthogroups: 
 
 **1) OrthologousGroups.csv** is a tab separated text file. Each row comprises a single orthogroup and contains all the genes that belong to that orthogroup. The genes are organized into separate columns where each column corresponds to a single species.
