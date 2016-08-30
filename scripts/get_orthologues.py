@@ -9,6 +9,7 @@ Created on Thu Jun  9 16:00:33 2016
 import sys
 import os
 import ete2
+import subprocess
 import numpy as np
 from collections import Counter, defaultdict
 import cPickle as pic
@@ -139,7 +140,7 @@ def lil_max(M):
 # ASTRAL
 
 def GetOGsToUse(ogSet):
-    return range(50, min(10000, len(ogSet.ogs)))
+    return range(100, min(10000, len(ogSet.ogs)))
 
 def CreateTaxaMapFile(ogSet, i_ogs_to_use, outputFN):
     """Get max number of sequences per species"""
@@ -180,8 +181,8 @@ def RunAstral(ogSet, treesPat, workingDir):
     CreateTaxaMapFile(ogSet, i_ogs_to_use, tmFN)
     treesFN = dir_astral + "TreesFile.txt"
     ConcatenateTrees(i_ogs_to_use, treesPat, treesFN)
-    speciesTreeFN = workingDir + "SpeciesTree.txt"
-    print(" ".join(["java", "-Xmx6000M", "-jar", "/home/david/software/ASTRAL-multiind/Astral/astral.4.8.0.jar", "-a", tmFN, "-i", treesFN, "-o", speciesTreeFN]))
+    speciesTreeFN = workingDir + "SpeciesTree_astral.txt"
+    subprocess.call(" ".join(["java", "-Xmx6000M", "-jar", "~/software/ASTRAL-multiind/Astral/astral.4.8.0.jar", "-a", tmFN, "-i", treesFN, "-o", speciesTreeFN]), shell=True)
     return speciesTreeFN
 
 # ==============================================================================================================================      
@@ -321,13 +322,14 @@ class DendroBLASTTrees(object):
                 values = " ".join(["%.6g" % (0. + M[i,j]) for j in range(n)])   # hack to avoid printing out "-0"
                 outfile.write(values + "\n")       
         treeFN = os.path.split(self.treesPatIDs)[0] + "/SpeciesTree_ids.txt"
-        cmd = " ".join(["fastme", "-i", speciesMatrixFN, "-o", treeFN, "-s"])
+        cmd = " ".join(["fastme", "-i", speciesMatrixFN, "-o", treeFN, "-w", "O"] + (["-s"] if n < 1000 else []))
         return cmd, treeFN
                 
     def PrepareGeneTreeCommand(self):
         cmds = []
         for iog in xrange(len(self.ogSet.ogs)):
-            cmds.append([" ".join(["fastme", "-i", self.distPat % iog, "-o", self.treesPatIDs % iog, "-s"])])
+            nTaxa = len(self.ogSet.ogs[iog])
+            cmds.append([" ".join(["fastme", "-i", self.distPat % iog, "-o", self.treesPatIDs % iog, "-w", "O"] + (["-s"] if nTaxa < 1000 else []))])
         return cmds
 
     def RenameTreeTaxa(self, treeFN, newTreeFilename, idsMap, qFixNegatives=False):     
@@ -355,7 +357,9 @@ class DendroBLASTTrees(object):
         seqDict = self.ogSet.Spec_SeqDict()
         for iog in xrange(len(self.ogSet.ogs)):
             self.RenameTreeTaxa(self.treesPatIDs % iog, self.treesPat % iog, seqDict, qFixNegatives=True)
-        self.RenameTreeTaxa(spTreeFN_ids, self.workingDir + "SpeciesTree_unrooted.txt", self.ogSet.SpeciesDict(), qFixNegatives=True)          
+        self.RenameTreeTaxa(spTreeFN_ids, self.workingDir + "SpeciesTree_unrooted.txt", self.ogSet.SpeciesDict(), qFixNegatives=True)       
+        #spTreeFN_ids = RunAstral(self.ogSet, self.treesPatIDs, self.workingDir)   
+        #self.RenameTreeTaxa(spTreeFN_ids, self.workingDir + "SpeciesTree_astral_unrooted.txt", self.ogSet.SpeciesDict(), qFixNegatives=True)     
         return len(ogs), D, spPairs, spTreeFN_ids
 
 # ==============================================================================================================================      
@@ -434,7 +438,7 @@ def RunDlcpar(treesPat, ogSet, nOGs, speciesTreeFN, workingDir):
     if not os.path.exists(dlcparResultsDir): os.mkdir(dlcparResultsDir)
     filenames = [rootedTreeDir + os.path.split(treesPat % i)[1] for i in xrange(nOGs)]
     
-    dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.5 %s -O %s' % (speciesTreeFN, geneMapFN, fn, dlcparResultsDir + os.path.splitext(os.path.split(fn)[1])[0]) for fn in filenames]
+    dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -O %s' % (speciesTreeFN, geneMapFN, fn, dlcparResultsDir + os.path.splitext(os.path.split(fn)[1])[0]) for fn in filenames]
 #    print(dlcCommands[0])
     # use this to run in parallel
     tfo.RunParallelCommandSets(nThreads, [[c] for c in dlcCommands], qHideStdout = True)
@@ -535,7 +539,6 @@ def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, clustersFilenam
         print("Best outgroup for species tree:")  
     for r in roots: print("  " + (", ".join([spDict[s] for s in r]))  )
     
-#    speciesTreeFN = RunAstral(ogSet, db.treesPat, resultsDir)
     qMultiple = len(roots) > 1
     if qMultiple: print("\nAnalysing each of the potential species tree roots.")
     resultsSpeciesTrees = []

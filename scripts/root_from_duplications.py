@@ -426,8 +426,8 @@ def PlotTree(speciesTree, treesDir, supported_clusters, qSimplePrint=True):
     tree_for_figure.render(treesDir + "Duplications.pdf")
 
 def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, treeFmt=None):
-    if treeFmt != None: spTreeFormat = treeFmt
-    speciesTree = ete2.Tree(speciesTreeFN, format=spTreeFormat)
+    if treeFmt == None: treeFmt = spTreeFormat
+    speciesTree = ete2.Tree(speciesTreeFN, format=treeFmt)
     species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
     pool = mp.Pool(nProcessors, maxtasksperchild=1)       
     list_of_lists = pool.map(SupportedHierachies_wrapper2, [(fn, GeneToSpeciesMap, species, dict_clades, clade_names) for fn in glob.glob(treesDir + "/*")])
@@ -490,7 +490,7 @@ if __name__ == "__main__":
             print(r)
         if args.verbose: PlotTree(speciesTree, args.input_tree, clusters)
     else:
-        root, clusters, _ = GetRoot(args.Species_tree, args.input_tree, GeneToSpecies, nProcs, treeFmt = 1)
+        root, clusters, _, nSupport = GetRoot(args.Species_tree, args.input_tree, GeneToSpecies, nProcs, treeFmt = 1)
         for r in root: print(r)
         speciesTree = ete2.Tree(args.Species_tree, format=1)
         if args.verbose: PlotTree(speciesTree, args.input_tree, clusters, qSimplePrint=False)

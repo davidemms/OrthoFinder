@@ -40,7 +40,7 @@ import glob
 
 import orthofinder    
 
-version = "0.6.1"   
+version = "1.0.0"   
 
 def RunCommandSet(commandSet, qHideStdout):
 #    orthofinder.util.PrintTime("Runing command: %s" % commandSet[-1])

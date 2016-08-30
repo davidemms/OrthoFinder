@@ -25,6 +25,9 @@
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
 
+nThreadsDefault = 16
+nAlgDefault = 1
+
 import sys                                      # Y
 import subprocess                               # Y
 import os                                       # Y
@@ -47,10 +50,7 @@ import Queue                                    # Y
 import warnings                                 # Y
 import time                                     # Y
 
-sys.path.append(os.path.split(os.path.abspath(__file__))[0] + "/scripts")
-import get_orthologues
-
-version = "0.6.1"
+version = "1.0.0"
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
 picProtocol = 1
 if sys.platform.startswith("linux"):
@@ -886,8 +886,6 @@ class WaterfallMethod:
 OrthoFinder
 -------------------------------------------------------------------------------
 """   
-nThreadsDefault = 16
-nAlgDefault = 1
 mclInflation = 1.5
 
 def CanRunCommand(command, qAllowStderr = False):
@@ -1041,6 +1039,9 @@ def AssignIDsToSequences(fastaDirectory, outputDirectory):
     return returnFilenames, originalFastaFilenames, idsFilename, speciesFilename, newSpeciesIDs, previousSpeciesIDs
 
 if __name__ == "__main__":
+    sys.path.append(os.path.split(os.path.abspath(__file__))[0] + "/scripts")
+    import get_orthologues
+    
     print("\nOrthoFinder version %s Copyright (C) 2014 David Emms\n" % version)
     print("""    This program comes with ABSOLUTELY NO WARRANTY.
     This is free software, and you are welcome to redistribute it under certain conditions.
@@ -1380,3 +1381,4 @@ if __name__ == "__main__":
         print(orthogroupsResultsFilesString)
         print(orthologuesResultsFilesString.rstrip())
     PrintCitation()
+    util.PrintTime("Done")
