@@ -8,7 +8,6 @@ Created on Thu Jun  9 16:00:33 2016
 
 import sys
 import os
-import ete2
 import subprocess
 import numpy as np
 from collections import Counter, defaultdict
@@ -17,7 +16,7 @@ import itertools
 import multiprocessing as mp
 import Queue
 
-#sys.path.append(os.path.split(os.path.abspath(__file__))[0] + "/..")
+import tree
 import trees_for_orthogroups as tfo
 import orthofinder
 import root_from_duplications as rfd
@@ -157,14 +156,14 @@ def CreateTaxaMapFile(ogSet, i_ogs_to_use, outputFN):
         
 def ConvertTree(treeString):
     """for trees with sequence names iSp_jSeq replaces the jSeq with 0, 1,..."""
-    tree = ete2.Tree(treeString)
+    t = tree.Tree(treeString)
     sp_counts = defaultdict(int)
-    for seq in tree:
+    for seq in t:
         iSp, jSeq = seq.name.split("_")
         kSeq = sp_counts[iSp]
         sp_counts[iSp] += 1
         seq.name = "%s_%d" % (iSp, kSeq)
-    return (tree.write() + "\n")
+    return (t.write() + "\n")
 
 def ConcatenateTrees(i_ogs_to_use, treesPat, outputFN):
     with open(outputFN, 'wb') as outfile:
@@ -335,13 +334,13 @@ class DendroBLASTTrees(object):
     def RenameTreeTaxa(self, treeFN, newTreeFilename, idsMap, qFixNegatives=False):     
 #        with open(treeFN, "rb") as inputTree: treeString = inputTree.next()
         try:
-            tree = ete2.Tree(treeFN)
-            for node in tree.get_leaves():
+            t = tree.Tree(treeFN)
+            for node in t.get_leaves():
                 node.name = idsMap[node.name]
             if qFixNegatives:
-                for n in tree.traverse():
+                for n in t.traverse():
                     if n.dist < 0.0: n.dist = 0.0
-            tree.write(outfile = newTreeFilename, format=4)  
+            t.write(outfile = newTreeFilename, format=4)  
         except:
             pass
     
@@ -365,11 +364,11 @@ class DendroBLASTTrees(object):
 # ==============================================================================================================================      
 # DLCPar
 
-def GetTotalLength(tree):
-    return sum([node.dist for node in tree])
+def GetTotalLength(t):
+    return sum([node.dist for node in t])
   
-def AllEqualBranchLengths(tree):
-    lengths = [node.dist for node in tree]
+def AllEqualBranchLengths(t):
+    lengths = [node.dist for node in t]
     return (len(lengths) > 1 and len(set(lengths)) == 1)
 
 def RootGeneTreesArbitrarily(treesPat, nOGs, outputDir):
@@ -380,7 +379,7 @@ def RootGeneTreesArbitrarily(treesPat, nOGs, outputDir):
     with open(outputDir + 'root_errors.txt', 'wb') as errorfile:
         for treeFN, outFN in zip(treeFilenames, outFilenames):
             try:    
-                t = ete2.Tree(treeFN)
+                t = tree.Tree(treeFN)
                 if len(t.get_children()) != 2:
                     R = t.get_midpoint_outgroup()
                     # if it's a tree with 3 genes all with zero length branches then root arbitrarily (it's possible this could happen with more than 3 nodes)
@@ -398,7 +397,7 @@ def RootGeneTreesArbitrarily(treesPat, nOGs, outputDir):
                 t.write(outfile = outFN)
             except Exception as err:
                 try:
-                    t = ete2.Tree(treeFN)
+                    t = tree.Tree(treeFN)
                     for leaf in t:
                        R = leaf
                        break

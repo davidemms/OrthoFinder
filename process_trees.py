@@ -6,7 +6,7 @@ import glob
 import itertools
 import numpy as np
 import cPickle as pic
-from ete2 import Tree
+import tree
 from scipy import sparse
 from collections import defaultdict
 
@@ -18,13 +18,13 @@ def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
 #make_dicts checks every leaf against every other leaf to find the ancestor node and checks this node against speclist and duplist to see which dictionary the gene-pair should be placed in.
 def make_dicts(dlcparResultsDir, outputDir):
     if not os.path.exists(outputDir): os.mkdir(outputDir) 
-    trees = glob.glob(dlcparResultsDir + '/*.locus.tree')
+    treeFNs = glob.glob(dlcparResultsDir + '/*.locus.tree')
     recons = glob.glob(dlcparResultsDir + '/*.locus.recon')
-    trees.sort(key = natural_sort_key)
+    treeFNs.sort(key = natural_sort_key)
     recons.sort(key = natural_sort_key)
     Orthologs = defaultdict(list)
-    for tree, recon in zip(trees, recons):
-        t = Tree(tree, format = 8)
+    for treeFN, recon in zip(treeFNs, recons):
+        t = tree.Tree(treeFN, format = 8)
         reconlist = []
         with open(recon, 'r') as rec:
             for line in rec:

@@ -15,7 +15,7 @@ import os
 import glob
 #import cProfile as profile
 #import pstats
-import ete2
+import tree
 import argparse
 import itertools
 import multiprocessing as mp
@@ -48,11 +48,11 @@ nProcs = 64
 
 class Node(object):
     """ The class allows the user to get the 'child' nodes in any of the three directions
-    rather than just for the two 'child' nodes in ete2's model
+    rather than just for the two 'child' nodes in the tree model
     """
     def __init__(self, node):
         """
-        node - the ete2 node
+        node - tree node
         """
         self.node = node
         
@@ -142,15 +142,15 @@ class Node(object):
         return set([sp for child in clades_of_clades for grandchild in child for sp in grandchild])
       
    
-def StoreSpeciesSets(tree, GeneMap, allTaxa):
-    for node in tree.traverse('postorder'):
+def StoreSpeciesSets(t, GeneMap, allTaxa):
+    for node in t.traverse('postorder'):
         if node.is_leaf():
             node.add_feature('sp_down', {GeneMap(node.name)})
         elif node.is_root():
             continue
         else:
             node.add_feature('sp_down', set.union(*[ch.sp_down for ch in node.get_children()]))
-    for node in tree.traverse('preorder'):
+    for node in t.traverse('preorder'):
         if node.is_root():
             node.add_feature('sp_up', set())
         else:
@@ -305,7 +305,7 @@ Parallelisation wrappers
 
 def SupportedHierachies_wrapper(treeName, GeneToSpecies, species, dict_clades, clade_names):
     if not os.path.exists(treeName): return []
-    t = ete2.Tree(treeName, format=1)
+    t = tree.Tree(treeName, format=1)
     G = set(t.get_leaf_names())
     S = list(set(map(GeneToSpecies, G)))
     if len(S) < 4:
@@ -321,30 +321,10 @@ def SupportedHierachies_wrapper2(args):
 End of Parallelisation wrappers
 ================================================================================================================================
 """
-
-def get_partitions(tree):
-    """ 
-    .. versionadded: 2.1
-    
-    It returns the set of all possible partitions under a
-    node. Note that current implementation is quite inefficient
-    when used in very large trees.
-
-    t = Tree("((a, b), e);")
-    partitions = t.get_partitions()
-    """
-    all_leaves = frozenset(tree.get_leaf_names())
-    all_partitions = set([all_leaves])
-    for n in tree.iter_descendants():
-        p1 = frozenset(n.get_leaf_names())
-        p2 = frozenset(all_leaves - p1)
-        all_partitions.add(p1)
-        all_partitions.add(p2)
-    return all_partitions
-    
+   
 def AnalyseSpeciesTree(speciesTree):
     species = frozenset(speciesTree.get_leaf_names())
-    parts = list(get_partitions(speciesTree))
+    parts = list(speciesTree.get_partitions())
     nSpecies = len(species)
     dict_clades = dict() # dictionary of clades we require evidence of duplicates from for each partition
     clade_names = dict()
@@ -363,16 +343,16 @@ def AnalyseSpeciesTree(speciesTree):
         dict_clades[p] = [[set(c.get_leaf_names()) for c in ch0], [set(c.get_leaf_names()) for c in ch1]]
     return species, dict_clades, clade_names
 
-def RootAtClade(tree, accs_in_clade):
+def RootAtClade(t, accs_in_clade):
     if len(accs_in_clade) == 1:
-        tree.set_outgroup(list(accs_in_clade)[0])
-        return tree
-    accs = set(tree.get_leaf_names())
+        t.set_outgroup(list(accs_in_clade)[0])
+        return t
+    accs = set(t.get_leaf_names())
     dummy = list(accs.difference(accs_in_clade))[0]
-    tree.set_outgroup(dummy)
-    node = tree.get_common_ancestor(accs_in_clade)
-    tree.set_outgroup(node)
-    return tree
+    t.set_outgroup(dummy)
+    node = t.get_common_ancestor(accs_in_clade)
+    t.set_outgroup(node)
+    return t
     
 def ParsimonyRoot(allSpecies, clades, supported_clusters):
     c = Counter(supported_clusters)
@@ -398,36 +378,9 @@ def ParsimonyRoot(allSpecies, clades, supported_clusters):
                 roots.append(clade)
     return roots, nSupport
 
-def PlotTree(speciesTree, treesDir, supported_clusters, qSimplePrint=True):
-    c = Counter(supported_clusters)
-    print("Observed duplications")
-    if qSimplePrint:
-        for x in c.most_common():
-            print(x)
-        return
-    S = set(speciesTree.get_leaf_names())
-    tree_for_figure = speciesTree.copy()
-    for cluster, count in c.items():
-        complement = None
-        if len(cluster) == 1: continue
-        n = tree_for_figure.get_common_ancestor(cluster)
-        # cluster could straddle root
-        if n == tree_for_figure:
-            complement = S.difference(cluster) # complement
-#            print(complement)
-            if len(complement) == 1:
-#                continue
-                n = tree_for_figure & list(complement)[0]
-            else:
-                n = tree_for_figure.get_common_ancestor(complement)
-#        print(('r' if complement != None else 'g', count, cluster))
-        face = ete2.faces.TextFace(" " + str(count), fgcolor=('red' if complement else 'green'))
-        n.add_face(face, 1) 
-    tree_for_figure.render(treesDir + "Duplications.pdf")
-
 def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, treeFmt=None):
     if treeFmt == None: treeFmt = spTreeFormat
-    speciesTree = ete2.Tree(speciesTreeFN, format=treeFmt)
+    speciesTree = tree.Tree(speciesTreeFN, format=treeFmt)
     species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
     pool = mp.Pool(nProcessors, maxtasksperchild=1)       
     list_of_lists = pool.map(SupportedHierachies_wrapper2, [(fn, GeneToSpeciesMap, species, dict_clades, clade_names) for fn in glob.glob(treesDir + "/*")])
@@ -463,9 +416,9 @@ if __name__ == "__main__":
         GeneToSpecies = GeneToSpecies_3rdDash  
     
     if not args.directory:
-        speciesTree = ete2.Tree(args.Species_tree, format=spTreeFormat)
+        speciesTree = tree.Tree(args.Species_tree, format=spTreeFormat)
         species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
-        t = ete2.Tree(args.input_tree, format=1)
+        t = tree.Tree(args.input_tree, format=1)
         G = set(t.get_leaf_names())
         S = list(set(map(GeneToSpecies, G)))
         filename = 'profile_stats.stats'
@@ -476,7 +429,7 @@ if __name__ == "__main__":
 #        stats.sort_stats('cumulative')
 #        stats.print_stats(0.3)
     elif qSerial:
-        speciesTree = ete2.Tree(args.Species_tree, format=spTreeFormat)
+        speciesTree = tree.Tree(args.Species_tree, format=spTreeFormat)
         species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
         clusters = []
         for fn in glob.glob(args.input_tree + "/*"):
@@ -492,6 +445,6 @@ if __name__ == "__main__":
     else:
         root, clusters, _, nSupport = GetRoot(args.Species_tree, args.input_tree, GeneToSpecies, nProcs, treeFmt = 1)
         for r in root: print(r)
-        speciesTree = ete2.Tree(args.Species_tree, format=1)
+        speciesTree = tree.Tree(args.Species_tree, format=1)
         if args.verbose: PlotTree(speciesTree, args.input_tree, clusters, qSimplePrint=False)
  

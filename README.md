@@ -47,7 +47,7 @@ See below for details on:
 
 ###Standalone Binaries
 
-If you do not have access to a python 2.X version or haven't installed the python ete2 library you can use the standalone binaries in the bin directory instead e.g.:
+If you do not have access to a python 2.X version you can use the standalone binaries in the bin directory instead e.g.:
 
 **bin/orthofinder -f ExampleDataset -t 16**
 
@@ -96,8 +96,6 @@ After the orthogroups have been calculated OrthoFinder will infer gene trees, th
 1. FastME
 
 2. DLCpar-search
-
-3. The python ete2 library (If you don't have this you can still use the standalone binaries instead)
 
 To use the trees_for_orthogroups.py utility, which infers trees using multiple sequence alignments, there are two additional dependencies which should be installed and in the system path:
 
