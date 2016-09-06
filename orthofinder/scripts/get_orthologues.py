@@ -1,13 +1,33 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Jun  9 16:00:33 2016
+#
+# Copyright 2014 David Emms
+#
+# This program (OrthoFinder) is distributed under the terms of the GNU General Public License v3
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#  
+#  When publishing work that uses OrthoFinder please cite:
+#      Emms, D.M. and Kelly, S. (2015) OrthoFinder: solving fundamental biases in whole genome comparisons dramatically 
+#      improves orthogroup inference accuracy, Genome Biology 16:157
+#
+# For any enquiries send an email to David Emms
+# david_emms@hotmail.comhor: david
 
-@author: david
-"""
-
-import sys
 import os
+import sys
+import glob
 import subprocess
 import numpy as np
 from collections import Counter, defaultdict
@@ -16,15 +36,15 @@ import itertools
 import multiprocessing as mp
 import Queue
 
+import util
 import tree
-import trees_for_orthogroups as tfo
-import orthofinder
+import matrices
+import mcl as MCL
 import root_from_duplications as rfd
-import process_trees as pt
+import orthologues_from_recon_trees as pt
+import blast_file_processor as BlastFileProcessor
 
-#print(orthofinder.__file__)
-
-nThreads = orthofinder.nThreadsDefault
+nThreads = util.nThreadsDefault
 
 class Seq(object):
     def __init__(self, seqInput):
@@ -61,21 +81,19 @@ class Seq(object):
 # ==============================================================================================================================
         
 class OrthoGroupsSet(object):
-    def __init__(self, orthofinderWorkingDir, clustersFilename_pairs, idExtractor = orthofinder.FirstWordExtractor):
+    def __init__(self, orthofinderWorkingDir, clustersFilename_pairs, idExtractor = util.FirstWordExtractor):
         self.workingDirOF = orthofinderWorkingDir
         self.seqIDsFN = orthofinderWorkingDir + "SequenceIDs.txt"
         self.speciesIDsFN = orthofinderWorkingDir + "SpeciesIDs.txt"
-        self.speciesIDsEx = orthofinder.FullAccession(self.speciesIDsFN)
+        self.speciesIDsEx = util.FullAccession(self.speciesIDsFN)
         self._Spec_SeqIDs = None
         self._extractor = idExtractor
         self.clustersFN = clustersFilename_pairs
         self.seqIDsEx = None
         self.ogs = self.OGs()
-        self.speciesToUse = orthofinder.GetSpeciesToUse(self.speciesIDsFN)
-        self.seqsInfo = orthofinder.GetSeqsInfo(orthofinderWorkingDir, self.speciesToUse)
-        self.fileInfo = orthofinder.FileInfo(inputDir=orthofinderWorkingDir, outputDir = orthofinderWorkingDir, graphFilename="")
-#        nSeqs, nSpecies, speciesStartingIndices = orthofinder.BlastFileProcessor.GetNumberOfSequencesInFileFromDir(workingDir, self.speciesToUse)
-#        self.bfp = orthofinder.BlastFileProcessor(workingDir, self.speciesToUse, nSeqs, nSpecies, speciesStartingIndices)
+        self.speciesToUse = util.GetSpeciesToUse(self.speciesIDsFN)
+        self.seqsInfo = util.GetSeqsInfo(orthofinderWorkingDir, self.speciesToUse)
+        self.fileInfo = util.FileInfo(inputDir=orthofinderWorkingDir, outputDir = orthofinderWorkingDir, graphFilename="")
 
     def SequenceDict(self):
         if self.seqIDsEx == None:
@@ -103,15 +121,9 @@ class OrthoGroupsSet(object):
         return self._Spec_SeqIDs
     
     def OGs(self):
-        ogs = orthofinder.MCL.GetPredictedOGs(self.clustersFN)     
+        ogs = MCL.GetPredictedOGs(self.clustersFN)     
         ogs = [[Seq(g) for g in og] for og in ogs if len(og) >= 4]   
         return ogs
-        
-#    def BitScores(self, iSp, jSp):
-##        return self.bfp.GetBLAST6Scores(self.speciesToUse.index(iSp), self.speciesToUse.index(jSp), False)
-#        return orthofinder.BlastFileProcessor.GetBLAST6Scores(self.seqsInfo, self.fileInfo, iSp, jSp, False)
-##        with open(self.workingDir + "B%d_%d.pic" % (iSp, jSp), 'rb') as infile:
-##            return pic.load(infile)
 
 # ==============================================================================================================================
 
@@ -193,10 +205,10 @@ def Worker_BlastScores(cmd_queue, seqsInfo, fileInfo, nProcesses, nToDo):
             i, args = cmd_queue.get(True, 1)
             nDone = i - nProcesses + 1
             if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
-                orthofinder.util.PrintTime("Done %d of %d" % (nDone, nToDo))
-            B = orthofinder.BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, *args, qExcludeSelfHits = False)
+                util.PrintTime("Done %d of %d" % (nDone, nToDo))
+            B = BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, *args, qExcludeSelfHits = False)
             with open(fileInfo.outputDir + "Bit%d_%d.pic" % args, 'wb') as outfile:
-                pic.dump(B, outfile, protocol = orthofinder.picProtocol)
+                pic.dump(B, outfile, protocol = util.picProtocol)
         except Queue.Empty:
             return 
                 
@@ -250,8 +262,8 @@ class DendroBLASTTrees(object):
         nSeqs = self.NumberOfSequences(self.species)
         ogMatrices = [np.zeros((n, n)) for n in nGenes]
         for iiSp, sp1 in enumerate(self.species):
-            orthofinder.util.PrintTime("Processing species %d" % sp1)
-            Bs = [orthofinder.LoadMatrix("Bit", self.ogSet.fileInfo, iiSp, jjSp) for jjSp in xrange(len(self.species))]
+            util.PrintTime("Processing species %d" % sp1)
+            Bs = [matrices.LoadMatrix("Bit", self.ogSet.fileInfo, iiSp, jjSp) for jjSp in xrange(len(self.species))]
             mins = np.ones((nSeqs[sp1], 1), dtype=np.float64)*9e99 
             maxes = np.zeros((nSeqs[sp1], 1), dtype=np.float64)
             for B, sp2 in zip(Bs, self.species):
@@ -264,6 +276,10 @@ class DendroBLASTTrees(object):
                                 m[i, j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) /  maxes[gi.iSeq]
         return ogs, ogMatrices
     
+    def DeleteBlastMatrices(self, workingDir):
+        for f in glob.glob(workingDir + "B*_*.pic"):
+            if os.path.exists(f): os.remove(f)
+        
     def WriteOGMatrices(self, ogs, ogMatrices):
         newMatrices = []
         for iog, (og, m) in enumerate(zip(ogs, ogMatrices)):
@@ -347,12 +363,13 @@ class DendroBLASTTrees(object):
     def RunAnalysis(self):
         ogs, ogMatrices_partial = self.GetOGMatrices()
         ogMatrices = self.WriteOGMatrices(ogs, ogMatrices_partial)
+        
         D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
         cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs)
         cmds_geneTrees = self.PrepareGeneTreeCommand()
         print("\n3. Inferring gene and species trees")
         print(  "-----------------------------------")
-        tfo.RunParallelCommandSets(self.nProcesses, [[cmd_spTree]] + cmds_geneTrees, qHideStdout = True)
+        util.RunParallelOrderedCommandLists(self.nProcesses, [[cmd_spTree]] + cmds_geneTrees, qHideStdout = True)
         seqDict = self.ogSet.Spec_SeqDict()
         for iog in xrange(len(self.ogSet.ogs)):
             self.RenameTreeTaxa(self.treesPatIDs % iog, self.treesPat % iog, seqDict, qFixNegatives=True)
@@ -440,31 +457,33 @@ def RunDlcpar(treesPat, ogSet, nOGs, speciesTreeFN, workingDir):
     dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -O %s' % (speciesTreeFN, geneMapFN, fn, dlcparResultsDir + os.path.splitext(os.path.split(fn)[1])[0]) for fn in filenames]
 #    print(dlcCommands[0])
     # use this to run in parallel
-    tfo.RunParallelCommandSets(nThreads, [[c] for c in dlcCommands], qHideStdout = True)
+    util.RunParallelOrderedCommandLists(nThreads, [[c] for c in dlcCommands], qHideStdout = True)
     return dlcparResultsDir
 
 # ==============================================================================================================================      
 # Main
 
-def WriteTestDistancesFile(workingDir):
-    testFN = workingDir + "SimpleTest.phy"
+def WriteTestDistancesFile(testFN):
     with open(testFN, 'wb') as outfile:
         outfile.write("4\n1_1 0 0 0.2 0.25\n0_2 0 0 0.21 0.28\n3_1 0.21 0.21 0 0\n4_1 0.25 0.28 0 0")
     return testFN
 
 def CanRunDependencies(workingDir):
     # FastME
-    testFN = WriteTestDistancesFile(workingDir)
+    testFN = workingDir + "SimpleTest.phy"
+    WriteTestDistancesFile(testFN)
     outFN = workingDir + "SimpleTest.tre"
     if os.path.exists(outFN): os.remove(outFN)        
-    if not orthofinder.CanRunCommand("fastme -i %s -o %s" % (testFN, outFN), qAllowStderr=False):
+    if not util.CanRunCommand("fastme -i %s -o %s" % (testFN, outFN), qAllowStderr=False):
         print("ERROR: Cannot run fastme")
         print("Please check FastME is installed and that the executables are in the system path\n")
         return False
     os.remove(testFN)
     os.remove(outFN)
+    fastme_stat_fn = workingDir + "SimpleTest.phy_fastme_stat.txt"
+    if os.path.exists(fastme_stat_fn): os.remove(fastme_stat_fn)
     # DLCPar
-    if not orthofinder.CanRunCommand("dlcpar_search --version", qAllowStderr=False):
+    if not util.CanRunCommand("dlcpar_search --version", qAllowStderr=False):
         print("ERROR: Cannot run dlcpar_search")
         print("Please check DLCpar is installed and that the executables are in the system path\n")
         return False
@@ -484,11 +503,11 @@ def PrintHelp():
     
     print("""-t max_number_of_threads, --threads max_number_of_threads
     The maximum number of processes to be run simultaneously. The deafult is %d but this 
-    should be increased by the user to the maximum number of cores available.\n""" % orthofinder.nThreadsDefault)
+    should be increased by the user to the maximum number of cores available.\n""" % util.nThreadsDefault)
         
     print("""-h, --help
    Print this help text""")
-    orthofinder.PrintCitation()   
+    util.PrintCitation()   
 
 def GetResultsFilesString(rootedSpeciesTreeFN):
     st = ""
@@ -509,18 +528,18 @@ def GetResultsFilesString(rootedSpeciesTreeFN):
             
 
 def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs, nProcesses):
-    ogSet = OrthoGroupsSet(orthofinderWorkingDir, clustersFilename_pairs, idExtractor = orthofinder.FirstWordExtractor)
+    ogSet = OrthoGroupsSet(orthofinderWorkingDir, clustersFilename_pairs, idExtractor = util.FirstWordExtractor)
     if len(ogSet.speciesToUse) < 4: 
         print("ERROR: Not enough species to infer species tree")
-        orthofinder.Fail()
+        util.Fail()
 
     print("\n1. Checking required programs are installed")
     print(  "-------------------------------------------")
-    if not CanRunDependencies(orthofinderWorkingDir): orthofinder.Fail()   
+    if not CanRunDependencies(orthofinderWorkingDir): util.Fail()   
     
     print("\n2. Reading sequence similarity scores")
     print(  "-------------------------------------")
-    resultsDir = orthofinder.util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_")
+    resultsDir = util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_")
     
     db = DendroBLASTTrees(ogSet, resultsDir, nProcesses)
     db.ReadAndPickle()
@@ -580,13 +599,13 @@ if __name__ == "__main__":
         if arg == "-t" or arg == "--threads":
             if len(args) == 0:
                 print("Missing option for command line argument -t")
-                orthofinder.Fail()
+                util.Fail()
             arg = args.pop(0)
             try:
                 nProcesses = int(arg)
             except:
                 print("Incorrect argument for number of threads: %s" % arg)
-                orthofinder.Fail()   
+                util.Fail()   
         else:
             userDir = arg
         
@@ -596,13 +615,13 @@ if __name__ == "__main__":
     if nProcesses == None:
         print("""\nNumber of parallel processes has not been specified, will use the default value.  
 Number of parallel processes can be specified using the -t option.""")
-        nProcesses = orthofinder.nThreadsDefault
+        nProcesses = util.nThreadsDefault
     print("Using %d threads for alignments and trees" % nProcesses)
     
-    orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = tfo.GetOGsFile(userDir)
+    orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = util.GetOGsFile(userDir)
     resultsString = GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs, nProcesses)
     print(resultsString)
-    orthofinder.PrintCitation()
+    util.PrintCitation()
     
     
     

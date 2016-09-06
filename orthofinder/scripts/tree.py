@@ -37,7 +37,6 @@
 # 
 # #END_LICENSE#############################################################
 
-import os
 import cPickle
 import random
 import copy
@@ -158,20 +157,6 @@ class TreeNode(object):
     up = property(fget=_get_up, fset=_set_up)
     #: A list of children nodes
     children = property(fget=_get_children, fset=_set_children)
-
-    def _set_face_areas(self, value):
-        if isinstance(value, _FaceAreas):
-            self._faces = value
-        else:
-            raise ValueError("[%s] is not a valid FaceAreas instance" %type(value))
-        
-    def _get_face_areas(self):
-        if not hasattr(self, "_faces"):
-            self._faces = _FaceAreas()
-        return self._faces
-
-    faces = property(fget=_get_face_areas, \
-                         fset=_set_face_areas)
 
     def __init__(self, newick=None, format=0, dist=None, support=None,
                  name=None):

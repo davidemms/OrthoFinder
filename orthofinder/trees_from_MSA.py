@@ -32,26 +32,11 @@ Created on Thu Sep 25 13:15:22 2014
 """
 import os
 import sys
-import multiprocessing as mp
-import time
-import subprocess
-import Queue
 import glob
 
-import orthofinder    
+import scripts.mcl as MCL  
+import scripts.util as util 
 
-version = "1.0.0"   
-
-def RunCommandSet(commandSet, qHideStdout):
-#    orthofinder.util.PrintTime("Runing command: %s" % commandSet[-1])
-    if qHideStdout:
-        for cmd in commandSet:
-            subprocess.call(cmd, shell=True, stdout=subprocess.PIPE)
-    else:
-        for cmd in commandSet:
-            subprocess.call(cmd, shell=True)
-#    orthofinder.util.PrintTime("Finshed command: %s" % commandSet[-1])
-    
 class FastaWriter(object):
     def __init__(self, fastaFileDir):
         self.SeqLists = dict()
@@ -91,52 +76,12 @@ class FastaWriter(object):
                     
     def SortSeqs(self, seqs):
         return sorted(seqs, key=lambda x: map(int, x.split("_")))
-                    
-def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qHideStdout):
-    """ repeatedly takes items to process from the queue until it is empty at which point it returns. Does not take a new task
-        if it can't acquire queueLock as this indicates the queue is being rearranged.
-        
-        Writes each commands output and stderr to a file
-    """
-    while True:
-        try:
-            i, commandSet = cmd_queue.get(True, 1)
-            nDone = i - nProcesses + 1
-            if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
-                orthofinder.util.PrintTime("Done %d of %d" % (nDone, nToDo))
-            RunCommandSet(commandSet, qHideStdout)
-        except Queue.Empty:
-            return   
-    
-def RunParallelCommandSets(nProcesses, commands, qHideStdout = False):
-    """nProcesss - the number of processes to run in parallel
-    commands - list of lists of commands where the commands in the inner list are completed in order (the i_th won't run until
-    the i-1_th has finished).
-    """
-    # Setup the workers and run
-    cmd_queue = mp.Queue()
-    for i, cmd in enumerate(commands):
-        cmd_queue.put((i, cmd))
-    runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, nProcesses, i+1, qHideStdout)) for i_ in xrange(nProcesses)]
-    for proc in runningProcesses:
-        proc.start()
-    
-    for proc in runningProcesses:
-        while proc.is_alive():
-            proc.join(10.)
-            time.sleep(2)    
 
 def WriteTestFile(workingDir):
     testFN = workingDir + "SimpleTest.fa"
     with open(testFN, 'wb') as outfile:
         outfile.write(">a\nA\n>b\nA")
     return testFN
-
-def IsWorkingDirectory(orthofinderWorkingDir):
-    ok = True
-    ok = ok and len(glob.glob(orthofinderWorkingDir + "clusters_OrthoFinder_*.txt_id_pairs.txt")) > 0
-    ok = ok and len(glob.glob(orthofinderWorkingDir + "Species*.fa")) > 0
-    return ok
       
 class TreesForOrthogroups(object):
     def __init__(self, baseOutputDir, orthofinderWorkingDir):
@@ -197,15 +142,15 @@ class TreesForOrthogroups(object):
     def DoTrees(self, ogs, idDict, nProcesses, nSwitchToMafft=500):
         
         testFN = WriteTestFile(self.orthofinderWorkingDir)
-        if not orthofinder.CanRunCommand("mafft %s" % testFN, qAllowStderr=True):
+        if not util.CanRunCommand("mafft %s" % testFN, qAllowStderr=True):
             print("ERROR: Cannot run mafft")
             print("Please check MAFFT is installed and that the executables are in the system path\n")
             return False
-        if not orthofinder.CanRunCommand("mafft %s" % testFN, qAllowStderr=True):
+        if not util.CanRunCommand("mafft %s" % testFN, qAllowStderr=True):
             print("ERROR: Cannot run mafft")
             print("Please check mafft is installed and that the executables are in the system path\n")
             return False
-        if not orthofinder.CanRunCommand("FastTree %s" % testFN, qAllowStderr=True):
+        if not util.CanRunCommand("FastTree %s" % testFN, qAllowStderr=True):
             print("ERROR: Cannot run FastTree")
             print("Please check FastTree is installed and that the executables are in the system path\n")
             return False
@@ -241,9 +186,9 @@ class TreesForOrthogroups(object):
                     print(cmd)
             print("")
             
-        RunParallelCommandSets(nProcesses, commandsSet)
+        util.RunParallelOrderedCommandLists(nProcesses, commandsSet)
         
-        orthofinder.PrintCitation()
+        util.PrintCitation()
         print("\nFasta files for orthogroups have been written to:\n   %s\n" % (self.baseOutputDir + "Sequences/"))
         print("Multiple sequences alignments have been written to:\n   %s\n" % (self.baseOutputDir + "Alignments/"))
         print("Gene trees have been written to:\n   %s\n" % (self.baseOutputDir + "Trees/"))
@@ -262,31 +207,31 @@ def PrintHelp():
     
     print("""-t max_number_of_threads, --threads max_number_of_threads
     The maximum number of processes to be run simultaneously. The deafult is %d but this 
-    should be increased by the user to the maximum number of cores available.\n""" % orthofinder.nThreadsDefault)
+    should be increased by the user to the maximum number of cores available.\n""" % util.nThreadsDefault)
         
     print("""-h, --help
    Print this help text""")
-    orthofinder.PrintCitation()   
+    util.PrintCitation()   
 
 def GetIDsDict(orthofinderWorkingDir):
     # sequence IDs
     idsFilename = orthofinderWorkingDir + "SequenceIDs.txt"
     try:
-        idExtract = orthofinder.FirstWordExtractor(idsFilename)
+        idExtract = util.FirstWordExtractor(idsFilename)
         idDict = idExtract.GetIDToNameDict()
     except RuntimeError as error:
         print(error.message)
         if error.message.startswith("ERROR"):
             print("ERROR: %s contains a duplicate ID. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, idsFilename))
-            orthofinder.Fail()
+            util.Fail()
         else:
             print("Tried to use only the first part of the accession in order to list the sequences in each orthologous group more concisely but these were not unique. Will use the full accession line instead.")     
             try:
-                idExtract = orthofinder.FullAccession(idsFilename)
+                idExtract = util.FullAccession(idsFilename)
                 idDict = idExtract.GetIDToNameDict()
             except:
                 print("ERROR: %s contains a duplicate ID. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, idsFilename))
-                orthofinder.Fail()
+                util.Fail()
     
     # species names
     speciesDict = dict()
@@ -299,72 +244,8 @@ def GetIDsDict(orthofinderWorkingDir):
     idDict = {seqID:speciesDict[seqID.split("_")[0]] + "_" + name for seqID, name in idDict.items()}
     return idDict    
 
-def GetOGsFile(userArg):
-    """returns the WorkingDirectory, ResultsDirectory and clusters_id_pairs filename"""
-    qSpecifiedResultsFile = False
-    if userArg == None:
-        print("ERROR: orthofinder_results_directory has not been specified")
-        orthofinder.Fail()
-    if os.path.isfile(userArg):
-        fn = os.path.split(userArg)[1]
-        if ("clusters_OrthoFinder_" not in fn) or ("txt_id_pairs.txt" not in fn):
-            print("ERROR:\n    %s\nis neither a directory or a clusters_OrthoFinder_*.txt_id_pairs.txt file." % userArg)
-            orthofinder.Fail()
-        qSpecifiedResultsFile = True
-        # user has specified specific results file
-    elif userArg[-1] != os.path.sep: 
-        userArg += os.path.sep
-    
-    # find required files
-    if qSpecifiedResultsFile:
-        orthofinderWorkingDir = os.path.split(userArg)[0] + os.sep
-        if not IsWorkingDirectory(orthofinderWorkingDir):
-            print("ERROR: cannot find files from OrthoFinder run in directory:\n   %s" % orthofinderWorkingDir)
-            orthofinder.Fail()
-    else:
-        orthofinderWorkingDir = os.path.split(userArg)[0] if qSpecifiedResultsFile else userArg
-        if not IsWorkingDirectory(orthofinderWorkingDir):
-            orthofinderWorkingDir = userArg + "WorkingDirectory" + os.sep   
-            if not IsWorkingDirectory(orthofinderWorkingDir):
-                print("ERROR: cannot find files from OrthoFinder run in directory:\n   %s\nor\n   %s\n" % (userArg, orthofinderWorkingDir))
-                orthofinder.Fail()
-            
-    if qSpecifiedResultsFile:
-        print("Generating trees for orthogroups in file:\n    %s" % userArg)
-        return orthofinderWorkingDir, orthofinderWorkingDir, userArg
-    else:     
-        # identify orthogroups file
-        clustersFiles = glob.glob(orthofinderWorkingDir + "clusters_OrthoFinder_*.txt_id_pairs.txt")
-        orthogroupFiles = glob.glob(orthofinderWorkingDir + "OrthologousGroups*.txt") 
-        if orthofinderWorkingDir != userArg:
-            orthogroupFiles += glob.glob(userArg + "OrthologousGroups*.txt")
-        # User may have specified a WorkingDirectory and results could be in directory above
-        if len(orthogroupFiles) < len(clustersFiles):
-            orthogroupFiles += glob.glob(userArg + ".." + os.sep + "OrthologousGroups*.txt")
-        clustersFiles = sorted(clustersFiles)
-        orthogroupFiles = sorted(orthogroupFiles)
-        if len(clustersFiles) > 1 or len(orthogroupFiles) > 1:
-            print("ERROR: Results from multiple OrthoFinder runs found\n")
-            print("Tab-delimiter OrthologousGroups*.txt files:")
-            for fn in orthogroupFiles:
-                print("    " + fn)
-            print("With corresponding cluster files:")
-            for fn in clustersFiles:
-                print("    " + fn)
-            print("\nPlease run with only one set of results in directories or specifiy the specific clusters_OrthoFinder_*.txt_id_pairs.txt file on the command line")
-            orthofinder.Fail()        
-            
-        if len(clustersFiles) != 1 or len(orthogroupFiles) != 1:
-            print("ERROR: Results not found in <orthofinder_results_directory> or <orthofinder_results_directory>/WorkingDirectory")
-            print("\nCould not find:\n    OrthologousGroups*.txt\nor\n    clusters_OrthoFinder_*.txt_id_pairs.txt")
-            orthofinder.Fail()
-            
-        print("Generating trees for orthogroups in file:\n    %s" % orthogroupFiles[0])
-        print("and corresponding clusters file:\n    %s" % clustersFiles[0])
-        return orthofinderWorkingDir, userArg, clustersFiles[0]
-
 if __name__ == "__main__":
-    print("\nOrthoFinder Alignments and Trees version %s Copyright (C) 2015 David Emms\n" % version)
+    print("\nOrthoFinder Alignments and Trees version %s Copyright (C) 2015 David Emms\n" % util.version)
     print("""    This program comes with ABSOLUTELY NO WARRANTY.
     This is free software, and you are welcome to redistribute it under certain conditions.
     For details please see the License.md that came with this software.\n""")
@@ -372,12 +253,6 @@ if __name__ == "__main__":
         PrintHelp()
         sys.exit()
         
-    v = map(int, orthofinder.version.split("."))
-    v = 100 * v[0] + 10*v[1] + v[2] 
-    if v < 28: 
-        print("ERROR: OrthoFinder program has not been updated, please update 'orthofinder.py' to the version %s\n" % version)
-        orthofinder.Fail()
-
     # Get arguments    
     userDir = None
     nProcesses = None
@@ -388,26 +263,26 @@ if __name__ == "__main__":
         if arg == "-t" or arg == "--threads":
             if len(args) == 0:
                 print("Missing option for command line argument -t")
-                orthofinder.Fail()
+                util.Fail()
             arg = args.pop(0)
             try:
                 nProcesses = int(arg)
             except:
                 print("Incorrect argument for number of threads: %s" % arg)
-                orthofinder.Fail()   
+                util.Fail()   
         else:
             userDir = arg
     
     # Check arguments
-    orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = GetOGsFile(userDir)
+    orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = util.GetOGsFile(userDir)
 
     if nProcesses == None:
         print("""Number of parallel processes has not been specified, will use the default value.  
    Number of parallel processes can be specified using the -t option\n""")
-        nProcesses = orthofinder.nThreadsDefault
+        nProcesses = util.nThreadsDefault
     print("Using %d threads for alignments and trees\n" % nProcesses)
     
-    ogs = orthofinder.MCL.GetPredictedOGs(clustersFilename_pairs)     
+    ogs = MCL.GetPredictedOGs(clustersFilename_pairs)     
     idDict = GetIDsDict(orthofinderWorkingDir)
     
     treeGen = TreesForOrthogroups(orthofinderResultsDir, orthofinderWorkingDir)

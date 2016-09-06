@@ -1,6 +1,31 @@
+# -*- coding: utf-8 -*-
+#
+# Copyright 2014 David Emms
+#
+# This program (OrthoFinder) is distributed under the terms of the GNU General Public License v3
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#  
+#  When publishing work that uses OrthoFinder please cite:
+#      Emms, D.M. and Kelly, S. (2015) OrthoFinder: solving fundamental biases in whole genome comparisons dramatically 
+#      improves orthogroup inference accuracy, Genome Biology 16:157
+#
+# For any enquiries send an email to David Emms
+# david_emms@hotmail.com
+
 import re
 import os
-import sys
 import csv
 import glob
 import itertools
@@ -10,7 +35,7 @@ import tree
 from scipy import sparse
 from collections import defaultdict
 
-import orthofinder 
+import util
 
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(_nsre, s)]
@@ -43,8 +68,8 @@ def make_dicts(dlcparResultsDir, outputDir):
     return Orthologs, picFN
     
 def GetSpeciesGenesInfo(ogSet):
-    speciesLabels = orthofinder.GetSpeciesToUse(ogSet.speciesIDsFN) 
-    seqsInfo = orthofinder.GetSeqsInfo(ogSet.workingDirOF, speciesLabels)
+    speciesLabels = util.GetSpeciesToUse(ogSet.speciesIDsFN) 
+    seqsInfo = util.GetSeqsInfo(ogSet.workingDirOF, speciesLabels)
     genenumbers = list(np.diff(seqsInfo.seqStartingIndices))
     genenumbers.append(seqsInfo.nSeqs - seqsInfo.seqStartingIndices[-1])
     return speciesLabels, genenumbers
@@ -54,7 +79,7 @@ def one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, output
         try to mostly deal with iSpecies which is the ordinal number not the label it is given
     """
     #Creates all matrices and appends them to matrixlist.
-    orthofinder.util.PrintTime("Processing orthologues for species %d" % iSpecies)
+    util.PrintTime("Processing orthologues for species %d" % iSpecies)
     matrixlist = []
     numspecies = len(speciesLabels)
     speciesLabelsReverse = {label:i for i, label in enumerate(speciesLabels)}
@@ -141,17 +166,4 @@ def get_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir):
     # -> csv files
     species_find_all(ogSet.SpeciesDict(), ogSet.SequenceDict(), matrixDir, resultsDir)
     
-    
-if __name__ == "__main__":
-    import get_orthologues as go
-    d = "/home/david/projects/Orthology/OrthoFinder/Development/Orthologues/ExampleDataset_Results/"
-    orthofinderWorkingDir = d + "WorkingDirectory/"
-    clustersFilename_pairs = orthofinderWorkingDir + "clusters_OrthoFinder_v0.7.0_I1.5.txt_id_pairs.txt"
-    resultsDir = d + "Orthologues_Aug18_test2/"
-    dlcparResultsDir = resultsDir + "/WorkingDirectory/dlcpar/"
-    workingDir = resultsDir + "/WorkingDirectory/"
-    
-    ogSet = go.OrthoGroupsSet(orthofinderWorkingDir, clustersFilename_pairs, idExtractor = orthofinder.FirstWordExtractor)
-    
-    get_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir)
         

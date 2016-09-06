@@ -1,16 +1,30 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Jul 26 14:34:46 2016
+#
+# Copyright 2014 David Emms
+#
+# This program (OrthoFinder) is distributed under the terms of the GNU General Public License v3
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#  
+#  When publishing work that uses OrthoFinder please cite:
+#      Emms, D.M. and Kelly, S. (2015) OrthoFinder: solving fundamental biases in whole genome comparisons dramatically 
+#      improves orthogroup inference accuracy, Genome Biology 16:157
+#
+# For any enquiries send an email to David Emms
+# david_emms@hotmail.com
 
-@author: david
-"""
-
-"""
-Performance improvements:
-- Use an unrooted tree representation so that the trees don't need to be rerooted at all
-- convert all the gene names to species names once per tree
-
-"""
 import os
 import glob
 #import cProfile as profile
@@ -20,6 +34,8 @@ import argparse
 import itertools
 import multiprocessing as mp
 from collections import Counter
+
+import util
 
 def cmp_equal(exp, act):
     """exp - expected set of species
@@ -43,8 +59,7 @@ criteria = "crit_all"
 
 spTreeFormat = 3
 qSerial = False
-nProcs = 64
-#nProcs = 16
+nProcs = util.nThreadsDefault
 
 class Node(object):
     """ The class allows the user to get the 'child' nodes in any of the three directions
@@ -404,7 +419,6 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--separator", choices=("dot", "dash", "second_dash", "3rd_dash"))
     parser.add_argument("-S", "--Species_tree")
     parser.add_argument("-d", "--directory", action="store_true")
-    parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
       
     GeneToSpecies = GeneToSpecies_dash
@@ -441,10 +455,8 @@ if __name__ == "__main__":
         print("Best outgroup(s) for species tree:")
         for r in roots: 
             print(r)
-        if args.verbose: PlotTree(speciesTree, args.input_tree, clusters)
     else:
         root, clusters, _, nSupport = GetRoot(args.Species_tree, args.input_tree, GeneToSpecies, nProcs, treeFmt = 1)
         for r in root: print(r)
         speciesTree = tree.Tree(args.Species_tree, format=1)
-        if args.verbose: PlotTree(speciesTree, args.input_tree, clusters, qSimplePrint=False)
  

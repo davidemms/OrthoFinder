@@ -25,9 +25,6 @@
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
 
-nThreadsDefault = 16
-nAlgDefault = 1
-
 import sys                                      # Y
 import subprocess                               # Y
 import os                                       # Y
@@ -42,30 +39,23 @@ import csv                                      # Y
 import scipy.sparse as sparse                   # install
 import os.path                                  # Y
 import numpy.core.numeric as numeric            # install
-import cPickle as pic                           # Y
-from collections import defaultdict, namedtuple # Y
+from collections import defaultdict             # Y
 import xml.etree.ElementTree as ET              # Y
 from xml.etree.ElementTree import SubElement    # Y
 from xml.dom import minidom                     # Y
 import Queue                                    # Y
 import warnings                                 # Y
-import time                                     # Y
 
+import scripts.mcl as MCLread
+import scripts.blast_file_processor as BlastFileProcessor
+from scripts import util, matrices, get_orthologues
 
-version = "1.0.0"
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
-picProtocol = 1
 if sys.platform.startswith("linux"):
     with open(os.devnull, "w") as f:
         subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f) # get round problem with python multiprocessing library that can set all cpu affinities to a single cpu
-
-"""
-Utilities
--------------------------------------------------------------------------------
-"""
-def RunCommand(command):
-    subprocess.call(command)
-
+         
+         
 def RunBlastDBCommand(command):
     capture = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout = [x for x in capture.stdout]
@@ -75,162 +65,7 @@ def RunBlastDBCommand(command):
         print("\nWarning:")
         print("".join(stdout[2:]))
         if len(stderr) > 0: print(stderr)
-    
-def Worker_RunCommand(cmd_queue, nTotal):
-    while True:
-        try:
-            iCommand, command = cmd_queue.get(True, 1)
-            util.PrintTime("Running Blast %d of %d" % (iCommand, nTotal))
-            subprocess.call(command)
-            util.PrintTime("Finished Blast %d of %d" % (iCommand, nTotal))
-        except Queue.Empty:
-            return   
-               
-class util:
-    @staticmethod
-    def GetDirectoryName(baseDirName, dateString, i):
-        if i == 0:
-            return baseDirName + dateString + os.sep
-        else:
-            return baseDirName + dateString + ("_%d" % i) + os.sep
-    
-    """Call GetNameForNewWorkingDirectory before a call to CreateNewWorkingDirectory to find out what directory will be created"""
-    @staticmethod
-    def CreateNewWorkingDirectory(baseDirectoryName):
-        dateStr = datetime.date.today().strftime("%b%d") 
-        iAppend = 0
-        newDirectoryName = util.GetDirectoryName(baseDirectoryName, dateStr, iAppend)
-        while os.path.exists(newDirectoryName):
-            iAppend += 1
-            newDirectoryName = util.GetDirectoryName(baseDirectoryName, dateStr, iAppend)
-        os.mkdir(newDirectoryName)
-        return newDirectoryName
-    
-    @staticmethod
-    def GetUnusedFilename(baseFilename, ext):
-        iAppend = 0
-        newFilename = baseFilename + ext
-        while os.path.exists(newFilename):
-            iAppend += 1
-            newFilename = baseFilename + ("_%d" % iAppend) + ext
-        return newFilename, iAppend
-    
-    @staticmethod
-    def PrintTime(message):
-        print(str(datetime.datetime.now()).rsplit(".", 1)[0] + " : " + message)  
-           
-    @staticmethod
-    def SortArrayPairByFirst(useForSortAr, keepAlignedAr, qLargestFirst=False):
-        sortedTuples = sorted(zip(useForSortAr, keepAlignedAr), reverse=qLargestFirst)
-        useForSortAr = [i for i, j in sortedTuples]
-        keepAlignedAr = [j for i, j in sortedTuples]
-        return useForSortAr, keepAlignedAr
-           
-    @staticmethod
-    def PrintNoNewLine(text):
-        sys.stdout.write(text)
-     
-    @staticmethod
-    def SortFastaFilenames(fastaFilenames):
-        speciesIndices = []
-        for f in fastaFilenames:
-            start = f.rfind("Species")
-            speciesIndices.append(int(f[start+7:-3]))
-        indices, sortedFasta = util.SortArrayPairByFirst(speciesIndices, fastaFilenames)
-        return sortedFasta    
-        
-def Fail():
-    print("ERROR: An error occurred, please review previous error messages for more information.")
-    sys.exit()
-    
-def ManageQueue(runningProcesses, cmd_queue):
-    """Manage a set of runningProcesses working through cmd_queue.
-    If there is an error the exit all processes as quickly as possible and 
-    exit via Fail() methods. Otherwise return when all work is complete
-    """            
-    # set all completed processes to None
-    qError = False
-#    dones = [False for _ in runningProcesses]
-    nProcesses = len(runningProcesses)
-    while True:
-        if runningProcesses.count(None) == len(runningProcesses): break
-        time.sleep(2)
-#        for proc in runningProcesses:
-        for i in xrange(nProcesses):
-            proc = runningProcesses[i]
-            if proc == None: continue
-            if not proc.is_alive():
-                if proc.exitcode != 0:
-                    qError = True
-                    while True:
-                        try:
-                            cmd_queue.get(True, 1)
-                        except Queue.Empty:
-                            break
-                runningProcesses[i] = None
-    if qError:
-        DeleteMatrices(fileInfo)
-        Fail()            
-       
-"""
-IDExtractor
--------------------------------------------------------------------------------
-"""
-class IDExtractor(object):
-    """IDExtractor deals with the fact that for different datasets a user will
-    want to extract a unique sequence ID from the fasta file accessions uin different 
-    ways."""
-    def GetIDToNameDict(self):
-        raise NotImplementedError("Should not be implemented")
-    def GetNameToIDDict(self):
-        raise NotImplementedError("Should not be implemented")
-
-class FullAccession(IDExtractor):
-    def __init__(self, idsFilename):
-        # only want the first part and nothing else (easy!)
-        self.idToNameDict = dict()
-        self.nameToIDDict = dict()
-        with open(idsFilename, 'rb') as idsFile:
-            for line in idsFile:
-                if line.startswith("#"): continue
-                id, accession = line.rstrip().split(": ", 1)
-                # Replace problematic characters
-                accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_")
-                if id in self.idToNameDict:
-                    raise RuntimeError("ERROR: A duplicate id was found in the fasta files: % s" % id)
-                self.idToNameDict[id] = accession                
-                self.nameToIDDict[accession] = id 
-                
-    def GetIDToNameDict(self):
-        return self.idToNameDict
-        
-    def GetNameToIDDict(self):
-        return self.nameToIDDict
-                
-class FirstWordExtractor(IDExtractor):
-    def __init__(self, idsFilename):
-        # only want the first part and nothing else (easy!)
-        self.idToNameDict = dict()
-        self.nameToIDDict = dict()
-        with open(idsFilename, 'rb') as idsFile:
-            for line in idsFile:
-                id, rest = line.split(": ", 1)
-                accession = rest.split(None, 1)[0]
-                # Replace problematic characters
-                accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_")
-                if accession in self.nameToIDDict:
-                    raise RuntimeError("A duplicate accession was found using just first part: % s" % accession)
-                if id in self.idToNameDict:
-                    raise RuntimeError("ERROR: A duplicate id was found in the fasta files: % s" % id)
-                self.idToNameDict[id] = accession                
-                self.nameToIDDict[accession] = id   
-                
-    def GetIDToNameDict(self):
-        return self.idToNameDict
-        
-    def GetNameToIDDict(self):
-        return self.nameToIDDict
-        
+            
 def SpeciesNameDict(speciesIDsFN):
     speciesNamesDict = dict()
     with open(speciesIDsFN, 'rb') as speciesNamesFile:
@@ -243,92 +78,9 @@ def SpeciesNameDict(speciesIDsFN):
 """
 MCL
 -------------------------------------------------------------------------------
-"""
-
-class MCL:
-    @staticmethod
-    def GetPredictedOGs(clustersFilename):
-        predictedOGs = []
-        nOGsString = ""
-        qContainsProfiles = False
-        with open(clustersFilename, 'rb') as clusterFile:
-            header = True
-            og = set()
-            for line in clusterFile:
-                if header:
-                    if line.count("begin"):
-                        header = False
-                else:
-                    if line.find(")") != -1:
-                        break
-                    if line[-2] == "$":
-                        line = line[:-3]
-                    if line[0] == " ":
-                        # continuation of group
-                        x = line.split()
-                        y = [x_ for x_ in x if not x_.startswith('Prof')]
-                        og = og.union(y)
-                    else:
-                        # new OG
-                        if len(og) != 0:
-                            predictedOGs.append(og)
-                        nOGsString, line = line.split(" ", 1)
-                        x = line.split()
-                        y = [x_ for x_ in x if not x_.startswith('Prof')]
-                        if len(x) != len(y):
-                            qContainsProfiles = True
-                        og = set(y)
-            if len(og) > 0:
-                predictedOGs.append(og)
-        if not qContainsProfiles:
-            assert(len(predictedOGs) == int(nOGsString) + 1)
-        return predictedOGs
-        
-    @staticmethod
-    def GetSingleID(speciesStartingIndices, seq, speciesToUse):    
-        iSpecies, iSeq = map(int, seq.split("_"))
-        offset = speciesStartingIndices[speciesToUse.index(iSpecies)]
-        return iSeq + offset
-        
-    @staticmethod
-    def GetIDPair(speciesStartingIndices, singleID, speciesToUse):   
-        for i, startingIndex in enumerate(speciesStartingIndices):
-            if startingIndex > singleID:
-                return "%d_%d" % (speciesToUse[i-1], singleID - speciesStartingIndices[i-1])
-        return "%d_%d" % (speciesToUse[-1], singleID - speciesStartingIndices[len(speciesStartingIndices)-1]) 
+"""    
     
-    @staticmethod
-    def ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, newFilename):
-        with open(clustersFilename, 'rb') as clusterFile, open(newFilename, "wb") as output:
-            header = True
-            for line in clusterFile:
-                appendDollar = False
-                initialText = ""
-                idsString = ""
-                ids = []
-                if header:
-                    output.write(line)
-                    if line.count("begin"):
-                        header = False
-                else:
-                    if line.find(")") != -1:
-                        output.write(line)
-                        break
-                    if line[-2] == "$":
-                        line = line[:-3]
-                        appendDollar = True
-                    if line[0] != " ":
-                        initialText, line = line.split(None, 1)
-                    # continuation of group
-                    ids = line.split()
-                    for id in ids:
-                        idsString += MCL.GetIDPair(seqsInfo.seqStartingIndices, int(id), seqsInfo.speciesToUse) + " "
-                    output.write(initialText + "      " + idsString)
-                    if appendDollar:
-                        output.write("$\n")
-                    else:
-                        output.write("\n")
-                        
+class MCL:
     @staticmethod
     def CreateOGs(predictedOGs, outputFilename, idDict):
         with open(outputFilename, 'wb') as outputFile:
@@ -338,30 +90,28 @@ class MCL:
                 outputFile.write(" ".join(accessions))
                 outputFile.write("\n")
       
-    @staticmethod            
+    @staticmethod
     def prettify(elem):
         """Return a pretty-printed XML string for the Element.
         """
         rough_string = ET.tostring(elem, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         return reparsed.toprettyxml(indent="  ")
-    
-    @staticmethod            
+       
+    @staticmethod         
     def WriteOrthoXML(speciesInfo, predictedOGs, numbersOfSequences, idDict, orthoxmlFilename, speciesToUse):
         """ speciesInfo: ordered array for which each element has
             fastaFilename, speciesName, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile
         """
-                
-        
         # Write OrthoXML file
         root = ET.Element("orthoXML")
         root.set('xsi:schemaLocation', "http://orthoXML.org/2011/ http://www.orthoxml.org/0.3/orthoxml.xsd")
-        root.set('originVersion', version)
+        root.set('originVersion', util.version)
         root.set('origin', 'OrthoFinder')
         root.set('version', "0.3")
         root.set('xmlns:xsi', "http://www.w3.org/2001/XMLSchema-instance")
         #notes = SubElement(root, 'notes')
-
+    
         # Species: details of source of genomes and sequences they contain
         speciesStartingIndices = []
         iGene_all = 0
@@ -372,80 +122,80 @@ class MCL:
             speciesDatabaseNode = SubElement(speciesNode, "database")
             speciesDatabaseNode.set('name', thisSpeciesInfo[3])            # required
             speciesDatabaseNode.set('version', thisSpeciesInfo[4])         # required
-#            speciesDatabaseNode.set('geneLink', "")        # skip
-#            speciesDatabaseNode.set('protLink', "")        # skip
-#            speciesDatabaseNode.set('transcriptLink', "")  # skip
+    #            speciesDatabaseNode.set('geneLink', "")        # skip
+    #            speciesDatabaseNode.set('protLink', "")        # skip
+    #            speciesDatabaseNode.set('transcriptLink', "")  # skip
             allGenesNode = SubElement(speciesDatabaseNode, "genes")
             speciesStartingIndices.append(iGene_all)
             for iGene_species in xrange(nSeqs):
                 geneNode = SubElement(allGenesNode, 'gene')
                 geneNode.set("geneId", idDict["%d_%d" % (iSpecies , iGene_species)])  
                 geneNode.set('id', str(iGene_all))       # required
-#                geneNode.set("protID", "")  # skip
+    #                geneNode.set("protID", "")  # skip
                 iGene_all += 1
                 
         # Scores tag - unused
-#            scoresNode = SubElement(root, 'scores')        # skip
-
+    #            scoresNode = SubElement(root, 'scores')        # skip
+    
         # Orthogroups
         allGroupsNode = SubElement(root, 'groups')
         for iOg, og in enumerate(predictedOGs):
             groupNode = SubElement(allGroupsNode, 'orthologGroup')
             groupNode.set('id', str(iOg))
-#                groupScoreNode = SubElement(groupNode, 'score')    # skip
-#                groupScoreNode.set('id', "")                       # skip
-#                groupScoreNode.set('value', "")                    # skip
-#                SubElement(groupNode, 'property')                  # skip
+    #                groupScoreNode = SubElement(groupNode, 'score')    # skip
+    #                groupScoreNode.set('id', "")                       # skip
+    #                groupScoreNode.set('value', "")                    # skip
+    #                SubElement(groupNode, 'property')                  # skip
             for seq in og:
                 geneNode = SubElement(groupNode, 'geneRef')
-                geneNode.set('id', str(MCL.GetSingleID(speciesStartingIndices, seq, speciesToUse)))
-#                    SubElement(geneNode, 'score')                  # skip
+                geneNode.set('id', str(MCLread.GetSingleID(speciesStartingIndices, seq, speciesToUse)))
+    #                    SubElement(geneNode, 'score')                  # skip
         with open(orthoxmlFilename, 'wb') as orthoxmlFile:
-#            ET.ElementTree(root).write(orthoxmlFile)
+    #            ET.ElementTree(root).write(orthoxmlFile)
             orthoxmlFile.write(MCL.prettify(root))
         print("Orthologous groups have been written to orthoxml file:\n   %s" % orthoxmlFilename)
-                        
-    @staticmethod                       
+            
+    @staticmethod               
     def RunMCL(graphFilename, clustersFilename, nProcesses, inflation):
         nProcesses = 4 if nProcesses > 4 else nProcesses    # MCL appears to take *longer* as more than 4 processes are used
         command = ["mcl", graphFilename, "-I", str(inflation), "-o", clustersFilename, "-te", str(nProcesses), "-V", "all"]
-        RunCommand(command)
+        util.RunCommand(command)
         util.PrintTime("Ran MCL")  
-
-    @staticmethod 
+    
+    @staticmethod
     def WriteOrthogroupFiles(ogs, idsFilenames, resultsBaseFilename, clustersFilename_pairs):
         outputFN = resultsBaseFilename + ".txt"
         try:
             fullDict = dict()
             for idsFilename in idsFilenames:
-                idExtract = FirstWordExtractor(idsFilename)
+                idExtract = util.FirstWordExtractor(idsFilename)
                 idDict = idExtract.GetIDToNameDict()
                 fullDict.update(idDict)
             MCL.CreateOGs(ogs, outputFN, fullDict)
         except KeyError as e:
             sys.stderr.write("ERROR: Sequence ID not found in %s\n" % idsFilename)
             sys.stderr.write(str(e) + "\n")
-            Fail()        
+            util.Fail()        
         except RuntimeError as error:
             print(error.message)
             if error.message.startswith("ERROR"):
                 print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
-                Fail()
+                util.Fail()
             else:
                 print("Tried to use only the first part of the accession in order to list the sequences in each orthologous group\nmore concisely but these were not unique. The full accession line will be used instead.\n")     
                 try:
                     fullDict = dict()
                     for idsFilename in idsFilenames:
-                        idExtract = FullAccession(idsFilename)
+                        idExtract = util.tFullAccession(idsFilename)
                         idDict = idExtract.GetIDToNameDict()
                         fullDict.update(idDict)
                     MCL.CreateOGs(ogs, outputFN, fullDict)   
                 except:
                     print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
-                    Fail()
+                    util.Fail()
         return fullDict
-
-    @staticmethod 
+    
+    @staticmethod
     def CreateOrthogroupTable(ogs, 
                               idToNameDict, 
                               speciesNamesDict, 
@@ -549,19 +299,10 @@ RunInfo
 -------------------------------------------------------------------------------
 """     
 
-SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices")
-FileInfo = namedtuple("FileInfo", "inputDir outputDir graphFilename")
-
-def GetIDPairFromString(line):
-    return map(int, line.split("_"))
-
-def NumberOfSequences(seqsInfo, iSpecies):
-    return (seqsInfo.seqStartingIndices[iSpecies+1] if iSpecies != seqsInfo.nSpecies-1 else seqsInfo.nSeqs) - seqsInfo.seqStartingIndices[iSpecies] 
-
 def GetSequenceLengths(seqsInfo, fileInfo):                
     sequenceLengths = []
     for iSpecies, iFasta in enumerate(seqsInfo.speciesToUse):
-        sequenceLengths.append(np.zeros(NumberOfSequences(seqsInfo, iSpecies)))
+        sequenceLengths.append(np.zeros(BlastFileProcessor.NumberOfSequences(seqsInfo, iSpecies)))
         fastaFilename = fileInfo.inputDir + "Species%d.fa" % iFasta
         currentSequenceLength = 0
         iCurrentSequence = -1
@@ -574,7 +315,7 @@ def GetSequenceLengths(seqsInfo, fileInfo):
                     else:
                         sequenceLengths[iSpecies][iCurrentSequence] = currentSequenceLength
                         currentSequenceLength = 0
-                    _, iCurrentSequence = GetIDPairFromString(row[1:])
+                    _, iCurrentSequence = util.GetIDPairFromString(row[1:])
                 else:
                     currentSequenceLength += len(row.rstrip())
         sequenceLengths[iSpecies][iCurrentSequence] = currentSequenceLength
@@ -587,30 +328,6 @@ def GetNumberOfSequencesInFile(filename):
         for line in infile:
             if line.startswith(">"): count+=1
     return count
-
-# Get Info from seqs IDs file?
-def GetSeqsInfo(inputDirectory, speciesToUse):
-    seqStartingIndices = [0]
-    nSeqs = 0
-    for i, iFasta in enumerate(speciesToUse):
-        fastaFilename = inputDirectory + "Species%d.fa" % iFasta
-        with open(fastaFilename) as infile:
-            for line in infile:
-                if len(line) > 1 and line[0] == ">":
-                    nSeqs+=1
-        seqStartingIndices.append(nSeqs)
-    seqStartingIndices = seqStartingIndices[:-1]
-    nSpecies = len(speciesToUse)
-    return SequencesInfo(nSeqs=nSeqs, nSpecies=nSpecies, speciesToUse=speciesToUse, seqStartingIndices=seqStartingIndices)
- 
-def GetSpeciesToUse(speciesIDsFN):
-    speciesToUse = []
-    with open(speciesIDsFN, 'rb') as speciesF:
-        for line in speciesF:
-            if len(line) == 0 or line[0] == "#": continue
-            speciesToUse.append(int(line.split(":")[0]))
-    return speciesToUse
-
 
 """ Question: Do I want to do all BLASTs or just the required ones? It's got to be all BLASTs I think. They could potentially be 
 run after the clustering has finished."""
@@ -629,138 +346,55 @@ def GetOrderedBlastCommands(seqsInfo, previousFastaFiles, newFastaFiles, working
     taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
     commands = [["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", workingDir + "Species%d.fa" % iFasta, "-db", workingDir + "BlastDBSpecies%d" % iDB, "-out", "%sBlast%d_%d.txt" % (workingDir, iFasta, iDB)]
                     for iFasta, iDB in speciesPairs]               
-    return commands 
- 
-"""
-BlastFileProcessor
--------------------------------------------------------------------------------
-"""   
-class BlastFileProcessor(object):        
-    @staticmethod
-    def GetBH_s(pairwiseScoresMatrices, seqsInfo, iSpecies, tol=1e-3):
-        nSeqs_i = NumberOfSequences(seqsInfo, iSpecies)
-        bestHitForSequence = -1*np.ones(nSeqs_i)
-        H = [None for i_ in xrange(seqsInfo.nSpecies)] # create array of Nones to be replace by matrices
-        for j in xrange(seqsInfo.nSpecies):
-            if iSpecies == j:
-                # identify orthologs then come back to paralogs
-                continue
-            W = pairwiseScoresMatrices[j]
-            I = []
-            J = []
-            for kRow in xrange(nSeqs_i):
-                values=W.getrowview(kRow)
-                if values.nnz == 0:
-                    continue
-                m = max(values.data[0])
-                bestHitForSequence[kRow] = m if m > bestHitForSequence[kRow] else bestHitForSequence[kRow]
-                # get all above this value with tolerance
-                temp = [index for index, value in zip(values.rows[0], values.data[0]) if value > m - tol]
-                J.extend(temp)
-                I.extend(kRow * np.ones(len(temp), dtype=np.dtype(int)))
-            H[j] = sparse.csr_matrix((np.ones(len(I)), (I, J)), shape=W.get_shape())
-        # now look for paralogs
-        I = []
-        J = []
-        W = pairwiseScoresMatrices[iSpecies]
-        for kRow in xrange(nSeqs_i):
-            values=W.getrowview(kRow)
-            if values.nnz == 0:
-                continue
-            temp = [index for index, value in zip(values.rows[0], values.data[0]) if value > bestHitForSequence[kRow] - tol]
-            J.extend(temp)
-            I.extend(kRow * np.ones(len(temp), dtype=np.dtype(int)))
-        H[iSpecies] = sparse.csr_matrix((np.ones(len(I)), (I, J)), shape=W.get_shape())
-        return H
-                                       
-    @staticmethod
-    def GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies, qExcludeSelfHits = True, sep = "_"): 
-        nSeqs_i = NumberOfSequences(seqsInfo, iSpecies)
-        nSeqs_j = NumberOfSequences(seqsInfo, jSpecies)
-        B = sparse.lil_matrix((nSeqs_i, nSeqs_j))
-        row = ""
-        try:
-            with open(fileInfo.inputDir + "Blast%d_%d.txt" % (seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies]), 'rb') as blastfile:
-                blastreader = csv.reader(blastfile, delimiter='\t')
-                for row in blastreader:    
-                    # Get hit and query IDs
-                    try:
-                        species1ID, sequence1ID = map(int, row[0].split(sep, 1)) 
-                        species2ID, sequence2ID = map(int, row[1].split(sep, 1))     
-                    except (IndexError, ValueError):
-                        sys.stderr.write("\nERROR: Query or hit sequence ID in BLAST results file was missing or incorrectly formatted.\n")
-                        raise
-                    # Get bit score for pair
-                    try:
-                        score = float(row[11])   
-                    except (IndexError, ValueError):
-                        sys.stderr.write("\nERROR: 12th field in BLAST results file line should be the bit-score for the hit\n")
-                        raise
-                    if (qExcludeSelfHits and species1ID == species2ID and sequence1ID == sequence2ID):
-                        continue
-                    # store bit score
-                    try:
-                        if score > B[sequence1ID, sequence2ID]: 
-                            B[sequence1ID, sequence2ID] = score   
-                    except IndexError:
-                        def ord(n):
-                            return str(n)+("th" if 4<=n%100<=20 else {1:"st",2:"nd",3:"rd"}.get(n%10, "th"))
-#                        sys.stderr.write("\nError in input files, expected only %d sequences in species %d and %d sequences in species %d but found a hit in the Blast%d_%d.txt between sequence %d_%d (i.e. %s sequence in species) and sequence %d_%d (i.e. %s sequence in species)\n" %  (nSeqs_i, iSpecies, nSeqs_j, jSpecies, iSpecies, jSpecies, iSpecies, sequence1ID, ord(sequence1ID+1), jSpecies, sequence2ID, ord(sequence2ID+1)))
-                        sys.stderr.write("\nERROR: Inconsistent input files.\n")
-                        kSpecies, nSeqs_k, sequencekID = (iSpecies,  nSeqs_i, sequence1ID) if sequence1ID >= nSeqs_i else (jSpecies,  nSeqs_j, sequence2ID)
-                        sys.stderr.write("Species%d.fa contains only %d sequences " % (kSpecies,  nSeqs_k)) 
-                        sys.stderr.write("but found a query/hit in the Blast%d_%d.txt for sequence %d_%d (i.e. %s sequence in species %d).\n" %  (iSpecies, jSpecies, kSpecies, sequencekID, ord(sequencekID+1), kSpecies))
-                        sys.exit()
-        except Exception:
-            sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (fileInfo.inputDir, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies]))
-            sys.stderr.write("\t".join(row) + "\n")
-            sys.exit()
-        return B       
+    return commands     
 
 """
 Matrices
 -------------------------------------------------------------------------------
 """ 
 
-def DumpMatrix(name, m, fileInfo, iSpecies, jSpecies):
-    with open(fileInfo.outputDir + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'wb') as picFile:
-        pic.dump(m, picFile, protocol=picProtocol)
-    
-def DumpMatrixArray(name, matrixArray, fileInfo, iSpecies):
-    for jSpecies, m in enumerate(matrixArray):
-        DumpMatrix(name, m, fileInfo, iSpecies, jSpecies)
-
 def DeleteMatrices(fileInfo):
     for f in glob.glob(fileInfo.outputDir + "B*_*.pic"):
         if os.path.exists(f): os.remove(f)
     for f in glob.glob(fileInfo.outputDir + "connect*_*.pic"):
         if os.path.exists(f): os.remove(f)
-
-def LoadMatrix(name, fileInfo, iSpecies, jSpecies): 
-    with open(fileInfo.outputDir + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'rb') as picFile:  
-        M = pic.load(picFile)
-    return M
-        
-def LoadMatrixArray(name, fileInfo, seqsInfo, iSpecies, row=True):
-    matrixArray = []
-    for jSpecies in xrange(seqsInfo.nSpecies):
-        if row == True:
-            matrixArray.append(LoadMatrix(name, fileInfo, iSpecies, jSpecies))
-        else:
-            matrixArray.append(LoadMatrix(name, fileInfo, jSpecies, iSpecies))
-    return matrixArray
-              
-def MatricesAnd_s(Xarr, Yarr):
-    Zarr = []
-    for x, y in zip(Xarr, Yarr):
-        Zarr.append(x.multiply(y))
-    return Zarr
-                
-def MatricesAndTr_s(Xarr, Yarr):
-    Zarr = []
-    for x, y in zip(Xarr, Yarr):
-        Zarr.append(x.multiply(y.transpose()))
-    return Zarr    
+            
+def GetBH_s(pairwiseScoresMatrices, seqsInfo, iSpecies, tol=1e-3):
+    nSeqs_i = BlastFileProcessor.NumberOfSequences(seqsInfo, iSpecies)
+    bestHitForSequence = -1*np.ones(nSeqs_i)
+    H = [None for i_ in xrange(seqsInfo.nSpecies)] # create array of Nones to be replace by matrices
+    for j in xrange(seqsInfo.nSpecies):
+        if iSpecies == j:
+            # identify orthologs then come back to paralogs
+            continue
+        W = pairwiseScoresMatrices[j]
+        I = []
+        J = []
+        for kRow in xrange(nSeqs_i):
+            values=W.getrowview(kRow)
+            if values.nnz == 0:
+                continue
+            m = max(values.data[0])
+            bestHitForSequence[kRow] = m if m > bestHitForSequence[kRow] else bestHitForSequence[kRow]
+            # get all above this value with tolerance
+            temp = [index for index, value in zip(values.rows[0], values.data[0]) if value > m - tol]
+            J.extend(temp)
+            I.extend(kRow * np.ones(len(temp), dtype=np.dtype(int)))
+        H[j] = sparse.csr_matrix((np.ones(len(I)), (I, J)), shape=W.get_shape())
+    # now look for paralogs
+    I = []
+    J = []
+    W = pairwiseScoresMatrices[iSpecies]
+    for kRow in xrange(nSeqs_i):
+        values=W.getrowview(kRow)
+        if values.nnz == 0:
+            continue
+        temp = [index for index, value in zip(values.rows[0], values.data[0]) if value > bestHitForSequence[kRow] - tol]
+        J.extend(temp)
+        I.extend(kRow * np.ones(len(temp), dtype=np.dtype(int)))
+    H[iSpecies] = sparse.csr_matrix((np.ones(len(I)), (I, J)), shape=W.get_shape())
+    return H
+    
     
 """
 WaterfallMethod
@@ -773,14 +407,14 @@ def WriteGraph_perSpecies(args):
     with open(fileInfo.graphFilename + "_%d" % iSpec, 'wb') as graphFile:
         connect2 = []
         for jSpec in xrange(seqsInfo.nSpecies):
-            m1 = LoadMatrix("connect", fileInfo, iSpec, jSpec)
-            m2tr = numeric.transpose(LoadMatrix("connect", fileInfo, jSpec, iSpec))
+            m1 = matrices.LoadMatrix("connect", fileInfo, iSpec, jSpec)
+            m2tr = numeric.transpose(matrices.LoadMatrix("connect", fileInfo, jSpec, iSpec))
             connect2.append(m1 + m2tr)
-        B = LoadMatrixArray("B", fileInfo, seqsInfo, iSpec)
-        B_connect = MatricesAnd_s(connect2, B)
+        B = matrices.LoadMatrixArray("B", fileInfo, seqsInfo, iSpec)
+        B_connect = matrices.MatricesAnd_s(connect2, B)
         
         W = [b.sorted_indices().tolil() for b in B_connect]
-        for query in xrange(NumberOfSequences(seqsInfo, iSpec)):
+        for query in xrange(BlastFileProcessor.NumberOfSequences(seqsInfo, iSpec)):
             offset = seqsInfo.seqStartingIndices[iSpec]
             graphFile.write("%d    " % (offset + query))
             for jSpec in xrange(seqsInfo.nSpecies):
@@ -817,9 +451,9 @@ class WaterfallMethod:
                 Bij = BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies)  
                 Bij = WaterfallMethod.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
                 Bi.append(Bij)
-            DumpMatrixArray("B", Bi, fileInfo, iSpecies)
-            BH = BlastFileProcessor.GetBH_s(Bi, seqsInfo, iSpecies)
-            DumpMatrixArray("BH", BH, fileInfo, iSpecies)
+            matrices.DumpMatrixArray("B", Bi, fileInfo, iSpecies)
+            BH = GetBH_s(Bi, seqsInfo, iSpecies)
+            matrices.DumpMatrixArray("BH", BH, fileInfo, iSpecies)
             util.PrintTime("Initial processing of species %d complete" % iSpecies)
         
     @staticmethod 
@@ -834,12 +468,12 @@ class WaterfallMethod:
     @staticmethod
     def ConnectCognates(seqsInfo, fileInfo, iSpecies): 
         # calculate RBH for species i
-        BHix = LoadMatrixArray("BH", fileInfo, seqsInfo, iSpecies)
-        BHxi = LoadMatrixArray("BH", fileInfo, seqsInfo, iSpecies, row=False)
-        RBHi = MatricesAndTr_s(BHix, BHxi)   # twice as much work as before (only did upper triangular before)
-        B = LoadMatrixArray("B", fileInfo, seqsInfo, iSpecies)
+        BHix = matrices.LoadMatrixArray("BH", fileInfo, seqsInfo, iSpecies)
+        BHxi = matrices.LoadMatrixArray("BH", fileInfo, seqsInfo, iSpecies, row=False)
+        RBHi = matrices.MatricesAndTr_s(BHix, BHxi)   # twice as much work as before (only did upper triangular before)
+        B = matrices.LoadMatrixArray("B", fileInfo, seqsInfo, iSpecies)
         connect = WaterfallMethod.ConnectAllBetterThanAnOrtholog_s(RBHi, B, seqsInfo, iSpecies) 
-        DumpMatrixArray("connect", connect, fileInfo, iSpecies)
+        matrices.DumpMatrixArray("connect", connect, fileInfo, iSpecies)
             
     @staticmethod 
     def Worker_ConnectCognates(cmd_queue):
@@ -865,7 +499,7 @@ class WaterfallMethod:
                 
     @staticmethod
     def GetMostDistant_s(RBH, B, seqsInfo, iSpec):
-        mostDistant = numeric.transpose(np.ones(NumberOfSequences(seqsInfo, iSpec))*1e9)
+        mostDistant = numeric.transpose(np.ones(BlastFileProcessor.NumberOfSequences(seqsInfo, iSpec))*1e9)
         for kSpec in xrange(seqsInfo.nSpecies):
             B[kSpec] = B[kSpec].tocsr()
             if iSpec == kSpec:
@@ -878,7 +512,7 @@ class WaterfallMethod:
     @staticmethod
     def ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec):
         connect = []
-        nSeqs_i = NumberOfSequences(seqsInfo, iSpec)
+        nSeqs_i = BlastFileProcessor.NumberOfSequences(seqsInfo, iSpec)
         for jSpec in xrange(seqsInfo.nSpecies):
             M=B[jSpec].tolil()
             if iSpec != jSpec:
@@ -888,7 +522,7 @@ class WaterfallMethod:
             II = [i for (i, j) in IIJJ]
             JJ = [j for (i, j) in IIJJ]
             onesArray = np.ones(len(IIJJ))
-            mat = sparse.csr_matrix( (onesArray,  (II, JJ)), shape=(nSeqs_i,  NumberOfSequences(seqsInfo, jSpec)))
+            mat = sparse.csr_matrix( (onesArray,  (II, JJ)), shape=(nSeqs_i,  BlastFileProcessor.NumberOfSequences(seqsInfo, jSpec)))
             connect.append(mat)
         return connect
     
@@ -1078,20 +712,8 @@ OrthoFinder
 """   
 mclInflation = 1.5
 
-def CanRunCommand(command, qAllowStderr = False):
-    util.PrintNoNewLine("Test can run \"%s\"" % command)       # print without newline
-    capture = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout = [x for x in capture.stdout]
-    stderr = [x for x in capture.stderr]
-    if len(stdout) > 0 and (qAllowStderr or len(stderr) == 0):
-        print(" - ok")
-        return True
-    else:
-        print(" - failed")
-        return False
-
 def CanRunBLAST():
-    if CanRunCommand("makeblastdb -help") and CanRunCommand("blastp -help"):
+    if util.CanRunCommand("makeblastdb -help") and util.CanRunCommand("blastp -help"):
         return True
     else:
         print("ERROR: Cannot run BLAST+")
@@ -1100,17 +722,12 @@ def CanRunBLAST():
 
 def CanRunMCL():
     command = "mcl -h"
-    if CanRunCommand(command):
+    if util.CanRunCommand(command):
         return True
     else:
         print("ERROR: Cannot run MCL with the command \"%s\"" % command)
         print("Please check MCL is installed and in the system path\n")
         return False
-        
-def PrintCitation():
-    print("""\nWhen publishing work that uses OrthoFinder please cite:
-    D.M. Emms & S. Kelly (2015), OrthoFinder: solving fundamental biases in whole genome comparisons
-    dramatically improves orthogroup inference accuracy, Genome Biology 16:157.\n""")   
     
 def PrintHelp():  
     print("Simple Usage") 
@@ -1149,7 +766,7 @@ def PrintHelp():
     print("""-t number_of_blast_threads, --threads number_of_blast_threads
     The number of BLAST processes to be run simultaneously. This should be increased by the user to at least 
     the number of cores on the computer so as to minimise the time taken to perform the BLAST all-versus-all 
-    queries. [Default is %d]\n""" % nThreadsDefault)
+    queries. [Default is %d]\n""" % util.nThreadsDefault)
     
     print("""-a number_of_orthofinder_threads, --algthreads number_of_orthofinder_threads
     The number of threads to use for the OrthoFinder algorithm and MCL after BLAST searches have been completed. 
@@ -1157,7 +774,10 @@ def PrintHelp():
     requirements proportionally so be aware of the amount of RAM you have available (and see README file). 
     Additionally, as the algorithm implementation is very fast, file reading is likely to be the 
     limiting factor above about 5-10 threads and additional threads may have little effect other than 
-    increase RAM requirements. [Default is %d]\n""" % nAlgDefault)
+    increase RAM requirements. [Default is %d]\n""" % util.nAlgDefault)
+    
+    print("""-g, --groups
+    Only infer orthogroups, do not infer gene trees of orthologues.\n""")
     
     print("""-I inflation_parameter, --inflation inflation_parameter
     Specify a non-default inflation parameter for MCL. [Default is %0.1f]\n""" % mclInflation)
@@ -1171,7 +791,7 @@ def PrintHelp():
         
     print("""-h, --help
     Print this help text""")
-    PrintCitation() 
+    util.PrintCitation() 
     
 """
 Main
@@ -1181,7 +801,7 @@ Main
 def GetDirectoryArgument(arg, args):
     if len(args) == 0:
         print("Missing option for command line argument %s" % arg)
-        Fail()
+        util.Fail()
     directory = os.path.abspath(args.pop(0))
     if directory[-1] != os.sep:
         directory += os.sep
@@ -1228,10 +848,8 @@ def AssignIDsToSequences(fastaDirectory, outputDirectory):
     if len(originalFastaFilenames) > 0: outputFasta.close()
     return returnFilenames, originalFastaFilenames, idsFilename, speciesFilename, newSpeciesIDs, previousSpeciesIDs
 
-if __name__ == "__main__":
-    import get_orthologues
-    
-    print("\nOrthoFinder version %s Copyright (C) 2014 David Emms\n" % version)
+if __name__ == "__main__":    
+    print("\nOrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version)
     print("""    This program comes with ABSOLUTELY NO WARRANTY.
     This is free software, and you are welcome to redistribute it under certain conditions.
     For details please see the License.md that came with this software.\n""")
@@ -1240,8 +858,8 @@ if __name__ == "__main__":
         sys.exit()
              
     # Control
-    nBlast = nThreadsDefault
-    nProcessAlg = nAlgDefault
+    nBlast = util.nThreadsDefault
+    nProcessAlg = util.nAlgDefault
     qUsePrecalculatedBlast = False  # remove, just store BLAST to do
     qUseFastaFiles = False  # local to argument checking
     qXML = False
@@ -1264,70 +882,72 @@ if __name__ == "__main__":
         if arg == "-f" or arg == "--fasta":
             if qUseFastaFiles:
                 print("Repeated argument: -f/--fasta")
-                Fail()
+                util.Fail()
             qUseFastaFiles = True
             fastaDir = GetDirectoryArgument(arg, args)
         elif arg == "-b" or arg == "--blast":
             if qUsePrecalculatedBlast:
                 print("Repeated argument: -b/--blast")
-                Fail()
+                util.Fail()
             qUsePrecalculatedBlast = True
             workingDir_previous = GetDirectoryArgument(arg, args)
         elif arg == "-t" or arg == "--threads":
             if len(args) == 0:
                 print("Missing option for command line argument -t")
-                Fail()
+                util.Fail()
             arg = args.pop(0)
             try:
                 nBlast = int(arg)
             except:
                 print("Incorrect argument for number of BLAST threads: %s" % arg)
-                Fail()    
+                util.Fail()    
         elif arg == "-a" or arg == "--algthreads":
             if len(args) == 0:
                 print("Missing option for command line argument -a")
-                Fail()
+                util.Fail()
             arg = args.pop(0)
             try:
                 nProcessAlg = int(arg)
             except:
                 print("Incorrect argument for number of BLAST threads: %s" % arg)
-                Fail()   
+                util.Fail()   
         elif arg == "-I" or arg == "--inflation":
             if len(args) == 0:
                 print("Missing option for command line argument -I")
-                Fail()
+                util.Fail()
             arg = args.pop(0)
             try:
                 mclInflation = float(arg)
             except:
                 print("Incorrect argument for MCL inflation parameter: %s" % arg)
-                Fail()    
+                util.Fail()    
         elif arg == "-x" or arg == "--orthoxml":  
             if qXML:
                 print("Repeated argument: -x/--orthoxml")
-                Fail()
+                util.Fail()
             qXML = True
             if len(args) == 0:
                 print("Missing option for command line argument %s" % arg)
-                Fail()
+                util.Fail()
             speciesInfoFilename = args.pop(0)
 #        elif arg == "-s" or arg == "--subset":  
 #            if qUseSubset:
 #                print("Repeated argument: -s/--subset")
-#                Fail()
+#                util.Fail()
 #            qUseSubset = True
 #            qUsePrecalculatedBlast = True
 #            workingDir_previous = GetDirectoryArgument(arg, args)
         elif arg == "-p" or arg == "--prepare":
             qOnlyPrepare = True
             qOrthologues = False
+        elif arg == "-g" or arg == "--groups":
+            qOrthologues = False
         elif arg == "-h" or arg == "--help":
             PrintHelp()
             sys.exit()
         else:
             print("Unrecognised argument: %s\n" % arg)
-            Fail()            
+            util.Fail()            
     
     # check argument combinations   
     if qUseFastaFiles and qUsePrecalculatedBlast:
@@ -1338,8 +958,8 @@ if __name__ == "__main__":
         speciesIdsFilename = workingDir_previous + "SpeciesIDs.txt"
         if not os.path.exists(speciesIdsFilename):
             print("%s file must be provided if using previously calculated BLAST results" % speciesIdsFilename)
-            Fail()
-        speciesToUse = GetSpeciesToUse(speciesIdsFilename)
+            util.Fail()
+        speciesToUse = util.GetSpeciesToUse(speciesIdsFilename)
         workingDir = os.path.abspath(workingDir) + os.sep
         if resultsDir == None: 
             workingDir = workingDir_previous
@@ -1350,13 +970,13 @@ if __name__ == "__main__":
         # check BLAST results directory exists
         if not os.path.exists(workingDir_previous):
             print("Previous/Pre-calculated BLAST results directory does not exist: %s\n" % workingDir_previous)
-            Fail()
+            util.Fail()
      
         # check fasta files are present 
         previousFastaFiles = util.SortFastaFilenames(glob.glob(workingDir_previous + "Species*.fa"))
         if len(previousFastaFiles) == 0:
             print("No processed fasta files in the supplied previous working directory: %s\n" % workingDir_previous)
-            Fail()
+            util.Fail()
         tokens = previousFastaFiles[-1][:-3].split("Species")
         lastFastaNumberString = tokens[-1]
         iLastFasta = 0
@@ -1365,10 +985,10 @@ if __name__ == "__main__":
             iLastFasta = int(lastFastaNumberString)
         except:
             print("Filenames for processed fasta files are incorrect: %s\n" % previousFastaFiles[-1])
-            Fail()
+            util.Fail()
         if nFasta != iLastFasta + 1:
             print("Not all expected fasta files are present. Index of last fasta file is %s but found %d fasta files.\n" % (lastFastaNumberString, len(previousFastaFiles)))
-            Fail()
+            util.Fail()
         
         # check BLAST files
         qHaveBlast = True
@@ -1378,13 +998,13 @@ if __name__ == "__main__":
                 if not os.path.exists(filename):
                     print("BLAST results file is missing: %s" % filename)
                     qHaveBlast = False
-        if not qHaveBlast: Fail()
+        if not qHaveBlast: util.Fail()
                     
         # check SequenceIDs.txt and SpeciesIDs.txt files are present
         idsFilename = workingDir_previous + "SequenceIDs.txt"
         if not os.path.exists(idsFilename):
             print("%s file must be provided if using previous calculated BLAST results" % idsFilename)
-            Fail()
+            util.Fail()
         print("Using previously calculated BLAST results in %s" % workingDir_previous)       
     else:
         # - create working directory
@@ -1400,9 +1020,9 @@ if __name__ == "__main__":
     print("\n1. Checking required programs are installed")
     print("-------------------------------------------")
     if (not qUsePrecalculatedBlast) and (not CanRunBLAST()):
-        Fail()
+        util.Fail()
     if not CanRunMCL():
-        Fail()
+        util.Fail()
         
     # - rename sequences with unique, simple identifiers
     print("\n2. Temporarily renaming sequences with unique, simple identifiers")
@@ -1413,7 +1033,7 @@ if __name__ == "__main__":
         newFastaFiles, userFastaFilenames, idsFilename, speciesIdsFilename, newSpeciesIDs, previousSpeciesIDs = AssignIDsToSequences(fastaDir, workingDir)
         speciesToUse = speciesToUse + newSpeciesIDs
         print("Done!")
-    seqsInfo = GetSeqsInfo(workingDir_previous if qUsePrecalculatedBlast else workingDir, speciesToUse)
+    seqsInfo = util.GetSeqsInfo(workingDir_previous if qUsePrecalculatedBlast else workingDir, speciesToUse)
     
     if qXML:   
         print("\n2b. Reading species information file")
@@ -1437,7 +1057,7 @@ if __name__ == "__main__":
                     print("Each line should contain 5 tab-delimited fields:")
                     print("  fastaFilename, speciesName, NCBITaxID, sourceDatabaseName, databaseFastaFilename")
                     print("See README file for more information.")
-                    Fail() 
+                    util.Fail() 
                 fastaFilename, speciesName, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile = line
                 try:
                     iSpecies = fastaFileIndices[fastaFilename]
@@ -1448,7 +1068,7 @@ if __name__ == "__main__":
                     for filename in userFastaFilenames_justNames:
                         print(filename)
                     print("Please provide information for each of these species in the species information file")
-                    Fail() 
+                    util.Fail() 
                 speciesInfo[iSpecies] = line   
         # check information has been provided for all species
         speciesMissing = False        
@@ -1461,7 +1081,7 @@ if __name__ == "__main__":
                     speciesMissing = True
                 print(fastaFilename)
         if speciesMissing:
-            Fail()
+            util.Fail()
      
     print("\n3. Dividing up work for BLAST for parallel processing")
     print(  "-----------------------------------------------------")
@@ -1496,9 +1116,9 @@ if __name__ == "__main__":
         cmd_queue = mp.Queue()
         for iCmd, cmd in enumerate(commands):
             cmd_queue.put((iCmd+1, cmd))           
-        runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, len(commands))) for i_ in xrange(nBlast)]
+        runningProcesses = [mp.Process(target=util.Worker_RunCommand, args=(cmd_queue, nBlast, len(commands))) for i_ in xrange(nBlast)]
         for proc in runningProcesses:
-            proc.start()
+            proc.start()#
         for proc in runningProcesses:
             while proc.is_alive():
                 proc.join()
@@ -1511,13 +1131,13 @@ if __name__ == "__main__":
     # Run Algorithm, cluster and output cluster files with original accessions
     print("\n5. Running OrthoFinder algorithm")
     print(  "--------------------------------")
-    fileIdentifierString = "OrthoFinder_v%s" % version
+    fileIdentifierString = "OrthoFinder_v%s" % util.version
     graphFilename = workingDir + "%s_graph.txt" % fileIdentifierString
     # it's important to free up the memory from python used for processing the genomes
     # before launching MCL becuase both use sizeable ammounts of memory. The only
     # way I can find to do this is to launch the memory intensive python code 
     # as separate process that exitsbefore MCL is launched.
-    fileInfo = FileInfo(inputDir=workingDir_previous if qUsePrecalculatedBlast else workingDir, outputDir = workingDir, graphFilename=graphFilename)
+    fileInfo = util.FileInfo(inputDir=workingDir_previous if qUsePrecalculatedBlast else workingDir, outputDir = workingDir, graphFilename=graphFilename)
     if not os.path.exists(fileInfo.outputDir):
        os.mkdir(fileInfo.outputDir)  
     Lengths = GetSequenceLengths(seqsInfo, fileInfo)
@@ -1530,7 +1150,7 @@ if __name__ == "__main__":
     runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, )) for i_ in xrange(nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
-    ManageQueue(runningProcesses, cmd_queue)
+    util.ManageQueue(runningProcesses, cmd_queue)
     
     cmd_queue = mp.Queue()
     for iSpecies in xrange(seqsInfo.nSpecies):
@@ -1538,7 +1158,7 @@ if __name__ == "__main__":
     runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, )) for i_ in xrange(nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
-    ManageQueue(runningProcesses, cmd_queue)
+    util.ManageQueue(runningProcesses, cmd_queue)
     
     util.PrintTime("Connected putatitive homologs") 
     WaterfallMethod.WriteGraphParallel(seqsInfo, fileInfo)
@@ -1547,12 +1167,12 @@ if __name__ == "__main__":
     clustersFilename, iResultsVersion = util.GetUnusedFilename(workingDir + "clusters_%s_I%0.1f" % (fileIdentifierString, mclInflation), ".txt")
     MCL.RunMCL(graphFilename, clustersFilename, nProcessAlg, mclInflation)
     clustersFilename_pairs = clustersFilename + "_id_pairs.txt"
-    MCL.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
+    MCLread.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
     
     print("\n6. Creating files for Orthologous Groups")
     print(  "----------------------------------------")
-    if not qOrthologues: PrintCitation()
-    ogs = MCL.GetPredictedOGs(clustersFilename_pairs)
+    if not qOrthologues: util.PrintCitation()
+    ogs = MCLread.GetPredictedOGs(clustersFilename_pairs)
     resultsBaseFilename = util.GetUnusedFilename(resultsDir + "OrthologousGroups", ".csv")[:-4]         # remove .csv from base filename
     resultsBaseFilename = resultsDir + "OrthologousGroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion)
     idsDict = MCL.WriteOrthogroupFiles(ogs, [idsFilename], resultsBaseFilename, clustersFilename_pairs)
@@ -1575,4 +1195,4 @@ if __name__ == "__main__":
     print(statsFile)
     print("")
     print(summaryText)
-    PrintCitation()
+    util.PrintCitation()
