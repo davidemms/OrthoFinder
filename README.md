@@ -18,7 +18,7 @@ https://github.com/davidemms/OrthoFinder
 
 What's New
 ==========
-**Sep. 2016**: OrthoFinder now infers the gene tree for each orthogroup, the rooted species tree, all orthologues between all species and calculates summary statistics.
+**Sep. 2016**: OrthoFinder now infers the **gene trees** for the orthogroups, the **rooted species tree**, all **orthologues** between all species and calculates summary statistics.
 
 **Jul. 2016**: OrthoFinder now outputs **summary statistics** for the orthogroups produced. Statistics are in the files **Statistics_Overall.csv, Statistics_PerSpecies.csv** and **OrthologousGroups_SpeciesOverlaps.csv**.
 
