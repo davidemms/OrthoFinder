@@ -7,7 +7,6 @@ Created on Wed Dec 16 11:25:10 2015
 """
 
 import os 
-import sys
 import time
 import types
 import datetime
@@ -18,6 +17,7 @@ import filecmp
 import glob
 import random
 import csv
+import argparse
 
 __skipLongTests__ = False
 
@@ -657,28 +657,31 @@ Test to add:
 """  
       
 if __name__ == "__main__":
-    test = None
-    if len(sys.argv) == 1:
-        # run suite
-        suite = unittest.TestLoader().loadTestsFromTestCase(TestCommandLine)
-        unittest.TextTestRunner(verbosity=2).run(suite)
-    else:
-        if len(sys.argv) > 1:
-            if sys.argv[1] == "-binary": 
-                qBinary = True
-                print("Running tests using binary file")
-                if len(sys.argv) > 2:
-                    test = sys.argv[2]
-            else:
-                test = sys.argv[1]  
-        if test == None:
-            suite = unittest.TestLoader().loadTestsFromTestCase(TestCommandLine)
-            unittest.TextTestRunner(verbosity=2).run(suite)
-        else:
-            suite = unittest.TestSuite()
-            suite.addTest(TestCommandLine(test))
-            runner = unittest.TextTestRunner()
-            runner.run(suite)
-
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-b", "--binaries", action="store_true", help="Run tests on binary files")
+    parser.add_argument("-t", "--test", help="Individual test to run")
+    parser.add_argument("-d", "--dir", help="Test program in specified directory")
+    
+    args = parser.parse_args()
+    if args.dir:
+        orthofinder = args.dir + "/orthofinder.py"
+        orthofinder_bin = os.path.splitext(orthofinder)[0]
+        trees_for_orthogroups = args.dir + "/trees_from_MSA.py"
+        trees_for_orthogroups_bin = os.path.splitext(trees_for_orthogroups)[0]
         
+    qBinary = args.binaries
+    print("Testing:")
+    print("  " + orthofinder_bin if qBinary else orthofinder)
+    print("  " + trees_for_orthogroups_bin if qBinary else trees_for_orthogroups)
+    print("")
+    
+    if args.test != None:
+        suite = unittest.TestSuite()
+        print("Running single test: %s" % args.test)
+        suite.addTest(TestCommandLine(args.test))
+        runner = unittest.TextTestRunner()
+        runner.run(suite)
+    else:
+        suite = unittest.TestLoader().loadTestsFromTestCase(TestCommandLine)
+        unittest.TextTestRunner(verbosity=2).run(suite)        
     
