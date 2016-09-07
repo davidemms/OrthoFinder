@@ -100,7 +100,7 @@ class OrthoGroupsSet(object):
     def SequenceDict(self):
         if self.seqIDsEx == None:
             try:
-                self.seqIDsEx = self._extractor(self.seqIDsFN, qRejectDuplicates=False)
+                self.seqIDsEx = self._extractor(self.seqIDsFN)
             except RuntimeError as error:
                 print(error.message)
                 if error.message.startswith("ERROR"): 
@@ -108,7 +108,7 @@ class OrthoGroupsSet(object):
                 else:
                     print("Tried to use only the first part of the accession in order to list the sequences in each orthogroup\nmore concisely but these were not unique. The full accession line will be used instead.\n")     
                     self.seqIDsEx = util.FullAccession(self.seqIDsFN).GetIDToNameDict()
-        return self.seqIDsEx.GetIDToNameDict()
+        return self.seqIDsEx
         
     def SpeciesDict(self):
         d = self.speciesIDsEx.GetIDToNameDict()
