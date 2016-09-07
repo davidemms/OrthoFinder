@@ -46,7 +46,7 @@ SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStar
 FileInfo = namedtuple("FileInfo", "inputDir outputDir graphFilename")     
 
 picProtocol = 1
-version = "1.0.1"
+version = "1.0.2"
 
 def PrintNoNewLine(text):
     sys.stdout.write(text)
@@ -354,17 +354,19 @@ def GetOGsFile(userArg):
     else:     
         # identify orthogroups file
         clustersFiles = glob.glob(orthofinderWorkingDir + "clusters_OrthoFinder_*.txt_id_pairs.txt")
-        orthogroupFiles = glob.glob(orthofinderWorkingDir + "OrthologousGroups*.txt") 
+        orthogroupFiles = glob.glob(orthofinderWorkingDir + "OrthologousGroups*.txt") + glob.glob(orthofinderWorkingDir + "Orthogroups*.txt")
         if orthofinderWorkingDir != userArg:
             orthogroupFiles += glob.glob(userArg + "OrthologousGroups*.txt")
+            orthogroupFiles += glob.glob(userArg + "Orthogroups*.txt")
         # User may have specified a WorkingDirectory and results could be in directory above
         if len(orthogroupFiles) < len(clustersFiles):
             orthogroupFiles += glob.glob(userArg + ".." + os.sep + "OrthologousGroups*.txt")
+            orthogroupFiles += glob.glob(userArg + ".." + os.sep + "Orthogroups*.txt")
         clustersFiles = sorted(clustersFiles)
         orthogroupFiles = sorted(orthogroupFiles)
         if len(clustersFiles) > 1 or len(orthogroupFiles) > 1:
             print("ERROR: Results from multiple OrthoFinder runs found\n")
-            print("Tab-delimiter OrthologousGroups*.txt files:")
+            print("Tab-delimiter Orthogroups*.txt/OrthologousGroups*.txt files:")
             for fn in orthogroupFiles:
                 print("    " + fn)
             print("With corresponding cluster files:")
@@ -375,7 +377,7 @@ def GetOGsFile(userArg):
             
         if len(clustersFiles) != 1 or len(orthogroupFiles) != 1:
             print("ERROR: Results not found in <orthofinder_results_directory> or <orthofinder_results_directory>/WorkingDirectory")
-            print("\nCould not find:\n    OrthologousGroups*.txt\nor\n    clusters_OrthoFinder_*.txt_id_pairs.txt")
+            print("\nCould not find:\n    Orthogroups*.txt/OrthologousGroups*.txt\nor\n    clusters_OrthoFinder_*.txt_id_pairs.txt")
             Fail()
             
         print("Generating trees for orthogroups in file:\n    %s" % orthogroupFiles[0])

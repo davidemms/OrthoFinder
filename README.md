@@ -20,7 +20,7 @@ What's New
 ==========
 **Sep. 2016**: OrthoFinder now infers the **gene trees** for the orthogroups, the **rooted species tree**, all **orthologues** between all species and calculates summary statistics.
 
-**Jul. 2016**: OrthoFinder now outputs **summary statistics** for the orthogroups produced. Statistics are in the files **Statistics_Overall.csv, Statistics_PerSpecies.csv** and **OrthologousGroups_SpeciesOverlaps.csv**.
+**Jul. 2016**: OrthoFinder now outputs **summary statistics** for the orthogroups produced. Statistics are in the files **Statistics_Overall.csv, Statistics_PerSpecies.csv** and **Orthogroups_SpeciesOverlaps.csv**.
 
 **Jul. 2016**: Provided **standalone binaries** for those without access to python (download the package from OrthoFinder's GitHub **releases tab**).
 
@@ -61,17 +61,17 @@ An orthogroup is the set of genes that are descended from a single gene in the l
 
 OrthoFinder generates three output files for orthogroups: 
 
-**1) OrthologousGroups.csv** is a tab separated text file. Each row comprises a single orthogroup and contains all the genes that belong to that orthogroup. The genes are organized into separate columns where each column corresponds to a single species.
+**1) Orthogroups.csv** is a tab separated text file. Each row comprises a single orthogroup and contains all the genes that belong to that orthogroup. The genes are organized into separate columns where each column corresponds to a single species.
 
-**2) OrthologousGroups.txt** is a tab separated text file that is identical in format to the output file from OrthoMCL. This enables OrthoFinder to easily slot into existing bioinformatic pipelines.
+**2) Orthogroups.txt** is a tab separated text file that is identical in format to the output file from OrthoMCL. This enables OrthoFinder to easily slot into existing bioinformatic pipelines.
 
-**3) OrthologousGroups_UnassignedGenes.csv** is a tab separated text file that is identical in format to OrthologousGroups.csv but contains all of the genes that were not assigned to any orthogroup.
+**3) Orthogroups_UnassignedGenes.csv** is a tab separated text file that is identical in format to Orthogroups.csv but contains all of the genes that were not assigned to any orthogroup.
 
 **4) Statistics_Overall.csv** is a tab separated text file giving statistics for the orthogroups.
 
 **5) Statistics_PerSpecies.csv** is a tab separated text file giving statistics for the orthogroups on a species-by-species basis.
 
-**6) OrthologousGroups_SpeciesOverlaps.csv** is a tab separated text file containing a matrix of the number of orthogroups shared by each species-pair (i.e. the number of orthogroups which contain at least one gene from each of the species-pairs)
+**6) Orthogroups_SpeciesOverlaps.csv** is a tab separated text file containing a matrix of the number of orthogroups shared by each species-pair (i.e. the number of orthogroups which contain at least one gene from each of the species-pairs)
 
 ###Statistics Files
 Most of the terms in the files **Statistics_Overall.csv** and **Statistics_PerSpecies.csv** are self-explanatory, the remainder are defined below:
@@ -121,7 +121,7 @@ Executables are found here ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/L
 
 MCL
 ---
-mcl is available in the repositories for some linux distributions and so can be installed in the same way as any other package. E.g. on Ubuntu "sudo apt-get install mcl". Alternatively it can be built from source which will likely require the build-essential or equivalent package on the Linux distribution being used. Instructions are provided on the MCL webpage.  
+mcl is available in the repositories for some linux distributions and so can be installed in the same way as any other package. E.g. on Ubuntu "sudo apt-get install mcl". Alternatively it can be built from source which will likely require the build-essential or equivalent package on the Linux distribution being used. Instructions are provided on the MCL webpage.
 
 FastME
 ------
@@ -138,7 +138,7 @@ Once the required dependencies have been installed, OrthoFinder can be setup and
 1. Save OrthoFinder-master.zip and unpack it 
 2. Open a terminal and cd into the directory OrthoFinder-master
 3. python orthofinder.py -f ExampleDataset/
-4. If everything was successful the output generated will end with a line giving the location of the results file containing the orthologous groups.
+4. If everything was successful the output generated will end with a line giving the location of the results file containing the orthogroups.
 
 The command for running OrthoFinder on any dataset is:
 
@@ -245,7 +245,7 @@ BLAST results files
 -------------------
 For each species pair x, y there should be a BLAST results file Blastx_y.txt where x is the index of the query fasta file and y is the index of the species used for the database. Similarly, there should be a BLAST results file Blasty_x.txt where y is the index of the query fasta file and x is the index of the species used for the database. The tabular BLAST output format 6 should be used. The query and hit IDs in the BLAST results files should correspond to the IDs in the fasta files.
 
-**Aside, reducing BLAST computations:** Note that since the BLAST queries are by far the most computationally expensive step, considerable time could be saved by only performing n(n+1)/2 of the species versus species BLAST queries instead of n^2, where n is the number of species. This would be done by only searching Species<x>.fa against the BLAST database generated from Species<y>.fa if x <= y. The results would give the file Blastx_y.txt and then this file could be used to generate the Blasty_x.txt file by swapping the query and hit sequence on each line in the results file. This should have only a small effect on the generated orthologous groups.
+**Aside, reducing BLAST computations:** Note that since the BLAST queries are by far the most computationally expensive step, considerable time could be saved by only performing n(n+1)/2 of the species versus species BLAST queries instead of n^2, where n is the number of species. This would be done by only searching Species<x>.fa against the BLAST database generated from Species<y>.fa if x <= y. The results would give the file Blastx_y.txt and then this file could be used to generate the Blasty_x.txt file by swapping the query and hit sequence on each line in the results file. This should have only a small effect on the generated orthogroups.
 
 SequenceIDs.txt
 --------------- 
@@ -280,9 +280,9 @@ Orthobench with pre-computed BLAST results
 The BLAST pre-calculated BLAST results files etc. for the Orthobench dataset are available for download as are the original fasta files. 
 
 
-Output orthologous groups using the orthoxml format
+Output orthogroups using the orthoxml format
 ===================================================
-Orthologous groups can be output using the orthoxml format. This is requested by adding '-x speciesInfoFilename' to the command used to call orthofinder, where speciesInfoFilename should be the filename (including the path if necessary) of a user prepared file providing the information about the species that is required by the orthoxml format. This file should contain one line per species and each line should contain the following 5 fields separated by tabs:
+Orthogroups can be output using the orthoxml format. This is requested by adding '-x speciesInfoFilename' to the command used to call orthofinder, where speciesInfoFilename should be the filename (including the path if necessary) of a user prepared file providing the information about the species that is required by the orthoxml format. This file should contain one line per species and each line should contain the following 5 fields separated by tabs:
 
 1. **fasta filename**: the filename (without path) of the fasta file for the species described on this line
 2. **species name**: the name of the species
@@ -299,7 +299,7 @@ Information on the orthoxml format can be found here: http://orthoxml.org/0.3/or
 
 Trees for Orthogroups
 =====================
-The 'trees_from_MSA.py' utility will automatically generate multiple sequence alignments and gene trees for each orthologous group generated by OrthoFinder. For example, once OrthoFinder has been run on the example dataset, trees_from_MSA can be run using:
+The 'trees_from_MSA.py' utility will automatically generate multiple sequence alignments and gene trees for each orthogroup generated by OrthoFinder. For example, once OrthoFinder has been run on the example dataset, trees_from_MSA can be run using:
 
 **python trees_from_MSA.py ExampleDataset/Results_\<date\> -t 16**
 

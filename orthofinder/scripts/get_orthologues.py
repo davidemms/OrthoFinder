@@ -28,6 +28,7 @@
 import os
 import sys
 import glob
+import shutil
 import subprocess
 import numpy as np
 from collections import Counter, defaultdict
@@ -222,7 +223,7 @@ class DendroBLASTTrees(object):
         self.ogSet = ogSet
         self.nProcesses = nProcesses
         self.species = sorted(map(int, self.ogSet.SpeciesDict().keys()))
-        treesDir = outD + "Trees/"
+        treesDir = outD + "Gene_Trees/"
         self.workingDir = outD + "WorkingDirectory/"
         treesIDsDir = self.workingDir + "Trees_ids/"
         distancesDir = self.workingDir + "Distances/"
@@ -280,8 +281,8 @@ class DendroBLASTTrees(object):
                                 m[i, j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) /  maxes[gi.iSeq]
         return ogs, ogMatrices
     
-    def DeleteBlastMatrices(self, workingDir):
-        for f in glob.glob(workingDir + "B*_*.pic"):
+    def DeleteBlastMatrices(self):
+        for f in glob.glob(self.ogSet.fileInfo.outputDir + "Bit*_*.pic"):
             if os.path.exists(f): os.remove(f)
         
     def WriteOGMatrices(self, ogs, ogMatrices):
@@ -364,7 +365,7 @@ class DendroBLASTTrees(object):
             t.write(outfile = newTreeFilename, format=4)  
         except:
             pass
-    
+        
     def RunAnalysis(self):
         ogs, ogMatrices_partial = self.GetOGMatrices()
         ogMatrices = self.WriteOGMatrices(ogs, ogMatrices_partial)
@@ -517,11 +518,11 @@ def PrintHelp():
 def GetResultsFilesString(rootedSpeciesTreeFN):
     st = ""
     baseResultsDir = os.path.abspath(os.path.split(rootedSpeciesTreeFN[0])[0] + "./../Trees/")
-    st += "Gene trees:\n   %s\n" % baseResultsDir
+    st += "\nGene trees:\n   %s\n" % baseResultsDir
     if len(rootedSpeciesTreeFN) == 1:
         resultsDir = os.path.split(rootedSpeciesTreeFN[0])[0]
-        st += "Rooted species tree:\n   %s\n" % rootedSpeciesTreeFN[0]
-        st += "Species-by-species orthologues:\n   %s\n" % resultsDir
+        st += "\nRooted species tree:\n   %s\n" % rootedSpeciesTreeFN[0]
+        st += "\nSpecies-by-species orthologues:\n   %s\n" % resultsDir
     else:
         st += "\nMultiple potential outgroups were identified for the species tree. Each case has been analysed separately.\n" 
         st+=  "Please review the rooted species trees and use the results corresponding to the correct one.\n\n"        
@@ -532,6 +533,17 @@ def GetResultsFilesString(rootedSpeciesTreeFN):
     return st
             
 
+def CleanWorkingDir(dendroBlast):
+    dendroBlast.DeleteBlastMatrices()
+    dirs = ['Distances/', "matrices_orthologues/", "Trees_ids_arbitraryRoot/", "SpeciesTree_unrooted.txt"]
+    for d in dirs:
+        dFull = dendroBlast.workingDir + d
+        if os.path.exists(dFull): 
+            if dFull[-1] == "/":
+                shutil.rmtree(dFull)
+            else:
+                os.remove(dFull)
+            
 def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs, nProcesses):
     ogSet = OrthoGroupsSet(orthofinderWorkingDir, clustersFilename_pairs, idExtractor = util.FirstWordExtractor)
     if len(ogSet.speciesToUse) < 4: 
@@ -545,8 +557,8 @@ def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, clustersFilenam
         sys.exit()
         
     
-    print("\n2. Reading sequence similarity scores")
-    print(  "-------------------------------------")
+    print("\n2. Calculating gene distances")
+    print(  "-----------------------------")
     resultsDir = util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_")
     
     db = DendroBLASTTrees(ogSet, resultsDir, nProcesses)
@@ -570,16 +582,17 @@ def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, clustersFilenam
     resultsSpeciesTrees = []
     for i, (r, speciesTree_fn) in enumerate(zip(roots, rootedSpeciesTreeFN)):
         if qMultiple: 
-            resultsDir_new = resultsDir + "Orthologues_for_potential_outgroup_%d/" % i
+            resultsDir_new = resultsDir + "Orthologues_using_outgroup_%d/" % i
+            resultsSpeciesTrees.append(resultsDir_new + "SpeciesTree_rooted_at_outgroup_%d.txt" % i)
         else:
             resultsDir_new = resultsDir + "Orthologues/"
+            resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
         os.mkdir(resultsDir_new)
-        resultsSpeciesTrees.append(resultsDir_new + "SpeciesTree_rooted.txt")
         db.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True)
 
         print("\n5%s. Reconciling gene and species trees" % ("-%d"%i if qMultiple else "")) 
         print(  "-------------------------------------" + ("--" if qMultiple else ""))   
-        print("Root: " + (", ".join([spDict[s] for s in r])))
+        print("Outgroup: " + (", ".join([spDict[s] for s in r])))
         dlcparResultsDir = RunDlcpar(db.treesPatIDs, ogSet, nOGs, speciesTree_fn, db.workingDir)
 
         # Orthologue lists
@@ -587,11 +600,12 @@ def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, clustersFilenam
         print(  "----------------------------------------" + ("--" if qMultiple else ""))      
         pt.get_orthologue_lists(ogSet, resultsDir_new, dlcparResultsDir, db.workingDir)     
      
+    CleanWorkingDir(db)
     print("\n7. Writing results files")
     print(  "------------------------")   
     
     return GetResultsFilesString(resultsSpeciesTrees)
-     
+                
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] == "--help" or sys.argv[1] == "-h":
         PrintHelp()

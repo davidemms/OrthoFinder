@@ -33,7 +33,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.0.1"
+version = "1.0.2"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -179,7 +179,7 @@ class TestCommandLine(unittest.TestCase):
 #    @unittest.skipIf(__skipLongTests__, "Only performing quick tests")     
     def test_fromfasta(self):
         currentResultsDir = exampleFastaDir + "Results_%s/" % datetime.date.today().strftime("%b%d") 
-        expectedCSVFile = currentResultsDir + "OrthologousGroups.csv"
+        expectedCSVFile = currentResultsDir + "Orthogroups.csv"
         with CleanUp([], [], [currentResultsDir, ]):
             self.stdout, self.stderr = self.RunOrthoFinder("-f %s -g" % exampleFastaDir)
             self.CheckStandardRun(self.stdout, self.stderr, goldResultsDir_smallExample, expectedCSVFile)  
@@ -187,7 +187,7 @@ class TestCommandLine(unittest.TestCase):
             
     def test_fromfasta_threads(self):
         currentResultsDir = exampleFastaDir + "Results_%s/" % datetime.date.today().strftime("%b%d") 
-        expectedCSVFile = currentResultsDir + "OrthologousGroups.csv"
+        expectedCSVFile = currentResultsDir + "Orthogroups.csv"
         with CleanUp([], [], [currentResultsDir, ]):
             self.stdout, self.stderr = self.RunOrthoFinder("-f %s -t 4 -a 3 -g" % exampleFastaDir)
             self.CheckStandardRun(self.stdout, self.stderr, goldResultsDir_smallExample, expectedCSVFile)  
@@ -196,7 +196,7 @@ class TestCommandLine(unittest.TestCase):
     @unittest.skipIf(__skipLongTests__, "Only performing quick tests")     
     def test_fromfasta_full(self):
         currentResultsDir = exampleFastaDir + "Results_%s/" % datetime.date.today().strftime("%b%d") 
-        expectedCSVFile = currentResultsDir + "OrthologousGroups.csv"     
+        expectedCSVFile = currentResultsDir + "Orthogroups.csv"     
         with CleanUp([], [], [currentResultsDir, ]):
             self.stdout, self.stderr = self.RunOrthoFinder("--fasta %s -g" % exampleFastaDir)
             self.CheckStandardRun(self.stdout, self.stderr, goldResultsDir_smallExample, expectedCSVFile)  
@@ -245,8 +245,8 @@ class TestCommandLine(unittest.TestCase):
         self.test_passed = True         
         
     def test_fromblast(self):
-        expectedCSVFile = exampleBlastDir + "OrthologousGroups.csv"
-        newFiles = ("OrthologousGroups.csv OrthologousGroups_UnassignedGenes.csv OrthologousGroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv OrthologousGroups_SpeciesOverlaps.csv" % (version, version, version)).split()
+        expectedCSVFile = exampleBlastDir + "Orthogroups.csv"
+        newFiles = ("Orthogroups.csv Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv" % (version, version, version)).split()
         newFiles = [exampleBlastDir + fn for fn in newFiles]
         with CleanUp(newFiles, []):
             self.stdout, self.stderr = self.RunOrthoFinder("-b %s -g" % exampleBlastDir)
@@ -254,8 +254,8 @@ class TestCommandLine(unittest.TestCase):
         self.test_passed = True         
         
     def test_fromblast_full(self):
-        expectedCSVFile = exampleBlastDir + "OrthologousGroups.csv"
-        newFiles = ("OrthologousGroups.csv OrthologousGroups_UnassignedGenes.csv OrthologousGroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv OrthologousGroups_SpeciesOverlaps.csv" % (version, version, version)).split()
+        expectedCSVFile = exampleBlastDir + "Orthogroups.csv"
+        newFiles = ("Orthogroups.csv Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv" % (version, version, version)).split()
         newFiles = [exampleBlastDir + fn for fn in newFiles]
         with CleanUp(newFiles, []):        
             self.stdout, self.stderr = self.RunOrthoFinder("--blast %s -g" % exampleBlastDir)
@@ -263,8 +263,8 @@ class TestCommandLine(unittest.TestCase):
         self.test_passed = True         
         
     def test_fromblast_algthreads(self):
-        expectedCSVFile = exampleBlastDir + "OrthologousGroups.csv"
-        newFiles = ("Statistics_PerSpecies.csv Statistics_Overall.csv OrthologousGroups_SpeciesOverlaps.csv OrthologousGroups.csv OrthologousGroups_UnassignedGenes.csv OrthologousGroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()
+        expectedCSVFile = exampleBlastDir + "Orthogroups.csv"
+        newFiles = ("Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv Orthogroups.csv Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()
         newFiles = [exampleBlastDir + fn for fn in newFiles]
         with CleanUp(newFiles, []):
             self.stdout, self.stderr = self.RunOrthoFinder("-b %s -a 3 -g" % exampleBlastDir)
@@ -284,8 +284,8 @@ class TestCommandLine(unittest.TestCase):
         self.test_passed = True         
         
     def test_inflation(self):
-        expectedCSVFile = exampleBlastDir + "OrthologousGroups.csv"
-        newFiles = ("Statistics_PerSpecies.csv Statistics_Overall.csv OrthologousGroups_SpeciesOverlaps.csv OrthologousGroups.csv OrthologousGroups_UnassignedGenes.csv OrthologousGroups.txt clusters_OrthoFinder_v%s_I1.8.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.8.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()
+        expectedCSVFile = exampleBlastDir + "Orthogroups.csv"
+        newFiles = ("Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv Orthogroups.csv Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.8.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.8.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()
         newFiles = [exampleBlastDir + fn for fn in newFiles]
         with CleanUp(newFiles, []):
             self.stdout, self.stderr = self.RunOrthoFinder("-I 1.8 -b %s -g" % exampleBlastDir)
@@ -295,7 +295,7 @@ class TestCommandLine(unittest.TestCase):
 #    @unittest.skipIf(__skipLongTests__, "Only performing quick tests")       
 #    def test_fromblastOrthobench(self):
 #        goldResultsDir_orthobench = baseDir + "ExpectedOutput/Orthobench_blast/"
-#        expectedCSVFileLocation = baseDir + "Input/Orthobench_blast/OrthologousGroups.csv"
+#        expectedCSVFileLocation = baseDir + "Input/Orthobench_blast/Orthogroups.csv"
 #        self.currentResultsDir = None
 #        expectedNewFiles = [baseDir + "Input/Orthobench_blast/" + x for x in "OrthoFinder_v0.4.0_graph.txt clusters_OrthoFinder_v0.4.0_I1.5.txt clusters_OrthoFinder_v0.4.0_I1.5.txt_id_pairs.txt".split()]
 #        with CleanUp(expectedNewFiles, []):
@@ -329,8 +329,8 @@ class TestCommandLine(unittest.TestCase):
          
     def test_addOneSpecies(self):
         expectedExtraFiles = [exampleBlastDir + fn for fn in ("Blast0_3.txt Blast3_0.txt Blast1_3.txt Blast3_1.txt Blast2_3.txt Blast3_2.txt Blast3_3.txt Species3.fa \
-        OrthologousGroups.csv OrthologousGroups.txt OrthologousGroups_UnassignedGenes.csv \
-        Statistics_PerSpecies.csv Statistics_Overall.csv OrthologousGroups_SpeciesOverlaps.csv \
+        Orthogroups.csv Orthogroups.txt Orthogroups_UnassignedGenes.csv \
+        Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv \
         clusters_OrthoFinder_v%s_I1.5.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()]
         expectedChangedFiles = [exampleBlastDir + fn for fn in "SpeciesIDs.txt SequenceIDs.txt".split()]
         # cleanup afterwards including failed test
@@ -351,8 +351,8 @@ class TestCommandLine(unittest.TestCase):
     def test_addTwoSpecies(self):
         expectedExtraFiles = [exampleBlastDir + fn for fn in ("Blast0_3.txt Blast3_0.txt Blast1_3.txt Blast3_1.txt Blast2_3.txt Blast3_2.txt Blast3_3.txt Species3.fa \
         Blast0_4.txt Blast4_0.txt Blast1_4.txt Blast4_1.txt Blast2_4.txt Blast4_2.txt Blast3_4.txt Blast4_3.txt Blast4_4.txt Species4.fa \
-        OrthologousGroups.csv OrthologousGroups.txt OrthologousGroups_UnassignedGenes.csv \
-        Statistics_PerSpecies.csv Statistics_Overall.csv OrthologousGroups_SpeciesOverlaps.csv \
+        Orthogroups.csv Orthogroups.txt Orthogroups_UnassignedGenes.csv \
+        Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv \
         clusters_OrthoFinder_v%s_I1.5.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()]
         expectedChangedFiles = [exampleBlastDir + fn for fn in "SpeciesIDs.txt SequenceIDs.txt".split()]
         goldDir = baseDir + "ExpectedOutput/AddTwoSpecies/"
@@ -399,8 +399,8 @@ class TestCommandLine(unittest.TestCase):
     
     def RemoveSpeciesTest(self, inputDir, goldDir):
         """Working directory and results directory with correct files in"""
-        requiredResults = [inputDir + fn for fn in "OrthologousGroups.csv OrthologousGroups_UnassignedGenes.csv OrthologousGroups.txt".split()]
-        expectedExtraFiles = [inputDir + fn for fn in ("Statistics_PerSpecies.csv Statistics_Overall.csv OrthologousGroups_SpeciesOverlaps.csv clusters_OrthoFinder_v%s_I1.5.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()]
+        requiredResults = [inputDir + fn for fn in "Orthogroups.csv Orthogroups_UnassignedGenes.csv Orthogroups.txt".split()]
+        expectedExtraFiles = [inputDir + fn for fn in ("Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv clusters_OrthoFinder_v%s_I1.5.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()]
         with CleanUp(expectedExtraFiles + requiredResults, []):
             self.stdout, self.stderr = self.RunOrthoFinder("-b %s" % inputDir)
             for fn in requiredResults:
@@ -414,8 +414,8 @@ class TestCommandLine(unittest.TestCase):
     def test_removeOneAddOne(self):
         inputDir = baseDir + "Input/ExampleDataset_addOneRemoveOne/Results_Jan28/WorkingDirectory/"
         expectedExtraFiles = [inputDir + fn for fn in ("Blast0_3.txt Blast3_0.txt Blast1_3.txt Blast3_1.txt Blast2_3.txt Blast3_2.txt Blast3_3.txt Species3.fa \
-        OrthologousGroups.csv OrthologousGroups.txt OrthologousGroups_UnassignedGenes.csv \
-        Statistics_PerSpecies.csv Statistics_Overall.csv OrthologousGroups_SpeciesOverlaps.csv \
+        Orthogroups.csv Orthogroups.txt Orthogroups_UnassignedGenes.csv \
+        Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv \
         clusters_OrthoFinder_v%s_I1.5.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()] 
         expectedChangedFiles = [inputDir + fn for fn in "SpeciesIDs.txt SequenceIDs.txt".split()]
         goldDir = baseDir + "ExpectedOutput/AddOneRemoveOne/"
@@ -426,7 +426,7 @@ class TestCommandLine(unittest.TestCase):
             for fn in expectedExtraFiles:
                 os.path.split(fn)[1]
                 self.assertTrue(os.path.exists(fn), msg=fn)
-                if "OrthologousGroups" in os.path.split(fn)[1]:
+                if "Orthogroups" in os.path.split(fn)[1]:
                     self.CompareFile(goldDir + os.path.split(fn)[1], fn)  
             self.CompareFile(goldDir + "SpeciesIDs.txt", inputDir + "SpeciesIDs.txt") 
             self.CompareFile(goldDir + "SequenceIDs.txt", inputDir + "SequenceIDs.txt")  
@@ -568,7 +568,7 @@ class TestCommandLine(unittest.TestCase):
     def tearDown(self):
         self.CleanCurrentResultsDir()
         if not self.test_passed:
-            print(self.stdout)
+#            print(self.stdout)
             print(self.stderr)
         
     def RunOrthoFinder(self, commands):
@@ -601,9 +601,9 @@ class TestCommandLine(unittest.TestCase):
         
         # Results - orthogroups correct
         resultsDir = os.path.split(expectedCSVFileLocation)[0] + "/"
-        self.CompareFile(goldResultsDir + "OrthologousGroups.csv", resultsDir + "OrthologousGroups.csv")
-        self.CompareFile(goldResultsDir + "OrthologousGroups_UnassignedGenes.csv", resultsDir + "OrthologousGroups_UnassignedGenes.csv")
-        self.CompareFile(goldResultsDir + "OrthologousGroups.txt", resultsDir + "OrthologousGroups.txt")
+        self.CompareFile(goldResultsDir + "Orthogroups.csv", resultsDir + "Orthogroups.csv")
+        self.CompareFile(goldResultsDir + "Orthogroups_UnassignedGenes.csv", resultsDir + "Orthogroups_UnassignedGenes.csv")
+        self.CompareFile(goldResultsDir + "Orthogroups.txt", resultsDir + "Orthogroups.txt")
          
     def CleanCurrentResultsDir(self):
         if self.currentResultsDir == None: return

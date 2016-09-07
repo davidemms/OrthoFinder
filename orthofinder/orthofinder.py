@@ -153,7 +153,7 @@ class MCL:
         with open(orthoxmlFilename, 'wb') as orthoxmlFile:
     #            ET.ElementTree(root).write(orthoxmlFile)
             orthoxmlFile.write(MCL.prettify(root))
-        print("Orthologous groups have been written to orthoxml file:\n   %s" % orthoxmlFilename)
+        print("Orthogroups have been written to orthoxml file:\n   %s" % orthoxmlFilename)
             
     @staticmethod               
     def RunMCL(graphFilename, clustersFilename, nProcesses, inflation):
@@ -232,8 +232,7 @@ class MCL:
                     for iSpecies in xrange(nSpecies):
                         row.append(", ".join(sorted(ogDict[iSpecies])))
                 thisOutputWriter.writerow(row)
-        resultsFilesString = "Orthologous groups have been written to tab-delimited files:\n   %s\n   %s\n" % (outputFilename, singleGeneFilename)
-        resultsFilesString += "And in OrthoMCL format:\n   %s" % (outputFilename[:-3] + "txt")
+        resultsFilesString = "Orthogroups have been written to tab-delimited files:\n   %s\n   %s (OrthoMCL format)\n   %s" % (outputFilename, outputFilename[:-3] + "txt", singleGeneFilename)
         return resultsFilesString
 
 """
@@ -444,7 +443,6 @@ class WaterfallMethod:
     def ProcessBlastHits(seqsInfo, fileInfo, Lengths, iSpecies):
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
-            util.PrintTime("Starting species %d" % iSpecies)
             # process up to the best hits for each species
             Bi = []
             for jSpecies in xrange(seqsInfo.nSpecies):
@@ -536,7 +534,7 @@ class WaterfallMethod:
 Stats
 -------------------------------------------------------------------------------
 """
-def OrthologousGroupsMatrix(iSpecies, properOGs):
+def OrthogroupsMatrix(iSpecies, properOGs):
     speciesIndexDict = {iSp:iCol for iCol, iSp in enumerate(iSpecies)}
     nSpecies = len(iSpecies)
     nGroups = len(properOGs)
@@ -612,7 +610,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, resultsDir, iResultsVersion):
     allGenes = [g for og in allOgs for g in og]
     filename_sp = resultsDir +  "Statistics_PerSpecies" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
     filename_sum = resultsDir +  "Statistics_Overall" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
-    filename_overlap = resultsDir +  "OrthologousGroups_SpeciesOverlaps" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
+    filename_overlap = resultsDir +  "Orthogroups_SpeciesOverlaps" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
     percentFormat = "%0.1f"
     with open(filename_sp, 'wb') as outfile_species, open(filename_sum, 'wb') as outfile_sum:
         writer_sp = csv.writer(outfile_species, delimiter="\t")
@@ -677,7 +675,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, resultsDir, iResultsVersion):
         writer_sum.writerow(["O50 (all genes)", O50])
         
         # Single-copy orthogroups
-        ogMatrix = OrthologousGroupsMatrix(iSpecies, properOGs)
+        ogMatrix = OrthogroupsMatrix(iSpecies, properOGs)
         nSpecies = len(iSpecies)
         nPresent = (ogMatrix > np.zeros((1, nSpecies))).sum(1)
         nCompleteOGs = list(nPresent).count(nSpecies)
@@ -688,8 +686,8 @@ def Stats(ogs, speciesNamesDict, iSpecies, resultsDir, iResultsVersion):
         
         # Results filenames
         writer_sum.writerow(["Date", str(datetime.datetime.now()).split()[0]])
-        writer_sum.writerow(["Orthogroups file", "OrthologousGroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"])
-        writer_sum.writerow(["Unassigned genes file", "OrthologousGroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + "_UnassignedGenes.csv"])
+        writer_sum.writerow(["Orthogroups file", "Orthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"])
+        writer_sum.writerow(["Unassigned genes file", "Orthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + "_UnassignedGenes.csv"])
         writer_sum.writerow(["Per-species statistics", os.path.split(filename_sp)[1]])
         writer_sum.writerow(["Overall statistics", os.path.split(filename_sum)[1]])
         writer_sum.writerow(["Orthogroups shared between species", os.path.split(filename_overlap)[1]])
@@ -699,7 +697,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, resultsDir, iResultsVersion):
         Stats_SpeciesOverlaps(filename_overlap, speciesNamesDict, iSpecies, speciesPresence)
 
     statsFiles = "Orthogroup statistics:\n"
-    statsFiles += "   " + "   ".join([os.path.split(fn)[1] for fn in [filename_sp, filename_sum, filename_overlap]]) + "\n"
+    statsFiles += "   " + "   ".join([os.path.split(fn)[1] for fn in [filename_sp, filename_sum, filename_overlap]])
     summaryText = """OrthoFinder assigned %d genes (%0.1f%% of total) to %d orthogroups. Fifty percent of all genes were in orthogroups 
 with %d or more genes (G50 was %d) and were contained in the largest %d orthogroups (O50 was %d). There were %d 
 orthogroups with all species present and %d of these consisted entirely of single-copy genes.""" % (nAssigned, pAssigned, nOgs, G50, G50, O50, O50, nCompleteOGs, nSingleCopy)
@@ -1011,10 +1009,8 @@ if __name__ == "__main__":
         if resultsDir == None: resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results_")
         workingDir = resultsDir + "WorkingDirectory" + os.sep
         os.mkdir(workingDir)
-    if qUsePrecalculatedBlast:
-        print("%d thread(s) for BLAST searches" % nBlast)
-    if not qOnlyPrepare:
-        print("%d thread(s) for OrthoFinder algorithm" % nProcessAlg)
+    print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % nBlast)
+    print("%d thread(s) for OrthoFinder algorithm" % nProcessAlg)
      
     # check for BLAST+ and MCL - else instruct how to install and add to path
     print("\n1. Checking required programs are installed")
@@ -1032,7 +1028,6 @@ if __name__ == "__main__":
     else:
         newFastaFiles, userFastaFilenames, idsFilename, speciesIdsFilename, newSpeciesIDs, previousSpeciesIDs = AssignIDsToSequences(fastaDir, workingDir)
         speciesToUse = speciesToUse + newSpeciesIDs
-        print("Done!")
     seqsInfo = util.GetSeqsInfo(workingDir_previous if qUsePrecalculatedBlast else workingDir, speciesToUse)
     
     if qXML:   
@@ -1093,7 +1088,6 @@ if __name__ == "__main__":
             command = ["makeblastdb", "-dbtype", "prot", "-in", workingDir + "Species%d.fa" % iSp, "-out", workingDir + "BlastDBSpecies%d" % iSp]
             util.PrintTime("Creating Blast database %d of %d" % (iSp + 1, nDB))
             RunBlastDBCommand(command) 
-        print("Done!")
     
     if qOnlyPrepare:
         print("\n4. BLAST commands that must be run")
@@ -1111,7 +1105,7 @@ if __name__ == "__main__":
             for command in commands:
                 print(" ".join(command))
             sys.exit()
-        print("Maximum number of BLAST processes: %d" % nBlast)
+        print("Using %d thread(s)" % nBlast)
         util.PrintTime("This may take some time....")  
         cmd_queue = mp.Queue()
         for iCmd, cmd in enumerate(commands):
@@ -1169,12 +1163,12 @@ if __name__ == "__main__":
     clustersFilename_pairs = clustersFilename + "_id_pairs.txt"
     MCLread.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
     
-    print("\n6. Creating files for Orthologous Groups")
-    print(  "----------------------------------------")
+    print("\n6. Writing orthogroups to file")
+    print(  "------------------------------")
     if not qOrthologues: util.PrintCitation()
     ogs = MCLread.GetPredictedOGs(clustersFilename_pairs)
-    resultsBaseFilename = util.GetUnusedFilename(resultsDir + "OrthologousGroups", ".csv")[:-4]         # remove .csv from base filename
-    resultsBaseFilename = resultsDir + "OrthologousGroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion)
+    resultsBaseFilename = util.GetUnusedFilename(resultsDir + "Orthogroups", ".csv")[:-4]         # remove .csv from base filename
+    resultsBaseFilename = resultsDir + "Orthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion)
     idsDict = MCL.WriteOrthogroupFiles(ogs, [idsFilename], resultsBaseFilename, clustersFilename_pairs)
     speciesNamesDict = SpeciesNameDict(speciesIdsFilename)
     orthogroupsResultsFilesString = MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesToUse, resultsBaseFilename)
@@ -1192,6 +1186,7 @@ if __name__ == "__main__":
         orthologuesResultsFilesString = get_orthologues.GetOrthologues(workingDir, resultsDir, clustersFilename_pairs, nBlast)
         print(orthogroupsResultsFilesString)
         print(orthologuesResultsFilesString.rstrip())
+    print("")
     print(statsFile)
     print("")
     print(summaryText)
