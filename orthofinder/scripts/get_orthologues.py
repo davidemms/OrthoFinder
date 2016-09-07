@@ -104,20 +104,13 @@ class OrthoGroupsSet(object):
         d = self.speciesIDsEx.GetIDToNameDict()
         return {k:v.rsplit(".",1)[0] for k,v in d.items()}
         
-    def Spec_SeqDict(self, qSplitBar=True):
+    def Spec_SeqDict(self):
         if self._Spec_SeqIDs != None:
             return self._Spec_SeqIDs
-#        try:
         seqs = self.SequenceDict()
         specs = self.SpeciesDict()
-        self._Spec_SeqIDs = dict()
-        for seq in seqs:
-            iSpecies = seq.split("_")[0]
-            if iSpecies not in specs: continue
-            if qSplitBar:
-                self._Spec_SeqIDs[seq] = specs[iSpecies].replace(". ", "_").replace(" ", "_") + "_" + seqs[seq].split("|")[0]
-            else:
-                self._Spec_SeqIDs[seq] = specs[iSpecies].replace(". ", "_").replace(" ", "_") + "_" + seqs[seq]
+        specs_ed = {k:v.replace(".", "_").replace(" ", "_") for k,v in specs.items()}
+        self._Spec_SeqIDs = {seqID:specs_ed[seqID.split("_")[0]] + "_" + name for seqID, name in seqs.items()}
         return self._Spec_SeqIDs
     
     def OGs(self):
