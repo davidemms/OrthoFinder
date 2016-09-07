@@ -476,7 +476,7 @@ def CanRunDependencies(workingDir):
     if os.path.exists(outFN): os.remove(outFN)        
     if not util.CanRunCommand("fastme -i %s -o %s" % (testFN, outFN), qAllowStderr=False):
         print("ERROR: Cannot run fastme")
-        print("Please check FastME is installed and that the executables are in the system path\n")
+        print("Please check FastME is installed and that the executables are in the system path.\n")
         return False
     os.remove(testFN)
     os.remove(outFN)
@@ -485,7 +485,7 @@ def CanRunDependencies(workingDir):
     # DLCPar
     if not util.CanRunCommand("dlcpar_search --version", qAllowStderr=False):
         print("ERROR: Cannot run dlcpar_search")
-        print("Please check DLCpar is installed and that the executables are in the system path\n")
+        print("Please check DLCpar is installed and that the executables are in the system path.\n")
         return False
     return True    
         
@@ -535,7 +535,10 @@ def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, clustersFilenam
 
     print("\n1. Checking required programs are installed")
     print(  "-------------------------------------------")
-    if not CanRunDependencies(orthofinderWorkingDir): util.Fail()   
+    if not CanRunDependencies(orthofinderWorkingDir): 
+        print("Orthogroups have been inferred but the dependencies for inferring gene trees and\northologues have not been met. Please review previous messages for more information.")
+        sys.exit()
+        
     
     print("\n2. Reading sequence similarity scores")
     print(  "-------------------------------------")
