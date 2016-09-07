@@ -109,17 +109,21 @@ def multiply(specmin, specmax, matrixDir):
     product = M.dot(M.transpose())
     return product, M
 
-def WriteOrthologues(resultsDir, spec1, spec2, orthologues, speciesDict, sequenceDict):
+def WriteOrthologues(resultsDir, spec1, spec2, orthologues, ogSet):
+    speciesDict = ogSet.SpeciesDict()
+    id_to_og = ogSet.ID_to_OG_Dict()
+    sequenceDict = ogSet.SequenceDict()
     d1 = resultsDir + "Orthologues_" + speciesDict[str(spec1)] + "/"
     d2 = resultsDir + "Orthologues_" + speciesDict[str(spec2)] + "/"
     with open(d1 + '%s__v__%s.csv' % (speciesDict[str(spec1)], speciesDict[str(spec2)]), 'wb') as outfile1, open(d2 + '%s__v__%s.csv' % (speciesDict[str(spec2)], speciesDict[str(spec1)]), 'wb') as outfile2:
         writer1 = csv.writer(outfile1)
         writer2 = csv.writer(outfile2)
-        writer1.writerow((speciesDict[str(spec1)], speciesDict[str(spec2)]))
-        writer2.writerow((speciesDict[str(spec2)], speciesDict[str(spec1)]))
+        writer1.writerow(("Orthogroup", speciesDict[str(spec1)], speciesDict[str(spec2)]))
+        writer2.writerow(("Orthogroup", speciesDict[str(spec2)], speciesDict[str(spec1)]))
         for genes1, genes2 in orthologues:
-            writer1.writerow((", ".join([sequenceDict["%d_%d" % (spec1, o)] for o in genes1]), ", ".join([sequenceDict["%d_%d" % (spec2, o)] for o in genes2])))
-            writer2.writerow((", ".join([sequenceDict["%d_%d" % (spec2, o)] for o in genes2]), ", ".join([sequenceDict["%d_%d" % (spec1, o)] for o in genes1])))
+            og = "OG%07d" % id_to_og["%d_%d" % (spec1, genes1[0])]
+            writer1.writerow((og, ", ".join([sequenceDict["%d_%d" % (spec1, o)] for o in genes1]), ", ".join([sequenceDict["%d_%d" % (spec2, o)] for o in genes2])))
+            writer2.writerow((og, ", ".join([sequenceDict["%d_%d" % (spec2, o)] for o in genes2]), ", ".join([sequenceDict["%d_%d" % (spec1, o)] for o in genes1])))
 
 def GetOrthologues(orig_matrix, orig_matrix_csc, index):
     orthologues = orig_matrix.getrowview(index).nonzero()[1]
@@ -140,7 +144,8 @@ def find_all(matrix, orig_matrix):
         orthologues.append((orthologuesSp1, orthologuesSp2))
     return orthologues
         
-def species_find_all(speciesDict, sequenceDict, matrixDir, resultsDir):
+def species_find_all(ogSet, matrixDir, resultsDir):
+    speciesDict = ogSet.SpeciesDict()
     # Calls multiply and find_all on each species pair, and appends the numbers from find_all's output to the relevant csv lists.
     speciesIDs = sorted(map(int, speciesDict.keys()))
     nspecies = len(speciesIDs)           
@@ -151,7 +156,7 @@ def species_find_all(speciesDict, sequenceDict, matrixDir, resultsDir):
         if index1 >= index2: continue
         product, M = multiply(index1, index2, matrixDir)
         orthologues = find_all(product, M)
-        WriteOrthologues(resultsDir, speciesIDs[index2], speciesIDs[index1], orthologues, speciesDict, sequenceDict)    
+        WriteOrthologues(resultsDir, speciesIDs[index2], speciesIDs[index1], orthologues, ogSet)    
     
 def get_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir):
     # -> Matrices
@@ -164,6 +169,6 @@ def get_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir):
         one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, matrixDir)
         
     # -> csv files
-    species_find_all(ogSet.SpeciesDict(), ogSet.SequenceDict(), matrixDir, resultsDir)
+    species_find_all(ogSet, matrixDir, resultsDir)
     
         

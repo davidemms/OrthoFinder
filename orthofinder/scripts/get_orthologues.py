@@ -90,10 +90,11 @@ class OrthoGroupsSet(object):
         self._extractor = idExtractor
         self.clustersFN = clustersFilename_pairs
         self.seqIDsEx = None
-        self.ogs = self.OGs()
+        self.ogs = None
         self.speciesToUse = util.GetSpeciesToUse(self.speciesIDsFN)
         self.seqsInfo = util.GetSeqsInfo(orthofinderWorkingDir, self.speciesToUse)
         self.fileInfo = util.FileInfo(inputDir=orthofinderWorkingDir, outputDir = orthofinderWorkingDir, graphFilename="")
+        self.id_to_og = None
 
     def SequenceDict(self):
         if self.seqIDsEx == None:
@@ -114,9 +115,18 @@ class OrthoGroupsSet(object):
         return self._Spec_SeqIDs
     
     def OGs(self):
-        ogs = MCL.GetPredictedOGs(self.clustersFN)     
-        ogs = [[Seq(g) for g in og] for og in ogs if len(og) >= 4]   
-        return ogs
+        if self.ogs != None:
+            return self.ogs
+        self.ogs = MCL.GetPredictedOGs(self.clustersFN)     
+        self.ogs = [[Seq(g) for g in og] for og in self.ogs if len(og) >= 4]   
+        return self.ogs
+        
+    def ID_to_OG_Dict(self):
+        if self.id_to_og != None:
+            return self.id_to_og
+        self.id_to_og = {g.ToString():iog for iog, og in enumerate(self.OGs()) for g in og}
+        return self.id_to_og
+        
 
 # ==============================================================================================================================
 
@@ -144,14 +154,15 @@ def lil_max(M):
 # ASTRAL
 
 def GetOGsToUse(ogSet):
-    return range(100, min(10000, len(ogSet.ogs)))
+    return range(100, min(10000, len(ogSet.OGs())))
 
 def CreateTaxaMapFile(ogSet, i_ogs_to_use, outputFN):
     """Get max number of sequences per species"""
     sp_max = defaultdict(int)
+    ogs = ogSet.OGs()
     for iog in i_ogs_to_use:
         thisCount = defaultdict(int)
-        for seq in ogSet.ogs[iog]:
+        for seq in ogs[iog]:
             thisCount[seq.iSp] += 1
         for iSp in thisCount:
             sp_max[iSp] = max(sp_max[iSp], thisCount[iSp])
@@ -335,8 +346,9 @@ class DendroBLASTTrees(object):
                 
     def PrepareGeneTreeCommand(self):
         cmds = []
-        for iog in xrange(len(self.ogSet.ogs)):
-            nTaxa = len(self.ogSet.ogs[iog])
+        ogs = self.ogSet.OGs()
+        for iog in xrange(len(ogs)):
+            nTaxa = len(ogs[iog])
             cmds.append([" ".join(["fastme", "-i", self.distPat % iog, "-o", self.treesPatIDs % iog, "-w", "O"] + (["-s"] if nTaxa < 1000 else []))])
         return cmds
 
@@ -364,7 +376,7 @@ class DendroBLASTTrees(object):
         print(  "-----------------------------------")
         util.RunParallelOrderedCommandLists(self.nProcesses, [[cmd_spTree]] + cmds_geneTrees, qHideStdout = True)
         seqDict = self.ogSet.Spec_SeqDict()
-        for iog in xrange(len(self.ogSet.ogs)):
+        for iog in xrange(len(self.ogSet.OGs())):
             self.RenameTreeTaxa(self.treesPatIDs % iog, self.treesPat % iog, seqDict, qFixNegatives=True)
         self.RenameTreeTaxa(spTreeFN_ids, self.workingDir + "SpeciesTree_unrooted.txt", self.ogSet.SpeciesDict(), qFixNegatives=True)       
         #spTreeFN_ids = RunAstral(self.ogSet, self.treesPatIDs, self.workingDir)   
