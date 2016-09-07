@@ -177,12 +177,14 @@ class TestCommandLine(unittest.TestCase):
         
     
 #    @unittest.skipIf(__skipLongTests__, "Only performing quick tests")     
-    def test_fromfasta(self):
+    def test_fromfasta_full(self):
         currentResultsDir = exampleFastaDir + "Results_%s/" % datetime.date.today().strftime("%b%d") 
         expectedCSVFile = currentResultsDir + "Orthogroups.csv"
         with CleanUp([], [], [currentResultsDir, ]):
-            self.stdout, self.stderr = self.RunOrthoFinder("-f %s -g" % exampleFastaDir)
+            self.stdout, self.stderr = self.RunOrthoFinder("-f %s" % exampleFastaDir)
             self.CheckStandardRun(self.stdout, self.stderr, goldResultsDir_smallExample, expectedCSVFile)  
+            expectedTreeFN = exampleFastaDir + ("Results_%s/" % datetime.date.today().strftime("%b%d")) + ("Orthologues_%s/" % datetime.date.today().strftime("%b%d")) + "Gene_Trees/OG0000000_tree.txt"
+            self.assertTrue(os.path.exists(expectedTreeFN))
         self.test_passed = True         
             
     def test_fromfasta_threads(self):

@@ -475,25 +475,29 @@ class WaterfallMethod:
             
     @staticmethod 
     def Worker_ConnectCognates(cmd_queue):
-        while True:
-            try:
-                args = cmd_queue.get(True, 1)
-                WaterfallMethod.ConnectCognates(*args)
-            except Queue.Empty:
-                return  
+        with warnings.catch_warnings():         
+            warnings.simplefilter("ignore")
+            while True:
+                try:
+                    args = cmd_queue.get(True, 1)
+                    WaterfallMethod.ConnectCognates(*args)
+                except Queue.Empty:
+                    return  
                                    
     @staticmethod
     def WriteGraphParallel(seqsInfo, fileInfo):
-        with open(fileInfo.graphFilename + "_header", 'wb') as graphFile:
-            graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (seqsInfo.nSeqs, seqsInfo.nSeqs)) 
-            graphFile.write("\n(mclmatrix\nbegin\n\n") 
-        pool = mp.Pool()
-        pool.map(WriteGraph_perSpecies, [(seqsInfo, fileInfo, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
-        subprocess.call("cat " + fileInfo.graphFilename + "_header " + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename, shell=True)
-        # Cleanup
-        os.remove(fileInfo.graphFilename + "_header")
-        for iSp in xrange(seqsInfo.nSpecies): os.remove(fileInfo.graphFilename + "_%d" % iSp)
-        DeleteMatrices(fileInfo) 
+        with warnings.catch_warnings():         
+            warnings.simplefilter("ignore")
+            with open(fileInfo.graphFilename + "_header", 'wb') as graphFile:
+                graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (seqsInfo.nSeqs, seqsInfo.nSeqs)) 
+                graphFile.write("\n(mclmatrix\nbegin\n\n") 
+            pool = mp.Pool()
+            pool.map(WriteGraph_perSpecies, [(seqsInfo, fileInfo, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
+            subprocess.call("cat " + fileInfo.graphFilename + "_header " + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename, shell=True)
+            # Cleanup
+            os.remove(fileInfo.graphFilename + "_header")
+            for iSp in xrange(seqsInfo.nSpecies): os.remove(fileInfo.graphFilename + "_%d" % iSp)
+            DeleteMatrices(fileInfo) 
                 
     @staticmethod
     def GetMostDistant_s(RBH, B, seqsInfo, iSpec):

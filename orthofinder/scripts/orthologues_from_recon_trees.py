@@ -96,7 +96,7 @@ def one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, output
             jSpLabel,jGene = map(int,Gene.split('_'))
             jSp = speciesLabelsReverse[jSpLabel]
             if iSpecies > jSp:
-                matrixlist[jSp][iGene, jGene]  = 1
+                matrixlist[jSp][iGene, jGene] = 1
     for j, m in enumerate(matrixlist):    
         with open(outputDir + 'ortholog_%d_%d_matrix.pic' % (iSpecies, j), 'wb') as file:
             pic.dump(m, file)
@@ -128,7 +128,7 @@ def WriteOrthologues(resultsDir, spec1, spec2, orthologues, ogSet):
 def GetOrthologues(orig_matrix, orig_matrix_csc, index):
     orthologues = orig_matrix.getrowview(index).nonzero()[1]
     index = orthologues[0]
-    originalSpeciesGenes = orig_matrix_csc.getcol(index).nonzero()[0]
+    originalSpeciesGenes = orig_matrix_csc.getcol(index).nonzero()[0]  # SparseEfficiencyWarning: changing the sparsity structure of a csc_matrix is expensive. lil_matrix is more efficient
     return (originalSpeciesGenes, orthologues)
                 
 #Takes in the output of multiply, finds all of the orthology relationships which it writes to textfiles and returns the number of each type of orthology relationship.

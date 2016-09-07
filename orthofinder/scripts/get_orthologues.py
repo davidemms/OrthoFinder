@@ -36,6 +36,7 @@ import cPickle as pic
 import itertools
 import multiprocessing as mp
 import Queue
+import warnings
 
 import util
 import tree
@@ -107,8 +108,8 @@ class OrthoGroupsSet(object):
                     util.Fail()
                 else:
                     print("Tried to use only the first part of the accession in order to list the sequences in each orthogroup\nmore concisely but these were not unique. The full accession line will be used instead.\n")     
-                    self.seqIDsEx = util.FullAccession(self.seqIDsFN).GetIDToNameDict()
-        return self.seqIDsEx
+                    self.seqIDsEx = util.FullAccession(self.seqIDsFN)
+        return self.seqIDsEx.GetIDToNameDict()
         
     def SpeciesDict(self):
         d = self.speciesIDsEx.GetIDToNameDict()
@@ -245,18 +246,20 @@ class DendroBLASTTrees(object):
         # Check files exist
         
     def ReadAndPickle(self): 
-        cmd_queue = mp.Queue()
-        i = 0
-        for iSp in xrange(len(self.ogSet.seqsInfo.speciesToUse)):
-            for jSp in xrange(len(self.ogSet.seqsInfo.speciesToUse)):
-                cmd_queue.put((i, (iSp, jSp)))           
-                i+=1
-        runningProcesses = [mp.Process(target=Worker_BlastScores, args=(cmd_queue, self.ogSet.seqsInfo, self.ogSet.fileInfo, nThreads, i)) for i_ in xrange(nThreads)]
-        for proc in runningProcesses:
-            proc.start()
-        for proc in runningProcesses:
-            while proc.is_alive():
-                proc.join() 
+        with warnings.catch_warnings():         
+            warnings.simplefilter("ignore")
+            cmd_queue = mp.Queue()
+            i = 0
+            for iSp in xrange(len(self.ogSet.seqsInfo.speciesToUse)):
+                for jSp in xrange(len(self.ogSet.seqsInfo.speciesToUse)):
+                    cmd_queue.put((i, (iSp, jSp)))           
+                    i+=1
+            runningProcesses = [mp.Process(target=Worker_BlastScores, args=(cmd_queue, self.ogSet.seqsInfo, self.ogSet.fileInfo, nThreads, i)) for i_ in xrange(nThreads)]
+            for proc in runningProcesses:
+                proc.start()
+            for proc in runningProcesses:
+                while proc.is_alive():
+                    proc.join() 
                 
     def NumberOfSequences(self, species):
         ids = self.ogSet.SequenceDict()
@@ -269,25 +272,27 @@ class DendroBLASTTrees(object):
         ogMatrices contains matrix M for each OG where:
             Mij = 0.5*max(Bij, Bmin_i)/Bmax_i
         """
-        ogs = self.ogSet.OGs()
-        ogsPerSpecies = [[[(g, i) for i, g in enumerate(og) if g.iSp == iSp] for iSp in self.species] for og in ogs]
-        nGenes = [len(og) for og in ogs]
-        nSeqs = self.NumberOfSequences(self.species)
-        ogMatrices = [np.zeros((n, n)) for n in nGenes]
-        for iiSp, sp1 in enumerate(self.species):
-            util.PrintTime("Processing species %d" % sp1)
-            Bs = [matrices.LoadMatrix("Bit", self.ogSet.fileInfo, iiSp, jjSp) for jjSp in xrange(len(self.species))]
-            mins = np.ones((nSeqs[sp1], 1), dtype=np.float64)*9e99 
-            maxes = np.zeros((nSeqs[sp1], 1), dtype=np.float64)
-            for B, sp2 in zip(Bs, self.species):
-                mins = np.minimum(mins, lil_min(B))
-                maxes = np.maximum(maxes, lil_max(B))
-            for jjSp, B  in enumerate(Bs):
-                for og, m in zip(ogsPerSpecies, ogMatrices):
-                    for gi, i in og[iiSp]:
-                        for gj, j in og[jjSp]:
-                                m[i, j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) /  maxes[gi.iSeq]
-        return ogs, ogMatrices
+        with warnings.catch_warnings():         
+            warnings.simplefilter("ignore")
+            ogs = self.ogSet.OGs()
+            ogsPerSpecies = [[[(g, i) for i, g in enumerate(og) if g.iSp == iSp] for iSp in self.species] for og in ogs]
+            nGenes = [len(og) for og in ogs]
+            nSeqs = self.NumberOfSequences(self.species)
+            ogMatrices = [np.zeros((n, n)) for n in nGenes]
+            for iiSp, sp1 in enumerate(self.species):
+                util.PrintTime("Processing species %d" % sp1)
+                Bs = [matrices.LoadMatrix("Bit", self.ogSet.fileInfo, iiSp, jjSp) for jjSp in xrange(len(self.species))]
+                mins = np.ones((nSeqs[sp1], 1), dtype=np.float64)*9e99 
+                maxes = np.zeros((nSeqs[sp1], 1), dtype=np.float64)
+                for B, sp2 in zip(Bs, self.species):
+                    mins = np.minimum(mins, lil_min(B))
+                    maxes = np.maximum(maxes, lil_max(B))
+                for jjSp, B  in enumerate(Bs):
+                    for og, m in zip(ogsPerSpecies, ogMatrices):
+                        for gi, i in og[iiSp]:
+                            for gj, j in og[jjSp]:
+                                    m[i, j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) /  maxes[gi.iSeq]
+            return ogs, ogMatrices
     
     def DeleteBlastMatrices(self):
         for f in glob.glob(self.ogSet.fileInfo.outputDir + "Bit*_*.pic"):
