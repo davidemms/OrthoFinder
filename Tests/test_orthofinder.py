@@ -50,7 +50,7 @@ expectedHelp="""OrthoFinder version %s Copyright (C) 2014 David Emms
 Simple Usage
 ------------
 python orthofinder.py -f fasta_directory [-t number_of_blast_threads] [-a number_of_orthofinder_threads]
-    Infers orthologous groups for the proteomes contained in fasta_directory running
+    Infers orthogroups for the proteomes contained in fasta_directory running
     number_of_blast_threads in parallel for the BLAST searches and subsequently running
     number_of_orthofinder_threads in parallel for the OrthoFinder algorithm.
 
@@ -58,12 +58,12 @@ Advanced Usage
 --------------
 python orthofinder.py -f fasta_directory -p
     1. Prepares files for BLAST and prints the BLAST commands. Does not perform BLAST searches
-    or infer orthologous groups. Useful if you want to prepare the files in the form required by
+    or infer orthogroups. Useful if you want to prepare the files in the form required by
     OrthoFinder but want to perform the BLAST searches using a job scheduler/on a cluster and
-    then infer orthologous groups using option 2.
+    then infer orthogroups using option 2.
 
 python orthofinder.py -b precalculated_blast_results_directory [-a number_of_orthofinder_threads]
-    2. Infers orthologous groups using pre-calculated BLAST results. These can be after BLAST
+    2. Infers orthogroups using pre-calculated BLAST results. These can be after BLAST
     searches have been completed following the use of option 1 or using the WorkingDirectory
     from a previous OrthoFinder run. Species can be commented out with a '#' in the SpeciesIDs.txt
     file to exclude them from the analysis. See README file for details.
@@ -104,7 +104,7 @@ Arguments
 
 -p , --prepare
     Only prepare the files in the format required by OrthoFinder and print out the BLAST searches that
-    need to be performed but don't run BLAST or infer orthologous groups
+    need to be performed but don't run BLAST or infer orthogroups
 
 -h, --help
     Print this help text
@@ -166,7 +166,7 @@ class TestCommandLine(unittest.TestCase):
         - Prints name of results files
             - These are were they should be
         - Claimed results files should've only just been created
-        - Results files should all contain the correct orthologous groups
+        - Results files should all contain the correct orthogroups
     """
     @classmethod
     def setUpClass(cls):
@@ -553,7 +553,20 @@ class TestCommandLine(unittest.TestCase):
             self.assertTrue(")" in l)
             self.assertTrue("," in l)
             self.assertTrue(";" in l)  
-        self.test_passed = True         
+        self.test_passed = True      
+        
+    def test_DuplicateAccession(self):
+        currentResultsDir = baseDir + "Input/SmallExampleDataset_dup_acc/" + "Results_%s/" % datetime.date.today().strftime("%b%d") 
+        with CleanUp([], [], [currentResultsDir]):        
+            self.stdout, self.stderr = self.RunOrthoFinder("-f %s" % baseDir + "Input/SmallExampleDataset_dup_acc/")
+            # Tree exists
+            expectedFN = baseDir + "Input/SmallExampleDataset_dup_acc/" + ("Results_%s/" % datetime.date.today().strftime("%b%d")) + ("Orthologues_%s/" % datetime.date.today().strftime("%b%d")) + "Gene_Trees/OG0000000_tree.txt"
+            self.assertTrue(os.path.exists(expectedFN))
+            # No error
+            self.assertTrue("ERROR" not in self.stdout)
+            self.assertTrue(len(self.stderr) == 0)
+            # run completes
+            self.assertTrue("Orthogroup statistics:"  in self.stdout)
         
         
 #    def test_treesExtraSpecies(self):
@@ -568,7 +581,7 @@ class TestCommandLine(unittest.TestCase):
     def tearDown(self):
         self.CleanCurrentResultsDir()
         if not self.test_passed:
-#            print(self.stdout)
+            #print(self.stdout)
             print(self.stderr)
         
     def RunOrthoFinder(self, commands):

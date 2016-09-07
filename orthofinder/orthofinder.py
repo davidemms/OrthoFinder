@@ -179,19 +179,19 @@ class MCL:
         except RuntimeError as error:
             print(error.message)
             if error.message.startswith("ERROR"):
-                print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
+                print("ERROR: %s contains a duplicate ID. The IDs for the orthogroups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
                 util.Fail()
             else:
-                print("Tried to use only the first part of the accession in order to list the sequences in each orthologous group\nmore concisely but these were not unique. The full accession line will be used instead.\n")     
+                print("Tried to use only the first part of the accession in order to list the sequences in each orthogroup\nmore concisely but these were not unique. The full accession line will be used instead.\n")     
                 try:
                     fullDict = dict()
                     for idsFilename in idsFilenames:
-                        idExtract = util.tFullAccession(idsFilename)
+                        idExtract = util.FullAccession(idsFilename)
                         idDict = idExtract.GetIDToNameDict()
                         fullDict.update(idDict)
                     MCL.CreateOGs(ogs, outputFN, fullDict)   
                 except:
-                    print("ERROR: %s contains a duplicate ID. The IDs for the orthologous groups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
+                    print("ERROR: %s contains a duplicate ID. The IDs for the orthogroups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
                     util.Fail()
         return fullDict
     
@@ -538,7 +538,7 @@ def OrthogroupsMatrix(iSpecies, properOGs):
     speciesIndexDict = {iSp:iCol for iCol, iSp in enumerate(iSpecies)}
     nSpecies = len(iSpecies)
     nGroups = len(properOGs)
-    # (i, j)-th entry of ogMatrix gives the number of genes from i in orthologous group j
+    # (i, j)-th entry of ogMatrix gives the number of genes from i in orthogroup j
     ogMatrix = np.zeros((nGroups, nSpecies)) 
     for i_og, og in enumerate(properOGs):
         for species, _ in og:
@@ -731,7 +731,7 @@ def PrintHelp():
     print("Simple Usage") 
     print("------------")
     print("python orthofinder.py -f fasta_directory [-t number_of_blast_threads] [-a number_of_orthofinder_threads]")
-    print("    Infers orthologous groups for the proteomes contained in fasta_directory running")
+    print("    Infers orthogroups for the proteomes contained in fasta_directory running")
     print("    number_of_blast_threads in parallel for the BLAST searches and subsequently running")
     print("    number_of_orthofinder_threads in parallel for the OrthoFinder algorithm.")
     print("")    
@@ -739,12 +739,12 @@ def PrintHelp():
     print("--------------")
     print("python orthofinder.py -f fasta_directory -p")
     print("    1. Prepares files for BLAST and prints the BLAST commands. Does not perform BLAST searches")
-    print("    or infer orthologous groups. Useful if you want to prepare the files in the form required by")
+    print("    or infer orthogroups. Useful if you want to prepare the files in the form required by")
     print("    OrthoFinder but want to perform the BLAST searches using a job scheduler/on a cluster and")
-    print("    then infer orthologous groups using option 2.")
+    print("    then infer orthogroups using option 2.")
     print("")
     print("python orthofinder.py -b precalculated_blast_results_directory [-a number_of_orthofinder_threads]")
-    print("    2. Infers orthologous groups using pre-calculated BLAST results. These can be after BLAST")
+    print("    2. Infers orthogroups using pre-calculated BLAST results. These can be after BLAST")
     print("    searches have been completed following the use of option 1 or using the WorkingDirectory")
     print("    from a previous OrthoFinder run. Species can be commented out with a '#' in the SpeciesIDs.txt")
     print("    file to exclude them from the analysis. See README file for details.")
@@ -785,7 +785,7 @@ def PrintHelp():
     
     print("""-p , --prepare
     Only prepare the files in the format required by OrthoFinder and print out the BLAST searches that
-    need to be performed but don't run BLAST or infer orthologous groups\n""" )
+    need to be performed but don't run BLAST or infer orthogroups\n""" )
         
     print("""-h, --help
     Print this help text""")

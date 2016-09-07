@@ -225,7 +225,7 @@ def GetIDsDict(orthofinderWorkingDir):
             print("ERROR: %s contains a duplicate ID. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, idsFilename))
             util.Fail()
         else:
-            print("Tried to use only the first part of the accession in order to list the sequences in each orthologous group more concisely but these were not unique. Will use the full accession line instead.")     
+            print("Tried to use only the first part of the accession in order to list the sequences in each orthogroup more concisely but these were not unique. Will use the full accession line instead.")     
             try:
                 idExtract = util.FullAccession(idsFilename)
                 idDict = idExtract.GetIDToNameDict()
