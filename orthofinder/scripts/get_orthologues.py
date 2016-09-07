@@ -352,19 +352,6 @@ class DendroBLASTTrees(object):
             nTaxa = len(ogs[iog])
             cmds.append([" ".join(["fastme", "-i", self.distPat % iog, "-o", self.treesPatIDs % iog, "-w", "O"] + (["-s"] if nTaxa < 1000 else []))])
         return cmds
-
-    def RenameTreeTaxa(self, treeFN, newTreeFilename, idsMap, qFixNegatives=False):     
-#        with open(treeFN, "rb") as inputTree: treeString = inputTree.next()
-        try:
-            t = tree.Tree(treeFN)
-            for node in t.get_leaves():
-                node.name = idsMap[node.name]
-            if qFixNegatives:
-                for n in t.traverse():
-                    if n.dist < 0.0: n.dist = 0.0
-            t.write(outfile = newTreeFilename, format=4)  
-        except:
-            pass
         
     def RunAnalysis(self):
         ogs, ogMatrices_partial = self.GetOGMatrices()
@@ -378,10 +365,8 @@ class DendroBLASTTrees(object):
         util.RunParallelOrderedCommandLists(self.nProcesses, [[cmd_spTree]] + cmds_geneTrees, qHideStdout = True)
         seqDict = self.ogSet.Spec_SeqDict()
         for iog in xrange(len(self.ogSet.OGs())):
-            self.RenameTreeTaxa(self.treesPatIDs % iog, self.treesPat % iog, seqDict, qFixNegatives=True)
-        self.RenameTreeTaxa(spTreeFN_ids, self.workingDir + "SpeciesTree_unrooted.txt", self.ogSet.SpeciesDict(), qFixNegatives=True)       
-        #spTreeFN_ids = RunAstral(self.ogSet, self.treesPatIDs, self.workingDir)   
-        #self.RenameTreeTaxa(spTreeFN_ids, self.workingDir + "SpeciesTree_astral_unrooted.txt", self.ogSet.SpeciesDict(), qFixNegatives=True)     
+            util.RenameTreeTaxa(self.treesPatIDs % iog, self.treesPat % iog, seqDict, qFixNegatives=True)
+#        util.RenameTreeTaxa(spTreeFN_ids, self.workingDir + "SpeciesTree_unrooted.txt", self.ogSet.SpeciesDict(), qFixNegatives=True)        
         return len(ogs), D, spPairs, spTreeFN_ids
 
 # ==============================================================================================================================      
@@ -535,14 +520,11 @@ def GetResultsFilesString(rootedSpeciesTreeFN):
 
 def CleanWorkingDir(dendroBlast):
     dendroBlast.DeleteBlastMatrices()
-    dirs = ['Distances/', "matrices_orthologues/", "Trees_ids_arbitraryRoot/", "SpeciesTree_unrooted.txt"]
+    dirs = ['Distances/', "matrices_orthologues/", "Trees_ids_arbitraryRoot/"]
     for d in dirs:
         dFull = dendroBlast.workingDir + d
         if os.path.exists(dFull): 
-            if dFull[-1] == "/":
-                shutil.rmtree(dFull)
-            else:
-                os.remove(dFull)
+            shutil.rmtree(dFull)
             
 def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs, nProcesses):
     ogSet = OrthoGroupsSet(orthofinderWorkingDir, clustersFilename_pairs, idExtractor = util.FirstWordExtractor)
@@ -588,12 +570,16 @@ def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, clustersFilenam
             resultsDir_new = resultsDir + "Orthologues/"
             resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
         os.mkdir(resultsDir_new)
-        db.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True)
+        util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True)
 
         print("\n5%s. Reconciling gene and species trees" % ("-%d"%i if qMultiple else "")) 
         print(  "-------------------------------------" + ("--" if qMultiple else ""))   
         print("Outgroup: " + (", ".join([spDict[s] for s in r])))
         dlcparResultsDir = RunDlcpar(db.treesPatIDs, ogSet, nOGs, speciesTree_fn, db.workingDir)
+        reconTreesRenamedDir = db.workingDir + "Recon_Gene_Trees/"
+        os.mkdir(reconTreesRenamedDir)
+        for iog in xrange(len(db.ogSet.OGs())):
+            util.RenameTreeTaxa(dlcparResultsDir + "OG%07d_tree_id.locus.tree" % iog, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, db.ogSet.Spec_SeqDict(), qFixNegatives=False, inFormat=8)
 
         # Orthologue lists
         print("\n6%s. Inferring orthologues from gene trees" % ("-%d"%i if qMultiple else ""))

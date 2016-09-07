@@ -37,6 +37,7 @@ import Queue
 import multiprocessing as mp
 from collections import namedtuple
 
+import tree
 
 """
 Utilities
@@ -306,6 +307,23 @@ class FirstWordExtractor(IDExtractor):
         
     def GetNameToIDDict(self):
         return self.nameToIDDict    
+
+
+def RenameTreeTaxa(treeFN, newTreeFilename, idsMap, qFixNegatives=False, inFormat=None):     
+#        with open(treeFN, "rb") as inputTree: treeString = inputTree.next()
+    try:
+        if inFormat == None:
+            t = tree.Tree(treeFN)
+        else:
+            t = tree.Tree(treeFN, format=inFormat)
+        for node in t.get_leaves():
+            node.name = idsMap[node.name]
+        if qFixNegatives:
+            for n in t.traverse():
+                if n.dist < 0.0: n.dist = 0.0
+        t.write(outfile = newTreeFilename, format=4)  
+    except:
+        pass
 
 def IsWorkingDirectory(orthofinderWorkingDir):
     ok = True
