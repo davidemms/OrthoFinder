@@ -33,7 +33,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.0.2"
+version = "1.0.3"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:

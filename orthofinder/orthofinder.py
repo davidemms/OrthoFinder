@@ -485,13 +485,13 @@ class WaterfallMethod:
                     return  
                                    
     @staticmethod
-    def WriteGraphParallel(seqsInfo, fileInfo):
+    def WriteGraphParallel(seqsInfo, fileInfo, nProcess):
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
             with open(fileInfo.graphFilename + "_header", 'wb') as graphFile:
                 graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (seqsInfo.nSeqs, seqsInfo.nSeqs)) 
                 graphFile.write("\n(mclmatrix\nbegin\n\n") 
-            pool = mp.Pool()
+            pool = mp.Pool(nProcess)
             pool.map(WriteGraph_perSpecies, [(seqsInfo, fileInfo, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
             subprocess.call("cat " + fileInfo.graphFilename + "_header " + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename, shell=True)
             # Cleanup
@@ -1159,7 +1159,7 @@ if __name__ == "__main__":
     util.ManageQueue(runningProcesses, cmd_queue)
     
     util.PrintTime("Connected putatitive homologs") 
-    WaterfallMethod.WriteGraphParallel(seqsInfo, fileInfo)
+    WaterfallMethod.WriteGraphParallel(seqsInfo, fileInfo, nProcessAlg)
     
     # 5b. MCL     
     clustersFilename, iResultsVersion = util.GetUnusedFilename(workingDir + "clusters_%s_I%0.1f" % (fileIdentifierString, mclInflation), ".txt")
