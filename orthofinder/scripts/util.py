@@ -43,11 +43,11 @@ import tree
 Utilities
 -------------------------------------------------------------------------------
 """
-SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices")
+SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")
 FileInfo = namedtuple("FileInfo", "inputDir outputDir graphFilename")     
 
 picProtocol = 1
-version = "1.0.3"
+version = "1.0.4"
 
 def PrintNoNewLine(text):
     sys.stdout.write(text)
@@ -215,31 +215,38 @@ def SortFastaFilenames(fastaFilenames):
         start = f.rfind("Species")
         speciesIndices.append(int(f[start+7:-3]))
     indices, sortedFasta = SortArrayPairByFirst(speciesIndices, fastaFilenames)
-    return sortedFasta    
-        
+    return sortedFasta        
 
 # Get Info from seqs IDs file?
-def GetSeqsInfo(inputDirectory, speciesToUse):
+def GetSeqsInfo(inputDirectory, speciesToUse, nSpAll):
     seqStartingIndices = [0]
     nSeqs = 0
-    for i, iFasta in enumerate(speciesToUse):
+    nSeqsPerSpecies = dict()
+    for iFasta in xrange(nSpAll):
         fastaFilename = inputDirectory + "Species%d.fa" % iFasta
+        n = 0
         with open(fastaFilename) as infile:
             for line in infile:
                 if len(line) > 1 and line[0] == ">":
-                    nSeqs+=1
-        seqStartingIndices.append(nSeqs)
+                    n+=1
+        nSeqsPerSpecies[iFasta] = n
+        if iFasta in speciesToUse:
+            nSeqs += n
+            seqStartingIndices.append(nSeqs)
     seqStartingIndices = seqStartingIndices[:-1]
     nSpecies = len(speciesToUse)
-    return SequencesInfo(nSeqs=nSeqs, nSpecies=nSpecies, speciesToUse=speciesToUse, seqStartingIndices=seqStartingIndices)
+    return SequencesInfo(nSeqs=nSeqs, nSpecies=nSpecies, speciesToUse=speciesToUse, seqStartingIndices=seqStartingIndices, nSeqsPerSpecies=nSeqsPerSpecies)
  
 def GetSpeciesToUse(speciesIDsFN):
+    """Returns species indices to use and total number of species available """
     speciesToUse = []
+    nSkipped = 0
     with open(speciesIDsFN, 'rb') as speciesF:
         for line in speciesF:
-            if len(line) == 0 or line[0] == "#": continue
-            speciesToUse.append(int(line.split(":")[0]))
-    return speciesToUse
+            if len(line) == 0: continue
+            elif line[0] == "#": nSkipped += 1
+            else: speciesToUse.append(int(line.split(":")[0]))
+    return speciesToUse, len(speciesToUse) + nSkipped
     
 def Fail():
     print("ERROR: An error occurred, please review previous error messages for more information.")
@@ -269,8 +276,9 @@ class FullAccession(IDExtractor):
         self.nameToIDDict = dict()
         with open(idsFilename, 'rb') as idsFile:
             for line in idsFile:
-                if line.startswith("#"): continue
+#                if line.startswith("#"): continue
                 id, accession = line.rstrip().split(": ", 1)
+                id = id.replace("#", "")
                 # Replace problematic characters
                 accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_")
                 if id in self.idToNameDict:

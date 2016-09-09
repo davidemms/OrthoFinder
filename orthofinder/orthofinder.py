@@ -301,7 +301,7 @@ RunInfo
 def GetSequenceLengths(seqsInfo, fileInfo):                
     sequenceLengths = []
     for iSpecies, iFasta in enumerate(seqsInfo.speciesToUse):
-        sequenceLengths.append(np.zeros(BlastFileProcessor.NumberOfSequences(seqsInfo, iSpecies)))
+        sequenceLengths.append(np.zeros(seqsInfo.nSeqsPerSpecies[iFasta]))
         fastaFilename = fileInfo.inputDir + "Species%d.fa" % iFasta
         currentSequenceLength = 0
         iCurrentSequence = -1
@@ -337,11 +337,10 @@ def GetOrderedBlastCommands(seqsInfo, previousFastaFiles, newFastaFiles, working
     """
     iSpeciesPrevious = [int(fn[fn.rfind("Species") + 7:].split(".")[0]) for fn in previousFastaFiles]
     iSpeciesNew = [int(fn[fn.rfind("Species") + 7:].split(".")[0]) for fn in newFastaFiles]
-    nSeqs = {i:GetNumberOfSequencesInFile(workingDir + "Species%d.fa" % i) for i in (iSpeciesPrevious+iSpeciesNew)}
     speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew)] + \
                    [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesPrevious)] + \
                    [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew)] 
-    taskSizes = [nSeqs[i]*nSeqs[j] for i,j in speciesPairs]
+    taskSizes = [seqsInfo.nSeqsPerSpecies[i]*seqsInfo.nSeqsPerSpecies[j] for i,j in speciesPairs]
     taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
     commands = [["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", workingDir + "Species%d.fa" % iFasta, "-db", workingDir + "BlastDBSpecies%d" % iDB, "-out", "%sBlast%d_%d.txt" % (workingDir, iFasta, iDB)]
                     for iFasta, iDB in speciesPairs]               
@@ -359,7 +358,7 @@ def DeleteMatrices(fileInfo):
         if os.path.exists(f): os.remove(f)
             
 def GetBH_s(pairwiseScoresMatrices, seqsInfo, iSpecies, tol=1e-3):
-    nSeqs_i = BlastFileProcessor.NumberOfSequences(seqsInfo, iSpecies)
+    nSeqs_i = seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpecies]]
     bestHitForSequence = -1*np.ones(nSeqs_i)
     H = [None for i_ in xrange(seqsInfo.nSpecies)] # create array of Nones to be replace by matrices
     for j in xrange(seqsInfo.nSpecies):
@@ -413,7 +412,7 @@ def WriteGraph_perSpecies(args):
         B_connect = matrices.MatricesAnd_s(connect2, B)
         
         W = [b.sorted_indices().tolil() for b in B_connect]
-        for query in xrange(BlastFileProcessor.NumberOfSequences(seqsInfo, iSpec)):
+        for query in xrange(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]):
             offset = seqsInfo.seqStartingIndices[iSpec]
             graphFile.write("%d    " % (offset + query))
             for jSpec in xrange(seqsInfo.nSpecies):
@@ -446,7 +445,7 @@ class WaterfallMethod:
             # process up to the best hits for each species
             Bi = []
             for jSpecies in xrange(seqsInfo.nSpecies):
-                Bij = BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies)  
+                Bij = BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies])  
                 Bij = WaterfallMethod.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
                 Bi.append(Bij)
             matrices.DumpMatrixArray("B", Bi, fileInfo, iSpecies)
@@ -501,7 +500,7 @@ class WaterfallMethod:
                 
     @staticmethod
     def GetMostDistant_s(RBH, B, seqsInfo, iSpec):
-        mostDistant = numeric.transpose(np.ones(BlastFileProcessor.NumberOfSequences(seqsInfo, iSpec))*1e9)
+        mostDistant = numeric.transpose(np.ones(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]])*1e9)
         for kSpec in xrange(seqsInfo.nSpecies):
             B[kSpec] = B[kSpec].tocsr()
             if iSpec == kSpec:
@@ -514,7 +513,7 @@ class WaterfallMethod:
     @staticmethod
     def ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec):
         connect = []
-        nSeqs_i = BlastFileProcessor.NumberOfSequences(seqsInfo, iSpec)
+        nSeqs_i = seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]
         for jSpec in xrange(seqsInfo.nSpecies):
             M=B[jSpec].tolil()
             if iSpec != jSpec:
@@ -524,7 +523,7 @@ class WaterfallMethod:
             II = [i for (i, j) in IIJJ]
             JJ = [j for (i, j) in IIJJ]
             onesArray = np.ones(len(IIJJ))
-            mat = sparse.csr_matrix( (onesArray,  (II, JJ)), shape=(nSeqs_i,  BlastFileProcessor.NumberOfSequences(seqsInfo, jSpec)))
+            mat = sparse.csr_matrix( (onesArray,  (II, JJ)), shape=(nSeqs_i,  seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[jSpec]]))
             connect.append(mat)
         return connect
     
@@ -961,7 +960,7 @@ if __name__ == "__main__":
         if not os.path.exists(speciesIdsFilename):
             print("%s file must be provided if using previously calculated BLAST results" % speciesIdsFilename)
             util.Fail()
-        speciesToUse = util.GetSpeciesToUse(speciesIdsFilename)
+        speciesToUse, nSpAll = util.GetSpeciesToUse(speciesIdsFilename)
         workingDir = os.path.abspath(workingDir) + os.sep
         if resultsDir == None: 
             workingDir = workingDir_previous
@@ -1032,7 +1031,8 @@ if __name__ == "__main__":
     else:
         newFastaFiles, userFastaFilenames, idsFilename, speciesIdsFilename, newSpeciesIDs, previousSpeciesIDs = AssignIDsToSequences(fastaDir, workingDir)
         speciesToUse = speciesToUse + newSpeciesIDs
-    seqsInfo = util.GetSeqsInfo(workingDir_previous if qUsePrecalculatedBlast else workingDir, speciesToUse)
+        nSpAll = max(speciesToUse) + 1      # will be one of the new species
+    seqsInfo = util.GetSeqsInfo(workingDir_previous if qUsePrecalculatedBlast else workingDir, speciesToUse, nSpAll)
     
     if qXML:   
         print("\n2b. Reading species information file")
@@ -1187,7 +1187,7 @@ if __name__ == "__main__":
     if qOrthologues:
         print("\nRunning Orthologue Prediction")
         print(  "=============================")
-        orthologuesResultsFilesString = get_orthologues.GetOrthologues(workingDir, resultsDir, clustersFilename_pairs, nBlast)
+        orthologuesResultsFilesString = get_orthologues.GetOrthologues(workingDir, resultsDir, speciesToUse, nSpAll, clustersFilename_pairs, nBlast)
         print(orthogroupsResultsFilesString)
         print(orthologuesResultsFilesString.rstrip())
     print("")

@@ -68,8 +68,8 @@ def make_dicts(dlcparResultsDir, outputDir):
     return Orthologs, picFN
     
 def GetSpeciesGenesInfo(ogSet):
-    speciesLabels = util.GetSpeciesToUse(ogSet.speciesIDsFN) 
-    seqsInfo = util.GetSeqsInfo(ogSet.workingDirOF, speciesLabels)
+    speciesLabels, nSpAll = util.GetSpeciesToUse(ogSet.speciesIDsFN) 
+    seqsInfo = util.GetSeqsInfo(ogSet.workingDirOF, speciesLabels, nSpAll)
     genenumbers = list(np.diff(seqsInfo.seqStartingIndices))
     genenumbers.append(seqsInfo.nSeqs - seqsInfo.seqStartingIndices[-1])
     return speciesLabels, genenumbers
@@ -147,7 +147,7 @@ def find_all(matrix, orig_matrix):
 def species_find_all(ogSet, matrixDir, resultsDir):
     speciesDict = ogSet.SpeciesDict()
     # Calls multiply and find_all on each species pair, and appends the numbers from find_all's output to the relevant csv lists.
-    speciesIDs = sorted(map(int, speciesDict.keys()))
+    speciesIDs = ogSet.speciesToUse
     nspecies = len(speciesIDs)           
     for index1 in xrange(nspecies):
         d = resultsDir + "Orthologues_" + speciesDict[str(speciesIDs[index1])]

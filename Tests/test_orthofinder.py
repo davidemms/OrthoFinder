@@ -20,6 +20,7 @@ import csv
 import argparse
 
 __skipLongTests__ = False
+qVerbose = False
 
 baseDir = os.path.dirname(os.path.realpath(__file__)) + os.sep
 qBinary = False
@@ -33,7 +34,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.0.3"
+version = "1.0.4"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -173,19 +174,7 @@ class TestCommandLine(unittest.TestCase):
         capture = subprocess.Popen("blastp -version", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
         stdout = "".join([x for x in capture.stdout])
         if requiredBlastVersion not in stdout:
-            raise RuntimeError("Tests require BLAST version %s" % requiredBlastVersion)
-        
-    
-#    @unittest.skipIf(__skipLongTests__, "Only performing quick tests")     
-    def test_fromfasta_full(self):
-        currentResultsDir = exampleFastaDir + "Results_%s/" % datetime.date.today().strftime("%b%d") 
-        expectedCSVFile = currentResultsDir + "Orthogroups.csv"
-        with CleanUp([], [], [currentResultsDir, ]):
-            self.stdout, self.stderr = self.RunOrthoFinder("-f %s" % exampleFastaDir)
-            self.CheckStandardRun(self.stdout, self.stderr, goldResultsDir_smallExample, expectedCSVFile)  
-            expectedTreeFN = exampleFastaDir + ("Results_%s/" % datetime.date.today().strftime("%b%d")) + ("Orthologues_%s/" % datetime.date.today().strftime("%b%d")) + "Gene_Trees/OG0000000_tree.txt"
-            self.assertTrue(os.path.exists(expectedTreeFN))
-        self.test_passed = True         
+            raise RuntimeError("Tests require BLAST version %s" % requiredBlastVersion)       
             
     def test_fromfasta_threads(self):
         currentResultsDir = exampleFastaDir + "Results_%s/" % datetime.date.today().strftime("%b%d") 
@@ -434,6 +423,33 @@ class TestCommandLine(unittest.TestCase):
             self.CompareFile(goldDir + "SequenceIDs.txt", inputDir + "SequenceIDs.txt")  
         self.test_passed = True         
     
+    
+    def test_removeOneAddOne_fullAnalysis(self):
+        inputDir = baseDir + "Input/AddOneRemoveOne_FullAnalysis/Results_Sep09/WorkingDirectory/"
+        extraBlast = [inputDir + "Blast%d_4.txt" % i for i in xrange(5)] + [inputDir + "Blast4_%d.txt" % i for i in xrange(4)]
+        expectedExtraFiles = extraBlast + [inputDir + fn for fn in ("Orthogroups.csv Orthogroups.txt Orthogroups_UnassignedGenes.csv \
+        Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv \
+        clusters_OrthoFinder_v%s_I1.5.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt OrthoFinder_v%s_graph.txt" % (version, version, version)).split()] 
+        expectedChangedFiles = [inputDir + fn for fn in "SpeciesIDs.txt SequenceIDs.txt".split()]
+        goldDir = baseDir + "ExpectedOutput/AddOneRemoveOne_FullAnalysis/"
+        expExtraDir = [inputDir + "Orthologues_%s/" % datetime.date.today().strftime("%b%d") ]
+        with CleanUp(expectedExtraFiles, expectedChangedFiles, expExtraDir):        
+            self.stdout, self.stderr = self.RunOrthoFinder("-b %s -f %s" % (inputDir, baseDir + "Input/AddOneRemoveOne_FullAnalysis/ExtraFasta/"))
+            for fn in expectedExtraFiles:
+                os.path.split(fn)[1]
+                self.assertTrue(os.path.exists(fn), msg=fn) 
+            self.assertTrue(citation in self.stdout)
+            egOrthologuesFN = expExtraDir[0] + "Orthologues/Orthologues_Mycoplasma_alkalescens/Mycoplasma_alkalescens__v__Mycoplasma_hyopneumoniae.csv"
+            self.assertTrue(os.path.exists(egOrthologuesFN))
+            self.CompareFile_95Percent(goldDir + "Mycoplasma_alkalescens__v__Mycoplasma_hyopneumoniae.csv", egOrthologuesFN) 
+            nTrees = 366
+            for i in xrange(nTrees):
+                self.assertTrue(os.path.exists(expExtraDir[0] + "Gene_Trees/OG%07d_tree.txt" % i))
+                self.assertGreater(os.stat(expExtraDir[0] + "Gene_Trees/OG%07d_tree.txt" % i).st_size, 200)
+            self.assertTrue(os.path.exists(expExtraDir[0] + "SpeciesTree_rooted.txt"))
+            self.assertGreater(os.stat(expExtraDir[0] + "SpeciesTree_rooted.txt").st_size, 150)
+        self.test_passed = True      
+        
 #    def test_addMultipleSpecies_prepare(selg):
 #        pass
 #    
@@ -583,7 +599,7 @@ class TestCommandLine(unittest.TestCase):
     def tearDown(self):
         self.CleanCurrentResultsDir()
         if not self.test_passed:
-            #print(self.stdout)
+            if qVerbose: print(self.stdout)
             print(self.stderr)
         
     def RunOrthoFinder(self, commands):
@@ -655,6 +671,13 @@ class TestCommandLine(unittest.TestCase):
                 shutil.copy(fn_actual, baseDir + "FailedOutput/" + os.path.split(fn_actual)[1]) 
                 self.assertTrue(False, msg=fn_gold) 
         
+    def CompareFile_95Percent(self, fn_gold, fn_actual):
+        with open(fn_gold, 'rb') as g, open(fn_actual, 'rb') as a:
+            G = set(g.readlines())
+            A = set(a.readlines())
+        result = float(len(G.symmetric_difference(A))) / float((min(len(A), len(G))))
+        self.assertLess(result, 0.05)
+        
     def CompareStatsFile(self, fn_gold, fn_actual):
         with open(fn_gold, 'rb') as f_gold, open(fn_actual, 'rb') as f_actual:
             for gold, actual in zip(f_gold, f_actual):
@@ -676,6 +699,7 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--binaries", action="store_true", help="Run tests on binary files")
     parser.add_argument("-t", "--test", help="Individual test to run")
     parser.add_argument("-d", "--dir", help="Test program in specified directory")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Print stdout from failing orthofinder run")
     
     args = parser.parse_args()
     if args.dir:
@@ -685,6 +709,7 @@ if __name__ == "__main__":
         trees_for_orthogroups_bin = os.path.splitext(trees_for_orthogroups)[0]
         
     qBinary = args.binaries
+    qVerbose = args.verbose
     print("Testing:")
     print("  " + orthofinder_bin if qBinary else orthofinder)
     print("  " + trees_for_orthogroups_bin if qBinary else trees_for_orthogroups)

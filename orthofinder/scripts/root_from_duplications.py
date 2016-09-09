@@ -48,17 +48,22 @@ def cmp_noExtra(exp, act):
     act - actual set of species
     """
     return act.issubset(exp)
+    
+def cmp_subset_oneExtra(exp, act):
+    """exp - expected set of species
+    act - actual set of species
+    """
+    return (len(act.difference(exp)) <= 1)
 
 # criteria with which to compare sets of species
 #compare = cmp_equal
 compare = cmp_noExtra
+#compare = cmp_subset_oneExtra
 
 # which clades must satisfy criteria
 criteria = "crit_all"
 #criteria = "crit_one"
 
-spTreeFormat = 3
-qSerial = False
 nProcs = util.nThreadsDefault
 
 class Node(object):
@@ -393,8 +398,7 @@ def ParsimonyRoot(allSpecies, clades, supported_clusters):
                 roots.append(clade)
     return roots, nSupport
 
-def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, treeFmt=None):
-    if treeFmt == None: treeFmt = spTreeFormat
+def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, treeFmt=3):
     speciesTree = tree.Tree(speciesTreeFN, format=treeFmt)
     species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
     pool = mp.Pool(nProcessors, maxtasksperchild=1)       
@@ -419,8 +423,10 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--separator", choices=("dot", "dash", "second_dash", "3rd_dash"))
     parser.add_argument("-S", "--Species_tree")
     parser.add_argument("-d", "--directory", action="store_true")
+    parser.add_argument("--debug", action="store_true", help="Run in serial to enable easier debugging")
     args = parser.parse_args()
-      
+    spTreeFormat = 1
+    
     GeneToSpecies = GeneToSpecies_dash
     if args.separator and args.separator == "dot":
         GeneToSpecies = GeneToSpecies_dot  
@@ -442,7 +448,7 @@ if __name__ == "__main__":
 #        stats = pstats.Stats('profile_stats.stats')
 #        stats.sort_stats('cumulative')
 #        stats.print_stats(0.3)
-    elif qSerial:
+    elif args.debug:
         speciesTree = tree.Tree(args.Species_tree, format=spTreeFormat)
         species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
         clusters = []
