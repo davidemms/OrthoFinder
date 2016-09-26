@@ -34,7 +34,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.0.4"
+version = "1.0.5"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -50,10 +50,9 @@ expectedHelp="""OrthoFinder version %s Copyright (C) 2014 David Emms
 
 Simple Usage
 ------------
-python orthofinder.py -f fasta_directory [-t number_of_blast_threads] [-a number_of_orthofinder_threads]
+python orthofinder.py -f fasta_directory [-t number_of_blast_threads]
     Infers orthogroups for the proteomes contained in fasta_directory running
-    number_of_blast_threads in parallel for the BLAST searches and subsequently running
-    number_of_orthofinder_threads in parallel for the OrthoFinder algorithm.
+    number_of_blast_threads in parallel for the BLAST searches and tree inference.
 
 Advanced Usage
 --------------
@@ -91,14 +90,14 @@ Arguments
     Running the OrthoFinder algorithm with a number of threads simultaneously increases the RAM 
     requirements proportionally so be aware of the amount of RAM you have available (and see README file). 
     Additionally, as the algorithm implementation is very fast, file reading is likely to be the 
-    limiting factor above about 5-10 threads and additional threads may have little effect other than 
+    limiting factor above about 5-10 threads and additional threads may have little effect other than to
     increase RAM requirements. [Default is 1]
 
 -g, --groups
     Only infer orthogroups, do not infer gene trees of orthologues.
 
 -I inflation_parameter, --inflation inflation_parameter
-    Specify a non-default inflation parameter for MCL. [Default is 1.5]
+    Specify a non-default inflation parameter for MCL. Not recommended. [Default is 1.5]
 
 -x speciesInfoFilename, --orthoxml speciesInfoFilename
     Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.

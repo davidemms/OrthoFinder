@@ -733,10 +733,9 @@ def CanRunMCL():
 def PrintHelp():  
     print("Simple Usage") 
     print("------------")
-    print("python orthofinder.py -f fasta_directory [-t number_of_blast_threads] [-a number_of_orthofinder_threads]")
+    print("python orthofinder.py -f fasta_directory [-t number_of_blast_threads]")
     print("    Infers orthogroups for the proteomes contained in fasta_directory running")
-    print("    number_of_blast_threads in parallel for the BLAST searches and subsequently running")
-    print("    number_of_orthofinder_threads in parallel for the OrthoFinder algorithm.")
+    print("    number_of_blast_threads in parallel for the BLAST searches and tree inference.")
     print("")    
     print("Advanced Usage")
     print("--------------")
@@ -774,14 +773,14 @@ def PrintHelp():
     Running the OrthoFinder algorithm with a number of threads simultaneously increases the RAM 
     requirements proportionally so be aware of the amount of RAM you have available (and see README file). 
     Additionally, as the algorithm implementation is very fast, file reading is likely to be the 
-    limiting factor above about 5-10 threads and additional threads may have little effect other than 
+    limiting factor above about 5-10 threads and additional threads may have little effect other than to
     increase RAM requirements. [Default is %d]\n""" % util.nAlgDefault)
     
     print("""-g, --groups
     Only infer orthogroups, do not infer gene trees of orthologues.\n""")
     
     print("""-I inflation_parameter, --inflation inflation_parameter
-    Specify a non-default inflation parameter for MCL. [Default is %0.1f]\n""" % mclInflation)
+    Specify a non-default inflation parameter for MCL. Not recommended. [Default is %0.1f]\n""" % mclInflation)
     
     print("""-x speciesInfoFilename, --orthoxml speciesInfoFilename
     Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.\n""")

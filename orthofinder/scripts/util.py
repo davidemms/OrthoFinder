@@ -47,7 +47,7 @@ SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStar
 FileInfo = namedtuple("FileInfo", "inputDir outputDir graphFilename")     
 
 picProtocol = 1
-version = "1.0.4"
+version = "1.0.5"
 
 def PrintNoNewLine(text):
     sys.stdout.write(text)

@@ -28,6 +28,7 @@
 import os
 import sys
 import glob
+import time
 import shutil
 import subprocess
 import numpy as np
@@ -524,15 +525,18 @@ def GetResultsFilesString(rootedSpeciesTreeFN):
             st += "Species-by-species orthologues directory:\n   %s\n\n" % resultsDir
     return st
             
-
 def CleanWorkingDir(dendroBlast):
     dendroBlast.DeleteBlastMatrices()
     dirs = ['Distances/', "matrices_orthologues/", "Trees_ids_arbitraryRoot/"]
     for d in dirs:
         dFull = dendroBlast.workingDir + d
         if os.path.exists(dFull): 
-            shutil.rmtree(dFull)
-            
+            try:
+                shutil.rmtree(dFull)
+            except OSError:
+                time.sleep(1)
+                shutil.rmtree(dFull, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
+                
 def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, speciesToUse, nSpAll, clustersFilename_pairs, nProcesses):
     ogSet = OrthoGroupsSet(orthofinderWorkingDir, speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor)
     if len(ogSet.speciesToUse) < 4: 
