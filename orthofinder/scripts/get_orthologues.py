@@ -279,14 +279,14 @@ class DendroBLASTTrees(object):
                 Bs = [matrices.LoadMatrix("Bit", self.ogSet.fileInfo, sp1, sp2) for sp2 in self.ogSet.seqsInfo.speciesToUse]
                 mins = np.ones((nSeqs[sp1], 1), dtype=np.float64)*9e99 
                 maxes = np.zeros((nSeqs[sp1], 1), dtype=np.float64)
-                for B, sp2 in zip(Bs, self.ogSet.seqsInfo.speciesToUse):
+                for B in Bs:
                     mins = np.minimum(mins, lil_min(B))
                     maxes = np.maximum(maxes, lil_max(B))
                 for jjSp, B  in enumerate(Bs):
                     for og, m in zip(ogsPerSpecies, ogMatrices):
                         for gi, i in og[iiSp]:
                             for gj, j in og[jjSp]:
-                                    m[i, j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) /  maxes[gi.iSeq]
+                                    m[i, j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) / maxes[gi.iSeq]   # inf if i doesn't hit anything but is hit
             return ogs, ogMatrices
     
     def DeleteBlastMatrices(self):
@@ -299,21 +299,25 @@ class DendroBLASTTrees(object):
             # dendroblast scores
             n = m.shape[0]
             m2 = np.zeros(m.shape)
+            max_og = -9e99
             for i in xrange(n):
                 for j in xrange(i):
-                    m2[i, j] = -np.log(m[i,j] + m[j, i])
-                    m2[j, i] = m2[i, j]
-            self.WritePhylipMatrix(m2, [g.ToString() for g in og], self.distPat % iog)
+                    m2[i, j] = -np.log(m[i,j] + m[j,i])  
+                    m2[j, i] = m2[i, j]  
+                    max_og = max(max_og, m2[i,j])
+            self.WritePhylipMatrix(m2, [g.ToString() for g in og], self.distPat % iog, max_og)
             newMatrices.append(m2)
         return newMatrices
     
-    def WritePhylipMatrix(self, m, names, outFN):
+    def WritePhylipMatrix(self, m, names, outFN, max_og):
+        max_og = 1.1*max_og
         with open(outFN, 'wb') as outfile:
             n = m.shape[0]
             outfile.write("%d\n" % n)
             for i in xrange(n):
                 outfile.write(names[i] + " ")
-                values = " ".join(["%.6g" % (0. + m[i,j]) for j in range(n)])   # hack to avoid printing out "-0"
+                # values could be -inf, these are the most distantly related so replace with max_og
+                values = " ".join(["%.6g" % (0. + (m[i,j] if m[i,j] > -9e99 else max_og)) for j in range(n)])   # hack to avoid printing out "-0"
                 outfile.write(values + "\n")
     
     def SpeciesTreeDistances(self, ogs, ogMatrices, method = 0):
