@@ -71,15 +71,6 @@ To perform an analysis OrthoFinder requires some dependencies to be installed an
 
 Brief instructions are given below although users can refer to the installation notes provided with these packages for more detailed instructions. 
 
-### Running OrthoFinder
-Once the required dependencies have been installed, try running OrthoFinder on the example data:
-
-- `OrthoFinder-1.0.6/orthofinder -f ExampleDataset`
-
-Assuming everything was successful OrthoFinder will end by printing the location of the results files, a short paragraph providing a statistical summary and the OrthoFinder citation. If you make use of OrthoFinder for any of your work then please cite it as this helps support future development. 
-
-If you have problems with this standalone binary version of OrthoFinder you can use the python source code version, which has a name of the form, 'OrthoFinder-1.0.6_source.tar.gz' and is available from the github 'releases tab'. See Section 'Python Source Code Version'.
-
 ### Dependencies
 Each of the following packages provide their own detailed instructions for installation, here we give a concise guide.
 
@@ -108,6 +99,15 @@ DLCpar can be downloaded from http://compbio.mit.edu/dlcpar/ and installed as fo
 3. `cd dlcpar-1.0/`
 4. `sudo python setup.py install`
 
+### Running OrthoFinder
+Once the required dependencies have been installed, try running OrthoFinder on the example data:
+
+- `OrthoFinder-1.0.6/orthofinder -f ExampleDataset`
+
+Assuming everything was successful OrthoFinder will end by printing the location of the results files, a short paragraph providing a statistical summary and the OrthoFinder citation. If you make use of OrthoFinder for any of your work then please cite it as this helps support future development. 
+
+If you have problems with this standalone binary version of OrthoFinder you can use the python source code version, which has a name of the form, 'OrthoFinder-1.0.6_source.tar.gz' and is available from the github 'releases tab'. See Section 'Python Source Code Version'.
+
 ### Setup for advanced use
 The following steps are not required for the standard OrthoFinder use cases and are only needed if you want to run the 'trees_from_MSA' utility or you want to run OrthoFinder using the python source code version.
 
@@ -120,7 +120,7 @@ To use the trees_from_MSA utility there are two additional dependencies which sh
 #### Python Source Code Version
 It is recommended that you use the standalone binaries for OrthoFinder which do not require python or scipy to be installed. However, the python source code version is available from the github 'releases' page (e.g. 'OrthoFinder-1.0.6_source.tar.gz' and requires python 2.7 and scipy to be installed. Up-to-date and clear instructions are provided here: http://www.scipy.org/install.html, be sure to chose a version using python 2.7. As websites can change, an alternative is to search online for "install scipy". 
 
-## Performing a Complete OrthoFinder Analysis
+## Performing Your Own OrthoFinder Analysis
 Performing a complete OrthoFinder analysis is simple:
 
 1. Download the amino acid sequences, in FASTA format, for the species you want to analyse. If you have the option, it is best to use a version containing a single representative/longest transcript-variant for each gene.
