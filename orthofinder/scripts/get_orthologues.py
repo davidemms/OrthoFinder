@@ -448,16 +448,14 @@ def RunDlcpar(treesPat, ogSet, nOGs, speciesTreeFN, workingDir):
     - run
     
     """
-    rootedTreeDir = workingDir + "Trees_ids_arbitraryRoot/"
-    if not os.path.exists(rootedTreeDir): os.mkdir(rootedTreeDir)
-    RootGeneTreesArbitrarily(treesPat, nOGs, rootedTreeDir)
-    geneMapFN = WriteGeneSpeciesMap(rootedTreeDir, ogSet)
-
     dlcparResultsDir = workingDir + 'dlcpar/'
     if not os.path.exists(dlcparResultsDir): os.mkdir(dlcparResultsDir)
-    filenames = [rootedTreeDir + os.path.split(treesPat % i)[1] for i in xrange(nOGs)]
+    RootGeneTreesArbitrarily(treesPat, nOGs, dlcparResultsDir)
+    geneMapFN = WriteGeneSpeciesMap(dlcparResultsDir, ogSet)
+
+    filenames = [dlcparResultsDir + os.path.split(treesPat % i)[1] for i in xrange(nOGs)]
     
-    dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -O %s' % (speciesTreeFN, geneMapFN, fn, dlcparResultsDir + os.path.splitext(os.path.split(fn)[1])[0]) for fn in filenames]
+    dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt' % (speciesTreeFN, geneMapFN, fn) for fn in filenames]
 #    print(dlcCommands[0])
     # use this to run in parallel
     util.RunParallelOrderedCommandLists(nThreads, [[c] for c in dlcCommands], qHideStdout = True)
@@ -531,7 +529,7 @@ def GetResultsFilesString(rootedSpeciesTreeFN):
             
 def CleanWorkingDir(dendroBlast):
     dendroBlast.DeleteBlastMatrices()
-    dirs = ['Distances/', "matrices_orthologues/", "Trees_ids_arbitraryRoot/"]
+    dirs = ['Distances/', "matrices_orthologues/"]
     for d in dirs:
         dFull = dendroBlast.workingDir + d
         if os.path.exists(dFull): 
