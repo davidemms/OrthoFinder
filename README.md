@@ -1,9 +1,10 @@
 # OrthoFinder — Accurate inference of orthogroups, orthologues, gene trees and rooted species tree made easy!
 
 ![OrthoFinder workflow](orthofinder/workflow.png)
+*Figure 1: Automatic OrthoFinder analysis*
 
 ## What does OrthoFinder do?
-OrthoFinder is a fast, accurate and comprehensive analysis tool for comparative genomics. It finds **orthologues** and **orthogroups}** infers **gene trees** for all orthogroups and infers a **rooted species tree** for the species being analysed. OrthoFinder also provides **comprehensive statistics** for comparative genomic analyses. OrthoFinder is simple to use and all you need to run it is a set of protein sequence files (one per species) in FASTA format.
+OrthoFinder is a fast, accurate and comprehensive analysis tool for comparative genomics. It finds **orthologues** and **orthogroups** infers **gene trees** for all orthogroups and infers a **rooted species tree** for the species being analysed. OrthoFinder also provides **comprehensive statistics** for comparative genomic analyses. OrthoFinder is simple to use and all you need to run it is a set of protein sequence files (one per species) in FASTA format.
 
 For more details see the OrthoFinder paper below.
 
@@ -18,17 +19,17 @@ https://github.com/davidemms/OrthoFinder
 ## What's New
 **Oct. 2016**:  Check out the new **PDF Manual**!
 
-**Sep. 2016**: OrthoFinder now infers the **gene trees** for the orthogroups, the **rooted species tree**, all **orthologues** between all species and calculates summary statistics.
+**Sep. 2016**: OrthoFinder now infers the gene trees for the orthogroups, the rooted species tree, all **orthologues** between all species and calculates summary statistics.
 
-**Jul. 2016**: OrthoFinder now outputs **summary statistics** for the orthogroups produced. Statistics are in the files **Statistics_Overall.csv, Statistics_PerSpecies.csv** and **Orthogroups_SpeciesOverlaps.csv**.
+**Jul. 2016**: OrthoFinder now outputs **summary statistics** for the orthogroups produced. Statistics are in the files Statistics_Overall.csv, Statistics_PerSpecies.csv and Orthogroups_SpeciesOverlaps.csv.
 
-**Jul. 2016**: Provided **standalone binaries** for those without access to python (download the package from OrthoFinder's GitHub **releases tab**).
+**Jul. 2016**: Provided **standalone binaries** for those without access to python (download the package from OrthoFinder's GitHub releases tab).
 
 **Jun. 2016**: **Parallelised** the remainder of the OrthoFinder algorithm. 
 
 **Jan. 2016**: Added the ability to **add and remove species**.
 
-**Sept. 2015**: Added the **trees_from_MSA.py** utility to automatically calculate multiple sequence alignments and gene trees for the orthogroups calcualted using OrthoFinder.
+**Sept. 2015**: Added the **trees_from_MSA** utility to automatically calculate multiple sequence alignments and gene trees for the orthogroups calcualted using OrthoFinder.
 
 ## Orthogroups, Orthologues & Paralogues
 'Orthologue' is a term that applies to genes from two species. Orthologues are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Figure 2A & B). An orthogroup is the natural extension of the concept of orthology to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). 
@@ -39,6 +40,7 @@ As a result of gene duplication events, it is possible to have multiple genes fr
 Gene duplication events give rise to paralogues. Paralogues are pairs of genes that diverged from a single gene at a gene duplication event. The two chicken genes ChA1 and ChA2 are paralogues (Figure 2A & C). Two genes from different species can also be paralogues if the diverged from one another at a gene duplication event, although there are no examples of this in Figure 2. Since all branching events in a gene tree are either speciation events (that give rise to orthologues) or duplication events (that give rise to paralogues), any genes in the same orthogroup that are not orthologues must necessarily be paralogues.
 
 ![Orthologues, Orthogroups & Paralogues](orthofinder/Orthogroups_Orthologues_Paralogues.png)
+*Figure 2: Orthologues, Orthogroups & Paralogues*
 
 ### Why Orthogroups
 If you followed the explanations above it will be clear that an orthogroup is just a gene family/clade of genes defined at a specific taxonomic level—namely, those genes descended from a single gene at the time of the LCA. Some may regard this definition of an orthogroup as unsatisfactory since an orthogroup can contain genes that are paralogues of one another (ChA1 is a paralogue of ChA2 in Figure 2). However, this definition of an orthogroup is the only logically consistent way of extending the concept of orthology to multiple species. If there have been gene duplication events it is not possible to create a group of genes containing all orthologues and only orthologues—try it with the example above! 
@@ -51,11 +53,11 @@ OrthoFinder runs on Linux and Mac, setup instructions are given below.
 ### Set Up
 1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases (for this example we will assume it is OrthoFinder-1.0.6.tar.gz, change this as appropriate.)
 
-2. In a terminal, **cd** to where you downloaded the package 
+2. In a terminal, 'cd' to where you downloaded the package 
 
-3. Extract the files: **tar xzf OrthoFinder-1.0.6.tar.gz**
+3. Extract the files: `tar xzf OrthoFinder-1.0.6.tar.gz`
 
-4. Test you can run OrthoFinder: **OrthoFinder-1.0.6/orthofinder -h**. OrthoFinder should print its 'help' text. 
+4. Test you can run OrthoFinder: `OrthoFinder-1.0.6/orthofinder -h`. OrthoFinder should print its 'help' text. 
 
 To perform an analysis OrthoFinder requires some dependencies to be installed and in the system path (only the first two are needed to infer orthogroups and all four are needed to infer orthologues and gene trees as well):
 
@@ -63,7 +65,7 @@ To perform an analysis OrthoFinder requires some dependencies to be installed an
 
 2. The MCL graph clustering algorithm 
 
-3. FastME (The appropriate version for your system, e.g. `fastme-2.1.5-linux64', should be renamed `fastme', see instructions below.) 
+3. FastME (The appropriate version for your system, e.g. 'fastme-2.1.5-linux64', should be renamed `fastme', see instructions below.) 
 
 4. DLCpar
 
@@ -72,7 +74,7 @@ Brief instructions are given below although users can refer to the installation 
 ### Running OrthoFinder
 Once the required dependencies have been installed, try running OrthoFinder on the example data:
 
-- **OrthoFinder-1.0.6/orthofinder -f ExampleDataset**
+- `OrthoFinder-1.0.6/orthofinder -f ExampleDataset`
 
 Assuming everything was successful OrthoFinder will end by printing the location of the results files, a short paragraph providing a statistical summary and the OrthoFinder citation. If you make use of OrthoFinder for any of your work then please cite it as this helps support future development. 
 
@@ -83,39 +85,40 @@ Each of the following packages provide their own detailed instructions for insta
 
 #### BLAST+
 NCBI BLAST+ is available in the repositories from most Linux distributions and so can be installed in the same way as any other package. For example, on Ubuntu, Debian, Linux Mint:
-- **sudo apt-get install ncbi-blast+**
+- `sudo apt-get install ncbi-blast+`
 
 Alternatively, instructions are provided for installing BLAST+ on Mac and various flavours of Linux on the "Standalone BLAST Setup for Unix" page of the BLAST+ Help manual currently at http://www.ncbi.nlm.nih.gov/books/NBK1762/. Follow the instructions under "Configuration" in the BLAST+ help manual to add BLAST+ to the PATH environment variable.
 
 #### MCL
 The mcl clustering algorithm is available in the repositories of some Linux distributions and so can be installed in the same way as any other package. For example, on Ubuntu, Debian, Linux Mint:
-- **sudo apt-get install mcl**
+- `sudo apt-get install mcl`
 
 Alternatively it can be built from source which will likely require the 'build-essential' or equivalent package on the Linux distribution being used. Instructions are provided on the MCL webpage, http://micans.org/mcl/.  
 
 #### FastME
-FastME can be obtained from http://www.atgc-montpellier.fr/fastme/binaries.php. The package contains a **'binaries/'** directory. Choose the appropriate one for your system and copy it to somewhere in the system path e.g. **'/usr/local/bin'** and name it ** 'fastme'**. I.e.:
+FastME can be obtained from http://www.atgc-montpellier.fr/fastme/binaries.php. The package contains a 'binaries/' directory. Choose the appropriate one for your system and copy it to somewhere in the system path e.g. '/usr/local/bin'** and name it 'fastme'. I.e.:
 
-- **sudo cp fastme-2.1.5-linux64 /usr/local/bin/fastme**
+- `sudo cp fastme-2.1.5-linux64 /usr/local/bin/fastme`
 
 #### DLCpar
 DLCpar can be downloaded from http://compbio.mit.edu/dlcpar/ and installed as for a standard python package:
+
 1. Download the latest version 
-2. Extract the package: **tar xzf dlcpar-1.0.tar.gz**
-3. **cd dlcpar-1.0/**
-4. ** sudo python setup.py install**
+2. Extract the package: `tar xzf dlcpar-1.0.tar.gz`
+3. `cd dlcpar-1.0/`
+4. `sudo python setup.py install`
 
 ### Setup for advanced use
-The following steps are not required for the standard OrthoFinder use cases and are only needed if you want to run the **'trees\_from\_MSA'** utility or you want to run OrthoFinder using the python source code version.
+The following steps are not required for the standard OrthoFinder use cases and are only needed if you want to run the 'trees_from_MSA' utility or you want to run OrthoFinder using the python source code version.
 
 #### Trees from MSA
-To use the trees\_from\_MSA utility there are two additional dependencies which should be installed and in the system path:
+To use the trees_from_MSA utility there are two additional dependencies which should be installed and in the system path:
 
 1. MAFFT
 2. FastTree 
 
 #### Python Source Code Version
-It is recommended that you use the standalone binaries for OrthoFinder which do not require python or scipy to be installed. However, the python source code version is available from the github 'releases' page (e.g. 'OrthoFinder-1.0.6\_source.tar.gz' and requires python 2.7 and scipy to be installed. Up-to-date and clear instructions are provided here: http://www.scipy.org/install.html, be sure to chose a version using python 2.7. As websites can change, an alternative is to search online for "install scipy". 
+It is recommended that you use the standalone binaries for OrthoFinder which do not require python or scipy to be installed. However, the python source code version is available from the github 'releases' page (e.g. 'OrthoFinder-1.0.6_source.tar.gz' and requires python 2.7 and scipy to be installed. Up-to-date and clear instructions are provided here: http://www.scipy.org/install.html, be sure to chose a version using python 2.7. As websites can change, an alternative is to search online for "install scipy". 
 
 ## Performing a Complete OrthoFinder Analysis
 Performing a complete OrthoFinder analysis is simple:
@@ -124,9 +127,9 @@ Performing a complete OrthoFinder analysis is simple:
 2. Optionally, you may want to rename the files to something simple since the filenames will be used as species identifiers in the results. E.g if you were using the 'Homo_sapiens.GRCh38.pep.all.fa' file you could rename it to 'Homo_sapiens.fa' or 'Human.fa'.
 3. Place the FASTA files all in a single directory.
 4. To perform a complete OrthoFinder analysis requires just one command: 
-**orthofinder -f fasta_files_directory [-t number_of_threads]**
+`orthofinder -f fasta_files_directory [-t number_of_threads]`
 
-The argument **'number_of_threads'** is an optional argument to specify the number of parallel threads to use for the BLAST searches, tree inference and reconciliation. As the BLAST queries can be a time-consuming step it is best to use at least as many BLAST processes as there are CPUs on the machine. 
+The argument 'number_of_threads' is an optional argument to specify the number of parallel threads to use for the BLAST searches, tree inference and reconciliation. As the BLAST queries can be a time-consuming step it is best to use at least as many BLAST processes as there are CPUs on the machine. 
 
 The OrthoFinder run will finish by printing the location of the results files, a short paragraph providing a descriptive statistical summary and the OrthoFinder citation. If you make use of OrthoFinder for any of your work then please cite it as this helps justify OrthoFinder support and future development. The OrthoFinder results files are described in the section "Results Files".
 
@@ -134,7 +137,7 @@ The OrthoFinder run will finish by printing the location of the results files, a
 A standard OrthoFinder run produces a set of files describing the orthogroups, orthologues and gene trees for the set of species being analysed. Their locations are given at the end of an OrthoFinder run.
 
 ### Results Files: Orthogroups
-OrthoFinder generates the main orthogroup file, **Orthogroups.csv**, and two supporting files:
+OrthoFinder generates the main orthogroup file, 'Orthogroups.csv', and two supporting files:
 
 1. **Orthogroups.csv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species.
 
@@ -171,52 +174,52 @@ OrthoFinder provides a number of options to allow you to incrementally add and r
 ### Adding Extra Species
 OrthoFinder allows you to add extra species without re-running the previously computed BLAST searches:
 
-- **orthofinder -b previous_orthofinder_directory -f new_fasta_directory**
+- `orthofinder -b previous_orthofinder_directory -f new_fasta_directory`
 
-This will add each species from the **new_fasta_directory** to existing set of species, reuse all the previous BLAST results, perform only the new BLAST searches required for the new species and recalculate the orthogroups. The **previous_orthofinder_directory** is the OrthoFinder **'WorkingDirectory/'** containing the file **'SpeciesIDs.txt'**.
+This will add each species from the 'new_fasta_directory' to existing set of species, reuse all the previous BLAST results, perform only the new BLAST searches required for the new species and recalculate the orthogroups. The 'previous_orthofinder_directory' is the OrthoFinder 'WorkingDirectory/' containing the file 'SpeciesIDs.txt'.
 
 ### Removing Species
-OrthoFinder allows you to remove species from a previous analysis. In the **'WorkingDirectory/'** from a previous analysis there is a file called **'SpeciesIDs.txt'**. Comment out any species to be removed from the analysis using a '#' character and then run OrthoFinder using: 
+OrthoFinder allows you to remove species from a previous analysis. In the 'WorkingDirectory/' from a previous analysis there is a file called 'SpeciesIDs.txt'. Comment out any species to be removed from the analysis using a '#' character and then run OrthoFinder using: 
 
-- **orthofinder -b previous_orthofinder_directory**
+- `orthofinder -b previous_orthofinder_directory`
 
-where **previous_orthofinder_directory** is the OrthoFinder **'WorkingDirectory/'** containing the file **'SpeciesIDs.txt'**.
+where 'previous_orthofinder_directory' is the OrthoFinder 'WorkingDirectory/' containing the file 'SpeciesIDs.txt'.
 
 ### Adding and Removing Species Simultaneously
 The previous two options can be combined, comment out the species to be removed as described above and use the command:
-- **orthofinder -b previous_orthofinder_directory -f new_fasta_directory**
+- `orthofinder -b previous_orthofinder_directory -f new_fasta_directory`
 
 ### Inferring MSA Gene Trees (to be replaced)
-**This functionality is to be incorporated into the main 'orthofinder' program, replacing the 'trees_from_MSA' utility.
+**This functionality is to be incorporated into the main 'orthofinder' program, replacing the 'trees_from_MSA' utility.**
 
 The 'trees_from_MSA' utility will automatically generate multiple sequence alignments and gene trees for each orthogroup generated by OrthoFinder. For example, once OrthoFinder has been run on the example dataset, trees_from_MSA can be run using:
 
-- **trees_from_MSA orthofinder_results_directory [-t number_of_threads]**
+- `trees_from_MSA orthofinder_results_directory [-t number_of_threads]`
 
 This will use MAFFT to generate the multiple sequence alignments and FastTree to generate the gene trees. Both of these programs need to be installed and in the system path.
 
 ### Parallelising OrthoFinder Algorithm (-a option)
-There are two separate options for controlling the parallelisation of OrthoFinder. The **'-t'** option should always be used whereas RAM requirements may affect whether you use the **'-a'** option or not.
+There are two separate options for controlling the parallelisation of OrthoFinder. The '-t' option should always be used whereas RAM requirements may affect whether you use the '-a' option or not.
 
 
-- **'-t number\_of\_threads'**:
+- **'-t number_of_threads'**:
 This option should always be used. It makes the BLAST searches, the tree inference and gene-tree reconciliation run in parallel. These are all highly-parallelisable and the BLAST searches in particular are by far the most time-consuming task. You should use as many threads as there are cores available.
 
-** '-a number\_of\_orthofinder\_threads'**
+- **'-a number_of_orthofinder_threads'**
 The remainder of the algorithm, beyond these highly-parallelisable tasks, is relatively fast and efficient and so this option has less overall effect. It is most useful when running OrthoFinder using pre-calculated BLAST results since the time savings will be more noticeable in this case. Using this option will also increase the RAM requirements (see manual for more details).
 
-### Running BLAST Searches Separately
-The **'-p'** option will prepare the files in the format required by OrthoFinder and print the set of BLAST commands that need to be run. 
-- **orthofinder -f fasta_files_directory -p**
+### Running BLAST Searches Separately (-p option)
+The '-p' option will prepare the files in the format required by OrthoFinder and print the set of BLAST commands that need to be run. 
+- `orthofinder -f fasta_files_directory -p`
 
-This is useful if you want to manage the BLAST searches yourself. For example, you may want to distribute them across multiple machines. Once the BLAST searches have been completed the orthogroups can be calculated using the **'-b'** command as described in Section "Using Pre-Computed BLAST Results".
+This is useful if you want to manage the BLAST searches yourself. For example, you may want to distribute them across multiple machines. Once the BLAST searches have been completed the orthogroups can be calculated using the '-b' command as described in Section "Using Pre-Computed BLAST Results".
 
 ### Using Pre-Computed BLAST Results
-It is possible to run OrthoFinder with pre-computed BLAST results provided they are in the correct format. They can be prepared in the correct format using the **'-p'** command and, equally, the files from a previous OrthoFinder run are also in the correct format to rerun using the **'-b'** option. The command is simply:
+It is possible to run OrthoFinder with pre-computed BLAST results provided they are in the correct format. They can be prepared in the correct format using the '-p' command and, equally, the files from a previous OrthoFinder run are also in the correct format to rerun using the '-b' option. The command is simply:
 
-- **orthofinder -b directory_with_processed_fasta_and_blast_results**
+- `orthofinder -b directory_with_processed_fasta_and_blast_results`
 
-If you are running the BLAST searches yourself it is strongly recommended that you use the **'-p'** option to prepare the files first (see Section "Running BLAST Searches Separately"). Should you need to prepare them manually, the required files and their formats are described in the appendix of the PDF Manual (for example, if you already have BLAST search results from another source and it will take too much computing time to redo them).
+If you are running the BLAST searches yourself it is strongly recommended that you use the '-p' option to prepare the files first (see Section "Running BLAST Searches Separately"). Should you need to prepare them manually, the required files and their formats are described in the appendix of the PDF Manual (for example, if you already have BLAST search results from another source and it will take too much computing time to redo them).
 
 ### Regression Tests
-A set of regression tests are included in the directory 'Tests' available from the github repository. They can be run by calling the script ** 'test_orthofinder.py'**. They currently require version 2.2.28 of NCBI BLAST and the script will exit with an error message if this is not the case.
+A set of regression tests are included in the directory 'Tests' available from the github repository. They can be run by calling the script 'test_orthofinder.py'. They currently require version 2.2.28 of NCBI BLAST and the script will exit with an error message if this is not the case.
