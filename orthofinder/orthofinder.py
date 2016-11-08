@@ -55,9 +55,13 @@ if sys.platform.startswith("linux"):
     with open(os.devnull, "w") as f:
         subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f) # get round problem with python multiprocessing library that can set all cpu affinities to a single cpu
          
-         
+my_env = os.environ.copy()
+if getattr(sys, 'frozen', False):
+#    my_env['LD_LIBRARY_PATH'] = my_env['LD_LIBRARY_PATH_ORIG']  
+    my_env['LD_LIBRARY_PATH'] = ''    
+     
 def RunBlastDBCommand(command):
-    capture = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    capture = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
     stdout = [x for x in capture.stdout]
     stderr = [x for x in capture.stderr]
     nLines_success= 10

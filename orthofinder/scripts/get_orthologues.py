@@ -48,6 +48,10 @@ import orthologues_from_recon_trees as pt
 import blast_file_processor as BlastFileProcessor
 
 nThreads = util.nThreadsDefault
+my_env = os.environ.copy()
+if getattr(sys, 'frozen', False):
+#    my_env['LD_LIBRARY_PATH'] = my_env['LD_LIBRARY_PATH_ORIG']  
+    my_env['LD_LIBRARY_PATH'] = ''   
 
 class Seq(object):
     def __init__(self, seqInput):
@@ -208,7 +212,7 @@ def RunAstral(ogSet, treesPat, workingDir):
     treesFN = dir_astral + "TreesFile.txt"
     ConcatenateTrees(i_ogs_to_use, treesPat, treesFN)
     speciesTreeFN = workingDir + "SpeciesTree_astral.txt"
-    subprocess.call(" ".join(["java", "-Xmx6000M", "-jar", "~/software/ASTRAL-multiind/Astral/astral.4.8.0.jar", "-a", tmFN, "-i", treesFN, "-o", speciesTreeFN]), shell=True)
+    subprocess.call(" ".join(["java", "-Xmx6000M", "-jar", "~/software/ASTRAL-multiind/Astral/astral.4.8.0.jar", "-a", tmFN, "-i", treesFN, "-o", speciesTreeFN]), shell=True, env=my_env)
     return speciesTreeFN
 
 # ==============================================================================================================================      
@@ -455,7 +459,7 @@ def RunDlcpar(treesPat, ogSet, nOGs, speciesTreeFN, workingDir):
 
     filenames = [dlcparResultsDir + os.path.split(treesPat % i)[1] for i in xrange(nOGs)]
     
-    dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt' % (speciesTreeFN, geneMapFN, fn) for fn in filenames]
+    dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -x 1' % (speciesTreeFN, geneMapFN, fn) for fn in filenames]
 #    print(dlcCommands[0])
     # use this to run in parallel
     util.RunParallelOrderedCommandLists(nThreads, [[c] for c in dlcCommands], qHideStdout = True)

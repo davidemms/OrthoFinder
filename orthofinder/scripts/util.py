@@ -47,7 +47,12 @@ SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStar
 FileInfo = namedtuple("FileInfo", "inputDir outputDir graphFilename")     
 
 picProtocol = 1
-version = "1.0.7"
+version = "1.0.8"
+
+my_env = os.environ.copy()
+if getattr(sys, 'frozen', False):
+#    my_env['LD_LIBRARY_PATH'] = my_env['LD_LIBRARY_PATH_ORIG']  
+    my_env['LD_LIBRARY_PATH'] = ""  
 
 def PrintNoNewLine(text):
     sys.stdout.write(text)
@@ -61,19 +66,19 @@ Command & parallel command management
 """
 
 def RunCommand(command):
-    subprocess.call(command)
+    subprocess.call(command, env=my_env)
             
 def RunOrderedCommandList(commandSet, qHideStdout):
     if qHideStdout:
         for cmd in commandSet:
-            subprocess.call(cmd, shell=True, stdout=subprocess.PIPE)
+            subprocess.call(cmd, shell=True, stdout=subprocess.PIPE, env=my_env)
     else:
         for cmd in commandSet:
-            subprocess.call(cmd, shell=True)
+            subprocess.call(cmd, shell=True, env=my_env)
     
 def CanRunCommand(command, qAllowStderr = False):
     PrintNoNewLine("Test can run \"%s\"" % command)       # print without newline
-    capture = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    capture = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
     stdout = [x for x in capture.stdout]
     stderr = [x for x in capture.stderr]
     if len(stdout) > 0 and (qAllowStderr or len(stderr) == 0):
@@ -90,7 +95,7 @@ def Worker_RunCommand(cmd_queue, nProcesses, nToDo):
             nDone = i - nProcesses + 1
             if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
                 PrintTime("Done %d of %d" % (nDone, nToDo))
-            subprocess.call(command)
+            subprocess.call(command, env=my_env)
         except Queue.Empty:
             return   
                             
