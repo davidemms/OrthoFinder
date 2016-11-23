@@ -47,7 +47,7 @@ SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStar
 FileInfo = namedtuple("FileInfo", "inputDir outputDir graphFilename")     
 
 picProtocol = 1
-version = "1.0.8"
+version = "1.0.9"
 
 my_env = os.environ.copy()
 if getattr(sys, 'frozen', False):

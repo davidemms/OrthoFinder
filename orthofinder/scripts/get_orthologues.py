@@ -313,15 +313,19 @@ class DendroBLASTTrees(object):
             newMatrices.append(m2)
         return newMatrices
     
-    def WritePhylipMatrix(self, m, names, outFN, max_og):
+    @staticmethod
+    def WritePhylipMatrix(m, names, outFN, max_og):
         max_og = 1.1*max_og
+        sliver = 1e-6
         with open(outFN, 'wb') as outfile:
             n = m.shape[0]
             outfile.write("%d\n" % n)
             for i in xrange(n):
                 outfile.write(names[i] + " ")
                 # values could be -inf, these are the most distantly related so replace with max_og
-                values = " ".join(["%.6g" % (0. + (m[i,j] if m[i,j] > -9e99 else max_og)) for j in range(n)])   # hack to avoid printing out "-0"
+                V = [0. + (m[i,j] if m[i,j] > -9e99 else max_og) for j in range(n)] # "0. +": hack to avoid printing out "-0"
+                V = [sliver if 0 < v < sliver  else v for v in V]  # make sure scientific notation is not used (not accepted by fastme)
+                values = " ".join(["%.6f" % v for v in V])   
                 outfile.write(values + "\n")
     
     def SpeciesTreeDistances(self, ogs, ogMatrices, method = 0):
@@ -355,7 +359,7 @@ class DendroBLASTTrees(object):
             for i in xrange(n):
 #                outfile.write(speciesDict[str(self.species[i])] + " ")
                 outfile.write(str(self.ogSet.seqsInfo.speciesToUse[i]) + " ")
-                values = " ".join(["%.6g" % (0. + M[i,j]) for j in range(n)])   # hack to avoid printing out "-0"
+                values = " ".join(["%.6f" % (0. + M[i,j]) for j in range(n)])   # hack to avoid printing out "-0"
                 outfile.write(values + "\n")       
         treeFN = os.path.split(self.treesPatIDs)[0] + "/SpeciesTree_ids.txt"
         cmd = " ".join(["fastme", "-i", speciesMatrixFN, "-o", treeFN, "-w", "O"] + (["-s"] if n < 1000 else []))

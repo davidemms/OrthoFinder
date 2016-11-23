@@ -5,8 +5,8 @@ Created on Wed Dec 16 11:25:10 2015
 
 @author: david
 """
-
 import os 
+import sys
 import time
 import types
 import datetime
@@ -18,6 +18,7 @@ import glob
 import random
 import csv
 import argparse
+import numpy as np
 
 __skipLongTests__ = False
 qVerbose = False
@@ -34,7 +35,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.0.8"
+version = "1.0.9"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -586,6 +587,29 @@ class TestCommandLine(unittest.TestCase):
             self.assertTrue("Orthogroup statistics:"  in self.stdout)
         
         
+    """ Unit tests """
+    def test_DistanceMatrixEvalues(self):
+        if qBinary:
+            self.skipTest("Skipping unit test. Test can be run on sourcecode version of OrthoFinder.") 
+        import get_orthologues
+        m = np.zeros((2,2))
+        m = np.matrix([[0, 1e-9, 0.1, 1], [1e-9, 0, 1, 1], [0.1, 1, 0, 1], [1, 1, 1, 0]])
+#        m[0,1] = 
+#        m[1,0] = 0.1
+        names = ["a", "b", "c", "d"]
+        outFN = baseDir + "Input/Distances.phy"
+        max_og = 1.
+        get_orthologues.DendroBLASTTrees.WritePhylipMatrix(m, names, outFN, max_og)
+        # read values and check they are written in the corect format
+        with open(outFN, 'rb') as infile:
+            infile.next()
+            line = infile.next().rstrip().split()
+            self.assertEqual('0.000000', line[1]) # expected format for writing 0
+            self.assertEqual('0.000001', line[2]) # min non-zero value. Should be writen in decimal rather than scientific format
+            line = infile.next().rstrip().split()
+            self.assertEqual('0.000001', line[1]) 
+        os.remove(outFN)
+        
 #    def test_treesExtraSpecies(self):
 #        pass
         
@@ -706,6 +730,7 @@ if __name__ == "__main__":
         orthofinder_bin = os.path.splitext(orthofinder)[0]
         trees_for_orthogroups = args.dir + "/trees_from_MSA.py"
         trees_for_orthogroups_bin = os.path.splitext(trees_for_orthogroups)[0]
+        sys.path.append(args.dir + "/scripts")
         
     qBinary = args.binaries
     qVerbose = args.verbose
