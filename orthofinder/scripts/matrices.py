@@ -29,7 +29,7 @@ import cPickle as pic
 import util
 
 def DumpMatrix(name, m, fileInfo, iSpecies, jSpecies):
-    with open(fileInfo.outputDir + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'wb') as picFile:
+    with open(fileInfo.workingDir + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'wb') as picFile:
         pic.dump(m, picFile, protocol=util.picProtocol)
     
 def DumpMatrixArray(name, matrixArray, fileInfo, iSpecies):
@@ -37,7 +37,7 @@ def DumpMatrixArray(name, matrixArray, fileInfo, iSpecies):
         DumpMatrix(name, m, fileInfo, iSpecies, jSpecies)
 
 def LoadMatrix(name, fileInfo, iSpecies, jSpecies): 
-    with open(fileInfo.outputDir + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'rb') as picFile:  
+    with open(fileInfo.workingDir + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'rb') as picFile:  
         M = pic.load(picFile)
     return M
         

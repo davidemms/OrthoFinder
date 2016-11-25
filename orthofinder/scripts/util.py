@@ -44,16 +44,16 @@ Utilities
 -------------------------------------------------------------------------------
 """
 SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")
-FileInfo = namedtuple("FileInfo", "inputDir outputDir graphFilename")     
+FileInfo = namedtuple("FileInfo", "workingDir graphFilename")     
 
 picProtocol = 1
-version = "1.0.9"
+version = "1.1.2"
 
 my_env = os.environ.copy()
 if getattr(sys, 'frozen', False):
 #    my_env['LD_LIBRARY_PATH'] = my_env['LD_LIBRARY_PATH_ORIG']  
     my_env['LD_LIBRARY_PATH'] = ""  
-
+    
 def PrintNoNewLine(text):
     sys.stdout.write(text)
 
@@ -183,20 +183,20 @@ Directory and file management
 -------------------------------------------------------------------------------
 """               
                
-def GetDirectoryName(baseDirName, dateString, i):
+def GetDirectoryName(baseDirName, i):
     if i == 0:
-        return baseDirName + dateString + os.sep
+        return baseDirName + os.sep
     else:
-        return baseDirName + dateString + ("_%d" % i) + os.sep
+        return baseDirName + ("_%d" % i) + os.sep
 
 """Call GetNameForNewWorkingDirectory before a call to CreateNewWorkingDirectory to find out what directory will be created"""
 def CreateNewWorkingDirectory(baseDirectoryName):
     dateStr = datetime.date.today().strftime("%b%d") 
     iAppend = 0
-    newDirectoryName = GetDirectoryName(baseDirectoryName, dateStr, iAppend)
+    newDirectoryName = GetDirectoryName(baseDirectoryName + dateStr, iAppend)
     while os.path.exists(newDirectoryName):
         iAppend += 1
-        newDirectoryName = GetDirectoryName(baseDirectoryName, dateStr, iAppend)
+        newDirectoryName = GetDirectoryName(baseDirectoryName + dateStr, iAppend)
     os.mkdir(newDirectoryName)
     return newDirectoryName
 
@@ -349,6 +349,10 @@ Find results of previous run
 -------------------------------------------------------------------------------
 """
 
+def GetSpeciesDirectory():
+    # Confirms all required Sequence files and BLAST etc are present
+    pass
+
 def GetOGsFile(userArg):
     """returns the WorkingDirectory, ResultsDirectory and clusters_id_pairs filename"""
     qSpecifiedResultsFile = False
@@ -380,7 +384,7 @@ def GetOGsFile(userArg):
                 Fail()
             
     if qSpecifiedResultsFile:
-        print("Generating trees for orthogroups in file:\n    %s" % userArg)
+        print("Using orthogroups in file:\n    %s" % userArg)
         return orthofinderWorkingDir, orthofinderWorkingDir, userArg
     else:     
         # identify orthogroups file
@@ -411,7 +415,7 @@ def GetOGsFile(userArg):
             print("\nCould not find:\n    Orthogroups*.txt/OrthologousGroups*.txt\nor\n    clusters_OrthoFinder_*.txt_id_pairs.txt")
             Fail()
             
-        print("Generating trees for orthogroups in file:\n    %s" % orthogroupFiles[0])
+        print("Using orthogroups in file:\n    %s" % orthogroupFiles[0])
         print("and corresponding clusters file:\n    %s" % clustersFiles[0])
         return orthofinderWorkingDir, userArg, clustersFiles[0]
 
@@ -419,3 +423,8 @@ def PrintCitation():
     print("""\nWhen publishing work that uses OrthoFinder please cite:
     D.M. Emms & S. Kelly (2015), OrthoFinder: solving fundamental biases in whole genome comparisons
     dramatically improves orthogroup inference accuracy, Genome Biology 16:157.\n""")         
+
+def PrintUnderline(text, qHeavy=False):
+    print("\n" + text)
+    print(("=" if qHeavy else "-") * len(text))
+

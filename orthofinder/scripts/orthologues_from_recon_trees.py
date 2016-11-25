@@ -144,7 +144,7 @@ def find_all(matrix, orig_matrix):
         orthologues.append((orthologuesSp1, orthologuesSp2))
     return orthologues
         
-def species_find_all(ogSet, matrixDir, resultsDir):
+def species_write_all(ogSet, matrixDir, resultsDir):
     speciesDict = ogSet.SpeciesDict()
     # Calls multiply and find_all on each species pair, and appends the numbers from find_all's output to the relevant csv lists.
     speciesIDs = ogSet.speciesToUse
@@ -158,7 +158,7 @@ def species_find_all(ogSet, matrixDir, resultsDir):
         orthologues = find_all(product, M)
         WriteOrthologues(resultsDir, speciesIDs[index2], speciesIDs[index1], orthologues, ogSet)    
     
-def get_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir):
+def create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir):
     # -> Matrices
     matrixDir = workingDir + "matrices_orthologues/"
     orthodict, orthodictFN = make_dicts(dlcparResultsDir, matrixDir)
@@ -169,6 +169,6 @@ def get_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir):
         one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, matrixDir)
         
     # -> csv files
-    species_find_all(ogSet, matrixDir, resultsDir)
+    species_write_all(ogSet, matrixDir, resultsDir)
     
         

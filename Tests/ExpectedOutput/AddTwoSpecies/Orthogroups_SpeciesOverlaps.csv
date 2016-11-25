@@ -1,6 +1,6 @@
-	Mycoplasma_agalactiae_5632_FP671138.faa	Mycoplasma_genitalium_uid97_L43967.faa	Mycoplasma_hyopneumoniae_AE017243.faa	Mycoplasma_bovis.GCA_001043135.1.29.pep.all.fa	Mycoplasma_gallisepticum_uid409_AE015450.faa
-Mycoplasma_agalactiae_5632_FP671138.faa	627	305	395	620	364
-Mycoplasma_genitalium_uid97_L43967.faa	305	396	296	304	386
-Mycoplasma_hyopneumoniae_AE017243.faa	395	296	423	394	345
-Mycoplasma_bovis.GCA_001043135.1.29.pep.all.fa	620	304	394	626	362
-Mycoplasma_gallisepticum_uid409_AE015450.faa	364	386	345	362	464
+	Mycoplasma_agalactiae_5632_FP671138	Mycoplasma_genitalium_uid97_L43967	Mycoplasma_hyopneumoniae_AE017243	Mycoplasma_bovis	Mycoplasma_gallisepticum_uid409_AE015450
+Mycoplasma_agalactiae_5632_FP671138	627	305	395	620	364
+Mycoplasma_genitalium_uid97_L43967	305	396	296	304	386
+Mycoplasma_hyopneumoniae_AE017243	395	296	423	394	345
+Mycoplasma_bovis	620	304	394	626	362
+Mycoplasma_gallisepticum_uid409_AE015450	364	386	345	362	464

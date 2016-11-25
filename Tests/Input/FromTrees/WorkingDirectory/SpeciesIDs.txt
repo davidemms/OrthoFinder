@@ -1,0 +1,4 @@
+0: Mycoplasma_agalactiae.faa
+1: Mycoplasma_gallisepticum.faa
+2: Mycoplasma_genitalium.faa
+3: Mycoplasma_hyopneumoniae.faa

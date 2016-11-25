@@ -37,7 +37,7 @@ def GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies, qExcludeSelfHits = T
     B = sparse.lil_matrix((nSeqs_i, nSeqs_j))
     row = ""
     try:
-        with open(fileInfo.inputDir + "Blast%d_%d.txt" % (iSpecies, jSpecies), 'rb') as blastfile:
+        with open(fileInfo.workingDir + "Blast%d_%d.txt" % (iSpecies, jSpecies), 'rb') as blastfile:
             blastreader = csv.reader(blastfile, delimiter='\t')
             for row in blastreader:    
                 # Get hit and query IDs
@@ -69,7 +69,7 @@ def GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies, qExcludeSelfHits = T
                     sys.stderr.write("but found a query/hit in the Blast%d_%d.txt for sequence %d_%d (i.e. %s sequence in species %d).\n" %  (iSpecies, jSpecies, kSpecies, sequencekID, ord(sequencekID+1), kSpecies))
                     sys.exit()
     except Exception:
-        sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (fileInfo.inputDir, iSpecies, jSpecies))
+        sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (fileInfo.workingDir, iSpecies, jSpecies))
         sys.stderr.write("\t".join(row) + "\n")
         sys.exit()
     return B  
