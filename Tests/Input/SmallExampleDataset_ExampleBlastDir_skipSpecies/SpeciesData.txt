@@ -1,0 +1,3 @@
+Mycoplasma_agalactiae_5632_FP671138.faa	Mycoplasma agalactiae_check	2110	Ensembl	Mycoplasma_agalactiae_5632_FP671138_ed.faa
+Mycoplasma_genitalium_uid97_L43967.fa	Mycoplasma genitaliumB	2097	NCBI	Mycoplasma_genitalium_uid97_L43967.fa
+Mycoplasma_hyopneumoniae_AE017243.faa	Mycoplasma hyopneumoniaeA	2099	Ensembl	Mycoplasma_hyopneumoniae_AE017243.faa

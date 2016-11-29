@@ -36,7 +36,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.1.2"
+version = "1.1.3"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -658,7 +658,28 @@ class TestCommandLine(unittest.TestCase):
             self.assertTrue(len(self.stderr) == 0)
             # run completes
             self.assertTrue("Orthogroup statistics:"  in self.stdout)
-    
+            
+    def test_xml(self):
+        newFiles = ("Orthogroups.orthoxml Orthogroups.csv Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv" % (version, version, version)).split()
+        newFiles = [exampleBlastDir + fn for fn in newFiles]
+        with CleanUp(newFiles, []):
+            self.stdout, self.stderr = self.RunOrthoFinder("-b %s -og -x %s" % (exampleBlastDir, baseDir + "Input/SpeciesData.txt"))
+            expectedCSVFile = exampleBlastDir + "Orthogroups.csv"
+            self.CheckStandardRun(self.stdout, self.stderr, goldResultsDir_smallExample, expectedCSVFile)  
+            self.CompareFile(baseDir + "ExpectedOutput/Orthogroups.orthoxml", exampleBlastDir + "Orthogroups.orthoxml")   
+        self.test_passed = True         
+          
+    def test_xml_skippedSpecies(self):
+        newFiles = ("Orthogroups.orthoxml Orthogroups.csv Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv" % (version, version, version)).split()
+        inDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir_skipSpecies/"
+        newFiles = [inDir + fn for fn in newFiles]
+        with CleanUp(newFiles, []):
+            self.stdout, self.stderr = self.RunOrthoFinder("-b %s -og -x %s" % (inDir, inDir + "SpeciesData.txt"))
+            expectedCSVFile = inDir + "Orthogroups.csv"
+            self.CheckStandardRun(self.stdout, self.stderr, goldResultsDir_smallExample, expectedCSVFile)  
+            self.CompareFile(baseDir + "ExpectedOutput/xml_skippedSpecies/Orthogroups.orthoxml", inDir + "Orthogroups.orthoxml")   
+        self.test_passed = True      
+        
     """ Unit tests """
     def test_DistanceMatrixEvalues(self):
         if qBinary:
@@ -693,8 +714,8 @@ class TestCommandLine(unittest.TestCase):
         
     def tearDown(self):
         self.CleanCurrentResultsDir()
+        if qVerbose: print(self.stdout)
         if not self.test_passed:
-            if qVerbose: print(self.stdout)
             print(self.stderr)
         
     def RunOrthoFinder(self, commands):

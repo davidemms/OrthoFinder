@@ -109,7 +109,7 @@ class MCL:
         return reparsed.toprettyxml(indent="  ")
        
     @staticmethod         
-    def WriteOrthoXML(speciesInfo, predictedOGs, numbersOfSequences, idDict, orthoxmlFilename, speciesToUse):
+    def WriteOrthoXML(speciesInfo, predictedOGs, nSequencesDict, idDict, orthoxmlFilename, speciesToUse):
         """ speciesInfo: ordered array for which each element has
             fastaFilename, speciesName, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile
         """
@@ -125,7 +125,9 @@ class MCL:
         # Species: details of source of genomes and sequences they contain
         speciesStartingIndices = []
         iGene_all = 0
-        for iSpecies, (species, nSeqs, thisSpeciesInfo) in enumerate(zip(speciesInfo, numbersOfSequences, speciesInfo)):
+        for iPos, thisSpeciesInfo in enumerate(speciesInfo):
+            iSpecies = speciesToUse[iPos]
+            nSeqs = nSequencesDict[iSpecies]
             speciesNode = SubElement(root, 'species')
             speciesNode.set('NCBITaxId', thisSpeciesInfo[2])           # required
             speciesNode.set('name', thisSpeciesInfo[1])                # required
@@ -345,8 +347,8 @@ def GetOrderedBlastCommands(seqsInfo, dirs):
     ordered so that the commands predicted to take the longest come first. This allows the load to be balanced better when processing 
     the BLAST commands.
     """
-    iSpeciesPrevious = [int(fn[fn.rfind("Species") + 7:].split(".")[0]) for fn in dirs.previousFastaFiles]
-    iSpeciesNew = [int(fn[fn.rfind("Species") + 7:].split(".")[0]) for fn in dirs.newFastaFiles]
+    iSpeciesPrevious = range(dirs.iFirstNewSpecies)
+    iSpeciesNew = range(dirs.iFirstNewSpecies, dirs.nSpAll)
     speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew)] + \
                    [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesPrevious)] + \
                    [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew)] 
@@ -847,15 +849,13 @@ class Options(object):#
 
 class Directories(object):
     def __init__(self):
-        self.fastaDir = None             # Where to find the original fasta files        
-        self.resultsDir = None           # Where to put the orthogroup results files
-        self.workingDir = None
-        self.workingDir_previous_orthologues = None   # Trees etc
-        self.previousFastaFiles = []
-        self.newFastaFiles = []
-        self.speciesToUse = []
-        self.nSpAll = None
-        self.userFastaFilenames = None
+        self.resultsDir = None           # directory for orthogroup results files
+        self.workingDir = None           # Orthogroup inference workingDir
+                                         # Will need to store 3 bits of information in total    
+        self.speciesToUse = []           #       seqsInfo.iSpeciesToUse   - which to include for this analysis 
+        self.nSpAll = None               #       seqsInfo.nSpAll => 0, 1, ..., nSpAll - 1 are valid species indices
+        self.iFirstNewSpecies = None     #       iFirstNew   => (0, 1, ..., iFirstNew-1) are from previous and (iFirstNew, iFirstNew+1, ..., nSpecies-1) are the new species indices
+    
     def IDsFilename(self):
         return self.workingDir + "SequenceIDs.txt"
     def SpeciesIdsFilename(self):
@@ -889,7 +889,7 @@ def ProcessArgs():
     -f: store fastaDir
     -b: store workingDir
     -fg: store orthologuesDir 
-    -ft: store workingDir_previous_orthologues 
+    -ft: store orthologuesDir 
     + xml: speciesXMLInfoFN
     """    
     
@@ -996,16 +996,16 @@ def GetXMLSpeciesInfo(dirs, options):
     # speciesInfo:  name, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile
     util.PrintUnderline("Reading species information file")
     # do this now so that we can alert user to any errors prior to running the algorithm
-    userFastaFilenames = dirs.previousFastaFiles + dirs.userFastaFilenames
     speciesInfo = [[] for i_ in dirs.speciesToUse]
-    userFastaFilenames_justNames = [name for path, name in map(os.path.split, userFastaFilenames)]
-    fastaFileIndices = {filename:iSpecies for iSpecies, filename in enumerate(userFastaFilenames_justNames)}
+    speciesNamesDict = SpeciesNameDict(dirs.SpeciesIdsFilename())
+    speciesRevDict = {v:k for k,v in speciesNamesDict.items()}
+    userFastaFilenames = [os.path.split(speciesNamesDict[i])[1] for i in dirs.speciesToUse]
     with open(options.speciesXMLInfoFN, 'rb') as speciesInfoFile:
         reader = csv.reader(speciesInfoFile, delimiter = "\t")
         for iLine, line in enumerate(reader):
             if len(line) != 5:
                 # allow for an extra empty line at the end
-                if len(line) == 0 and iLine == len(userFastaFilenames_justNames):
+                if len(line) == 0 and iLine == len(userFastaFilenames):
                     continue
                 print("ERROR")
                 print("Species information file %s line %d is incorrectly formatted." % (options.speciesXMLInfoFN, iLine + 1))        
@@ -1016,26 +1016,21 @@ def GetXMLSpeciesInfo(dirs, options):
                 util.Fail() 
             fastaFilename, speciesName, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile = line
             try:
-                iSpecies = fastaFileIndices[fastaFilename]
+                iSpecies = speciesRevDict[os.path.splitext(fastaFilename)[0]]
             except KeyError:
-                print("ERROR")
-                print("%s from line %d of the species information file was not one of the" % (fastaFilename, iLine+1))
-                print("input fasta files. The input fasta files were:")
-                for filename in userFastaFilenames_justNames:
-                    print(filename)
-                print("Please provide information for each of these species in the species information file")
-                util.Fail() 
-            speciesInfo[iSpecies] = line   
+                print("Skipping %s from line %d as it is not being used in this analysis" % (fastaFilename, iLine+1))
+                continue
+            speciesInfo[dirs.speciesToUse.index(iSpecies)] = line   
     # check information has been provided for all species
     speciesMissing = False        
-    for fastaFilename, iSpecies in fastaFileIndices.items():
-        if speciesInfo[iSpecies] == []:
+    for iPos, iSpecies in enumerate(dirs.speciesToUse):
+        if speciesInfo[iPos] == []:
             if not speciesMissing:
                 print("ERROR")
                 print("Species information file %s does not contain information for all species." % options.speciesXMLInfoFN) 
                 print("Information is missing for:") 
                 speciesMissing = True
-            print(fastaFilename)
+            print(speciesNamesDict[iSpecies])
     if speciesMissing:
         util.Fail()
     return speciesInfo
@@ -1097,10 +1092,7 @@ def DoOrthogroups(options, dirs, seqsInfo):
     print(orthogroupsResultsFilesString)
     summaryText, statsFile = Stats(ogs, speciesNamesDict, dirs.speciesToUse, dirs.resultsDir, iResultsVersion)
     if options.speciesXMLInfoFN:
-        numbersOfSequences = list(np.diff(seqsInfo.seqStartingIndices))
-        numbersOfSequences.append(seqsInfo.nSeqs - seqsInfo.seqStartingIndices[-1])
-        orthoxmlFilename = resultsBaseFilename + ".orthoxml"
-        MCL.WriteOrthoXML(speciesInfo, ogs, numbersOfSequences, idsDict, orthoxmlFilename, dirs.speciesToUse)
+        MCL.WriteOrthoXML(speciesInfo, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml", dirs.speciesToUse)
     return clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString
 
 # 0
@@ -1127,21 +1119,21 @@ def ProcessPreviousFiles(workingDir):
         util.Fail()
  
     # check fasta files are present 
-    dirs.previousFastaFiles = util.SortFastaFilenames(glob.glob(dirs.workingDir + "Species*.fa"))
-    if len(dirs.previousFastaFiles) == 0:
+    previousFastaFiles = util.SortFastaFilenames(glob.glob(dirs.workingDir + "Species*.fa"))
+    if len(previousFastaFiles) == 0:
         print("No processed fasta files in the supplied previous working directory: %s\n" % dirs.workingDir)
         util.Fail()
-    tokens = dirs.previousFastaFiles[-1][:-3].split("Species")
+    tokens = previousFastaFiles[-1][:-3].split("Species")
     lastFastaNumberString = tokens[-1]
     iLastFasta = 0
-    nFasta = len(dirs.previousFastaFiles)
+    nFasta = len(previousFastaFiles)
     try:
         iLastFasta = int(lastFastaNumberString)
     except:
-        print("Filenames for processed fasta files are incorrect: %s\n" % dirs.previousFastaFiles[-1])
+        print("Filenames for processed fasta files are incorrect: %s\n" % previousFastaFiles[-1])
         util.Fail()
     if nFasta != iLastFasta + 1:
-        print("Not all expected fasta files are present. Index of last fasta file is %s but found %d fasta files.\n" % (lastFastaNumberString, len(dirs.previousFastaFiles)))
+        print("Not all expected fasta files are present. Index of last fasta file is %s but found %d fasta files.\n" % (lastFastaNumberString, len(previousFastaFiles)))
         util.Fail()
     
     # check BLAST files
@@ -1226,13 +1218,11 @@ def ProcessesNewFasta(fastaDir, existingDirs=None):
         util.Fail()
     if None == existingDirs:
         dirs = Directories()
-        dirs.fastaDir = fastaDir
         dirs.resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results_")
         dirs.workingDir = dirs.resultsDir + "WorkingDirectory" + os.sep
         os.mkdir(dirs.workingDir)
     else:
         dirs = existingDirs
-        dirs.fastaDir = fastaDir
     iSeq = 0
     iSpecies = 0
     # check if SpeciesIDs.txt already exists
@@ -1241,18 +1231,17 @@ def ProcessesNewFasta(fastaDir, existingDirs=None):
             for line in infile: pass
         if line.startswith("#"): line = line[1:]
         iSpecies = int(line.split(":")[0]) + 1
-    dirs.newFastaFiles = []
+    dirs.iFirstNewSpecies = iSpecies
     newSpeciesIDs = []
     with open(dirs.IDsFilename(), 'ab') as idsFile, open(dirs.SpeciesIdsFilename(), 'ab') as speciesFile:
         for fastaFilename in originalFastaFilenames:
             newSpeciesIDs.append(iSpecies)
             outputFastaFilename = dirs.workingDir + "Species%d.fa" % iSpecies
             outputFasta = open(outputFastaFilename, 'wb')
-            dirs.newFastaFiles.append(outputFastaFilename)            
             fastaFilename = fastaFilename.rstrip()
             speciesFile.write("%d: %s\n" % (iSpecies, fastaFilename))
             baseFilename, extension = os.path.splitext(fastaFilename)
-            with open(dirs.fastaDir + os.sep + fastaFilename, 'rb') as fastaFile:
+            with open(fastaDir + os.sep + fastaFilename, 'rb') as fastaFile:
                 for line in fastaFile:
                     if len(line) > 0 and line[0] == ">":
                         newID = "%d_%d" % (iSpecies, iSeq)
@@ -1291,7 +1280,7 @@ if __name__ == "__main__":
     if options.qStartFromBlast and options.qStartFromFasta:
         # 0. Check Files
         dirs = ProcessPreviousFiles(workingDir)
-        print("Adding new species in %s to existing analysis in %s" % (dirs.fastaDir, dirs.workingDir))
+        print("Adding new species in %s to existing analysis in %s" % (fastaDir, dirs.workingDir))
         # 3. 
         dirs = ProcessesNewFasta(fastaDir, dirs)
         CheckOptions(options, dirs)
