@@ -58,25 +58,30 @@ orthofinder -f fasta_directory [-t n_blast_threads]
     n_blast_threads in parallel for the BLAST searches and tree inference.
 
 === Arguments ===
-Control where analysis starts/finishes:
+Control where analysis starts (at least one must be specified):
 
--f fasta_directory, --fasta fasta_directory
-    Predict orthogroups for the proteins in the fasta files in the fasta_directory
+-f fasta_dir, --fasta fasta_dir
+    Perform full OrthoFinder analysis for the proteins in the fasta files in fasta_dir/.
 
--b blast_results_directory, --blast blast_results_directory
-    Predict orthogroups using the pre-calcualted BLAST results in blast_results_directory.
+-b blast_results_dir, --blast blast_results_dir
+    Perform full OrthoFinder analysis using the pre-calcualted BLAST results in blast_results_dir/.
+
+-f & -b options can be combined in order to add new species to an analysis without needing
+to redo the BLAST searches from a previous analysis.
+
+-fg orthogroup_results_dir, --from-groups orthogroup_results_dir
+    Infer gene trees and orthologues starting from OrthoFinder orthogroups in orthogroup_results_dir/.
+
+-ft orthologues_results_dir, --from-trees orthologues_results_dir
+    Infer orthologues starting from OrthoFinder gene trees in directory in orthologues_results_dir/.
+
+Control where analysis stops (optional):
 
 -og, --only-groups
     Only infer orthogroups, do not infer gene trees of orthologues.
 
 -op, --only-prepare
     Only prepare the BLAST input files in the format required by OrthoFinder.
-
--fg, --from-groups
-    Infer gene trees and orthologues starting from pre-computed orthogroups.
-
--ft, --from-trees
-    Infer orthologues starting from pre-computed gene trees.
 
 Additional arguments:
 
@@ -85,7 +90,7 @@ Additional arguments:
 
 -a n_orthofinder_threads, --algthreads n_orthofinder_threads
     The number of threads to use for the less readily parallelised parts of the OrthoFinder algorithm.
-    There are a number of trade-offs involved, see manual for details. [Default is 1]
+    There are speed/memory trade-offs involved, see manual for details. [Default is 1]
 
 -I inflation_parameter, --inflation inflation_parameter
     Specify a non-default inflation parameter for MCL. Not recommended. [Default is 1.5]

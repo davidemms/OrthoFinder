@@ -751,25 +751,30 @@ def PrintHelp():
     print("")         
     print("=== Arguments ===")
 #    print("")         
-    print("Control where analysis starts/finishes:")
+    print("Control where analysis starts (at least one must be specified):")
     print("")
-    print("""-f fasta_directory, --fasta fasta_directory
-    Predict orthogroups for the proteins in the fasta files in the fasta_directory\n""")
+    print("""-f fasta_dir, --fasta fasta_dir
+    Perform full OrthoFinder analysis for the proteins in the fasta files in fasta_dir/.\n""")
     
-    print("""-b blast_results_directory, --blast blast_results_directory
-    Predict orthogroups using the pre-calcualted BLAST results in blast_results_directory.\n""")
+    print("""-b blast_results_dir, --blast blast_results_dir
+    Perform full OrthoFinder analysis using the pre-calcualted BLAST results in blast_results_dir/.\n""")
     
+    print("""-f & -b options can be combined in order to add new species to an analysis without needing
+to redo the BLAST searches from a previous analysis.\n""")
+    
+    print("""-fg orthogroup_results_dir, --from-groups orthogroup_results_dir
+    Infer gene trees and orthologues starting from OrthoFinder orthogroups in orthogroup_results_dir/.\n""")
+    
+    print("""-ft orthologues_results_dir, --from-trees orthologues_results_dir
+    Infer orthologues starting from OrthoFinder gene trees in directory in orthologues_results_dir/.\n""")
+    
+    print("Control where analysis stops (optional):")
+    print("")
     print("""-og, --only-groups
     Only infer orthogroups, do not infer gene trees of orthologues.\n""")
     
     print("""-op, --only-prepare
     Only prepare the BLAST input files in the format required by OrthoFinder.\n""" )
-    
-    print("""-fg, --from-groups
-    Infer gene trees and orthologues starting from pre-computed orthogroups.\n""")
-    
-    print("""-ft, --from-trees
-    Infer orthologues starting from pre-computed gene trees.\n""")
     
     print("Additional arguments:")
     print("")
@@ -779,7 +784,7 @@ def PrintHelp():
     
     print("""-a n_orthofinder_threads, --algthreads n_orthofinder_threads
     The number of threads to use for the less readily parallelised parts of the OrthoFinder algorithm.
-    There are a number of trade-offs involved, see manual for details. [Default is %d]\n""" % util.nAlgDefault)
+    There are speed/memory trade-offs involved, see manual for details. [Default is %d]\n""" % util.nAlgDefault)
     
 #    print("""-s, --species-tree
 #    Use user suplied rooted species tree for gene-tree/species-tree reconciliation.\n""")
