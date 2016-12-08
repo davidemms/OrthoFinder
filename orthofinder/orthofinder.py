@@ -46,6 +46,7 @@ from xml.dom import minidom                     # Y
 import Queue                                    # Y
 import warnings                                 # Y
 
+import trees_from_MSA as msa
 import scripts.mcl as MCLread
 import scripts.blast_file_processor as BlastFileProcessor
 from scripts import util, matrices, get_orthologues
@@ -771,11 +772,14 @@ to redo the BLAST searches from a previous analysis.\n""")
     print("Control where analysis stops (optional):")
     print("")
     print("""-og, --only-groups
-    Only infer orthogroups, do not infer gene trees of orthologues.\n""")
+    Stop after inferring orthogroups, do not infer gene trees of orthologues.\n""")
     
     print("""-op, --only-prepare
     Only prepare the BLAST input files in the format required by OrthoFinder.\n""" )
     
+    print("""-ot, --only-trees
+    Stop after inferring gene trees, do not infer orthologues.\n""" )
+
     print("Additional arguments:")
     print("")
     
@@ -786,8 +790,8 @@ to redo the BLAST searches from a previous analysis.\n""")
     The number of threads to use for the less readily parallelised parts of the OrthoFinder algorithm.
     There are speed/memory trade-offs involved, see manual for details. [Default is %d]\n""" % util.nAlgDefault)
     
-#    print("""-s, --species-tree
-#    Use user suplied rooted species tree for gene-tree/species-tree reconciliation.\n""")
+    print("""-M tree_inference_method, --method tree_inference_method
+    Use tree_inference_method for gene trees. Valid options are 'dendroblast' & 'msa'. [Default is dendroblast]\n""")
     
     print("""-I inflation_parameter, --inflation inflation_parameter
     Specify a non-default inflation parameter for MCL. Not recommended. [Default is %0.1f]\n""" % g_mclInflation)
@@ -843,6 +847,8 @@ class Options(object):#
         self.qStartFromTrees = False
         self.qStopAfterPrepare = False
         self.qStopAfterGroups = False
+        self.qStopAfterTrees = False
+        self.qMSATrees = False
         self.speciesXMLInfoFN = None
         self.speciesTreeFN = None
         self.mclInflation = g_mclInflation
@@ -927,7 +933,7 @@ def ProcessArgs():
             orthologuesDir = GetDirectoryArgument(arg, args)
         elif arg == "-t" or arg == "--threads":
             if len(args) == 0:
-                print("Missing option for command line argument -t")
+                print("Missing option for command line argument %s" % arg)
                 util.Fail()
             arg = args.pop(0)
             try:
@@ -937,7 +943,7 @@ def ProcessArgs():
                 util.Fail()    
         elif arg == "-a" or arg == "--algthreads":
             if len(args) == 0:
-                print("Missing option for command line argument -a")
+                print("Missing option for command line argument %s" % arg)
                 util.Fail()
             arg = args.pop(0)
             try:
@@ -947,7 +953,7 @@ def ProcessArgs():
                 util.Fail()   
         elif arg == "-I" or arg == "--inflation":
             if len(args) == 0:
-                print("Missing option for command line argument -I")
+                print("Missing option for command line argument %s" % arg)
                 util.Fail()
             arg = args.pop(0)
             try:
@@ -971,12 +977,24 @@ def ProcessArgs():
                 print("Missing option for command line argument %s" % arg)
                 util.Fail()
             options.speciesTreeFN = args.pop(0)
+        elif arg == "-M" or arg == "--method":
+            arg_M_or_msa = arg
+            if len(args) == 0:
+                print("Missing option for command line argument %s" % arg)
+                util.Fail()
+            arg = args.pop(0)
+            if arg == "msa": options.qMSATrees = True
+            elif arg == "dendroblast": options.qMSATrees = False    
+            else:
+                print("Invalid argument for option %s: %s" % (arg_M_or_msa, arg))
+                print("Valid options are 'dendroblast' and 'msa'")
+                util.Fail()
         elif arg == "-op" or arg == "--only-prepare":
             options.qStopAfterPrepare = True
         elif arg == "-og" or arg == "--only-groups":
             options.qStopAfterGroups = True
-        elif arg == "-o" or arg == "--orthologues":
-            options.qOrthogroups = False
+        elif arg == "-ot" or arg == "--only-trees":
+            options.qStopAfterTrees = True
         elif arg == "-h" or arg == "--help":
             PrintHelp()
             sys.exit()
@@ -1197,7 +1215,10 @@ def GetOrthogroupsFile(userDir):
 # 9
 def GetOrthologues(dirs, options, clustersFilename_pairs, orthogroupsResultsFilesString=None):
     util.PrintUnderline("Running Orthologue Prediction", True)
-    orthologuesResultsFilesString = get_orthologues.GetOrthologues(dirs.workingDir, dirs.resultsDir, dirs.speciesToUse, dirs.nSpAll, clustersFilename_pairs, options.nBlast, options.speciesTreeFN)
+    if options.qMSATrees:
+        orthologuesResultsFilesString = msa.GetOrthologues(dirs.workingDir, dirs.resultsDir, dirs.speciesToUse, dirs.nSpAll, clustersFilename_pairs, options.nBlast, options.speciesTreeFN, options.qStopAfterTrees)
+    else:
+        orthologuesResultsFilesString = get_orthologues.GetOrthologues(dirs.workingDir, dirs.resultsDir, dirs.speciesToUse, dirs.nSpAll, clustersFilename_pairs, options.nBlast, options.speciesTreeFN, options.qStopAfterTrees)
     if None != orthogroupsResultsFilesString: print(orthogroupsResultsFilesString)
     print(orthologuesResultsFilesString.rstrip())    
 

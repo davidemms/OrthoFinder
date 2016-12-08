@@ -47,7 +47,7 @@ SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStar
 FileInfo = namedtuple("FileInfo", "workingDir graphFilename")     
 
 picProtocol = 1
-version = "1.1.3"
+version = "1.1.4"
 
 # Fix LD_LIBRARY_PATH when using pyinstaller 
 my_env = os.environ.copy()
@@ -72,8 +72,8 @@ Command & parallel command management
 -------------------------------------------------------------------------------
 """
 
-def RunCommand(command):
-    subprocess.call(command, env=my_env)
+def RunCommand(command, shell=False):
+    subprocess.call(command, env=my_env, shell=shell)
             
 def RunOrderedCommandList(commandSet, qHideStdout):
     if qHideStdout:

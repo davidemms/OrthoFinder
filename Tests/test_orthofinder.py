@@ -20,6 +20,7 @@ import random
 import csv
 import argparse
 import numpy as np
+from itertools import izip_longest
 
 __skipLongTests__ = False
 qVerbose = False
@@ -36,7 +37,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.1.3"
+version = "1.1.4"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -548,12 +549,14 @@ class TestCommandLine(unittest.TestCase):
     """ Test that all Sequence files are identical to expected and that the expected Alignment & Tree files all exist.
     Don't require that the Alignment & Tree files are identical, they will change with different versions of programs used"""
     def test_trees(self):
-        expectedDirs = "Alignments Trees Sequences".split()
-        newDirs = [baseDir + "Input/SmallExampleDataset_forTrees/Results_Jan28/" + d +"/" for d in expectedDirs]
+        expectedDirs = "Alignments Gene_Trees Sequences".split()
+        inputDir = baseDir + "Input/SmallExampleDataset_forTrees/Results_Jan28/"
+        orthologuesDir = inputDir + "Orthologues_%s/" % Date()
+        newDirs = [orthologuesDir + d +"/" for d in expectedDirs]
         goldDirs = [baseDir + "ExpectedOutput/SmallExampleDataset_trees/" + d + "/" for d in expectedDirs]
         nTrees = 427
-        with CleanUp([], [], newDirs):   
-            self.stdout, self.stderr = self.RunTrees(baseDir + "Input/SmallExampleDataset_forTrees/Results_Jan28/")
+        with CleanUp([], [], [orthologuesDir]):   
+            self.stdout, self.stderr = self.RunTrees(inputDir)
             for i in xrange(nTrees):
                 self.assertTrue(os.path.exists(newDirs[0] + "/OG%07d.fa" % i), msg=str(i))
                 self.assertTrue(os.path.exists(newDirs[1] + "/OG%07d_tree.txt" % i))
@@ -566,11 +569,13 @@ class TestCommandLine(unittest.TestCase):
         self.test_passed = True         
     
     def test_treesAfterOption_b(self):
-        expectedDirs = "Alignments Trees Sequences".split()
-        newDirs = [baseDir + "Input/SmallExampleDataset_forTreesFromBlast/" + d +"/" for d in expectedDirs]
+        expectedDirs = "Alignments Gene_Trees Sequences".split()
+        inputDir = baseDir + "Input/SmallExampleDataset_forTreesFromBlast/"
+        orthologuesDir = inputDir + "Orthologues_%s/" % Date()
+        newDirs = [orthologuesDir + d +"/" for d in expectedDirs]
         goldDirs = [baseDir + "ExpectedOutput/SmallExampleDataset_trees/" + d +"/" for d in expectedDirs]
-        with CleanUp([], [], newDirs):        
-            self.stdout, self.stderr = self.RunTrees(baseDir + "Input/SmallExampleDataset_forTreesFromBlast/")
+        with CleanUp([], [], [orthologuesDir]):        
+            self.stdout, self.stderr = self.RunTrees(inputDir)
             for goldD, newD in zip(goldDirs, newDirs):
                 for goldFN in glob.glob(goldD + "*"):
                     newFN = newD + os.path.split(goldFN)[1]
@@ -580,11 +585,13 @@ class TestCommandLine(unittest.TestCase):
         self.test_passed = True         
     
     def test_treesMultipleResults(self):
-        expectedDirs = "Alignments Trees Sequences".split()
-        newDirs = [baseDir + "Input/MultipleResults/Results_Jan28/WorkingDirectory/" + d +"/" for d in expectedDirs]
+        expectedDirs = "Alignments Gene_Trees Sequences".split()
+        inputDir = baseDir + "Input/MultipleResults/Results_Jan28/WorkingDirectory/"
+        orthologuesDir = inputDir + "Orthologues_%s/" % Date()
+        newDirs = [orthologuesDir + d +"/" for d in expectedDirs]
         goldDirs = [baseDir + "ExpectedOutput/MultipleResultsInDirectory/" + d +"/" for d in expectedDirs]
-        with CleanUp([], [], newDirs):        
-            self.stdout, self.stderr = self.RunTrees(baseDir + "Input/MultipleResults/Results_Jan28/WorkingDirectory/clusters_OrthoFinder_v0.4.0_I1.5.txt_id_pairs.txt")
+        with CleanUp([], [], [orthologuesDir]):        
+            self.stdout, self.stderr = self.RunTrees(inputDir + "clusters_OrthoFinder_v0.4.0_I1.5.txt_id_pairs.txt")
             for goldD, newD in zip(goldDirs, newDirs):
                 for goldFN in glob.glob(goldD + "*"):
                     newFN = newD + os.path.split(goldFN)[1]
@@ -600,12 +607,14 @@ class TestCommandLine(unittest.TestCase):
         self.test_passed = True         
     
     def test_treesResultsChoice_subset(self):   
-        expectedDirs = "Alignments Trees Sequences".split()
-        newDirs = [baseDir + "/Input/Trees_OneSpeciesRemoved/" + d +"/" for d in expectedDirs]
+        expectedDirs = "Alignments Gene_Trees Sequences".split()
+        inputDir = baseDir + "/Input/Trees_OneSpeciesRemoved/"
+        orthologuesDir = inputDir + "Orthologues_%s/" % Date()
+        newDirs = [orthologuesDir + d +"/" for d in expectedDirs]
         goldDirs = [baseDir + "ExpectedOutput/SmallExampleDataset_trees/" + d + "/" for d in expectedDirs]
         nTrees = 427
-        with CleanUp([], [], newDirs):   
-            self.stdout, self.stderr = self.RunTrees(baseDir + "/Input/Trees_OneSpeciesRemoved/clusters_OrthoFinder_v0.6.1_I1.5_1.txt_id_pairs.txt")
+        with CleanUp([], [], [orthologuesDir]):   
+            self.stdout, self.stderr = self.RunTrees(inputDir + "clusters_OrthoFinder_v0.6.1_I1.5_1.txt_id_pairs.txt")
             for i in xrange(nTrees):
                 self.assertTrue(os.path.exists(newDirs[0] + "/OG%07d.fa" % i), msg=str(i))
                 self.assertTrue(os.path.exists(newDirs[1] + "/OG%07d_tree.txt" % i))
@@ -617,16 +626,18 @@ class TestCommandLine(unittest.TestCase):
         self.test_passed = True         
 #    
     def test_treesResultsChoice_full(self):
-        dirs = ["Trees/", "Alignments/", "Sequences/"]
+        dirs = ["Gene_Trees/", "Alignments/", "Sequences/"]
+        inputDir = baseDir + "/Input/Trees_OneSpeciesRemoved/"
+        orthologuesDir = inputDir + "Orthologues_%s/" % Date()
         goldDirs = [baseDir + "ExpectedOutput/Trees_OneSpeciesRemoved/" + d for d in dirs]
-        expectedDirs = [baseDir + "/Input/Trees_OneSpeciesRemoved/" + d for d in dirs]
+        expectedDirs = [orthologuesDir + d for d in dirs]
         nExpected = [536, 536, 1330]
-        fnPattern = [baseDir + "/Input/Trees_OneSpeciesRemoved/" + p for p in ["Trees/OG%07d_tree.txt", "Alignments/OG%07d.fa", "Sequences/OG%07d.fa"]]
-        with CleanUp([], [],  expectedDirs):
-            self.stdout, self.stderr = self.RunTrees(baseDir + "/Input/Trees_OneSpeciesRemoved/clusters_OrthoFinder_v0.6.1_I1.5.txt_id_pairs.txt")
+        fnPattern = [orthologuesDir + p for p in ["Gene_Trees/OG%07d_tree.txt", "Alignments/OG%07d.fa", "Sequences/OG%07d.fa"]]
+        with CleanUp([], [],  [orthologuesDir]):
+            self.stdout, self.stderr = self.RunTrees(inputDir + "clusters_OrthoFinder_v0.6.1_I1.5.txt_id_pairs.txt")
             for goldD, expD, n, fnPat in zip(goldDirs, expectedDirs, nExpected, fnPattern):
                 for i in xrange(n):
-                    self.assertTrue(os.path.exists(fnPat % i))
+                    self.assertTrue(os.path.exists(fnPat % i), msg=fnPat % i)
                 # Only test the contents of a limited number
                 for goldFN in glob.glob(goldD + "*"):
                     newFN = expD + os.path.split(goldFN)[1]
@@ -636,9 +647,10 @@ class TestCommandLine(unittest.TestCase):
     def test_ProblemCharacters_issue28(self):
         # Can't have ( ) : ,
         inputDir = baseDir + "Input/DisallowedCharacters/"
-        with CleanUp([], [], [inputDir + x for x in "Trees/ Sequences/ Alignments/".split()]):        
+        orthologuesDir = inputDir + "Orthologues_%s/" % Date()
+        with CleanUp([], [], [orthologuesDir]):        
             self.stdout, self.stderr = self.RunTrees(inputDir)
-            fn = inputDir + "Trees/OG0000000_tree.txt"
+            fn = orthologuesDir + "Gene_Trees/OG0000000_tree.txt"
             self.assertTrue(os.path.exists(fn))
             with open(fn, 'rb') as infile:
                 l = infile.readline()
@@ -671,7 +683,7 @@ class TestCommandLine(unittest.TestCase):
             self.stdout, self.stderr = self.RunOrthoFinder("-b %s -og -x %s" % (exampleBlastDir, baseDir + "Input/SpeciesData.txt"))
             expectedCSVFile = exampleBlastDir + "Orthogroups.csv"
             self.CheckStandardRun(self.stdout, self.stderr, goldResultsDir_smallExample, expectedCSVFile)  
-            self.CompareFile(baseDir + "ExpectedOutput/Orthogroups.orthoxml", exampleBlastDir + "Orthogroups.orthoxml")   
+            self.CompareFileLines(baseDir + "ExpectedOutput/Orthogroups.orthoxml", exampleBlastDir + "Orthogroups.orthoxml", 2)   
         self.test_passed = True         
           
     def test_xml_skippedSpecies(self):
@@ -682,7 +694,7 @@ class TestCommandLine(unittest.TestCase):
             self.stdout, self.stderr = self.RunOrthoFinder("-b %s -og -x %s" % (inDir, inDir + "SpeciesData.txt"))
             expectedCSVFile = inDir + "Orthogroups.csv"
             self.CheckStandardRun(self.stdout, self.stderr, goldResultsDir_smallExample, expectedCSVFile)  
-            self.CompareFile(baseDir + "ExpectedOutput/xml_skippedSpecies/Orthogroups.orthoxml", inDir + "Orthogroups.orthoxml")   
+            self.CompareFileLines(baseDir + "ExpectedOutput/xml_skippedSpecies/Orthogroups.orthoxml", inDir + "Orthogroups.orthoxml", 2)   
         self.test_passed = True      
         
     """ Unit tests """
@@ -734,9 +746,9 @@ class TestCommandLine(unittest.TestCase):
         
     def RunTrees(self, commands):
         if qBinary:
-            capture = subprocess.Popen("%s -t 8 %s" % (trees_for_orthogroups_bin, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
+            capture = subprocess.Popen("%s -t 8 -fg %s -ot -M msa" % (orthofinder_bin, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
         else:
-            capture = subprocess.Popen("python %s -t 8 %s" % (trees_for_orthogroups, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
+            capture = subprocess.Popen("python %s -t 8 -fg %s -ot -M msa" % (orthofinder, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
         stdout = "".join([x for x in capture.stdout])
         stderr = "".join([x for x in capture.stderr])
         return stdout, stderr
@@ -779,6 +791,15 @@ class TestCommandLine(unittest.TestCase):
                 if abs(float(ln1[11]) - float(ln2[11]))  > 2.0: 
                     shutil.copy(fn_actual, baseDir + "FailedOutput/" + os.path.split(fn_actual)[1]) 
                     self.assertTrue(False, msg=fn_gold) 
+                    
+    def CompareFileLines(self, fn_gold, fn_actual, nSkip=0):
+        with open(fn_gold, 'rb') as f1, open(fn_actual, 'rb') as f2:
+            for i in xrange(nSkip):
+                f1.next()
+                f2.next()
+            dummy = -1
+            for l1, l2 in izip_longest(f1, f2, fillvalue=dummy):
+                self.assertEqual(l1, l2, l1 if (l1 != dummy and l2 != dummy) else (l1, 'extra gold line') if l2 == dummy else (l2, 'extra acutal line') )
         
     def CompareFile(self, fn_gold, fn_actual):
         fn_gold = os.path.split(fn_gold)[0] + "/" + os.path.split(fn_gold)[1].replace(version, "0.4.0")

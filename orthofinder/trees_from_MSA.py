@@ -36,6 +36,7 @@ import glob
 
 import scripts.mcl as MCL  
 import scripts.util as util 
+import scripts.get_orthologues as gogs
 
 class FastaWriter(object):
     def __init__(self, fastaFileDir):
@@ -84,9 +85,15 @@ def WriteTestFile(workingDir):
     return testFN
       
 class TreesForOrthogroups(object):
-    def __init__(self, baseOutputDir, orthofinderWorkingDir):
+    def __init__(self, resultsDir, orthofinderWorkingDir, qUseIDs=False):
         self.baseOgFormat = "OG%07d"
-        self.baseOutputDir = baseOutputDir
+        self.resultsDir = resultsDir
+        self.qUseIDs = qUseIDs
+        if qUseIDs:
+            self.workingDir = resultsDir + "/WorkingDirectory/"
+            if not os.path.exists(self.workingDir): os.mkdir(self.workingDir)
+        else:
+            self.workingDir = resultsDir
         self.orthofinderWorkingDir = orthofinderWorkingDir
     
     def Align_linsi(self, fasta, alignedFasta, alignmentReport, nThreads=1):
@@ -96,18 +103,29 @@ class TreesForOrthogroups(object):
         """ For larger numbers of sequences (>500 perhaps)"""
         return "mafft --anysymbol --thread %d %s > %s 2> %s" % (nThreads, fasta, alignedFasta, alignmentReport)   
     
-    def GetFastaFilename(self, iOG):
-        return self.baseOutputDir + "Sequences/" + (self.baseOgFormat % iOG) + ".fa"
-    def GetAlignmentFilename(self, iOG):
-        return self.baseOutputDir + "Alignments/" + (self.baseOgFormat % iOG) + ".fa"
-    def GetTreeFilename(self, iOG):
-        return self.baseOutputDir + "Trees/" + (self.baseOgFormat % iOG) + "_tree.txt"
+    def GetFastaFilename(self, iOG, qResults=False):
+        if qResults:
+            return self.resultsDir + "Sequences/" + (self.baseOgFormat % iOG) + ".fa"
+        else:
+            return self.workingDir + "Sequences_ids/" + (self.baseOgFormat % iOG) + ".fa"
+            
+    def GetAlignmentFilename(self, iOG, qResults=False):
+        if qResults:
+            return self.resultsDir + "Alignments/" + (self.baseOgFormat % iOG) + ".fa"
+        else:
+            return self.workingDir + "Alignments_ids/" + (self.baseOgFormat % iOG) + ".fa"
+            
+    def GetTreeFilename(self, iOG, qResults=False):
+        if qResults:
+            return self.resultsDir + "Gene_Trees/" + (self.baseOgFormat % iOG) + "_tree.txt"
+        else:
+            return self.workingDir + "Gene_Trees_ids/" + (self.baseOgFormat % iOG) + "_tree.txt"
         
     def WriteFastaFiles(self, fastaWriter, ogs, idDict):
         for iOg, og in enumerate(ogs):
-            filename = self.GetFastaFilename(iOg)
-            fastaWriter.WriteSeqsToFasta_withNewAccessions(og, filename, idDict)
-      
+            fastaWriter.WriteSeqsToFasta_withNewAccessions(og, self.GetFastaFilename(iOg, True), idDict)
+            fastaWriter.WriteSeqsToFasta(og, self.GetFastaFilename(iOg))
+                
     def OGsStillToDo(self, ogs):
         retOGs = []
         nDone = 0
@@ -138,6 +156,13 @@ class TreesForOrthogroups(object):
             treeFilename = self.GetTreeFilename(i)
             commands.append("FastTree %s > %s 2> /dev/null" % (alignFN, treeFilename))
         return commands
+
+#    def ConvertAccessions(self, ogs, idDict):
+#        treesOutD = self.resultsDir + "Gene_Trees/"
+#        if not os.path.exists(treesOutD):
+#            os.mkdir(treesOutD)
+#        for self.
+
                
     def DoTrees(self, ogs, idDict, nProcesses, nSwitchToMafft=500):
         
@@ -157,15 +182,19 @@ class TreesForOrthogroups(object):
         os.remove(testFN)
         
         # 0
-        dirs = ['Sequences', 'Alignments', 'Trees']
+        dirs = ['Sequences_ids', 'Alignments_ids', 'Gene_Trees_ids']
+        dirsRes = [d.rsplit("_", 1)[0] for d in dirs]
         for d in dirs:
-            if not os.path.exists(self.baseOutputDir + d):
-                os.mkdir(self.baseOutputDir + d)
+            if not os.path.exists(self.workingDir + d):
+                os.mkdir(self.workingDir + d)
+        for d in dirsRes:
+            if not os.path.exists(self.resultsDir + d):
+                os.mkdir(self.resultsDir + d)
         
         # 1.
         fastaWriter = FastaWriter(self.orthofinderWorkingDir)
         self.WriteFastaFiles(fastaWriter, ogs, idDict)
-        print("\nFasta files for orthogroups have been written to:\n   %s" % self.baseOutputDir + "Sequences/")
+        print("\nFasta files for orthogroups have been written to:\n   %s" % self.workingDir + "Sequences/")
         
         # 2
         IandOGs_toDo, nDone = self.OGsStillToDo(ogs)
@@ -178,20 +207,30 @@ class TreesForOrthogroups(object):
         treeCommands = self.GetTreeCommands(alignmentFilesToUse, IandOGs_toDo)
         commandsSet = [(alignCmd, treeCms) for alignCmd, treeCms in zip(alignCommands, treeCommands)]
             
-        # 4
-        if len(commandsSet) > 0:
-            print("\nExample commands that will be run:")
-            for cmdSet in commandsSet[:10]:
-                for cmd in cmdSet:
-                    print(cmd)
-            print("")
+#        # 4
+#        if len(commandsSet) > 0:
+#            print("\nExample commands that will be run:")
+#            for cmdSet in commandsSet[:10]:
+#                for cmd in cmdSet:
+#                    print(cmd)
+#            print("")
             
         util.RunParallelOrderedCommandLists(nProcesses, commandsSet)
         
+        # Convert ids to accessions
+        for i, _ in IandOGs_toDo:
+            with open(self.GetAlignmentFilename(i), 'rb') as infile, open(self.GetAlignmentFilename(i, True), 'wb') as outfile:
+                for line in infile:
+                    if line.startswith(">"):
+                        outfile.write(">" + idDict[line[1:].rstrip()] + "\n")
+                    else:
+                        outfile.write(line)
+            util.RenameTreeTaxa(self.GetTreeFilename(i), self.GetTreeFilename(i, True), idDict, qFixNegatives=True)
+            
         util.PrintCitation()
-        print("\nFasta files for orthogroups have been written to:\n   %s\n" % (self.baseOutputDir + "Sequences/"))
-        print("Multiple sequences alignments have been written to:\n   %s\n" % (self.baseOutputDir + "Alignments/"))
-        print("Gene trees have been written to:\n   %s\n" % (self.baseOutputDir + "Trees/"))
+        print("\nFasta files for orthogroups have been written to:\n   %s\n" % (self.workingDir + "Sequences/"))
+        print("Multiple sequences alignments have been written to:\n   %s\n" % (self.workingDir + "Alignments/"))
+        print("Gene trees have been written to:\n   %s\n" % (self.workingDir + "Trees/"))
  
 def PrintHelp():
     print("Usage")    
@@ -242,7 +281,63 @@ def GetIDsDict(orthofinderWorkingDir):
             speciesName = os.path.splitext(os.path.split(filename)[1])[0]
             speciesDict[iSpecies] = speciesName   
     idDict = {seqID:speciesDict[seqID.split("_")[0]] + "_" + name for seqID, name in idDict.items()}
-    return idDict    
+    return idDict      
+
+def GetOrthologues(workingDir_ogs, resultsDir_ogs, speciesToUse, nSpAll, clustersFilename_pairs, nThreads, speciesTreeFN, qStopAfterTrees):
+    ogs = MCL.GetPredictedOGs(clustersFilename_pairs)   
+    resultsDir = util.CreateNewWorkingDirectory(resultsDir_ogs + "Orthologues_") 
+    idDict = GetIDsDict(workingDir_ogs)
+    
+    treeGen = TreesForOrthogroups(resultsDir, workingDir_ogs, qUseIDs=True)
+    treeGen.DoTrees(ogs, idDict, nThreads, nSwitchToMafft=500)  
+    
+    if qStopAfterTrees: return ""
+    ogSet = gogs.OrthoGroupsSet(workingDir_ogs, speciesToUse, nSpAll, clustersFilename_pairs)
+    # Species Tree
+    if speciesTreeFN == None:
+        db = gogs.DendroBLASTTrees(ogSet, resultsDir, nThreads)
+        db.ReadAndPickle()
+        spTreeFN_ids = db.SpeciesTreeOnly()
+        spDict = ogSet.SpeciesDict()
+        roots, clusters, rootedSpeciesTreeFN, nSupport = gogs.rfd.GetRoot(spTreeFN_ids, os.path.split(treeGen.GetTreeFilename(0))[0] + "/", gogs.rfd.GeneToSpecies_dash, nThreads, treeFmt = 1)
+        if len(roots) > 1:
+            print("Observed %d duplications. %d support the best roots and %d contradict them." % (len(clusters), nSupport, len(clusters) - nSupport))
+            print("Best outgroups for species tree:")  
+        else:
+            print("Observed %d duplications. %d support the best root and %d contradict it." % (len(clusters), nSupport, len(clusters) - nSupport))
+            print("Best outgroup for species tree:")  
+        for r in roots: print("  " + (", ".join([spDict[s] for s in r]))  )
+        qMultiple = len(roots) > 1
+    else:
+        rootedSpeciesTreeFN = [gogs.ConvertUserSpeciesTree(workingDir_ogs, speciesTreeFN, ogSet.SpeciesDict())]
+        roots = [None]
+        qMultiple = False
+    
+    # Reconciliation    
+    if qMultiple: print("\nAnalysing each of the potential species tree roots.")
+    resultsSpeciesTrees = []
+    for i, (r, speciesTree_fn) in enumerate(zip(roots, rootedSpeciesTreeFN)):
+#        util.PrintUnderline("5%s. Reconciling gene and species trees" % ("-%d"%i if qMultiple else "")) 
+        if qMultiple: 
+            resultsDir_new = resultsDir + "Orthologues_using_outgroup_%d/" % i
+            reconTreesRenamedDir = treeGen.workingDir + "Recon_Gene_Trees_using_outgroup_%d/" % i
+            resultsSpeciesTrees.append(resultsDir_new + "SpeciesTree_rooted_at_outgroup_%d.txt" % i)
+            print("Outgroup: " + (", ".join([spDict[s] for s in r])))
+        elif speciesTreeFN != None:
+            resultsDir_new = resultsDir + "Orthologues/"
+            reconTreesRenamedDir = treeGen.workingDir + "Recon_Gene_Trees/"
+            resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
+        else:
+            resultsDir_new = resultsDir + "Orthologues/"
+            reconTreesRenamedDir = treeGen.workingDir + "Recon_Gene_Trees/"
+            resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
+            print("Outgroup: " + (", ".join([spDict[s] for s in r])))
+        os.mkdir(resultsDir_new)
+        util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], ogSet.SpeciesDict(), qFixNegatives=True)
+        gogs.ReconciliationAndOrthologues(treeGen.GetTreeFilename, ogSet, speciesTree_fn, treeGen.workingDir, resultsDir, reconTreesRenamedDir, i if qMultiple else None) 
+    reconTreesRenamedDir = treeGen.workingDir + "Recon_Gene_Trees/"
+#    gogs.ReconciliationAndOrthologues(treeGen.GetTreeFilename, ogSet, spTreeFN_ids, treeGen.workingDir, resultsDir, reconTreesRenamedDir)
+    return ""
 
 if __name__ == "__main__":
     print("\nOrthoFinder Alignments and Trees version %s Copyright (C) 2015 David Emms\n" % util.version)
@@ -285,6 +380,6 @@ if __name__ == "__main__":
     ogs = MCL.GetPredictedOGs(clustersFilename_pairs)     
     idDict = GetIDsDict(orthofinderWorkingDir)
     
-    treeGen = TreesForOrthogroups(orthofinderResultsDir, orthofinderWorkingDir)
+    treeGen = TreesForOrthogroups(orthofinderResultsDir, orthofinderWorkingDir, qUseIDs=True)
     treeGen.DoTrees(ogs, idDict, nProcesses, nSwitchToMafft=500)
 

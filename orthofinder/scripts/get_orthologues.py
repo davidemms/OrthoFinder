@@ -30,7 +30,6 @@ import sys
 import glob
 import time
 import shutil
-import subprocess
 import numpy as np
 from collections import Counter, defaultdict
 import cPickle as pic
@@ -172,56 +171,6 @@ def lil_max(M):
             continue
         maxes[kRow] = max(values.data[0])
     return maxes
-     
-# ==============================================================================================================================      
-# ASTRAL
-
-def GetOGsToUse(ogSet):
-    return range(100, min(10000, len(ogSet.OGs())))
-
-def CreateTaxaMapFile(ogSet, i_ogs_to_use, outputFN):
-    """Get max number of sequences per species"""
-    sp_max = defaultdict(int)
-    ogs = ogSet.OGs()
-    for iog in i_ogs_to_use:
-        thisCount = defaultdict(int)
-        for seq in ogs[iog]:
-            thisCount[seq.iSp] += 1
-        for iSp in thisCount:
-            sp_max[iSp] = max(sp_max[iSp], thisCount[iSp])
-    with open(outputFN, 'wb') as outfile:
-        for iSp, m in sp_max.items():
-            outfile.write(("%d:" % iSp) + ",".join(["%d_%d" % (iSp, j) for j in xrange(m)]) + "\n")
-        
-def ConvertTree(treeString):
-    """for trees with sequence names iSp_jSeq replaces the jSeq with 0, 1,..."""
-    t = tree.Tree(treeString)
-    sp_counts = defaultdict(int)
-    for seq in t:
-        iSp, jSeq = seq.name.split("_")
-        kSeq = sp_counts[iSp]
-        sp_counts[iSp] += 1
-        seq.name = "%s_%d" % (iSp, kSeq)
-    return (t.write() + "\n")
-
-def ConcatenateTrees(i_ogs_to_use, treesPat, outputFN):
-    with open(outputFN, 'wb') as outfile:
-        for iog in i_ogs_to_use:
-            with open(treesPat % iog, 'rb') as infile:
-                for line in infile: 
-                  if ";" in line: outfile.write(ConvertTree(line))
-    
-def RunAstral(ogSet, treesPat, workingDir):
-    dir_astral = workingDir + "ASTRAL/"
-    os.mkdir(dir_astral)
-    i_ogs_to_use = GetOGsToUse(ogSet)
-    tmFN = dir_astral + "Taxa_map.txt"
-    CreateTaxaMapFile(ogSet, i_ogs_to_use, tmFN)
-    treesFN = dir_astral + "TreesFile.txt"
-    ConcatenateTrees(i_ogs_to_use, treesPat, treesFN)
-    speciesTreeFN = workingDir + "SpeciesTree_astral.txt"
-    subprocess.call(" ".join(["java", "-Xmx6000M", "-jar", "~/software/ASTRAL-multiind/Astral/astral.4.8.0.jar", "-a", tmFN, "-i", treesFN, "-o", speciesTreeFN]), shell=True, env=my_env)
-    return speciesTreeFN
 
 # ==============================================================================================================================      
 # DendroBlast   
@@ -257,6 +206,9 @@ class DendroBLASTTrees(object):
         self.treesPat = treesDir + "OG%07d_tree.txt"
         self.distPat = distancesDir + "OG%07d.phy"
         # Check files exist
+    
+    def TreeFilename_IDs(self, iog):
+        return (self.treesPatIDs % iog)
         
     def ReadAndPickle(self): 
         with warnings.catch_warnings():         
@@ -267,7 +219,7 @@ class DendroBLASTTrees(object):
                 for jSp in self.ogSet.seqsInfo.speciesToUse:
                     cmd_queue.put((i, (iSp, jSp)))           
                     i+=1
-            runningProcesses = [mp.Process(target=Worker_BlastScores, args=(cmd_queue, self.ogSet.seqsInfo, self.ogSet.fileInfo, nThreads, i)) for i_ in xrange(nThreads)]
+            runningProcesses = [mp.Process(target=Worker_BlastScores, args=(cmd_queue, self.ogSet.seqsInfo, self.ogSet.fileInfo, self.nProcesses, i)) for i_ in xrange(self.nProcesses)]
             for proc in runningProcesses:
                 proc.start()
             for proc in runningProcesses:
@@ -305,7 +257,22 @@ class DendroBLASTTrees(object):
         for f in glob.glob(self.ogSet.fileInfo.workingDir + "Bit*_*.pic"):
             if os.path.exists(f): os.remove(f)
         
-    def WriteOGMatrices(self, ogs, ogMatrices):
+    def CompleteOGMatrices(self, ogs, ogMatrices):
+        newMatrices = []
+        for iog, (og, m) in enumerate(zip(ogs, ogMatrices)):
+            # dendroblast scores
+            n = m.shape[0]
+            m2 = np.zeros(m.shape)
+            max_og = -9e99
+            for i in xrange(n):
+                for j in xrange(i):
+                    m2[i, j] = -np.log(m[i,j] + m[j,i])  
+                    m2[j, i] = m2[i, j]  
+                    max_og = max(max_og, m2[i,j])
+            newMatrices.append(m2)
+        return newMatrices
+        
+    def CompleteAndWriteOGMatrices(self, ogs, ogMatrices):
         newMatrices = []
         for iog, (og, m) in enumerate(zip(ogs, ogMatrices)):
             # dendroblast scores
@@ -351,7 +318,7 @@ class DendroBLASTTrees(object):
 #                    d_list.append(min(distances) if len(distances) > 0 else None)
         return D, spPairs
     
-    def PrepareSpeciesTreeCommand(self, D, spPairs):
+    def PrepareSpeciesTreeCommand(self, D, spPairs, qPutInWorkingDir=False):
         n = len(self.ogSet.seqsInfo.speciesToUse)
         M = np.zeros((n, n))
         for (sp1, sp2), d in zip(spPairs, D):
@@ -360,16 +327,20 @@ class DendroBLASTTrees(object):
             x = np.median(d)
             M[sp1, sp2] = x
             M[sp2, sp1] = x
-        speciesMatrixFN = os.path.split(self.distPat)[0] + "/SpeciesMatrix.phy"
+        if qPutInWorkingDir:
+            speciesMatrixFN = self.workingDir + "SpeciesMatrix.phy"
+        else:
+            speciesMatrixFN = os.path.split(self.distPat)[0] + "/SpeciesMatrix.phy"
         with open(speciesMatrixFN, 'wb') as outfile:
             outfile.write("%d\n" % n)
-#            speciesDict = self.ogSet.SpeciesDict()
             for i in xrange(n):
-#                outfile.write(speciesDict[str(self.species[i])] + " ")
                 outfile.write(str(self.ogSet.seqsInfo.speciesToUse[i]) + " ")
                 values = " ".join(["%.6g" % (0. + M[i,j]) for j in range(n)])   # hack to avoid printing out "-0"
                 outfile.write(values + "\n")       
-        treeFN = os.path.split(self.treesPatIDs)[0] + "/SpeciesTree_ids.txt"
+        if qPutInWorkingDir:
+            treeFN = self.workingDir + "SpeciesTree_ids.txt"
+        else:
+            treeFN = os.path.split(self.treesPatIDs)[0] + "/SpeciesTree_ids.txt"
         cmd = " ".join(["fastme", "-i", speciesMatrixFN, "-o", treeFN, "-w", "O"] + (["-s"] if n < 1000 else []))
         return cmd, treeFN
                 
@@ -378,12 +349,12 @@ class DendroBLASTTrees(object):
         ogs = self.ogSet.OGs()
         for iog in xrange(len(ogs)):
             nTaxa = len(ogs[iog])
-            cmds.append([" ".join(["fastme", "-i", self.distPat % iog, "-o", self.treesPatIDs % iog, "-w", "O"] + (["-s"] if nTaxa < 1000 else []))])
+            cmds.append([" ".join(["fastme", "-i", self.distPat % iog, "-o", self.TreeFilename_IDs(iog), "-w", "O"] + (["-s"] if nTaxa < 1000 else []))])
         return cmds
         
     def RunAnalysis(self):
         ogs, ogMatrices_partial = self.GetOGMatrices()
-        ogMatrices = self.WriteOGMatrices(ogs, ogMatrices_partial)
+        ogMatrices = self.CompleteAndWriteOGMatrices(ogs, ogMatrices_partial)
         
         D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
         cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs)
@@ -392,9 +363,17 @@ class DendroBLASTTrees(object):
         util.RunParallelOrderedCommandLists(self.nProcesses, [[cmd_spTree]] + cmds_geneTrees, qHideStdout = True)
         seqDict = self.ogSet.Spec_SeqDict()
         for iog in xrange(len(self.ogSet.OGs())):
-            util.RenameTreeTaxa(self.treesPatIDs % iog, self.treesPat % iog, seqDict, qFixNegatives=True)
+            util.RenameTreeTaxa(self.TreeFilename_IDs(iog), self.treesPat % iog, seqDict, qFixNegatives=True)
 #        util.RenameTreeTaxa(spTreeFN_ids, self.workingDir + "SpeciesTree_unrooted.txt", self.ogSet.SpeciesDict(), qFixNegatives=True)        
-        return len(ogs), D, spPairs, spTreeFN_ids
+        return len(ogs), D, spTreeFN_ids
+        
+    def SpeciesTreeOnly(self):
+        ogs, ogMatrices_partial = self.GetOGMatrices()
+        ogMatrices = self.CompleteOGMatrices(ogs, ogMatrices_partial)
+        D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
+        cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs, True)
+        util.RunCommand(cmd_spTree, shell=True)
+        return spTreeFN_ids
 
 # ==============================================================================================================================      
 # DLCPar
@@ -406,9 +385,9 @@ def AllEqualBranchLengths(t):
     lengths = [node.dist for node in t]
     return (len(lengths) > 1 and len(set(lengths)) == 1)
 
-def RootGeneTreesArbitrarily(treesPat, nOGs, outputDir):
-    filenames = [treesPat % i for i in xrange(nOGs)]
-    outFilenames = [outputDir + os.path.split(treesPat % i)[1] for i in xrange(nOGs)]
+def RootGeneTreesArbitrarily(treesIDsPatFn, nOGs, outputDir):
+    filenames = [treesIDsPatFn(i) for i in xrange(nOGs)]
+    outFilenames = [outputDir + os.path.split(treesIDsPatFn(i))[1] for i in xrange(nOGs)]
     treeFilenames = [fn for fn in filenames if fn.endswith(".txt")]
     nErrors = 0
     with open(outputDir + 'root_errors.txt', 'wb') as errorfile:
@@ -454,7 +433,7 @@ def WriteGeneSpeciesMap(d, speciesDict):
             outfile.write("%s_*\t%s\n" % (iSp, iSp))
     return fn
 
-def RunDlcpar(treesPat, ogSet, speciesTreeFN, workingDir):
+def RunDlcpar(treesIDsPatFn, ogSet, speciesTreeFN, workingDir):
     """
     
     Implementation:
@@ -467,10 +446,10 @@ def RunDlcpar(treesPat, ogSet, speciesTreeFN, workingDir):
     nOGs = len(ogs)
     dlcparResultsDir = workingDir + 'dlcpar/'
     if not os.path.exists(dlcparResultsDir): os.mkdir(dlcparResultsDir)
-    RootGeneTreesArbitrarily(treesPat, nOGs, dlcparResultsDir)
+    RootGeneTreesArbitrarily(treesIDsPatFn, nOGs, dlcparResultsDir)
     geneMapFN = WriteGeneSpeciesMap(dlcparResultsDir, ogSet.SpeciesDict())
 
-    filenames = [dlcparResultsDir + os.path.split(treesPat % i)[1] for i in xrange(nOGs)]
+    filenames = [dlcparResultsDir + os.path.split(treesIDsPatFn(i))[1] for i in xrange(nOGs)]
     
     dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -x 1' % (speciesTreeFN, geneMapFN, fn) for fn in filenames]
 #    print(dlcCommands[0])
@@ -607,15 +586,24 @@ def CleanWorkingDir(workingDir):
                 time.sleep(1)
                 shutil.rmtree(dFull, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
 
-def ReconciliationAndOrthologues(treesPatIDs, ogSet, speciesTree_fn, workingDir, resultsDir_new, reconTreesRenamedDir, iSpeciesTree=None):
-    dlcparResultsDir = RunDlcpar(treesPatIDs, ogSet, speciesTree_fn, workingDir)
+def ReconciliationAndOrthologues(treesIDsPatFn, ogSet, speciesTree_fn, workingDir, resultsDir, reconTreesRenamedDir, iSpeciesTree=None):
+    """
+    treesPatFn - function returning name of filename
+    ogSet - info about the orthogroups, species etc
+    speciesTree_fn - the species tree
+    workingDir - Orthologues working dir
+    resultsDir - where the Orthologues top level results directory will go
+    reconTreesRenamedDir - where to put the reconcilled trees that use the gene accessions
+    iSpeciesTree - which of the potential roots of the species tree is this
+    """
+    dlcparResultsDir = RunDlcpar(treesIDsPatFn, ogSet, speciesTree_fn, workingDir)
     if not os.path.exists(reconTreesRenamedDir): os.mkdir(reconTreesRenamedDir)
     for iog in xrange(len(ogSet.OGs())):
         util.RenameTreeTaxa(dlcparResultsDir + "OG%07d_tree_id.dlcpar.locus.tree" % iog, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=False, inFormat=8)
 
     # Orthologue lists
     util.PrintUnderline("6%s. Inferring orthologues from gene trees" % ("-%d"%iSpeciesTree if iSpeciesTree != None else ""))
-    pt.create_orthologue_lists(ogSet, resultsDir_new, dlcparResultsDir, workingDir)    
+    pt.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir)    
                 
 def JustOrthologues(groupsDir, speciesTree_fn, workingDir, qUserSpTree):
     """
@@ -624,7 +612,8 @@ def JustOrthologues(groupsDir, speciesTree_fn, workingDir, qUserSpTree):
     workingDir - orthologues 'WorkingDirectory'
     qUserSpTree - is the speciesTree_fn user-supplied
     """
-    treesPatIDs = workingDir + "Trees_ids/OG%07d_tree_id.txt"
+    def TreePatIDs(iog):
+        return workingDir + ("Trees_ids/OG%07d_tree_id.txt" % iog)
     reconTreesRenamedDir = workingDir + "Recon_Gene_Trees/"
     resultsDir_new = workingDir + "../Orthologues"
     if os.path.exists(resultsDir_new):
@@ -640,12 +629,26 @@ def JustOrthologues(groupsDir, speciesTree_fn, workingDir, qUserSpTree):
         speciesTree_fn = ConvertUserSpeciesTree(workingDir, speciesTree_fn, ogSet.SpeciesDict())
     util.PrintUnderline("Running Orthologue Prediction", True)
     util.PrintUnderline("5. Reconciling gene and species trees") 
-    ReconciliationAndOrthologues(treesPatIDs, ogSet, speciesTree_fn, workingDir, resultsDir_new, reconTreesRenamedDir)
+    ReconciliationAndOrthologues(TreePatIDs, ogSet, speciesTree_fn, workingDir, resultsDir_new, reconTreesRenamedDir)
     util.PrintUnderline("7. Writing results files")
     CleanWorkingDir(workingDir)
     return "Species-by-species orthologues directory:\n   %s\n\n" % resultsDir_new
     
-def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, speciesToUse, nSpAll, clustersFilename_pairs, nProcesses, userSpeciesTree = None):
+def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, speciesToUse, nSpAll, clustersFilename_pairs, nProcesses, userSpeciesTree = None, qStopAfterTrees=False):
+    """
+    1. Setup:
+        - ogSet, directories
+        - DendroBLASTTress - object
+    2. DendrobBLAST:
+        - read scores
+        - RunAnalysis: Get distance matrices, do trees
+    3. Root species tree
+    4. Reconciliation/Orthologues
+    5. Clean up
+    
+    Variables:
+    - ogSet - all the relevant information about the orthogroups, species etc.
+    """
     ogSet = OrthoGroupsSet(orthofinderWorkingDir, speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor)
     if len(ogSet.speciesToUse) < 4: 
         print("ERROR: Not enough species to infer species tree")
@@ -662,8 +665,9 @@ def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, speciesToUse, n
     
     db = DendroBLASTTrees(ogSet, resultsDir, nProcesses)
     db.ReadAndPickle()
-    nOGs, D, spPairs, spTreeFN_ids = db.RunAnalysis()
+    nOGs, D, spTreeFN_ids = db.RunAnalysis()
     
+    if qStopAfterTrees: return ""
     if userSpeciesTree:
         util.PrintUnderline("4. Using user-supplied species tree") 
         userSpeciesTree = ConvertUserSpeciesTree(db.workingDir, userSpeciesTree, ogSet.SpeciesDict())
@@ -673,7 +677,7 @@ def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, speciesToUse, n
     else:
         util.PrintUnderline("4. Best outgroup(s) for species tree") 
         spDict = ogSet.SpeciesDict()
-        roots, clusters, rootedSpeciesTreeFN, nSupport = rfd.GetRoot(spTreeFN_ids, os.path.split(db.treesPatIDs)[0] + "/", rfd.GeneToSpecies_dash, nProcesses, treeFmt = 1)
+        roots, clusters, rootedSpeciesTreeFN, nSupport = rfd.GetRoot(spTreeFN_ids, os.path.split(db.TreeFilename_IDs(0))[0] + "/", rfd.GeneToSpecies_dash, nProcesses, treeFmt = 1)
         if len(roots) > 1:
             print("Observed %d duplications. %d support the best roots and %d contradict them." % (len(clusters), nSupport, len(clusters) - nSupport))
             print("Best outgroups for species tree:")  
@@ -703,7 +707,7 @@ def GetOrthologues(orthofinderWorkingDir, orthofinderResultsDir, speciesToUse, n
             print("Outgroup: " + (", ".join([spDict[s] for s in r])))
         os.mkdir(resultsDir_new)
         util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True)
-        ReconciliationAndOrthologues(db.treesPatIDs, db.ogSet, speciesTree_fn, db.workingDir, resultsDir_new, reconTreesRenamedDir, i if qMultiple else None) 
+        ReconciliationAndOrthologues(db.TreeFilename_IDs, db.ogSet, speciesTree_fn, db.workingDir, resultsDir_new, reconTreesRenamedDir, i if qMultiple else None) 
     
     db.DeleteBlastMatrices()
     CleanWorkingDir(db.workingDir)
