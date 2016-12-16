@@ -75,12 +75,12 @@ Command & parallel command management
 def RunCommand(command, shell=False):
     subprocess.call(command, env=my_env, shell=shell)
             
-def RunOrderedCommandList(commandSet, qHideStdout):
+def RunOrderedCommandList(commandList, qHideStdout):
     if qHideStdout:
-        for cmd in commandSet:
+        for cmd in commandList:
             subprocess.call(cmd, shell=True, stdout=subprocess.PIPE, env=my_env)
     else:
-        for cmd in commandSet:
+        for cmd in commandList:
             subprocess.call(cmd, shell=True, env=my_env)
     
 def CanRunCommand(command, qAllowStderr = False):
@@ -391,7 +391,7 @@ def GetOGsFile(userArg):
                 Fail()
             
     if qSpecifiedResultsFile:
-        print("Using orthogroups in file:\n    %s" % userArg)
+        print("\nUsing orthogroups in file:\n    %s" % userArg)
         return orthofinderWorkingDir, orthofinderWorkingDir, userArg
     else:     
         # identify orthogroups file
@@ -422,7 +422,7 @@ def GetOGsFile(userArg):
             print("\nCould not find:\n    Orthogroups*.txt/OrthologousGroups*.txt\nor\n    clusters_OrthoFinder_*.txt_id_pairs.txt")
             Fail()
             
-        print("Using orthogroups in file:\n    %s" % orthogroupFiles[0])
+        print("\nUsing orthogroups in file:\n    %s" % orthogroupFiles[0])
         print("and corresponding clusters file:\n    %s" % clustersFiles[0])
         return orthofinderWorkingDir, userArg, clustersFiles[0]
 
@@ -433,5 +433,7 @@ def PrintCitation():
 
 def PrintUnderline(text, qHeavy=False):
     print("\n" + text)
-    print(("=" if qHeavy else "-") * len(text))
+    n = len(text)
+    if text.startswith("\n"): n -= 1
+    print(("=" if qHeavy else "-") * n)
 

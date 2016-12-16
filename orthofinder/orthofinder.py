@@ -46,7 +46,6 @@ from xml.dom import minidom                     # Y
 import Queue                                    # Y
 import warnings                                 # Y
 
-import trees_from_MSA as msa
 import scripts.mcl as MCLread
 import scripts.blast_file_processor as BlastFileProcessor
 from scripts import util, matrices, get_orthologues
@@ -771,11 +770,14 @@ to redo the BLAST searches from a previous analysis.\n""")
     
     print("Control where analysis stops (optional):")
     print("")
+    print("""-op, --only-prepare
+    Only prepare the BLAST input files in the format required by OrthoFinder.\n""" )
+    
     print("""-og, --only-groups
     Stop after inferring orthogroups, do not infer gene trees of orthologues.\n""")
     
-    print("""-op, --only-prepare
-    Only prepare the BLAST input files in the format required by OrthoFinder.\n""" )
+    print("""-os, --only-seqs
+    Stop after inferring orthogroups and writing out sequence files for each orthogroup\n""")
     
     print("""-ot, --only-trees
     Stop after inferring gene trees, do not infer orthologues.\n""" )
@@ -847,6 +849,7 @@ class Options(object):#
         self.qStartFromTrees = False
         self.qStopAfterPrepare = False
         self.qStopAfterGroups = False
+        self.qStopAfterSeqs = False
         self.qStopAfterTrees = False
         self.qMSATrees = False
         self.speciesXMLInfoFN = None
@@ -993,6 +996,8 @@ def ProcessArgs():
             options.qStopAfterPrepare = True
         elif arg == "-og" or arg == "--only-groups":
             options.qStopAfterGroups = True
+        elif arg == "-os" or arg == "--only-seqs":
+            options.qStopAfterSeqs = True
         elif arg == "-ot" or arg == "--only-trees":
             options.qStopAfterTrees = True
         elif arg == "-h" or arg == "--help":
@@ -1003,14 +1008,18 @@ def ProcessArgs():
             util.Fail()    
     
     # check argument combinations           
-    if options.qStartFromTrees and options.qStartFromFasta:
-        print("ERROR: Incompatible arguments, -f (start from fasta files) and -g (start from orthogroups)")
+    if options.qStartFromFasta and (options.qStartFromTrees or options.qStartFromGroups):
+        print("ERROR: Incompatible arguments, -f (start from fasta files) and" + (" -fg (start from orthogroups)" if options.qStartFromGroups else " -ft (start from trees)"))
         util.Fail()
         
-    if options.qStartFromTrees and options.qStartFromBlast:
-        print("ERROR: Incompatible arguments, -b (start from pre-calcualted BLAST results) and -g (start from orthogroups)")
+    if options.qStartFromBlast and (options.qStartFromTrees or options.qStartFromGroups):
+        print("ERROR: Incompatible arguments, -b (start from pre-calcualted BLAST results) and" + (" -fg (start from orthogroups)" if options.qStartFromGroups else " -ft (start from trees)"))
         util.Fail()      
 
+    if options.qStartFromTrees and options.qStartFromGroups:
+        print("ERROR: Incompatible arguments, -fg (start from orthogroups) and -ft (start from trees)")
+        util.Fail()      
+        
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
     print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
     return options, fastaDir, workingDir, orthologuesDir              
@@ -1058,12 +1067,17 @@ def GetXMLSpeciesInfo(dirs, options):
         util.Fail()
     return speciesInfo
 
-def CheckDependencies(options):
-    util.PrintUnderline("1. Checking required programs are installed")
-    if (not options.qStartFromBlast) and (not CanRunBLAST()):
+def CheckDependencies(options, dirForTempFiles):
+    util.PrintUnderline("Checking required programs are installed")
+    if (options.qStartFromFasta) and (not CanRunBLAST()):
         util.Fail()
-    if not CanRunMCL():
+    if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunMCL():
         util.Fail()
+    if not (options.qStopAfterPrepare or options.qStopAfterSeqs or options.qStopAfterGroups):
+        if not get_orthologues.CanRunOrthologueDependencies(dirForTempFiles, options.qMSATrees, options.qStopAfterTrees, options.speciesTreeFN == None):
+            print("Dependencies have been met for inference of orthogroups but not for the subsequent orthologue inference.")
+            print("Either install the required dependencies or use the option '-og' to stop the analysis after the inference of orthogroups.\n")
+            util.Fail()
 
 def DoOrthogroups(options, dirs, seqsInfo):
     # Run Algorithm, cluster and output cluster files with original accessions
@@ -1121,6 +1135,8 @@ def DoOrthogroups(options, dirs, seqsInfo):
 # 0
 def ProcessPreviousFiles(workingDir):
     """Checks for:
+    workingDir should be the WorkingDirectory containing Blast*.txt files
+    
     SpeciesIDs.txt
     Species*.fa
     Blast*txt
@@ -1209,25 +1225,28 @@ def RunBlast(options, dirs, seqsInfo):
     for f in glob.glob(dirs.workingDir + "BlastDBSpecies*"):
         os.remove(f)
 
-def GetOrthogroupsFile(userDir):
-    return util.GetOGsFile(userDir)
-
 # 9
 def GetOrthologues(dirs, options, clustersFilename_pairs, orthogroupsResultsFilesString=None):
     util.PrintUnderline("Running Orthologue Prediction", True)
-    if options.qMSATrees:
-        orthologuesResultsFilesString = msa.GetOrthologues(dirs.workingDir, dirs.resultsDir, dirs.speciesToUse, dirs.nSpAll, clustersFilename_pairs, options.nBlast, options.speciesTreeFN, options.qStopAfterTrees)
-    else:
-        orthologuesResultsFilesString = get_orthologues.GetOrthologues(dirs.workingDir, dirs.resultsDir, dirs.speciesToUse, dirs.nSpAll, clustersFilename_pairs, options.nBlast, options.speciesTreeFN, options.qStopAfterTrees)
+
+    orthologuesResultsFilesString = get_orthologues.OrthologuesWorkflow(dirs.workingDir, 
+                                                                        dirs.resultsDir, 
+                                                                        dirs.speciesToUse, 
+                                                                        dirs.nSpAll, 
+                                                                        clustersFilename_pairs, 
+                                                                        options.nBlast,
+                                                                        options.nProcessAlg,
+                                                                        options.speciesTreeFN, 
+                                                                        options.qStopAfterSeqs,
+                                                                        options.qStopAfterTrees,
+                                                                        options.qMSATrees)
     if None != orthogroupsResultsFilesString: print(orthogroupsResultsFilesString)
     print(orthologuesResultsFilesString.rstrip())    
 
-def GetOrthologues_FromTrees(orthologuesDir, userSpeciesTreeFN = None):
+def GetOrthologues_FromTrees(orthologuesDir, nHighParallel, userSpeciesTreeFN = None):
     groupsDir = orthologuesDir + "../"
     workingDir = orthologuesDir + "WorkingDirectory/"
-    speciesTree_fn = userSpeciesTreeFN if userSpeciesTreeFN else workingDir + "Trees_ids/SpeciesTree_ids_0_rooted.txt"
-    qUserSpTree = userSpeciesTreeFN != None
-    return get_orthologues.JustOrthologues(groupsDir, speciesTree_fn, workingDir, qUserSpTree)
+    return get_orthologues.OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, userSpeciesTreeFN)
  
 def ProcessesNewFasta(fastaDir, existingDirs=None):
     """
@@ -1292,6 +1311,11 @@ def CheckOptions(options, dirs):
     if options.speciesTreeFN:
         expSpecies = SpeciesNameDict(dirs.SpeciesIdsFilename()).values()
         get_orthologues.CheckUserSpeciesTree(options.speciesTreeFN, expSpecies)
+        
+    if options.qStopAfterTrees:
+        options.qMSATrees = True
+    
+    return options
 
 if __name__ == "__main__":    
     print("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version)
@@ -1300,16 +1324,19 @@ if __name__ == "__main__":
     For details please see the License.md that came with this software.\n""")
     options, fastaDir, workingDir, orthologuesDir = ProcessArgs()  
     # 2.
-    CheckDependencies(options) 
+    if options.qStartFromGroups:
+        # User can specify it using clusters_id_pairs file, process this first to get the workingDirectory
+        workingDir, orthofinderResultsDir, clustersFilename_pairs = util.GetOGsFile(workingDir)
+    CheckDependencies(options, next(d for d in [fastaDir, workingDir, orthologuesDir] if  d != None)) 
     
     # if using previous Trees etc., check these are all present - Job for get_orthologues
     if options.qStartFromBlast and options.qStartFromFasta:
         # 0. Check Files
         dirs = ProcessPreviousFiles(workingDir)
-        print("Adding new species in %s to existing analysis in %s" % (fastaDir, dirs.workingDir))
+        print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, dirs.workingDir))
         # 3. 
         dirs = ProcessesNewFasta(fastaDir, dirs)
-        CheckOptions(options, dirs)
+        options = CheckOptions(options, dirs)
         # 4.
         seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
         # 5.
@@ -1332,7 +1359,7 @@ if __name__ == "__main__":
     elif options.qStartFromFasta:
         # 3. 
         dirs = ProcessesNewFasta(fastaDir)
-        CheckOptions(options, dirs)
+        options = CheckOptions(options, dirs)
         # 4
         seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
         # 5.
@@ -1356,7 +1383,7 @@ if __name__ == "__main__":
         # 0.
         dirs = ProcessPreviousFiles(workingDir)
         print("Using previously calculated BLAST results in %s" % dirs.workingDir) 
-        CheckOptions(options, dirs)
+        options = CheckOptions(options, dirs)
         # 4.
         seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
         # 5.
@@ -1371,18 +1398,16 @@ if __name__ == "__main__":
         print("\n" + statsFile + "\n\n" + summaryText) 
         util.PrintCitation() 
     elif options.qStartFromGroups:
-        # 0.
-        orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = GetOrthogroupsFile(workingDir)   
-        dirs = ProcessPreviousFiles(orthofinderWorkingDir)
+        # 0.  
+        dirs = ProcessPreviousFiles(workingDir)
         dirs.resultsDir = orthofinderResultsDir       
-        CheckOptions(options, dirs)
+        options = CheckOptions(options, dirs)
         # 9
         GetOrthologues(dirs, options, clustersFilename_pairs)
         # 10
         util.PrintCitation() 
     elif options.qStartFromTrees:
-        # Don't call CheckOptions(options, dirs), Check species tree in GetOrthologues_FromTrees
-        summaryText = GetOrthologues_FromTrees(orthologuesDir, options.speciesTreeFN)
+        summaryText = GetOrthologues_FromTrees(orthologuesDir, options.nBlast, options.speciesTreeFN)
         print(summaryText) 
         util.PrintCitation() 
     else:

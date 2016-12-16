@@ -29,8 +29,6 @@ baseDir = os.path.dirname(os.path.realpath(__file__)) + os.sep
 qBinary = False
 orthofinder = baseDir + "../orthofinder/orthofinder.py"
 orthofinder_bin = baseDir + "../orthofinder/bin/orthofinder"
-trees_for_orthogroups = baseDir + "../orthofinder/trees_from_MSA.py"
-trees_for_orthogroups_bin = baseDir + "../orthofinder/bin/trees_from_MSA"
 exampleFastaDir = baseDir + "Input/SmallExampleDataset/"
 exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 
@@ -377,7 +375,7 @@ class TestCommandLine(unittest.TestCase):
                     assert("Blast%d_%d.txt" % (i,j) in self.stdout)
                     assert("Blast%d_%d.txt" % (j,i) in self.stdout)
                 
-            assert(self.stdout.count("blastp") == 2*len(new)*len(original) + len(new)**2)     
+            assert(self.stdout.count("-outfmt 6") == 2*len(new)*len(original) + len(new)**2)     
         self.test_passed = True         
                 
     def test_removeFirstSpecies(self):
@@ -554,11 +552,13 @@ class TestCommandLine(unittest.TestCase):
         orthologuesDir = inputDir + "Orthologues_%s/" % Date()
         newDirs = [orthologuesDir + d +"/" for d in expectedDirs]
         goldDirs = [baseDir + "ExpectedOutput/SmallExampleDataset_trees/" + d + "/" for d in expectedDirs]
-        nTrees = 427
+        nAlignments = 427
+        nTrees = 33
         with CleanUp([], [], [orthologuesDir]):   
             self.stdout, self.stderr = self.RunTrees(inputDir)
-            for i in xrange(nTrees):
+            for i in xrange(nAlignments):
                 self.assertTrue(os.path.exists(newDirs[0] + "/OG%07d.fa" % i), msg=str(i))
+            for i in xrange(nTrees):
                 self.assertTrue(os.path.exists(newDirs[1] + "/OG%07d_tree.txt" % i))
             goldD = goldDirs[2]
             newD = newDirs[2]
@@ -847,15 +847,12 @@ if __name__ == "__main__":
     if args.dir:
         orthofinder = args.dir + "/orthofinder.py"
         orthofinder_bin = os.path.splitext(orthofinder)[0]
-        trees_for_orthogroups = args.dir + "/trees_from_MSA.py"
-        trees_for_orthogroups_bin = os.path.splitext(trees_for_orthogroups)[0]
         sys.path.append(args.dir + "/scripts")
         
     qBinary = args.binaries
     qVerbose = args.verbose
     print("Testing:")
     print("  " + orthofinder_bin if qBinary else orthofinder)
-    print("  " + trees_for_orthogroups_bin if qBinary else trees_for_orthogroups)
     print("")
     
     if args.test != None:
