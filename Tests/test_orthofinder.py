@@ -76,11 +76,17 @@ to redo the BLAST searches from a previous analysis.
 
 Control where analysis stops (optional):
 
--og, --only-groups
-    Only infer orthogroups, do not infer gene trees of orthologues.
-
 -op, --only-prepare
     Only prepare the BLAST input files in the format required by OrthoFinder.
+
+-og, --only-groups
+    Stop after inferring orthogroups, do not infer gene trees of orthologues.
+
+-os, --only-seqs
+    Stop after inferring orthogroups and writing out sequence files for each orthogroup
+
+-ot, --only-trees
+    Stop after inferring gene trees, do not infer orthologues.
 
 Additional arguments:
 
@@ -90,6 +96,9 @@ Additional arguments:
 -a n_orthofinder_threads, --algthreads n_orthofinder_threads
     The number of threads to use for the less readily parallelised parts of the OrthoFinder algorithm.
     There are speed/memory trade-offs involved, see manual for details. [Default is 1]
+
+-M tree_inference_method, --method tree_inference_method
+    Use tree_inference_method for gene trees. Valid options are 'dendroblast' & 'msa'. [Default is dendroblast]
 
 -I inflation_parameter, --inflation inflation_parameter
     Specify a non-default inflation parameter for MCL. Not recommended. [Default is 1.5]
