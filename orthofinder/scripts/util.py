@@ -47,7 +47,7 @@ SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStar
 FileInfo = namedtuple("FileInfo", "workingDir graphFilename")     
 
 picProtocol = 1
-version = "1.1.4"
+version = "1.1.5"
 
 # Fix LD_LIBRARY_PATH when using pyinstaller 
 my_env = os.environ.copy()
@@ -95,14 +95,14 @@ def CanRunCommand(command, qAllowStderr = False):
         print(" - failed")
         return False
         
-def Worker_RunCommand(cmd_queue, nProcesses, nToDo):
+def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qShell=False):
     while True:
         try:
             i, command = cmd_queue.get(True, 1)
             nDone = i - nProcesses + 1
             if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
                 PrintTime("Done %d of %d" % (nDone, nToDo))
-            subprocess.call(command, env=my_env)
+            subprocess.call(command, env=my_env, shell=qShell)
         except Queue.Empty:
             return   
                             
@@ -122,7 +122,7 @@ def Worker_RunOrderedCommandList(cmd_queue, nProcesses, nToDo, qHideStdout):
         except Queue.Empty:
             return   
     
-def RunParallelCommands(nProcesses, commands, qHideStdout = False):
+def RunParallelCommands(nProcesses, commands, qShell, qHideStdout = False):
     """nProcesss - the number of processes to run in parallel
     commands - list of commands to be run in parallel
     """
@@ -130,7 +130,7 @@ def RunParallelCommands(nProcesses, commands, qHideStdout = False):
     cmd_queue = mp.Queue()
     for i, cmd in enumerate(commands):
         cmd_queue.put((i, cmd))
-    runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, nProcesses, i+1, qHideStdout)) for i_ in xrange(nProcesses)]
+    runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, nProcesses, i+1, qShell)) for i_ in xrange(nProcesses)]
     for proc in runningProcesses:
         proc.start()
     

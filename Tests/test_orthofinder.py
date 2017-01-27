@@ -35,7 +35,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.1.4"
+version = "1.1.5"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -621,7 +621,7 @@ class TestCommandLine(unittest.TestCase):
         orthologuesDir = inputDir + "Orthologues_%s/" % Date()
         newDirs = [orthologuesDir + d +"/" for d in expectedDirs]
         goldDirs = [baseDir + "ExpectedOutput/SmallExampleDataset_trees/" + d + "/" for d in expectedDirs]
-        nTrees = 427
+        nTrees = 33
         with CleanUp([], [], [orthologuesDir]):   
             self.stdout, self.stderr = self.RunTrees(inputDir + "clusters_OrthoFinder_v0.6.1_I1.5_1.txt_id_pairs.txt")
             for i in xrange(nTrees):
@@ -640,7 +640,7 @@ class TestCommandLine(unittest.TestCase):
         orthologuesDir = inputDir + "Orthologues_%s/" % Date()
         goldDirs = [baseDir + "ExpectedOutput/Trees_OneSpeciesRemoved/" + d for d in dirs]
         expectedDirs = [orthologuesDir + d for d in dirs]
-        nExpected = [536, 536, 1330]
+        nExpected = [312, 536, 1330]
         fnPattern = [orthologuesDir + p for p in ["Gene_Trees/OG%07d_tree.txt", "Alignments/OG%07d.fa", "Sequences/OG%07d.fa"]]
         with CleanUp([], [],  [orthologuesDir]):
             self.stdout, self.stderr = self.RunTrees(inputDir + "clusters_OrthoFinder_v0.6.1_I1.5.txt_id_pairs.txt")

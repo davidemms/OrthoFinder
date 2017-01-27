@@ -88,7 +88,7 @@ class TreesForOrthogroups(object):
     def __init__(self, resultsDir, ogsWorkingDir):
         self.baseOgFormat = "OG%07d"
         self.resultsDir = resultsDir
-        self.workingDir = resultsDir + "/WorkingDirectory/"
+        self.workingDir = resultsDir + "WorkingDirectory/"
         if not os.path.exists(self.workingDir): os.mkdir(self.workingDir)
         self.ogsWorkingDir = ogsWorkingDir
     
@@ -125,6 +125,7 @@ class TreesForOrthogroups(object):
     def GetAlignmentCommands(self, ogs, nSwitchToMafft):
         commands = []
         for i, og in enumerate(ogs):
+            if len(og) < 2: break
             ogFastaFilename = self.GetFastaFilename(i)
             alignedFilename = self.GetAlignmentFilename(i)
             reportFilename = "/dev/null"
@@ -134,14 +135,15 @@ class TreesForOrthogroups(object):
                 commands.append(self.Align_mafft(ogFastaFilename, alignedFilename, reportFilename))
         return commands
         
-    def GetTreeCommands(self, alignmentsForTree, nOGs):
+    def GetTreeCommands(self, alignmentsForTree, ogs):
         commands = []
-        for i, alignFN in enumerate(alignmentsForTree):
+        for i, (alignFN, og) in enumerate(zip(alignmentsForTree, ogs)):
+            if len(og) < 4: break
             treeFilename = self.GetTreeFilename(i)
             commands.append("FastTree %s > %s 2> /dev/null" % (alignFN, treeFilename))
         return commands
                
-    def DoTrees(self, ogs, idDict, nProcesses, qStopAfterSeqs, nSwitchToMafft=500):
+    def DoTrees(self, ogs, idDict, nProcesses, qStopAfterSeqs, qStopAfterAlignments, nSwitchToMafft=500):
         # 0       
         resultsDirsFullPath = []
         for fn in [self.GetFastaFilename, self.GetAlignmentFilename, self.GetTreeFilename]:
@@ -150,6 +152,7 @@ class TreesForOrthogroups(object):
                 if not os.path.exists(d): os.mkdir(d)
                 if not qIDs: resultsDirsFullPath.append(d)
             if qStopAfterSeqs: break
+            if qStopAfterAlignments and fn == self.GetAlignmentFilename: break
         
         # 1.
         fastaWriter = FastaWriter(self.ogsWorkingDir)
@@ -161,20 +164,27 @@ class TreesForOrthogroups(object):
         
         # 3
         alignCommands = self.GetAlignmentCommands(ogs, nSwitchToMafft)
-        nOGs = len(ogs)
-        alignmentFilesToUse = [self.GetAlignmentFilename(i) for i in xrange(nOGs)]
+        if qStopAfterAlignments:
+            util.RunParallelCommands(nProcesses, alignCommands, qShell=True)
+            return resultsDirsFullPath[:2]
+        alignmentFilesToUse = [self.GetAlignmentFilename(i) for i, _ in enumerate(alignCommands)]
         treeCommands = self.GetTreeCommands(alignmentFilesToUse, ogs)
-        commandsSet = [(alignCmd, treeCms) for alignCmd, treeCms in zip(alignCommands, treeCommands)]
+        commandsSet = []
+        for i in xrange(len(treeCommands)):
+            commandsSet.append([alignCommands[i], treeCommands[i]])
+        for i in xrange(len(treeCommands), len(alignCommands)):
+            commandsSet.append([alignCommands[i]])
         util.RunParallelOrderedCommandLists(nProcesses, commandsSet)
         
         # Convert ids to accessions
-        for i in xrange(nOGs):
-            with open(self.GetAlignmentFilename(i), 'rb') as infile, open(self.GetAlignmentFilename(i, True), 'wb') as outfile:
+        for i, alignFN in enumerate(alignmentFilesToUse):
+            with open(alignFN, 'rb') as infile, open(self.GetAlignmentFilename(i, True), 'wb') as outfile:
                 for line in infile:
                     if line.startswith(">"):
                         outfile.write(">" + idDict[line[1:].rstrip()] + "\n")
                     else:
                         outfile.write(line)
-            util.RenameTreeTaxa(self.GetTreeFilename(i), self.GetTreeFilename(i, True), idDict, qFixNegatives=True)
+            if os.path.exists(self.GetTreeFilename(i)):
+                util.RenameTreeTaxa(self.GetTreeFilename(i), self.GetTreeFilename(i, True), idDict, qFixNegatives=True)
         
         return resultsDirsFullPath[:2]

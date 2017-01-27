@@ -434,7 +434,7 @@ def WriteGraph_perSpecies(args):
                     graphFile.write("%d:%.3f " % (j + jOffset, value))
             graphFile.write("$\n")
         if iSpec == (seqsInfo.nSpecies - 1): graphFile.write(")\n")
-        util.PrintTime("Writen final scores for species %d to graph file" % iSpec)
+        util.PrintTime("Written final scores for species %d to graph file" % iSpec)
             
             
 class WaterfallMethod:    
@@ -852,6 +852,7 @@ class Options(object):#
         self.qStopAfterSeqs = False
         self.qStopAfterTrees = False
         self.qMSATrees = False
+        self.qPhyldog = False
         self.speciesXMLInfoFN = None
         self.speciesTreeFN = None
         self.mclInflation = g_mclInflation
@@ -987,6 +988,9 @@ def ProcessArgs():
                 util.Fail()
             arg = args.pop(0)
             if arg == "msa": options.qMSATrees = True
+            elif arg == "joint-tree-recon": 
+                options.qPhyldog = True
+                options.qMSATrees = False
             elif arg == "dendroblast": options.qMSATrees = False    
             else:
                 print("Invalid argument for option %s: %s" % (arg_M_or_msa, arg))
@@ -1074,7 +1078,7 @@ def CheckDependencies(options, dirForTempFiles):
     if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunMCL():
         util.Fail()
     if not (options.qStopAfterPrepare or options.qStopAfterSeqs or options.qStopAfterGroups):
-        if not get_orthologues.CanRunOrthologueDependencies(dirForTempFiles, options.qMSATrees, options.qStopAfterTrees, options.speciesTreeFN == None):
+        if not get_orthologues.CanRunOrthologueDependencies(dirForTempFiles, options.qMSATrees, options.qPhyldog, options.qStopAfterTrees, options.speciesTreeFN == None):
             print("Dependencies have been met for inference of orthogroups but not for the subsequent orthologue inference.")
             print("Either install the required dependencies or use the option '-og' to stop the analysis after the inference of orthogroups.\n")
             util.Fail()
@@ -1239,7 +1243,8 @@ def GetOrthologues(dirs, options, clustersFilename_pairs, orthogroupsResultsFile
                                                                         options.speciesTreeFN, 
                                                                         options.qStopAfterSeqs,
                                                                         options.qStopAfterTrees,
-                                                                        options.qMSATrees)
+                                                                        options.qMSATrees,
+                                                                        options.qPhyldog)
     if None != orthogroupsResultsFilesString: print(orthogroupsResultsFilesString)
     print(orthologuesResultsFilesString.rstrip())    
 
@@ -1312,8 +1317,8 @@ def CheckOptions(options, dirs):
         expSpecies = SpeciesNameDict(dirs.SpeciesIdsFilename()).values()
         get_orthologues.CheckUserSpeciesTree(options.speciesTreeFN, expSpecies)
         
-    if options.qStopAfterTrees:
-        options.qMSATrees = True
+#    if options.qStopAfterTrees:
+#        options.qMSATrees = True
     
     return options
 

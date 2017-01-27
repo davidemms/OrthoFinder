@@ -46,6 +46,7 @@ import root_from_duplications as rfd
 import orthologues_from_recon_trees as rt
 import blast_file_processor as BlastFileProcessor
 import trees_from_MSA as msa
+import trees_from_phyldog
 
 nThreads = util.nThreadsDefault
 
@@ -512,7 +513,7 @@ def WriteTestDistancesFile(testFN):
         outfile.write("4\n1_1 0 0 0.2 0.25\n0_2 0 0 0.21 0.28\n3_1 0.21 0.21 0 0\n4_1 0.25 0.28 0 0")
     return testFN
 
-def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qStopAfterTrees, qInferSpeciesTree):  
+def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfterTrees, qInferSpeciesTree):  
     # FastME
     if (not qMSAGeneTrees) or qInferSpeciesTree:
         testFN = workingDir + "SimpleTest.phy"
@@ -535,13 +536,13 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qStopAfterTrees, qIn
             return False
     
     # FastTree & MAFFT
-    if qMSAGeneTrees:
+    if qMSAGeneTrees or qPhyldog:
         testFN, temp_dir = msa.WriteTestFile(workingDir)
         if not util.CanRunCommand("mafft %s" % testFN, qAllowStderr=True):
             print("ERROR: Cannot run mafft")
             print("Please check MAFFT is installed and that the executables are in the system path\n")
             return False
-        if not util.CanRunCommand("FastTree %s" % testFN, qAllowStderr=True):
+        if qMSAGeneTrees and not util.CanRunCommand("FastTree %s" % testFN, qAllowStderr=True):
             print("ERROR: Cannot run FastTree")
             print("Please check FastTree is installed and that the executables are in the system path\n")
             return False       
@@ -688,7 +689,8 @@ def OrthologuesWorkflow(workingDir_ogs,
                        userSpeciesTree = None, 
                        qStopAfterSeqs = False,
                        qStopAfterTrees = False, 
-                       qMSA = False):
+                       qMSA = False,
+                       qPhyldog = False):
     """
     1. Setup:
         - ogSet, directories
@@ -712,12 +714,16 @@ def OrthologuesWorkflow(workingDir_ogs,
 #        sys.exit()
     
     resultsDir = util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_")
-    if qMSA:
+    if qMSA or qPhyldog:
         treeGen = msa.TreesForOrthogroups(resultsDir, workingDir_ogs)
-        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.Spec_SeqDict(), nHighParallel, qStopAfterSeqs, nSwitchToMafft=500)  
+        qStopAfterAlignments = qPhyldog
+        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.Spec_SeqDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlignments, nSwitchToMafft=500) 
         if qStopAfterSeqs:
             return ("\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0])
         db = DendroBLASTTrees(ogSet, resultsDir, nLowParrallel)
+        if qPhyldog:
+            trees_from_phyldog.RunPhyldogAnalysis(resultsDir + "WorkingDirectory/phyldog/", ogSet.OGs(), speciesToUse)
+            return "Running Phyldog" + "\n".join(seqs_alignments_dirs)
     else:
         util.PrintUnderline("Calculating gene distances")
         db = DendroBLASTTrees(ogSet, resultsDir, nLowParrallel)
@@ -739,6 +745,7 @@ def OrthologuesWorkflow(workingDir_ogs,
     else:
         if qMSA:
             util.PrintUnderline("Inferring species tree (calculating gene distances)")
+            print("Loading BLAST scores")
             db.ReadAndPickle()
             spTreeFN_ids = db.SpeciesTreeOnly()
         util.PrintUnderline("Best outgroup(s) for species tree") 
