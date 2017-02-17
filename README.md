@@ -1,5 +1,11 @@
 # OrthoFinder — Accurate inference of orthogroups, orthologues, gene trees and rooted species tree made easy!
 
+## Modification from parent
+I forked OrthoFinder to modify it to work with the DIAMOND aligner instead of BLAST.
+This should increase the speed by which it works considerably...
+
+ALSO It changes the behavior of the results output directories, which is now always "Results", rather than "Results_Date"
+
 ![OrthoFinder workflow](orthofinder/workflow.png)
 *Figure 1: Automatic OrthoFinder analysis*
 

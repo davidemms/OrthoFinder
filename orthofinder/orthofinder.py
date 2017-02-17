@@ -354,8 +354,8 @@ def GetOrderedBlastCommands(seqsInfo, dirs):
                    [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew)] 
     taskSizes = [seqsInfo.nSeqsPerSpecies[i]*seqsInfo.nSeqsPerSpecies[j] for i,j in speciesPairs]
     taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
-    commands = [["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", dirs.workingDir + "Species%d.fa" % iFasta, "-db", dirs.workingDir + "BlastDBSpecies%d" % iDB, "-out", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)]
-                    for iFasta, iDB in speciesPairs]               
+    commands = [["diamond", "blastp", "--evalue", "0.001", "--query", dirs.workingDir + "Species%d.fa" % iFasta, "--db", dirs.workingDir + "BlastDBSpecies%d" % iDB, "-out", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)]
+                    for iFasta, iDB in speciesPairs]
     return commands     
 
 """
@@ -1199,16 +1199,17 @@ def ProcessPreviousFiles(workingDir):
 def CreateBlastDatabases(dirs):
     nDB = max(dirs.speciesToUse) + 1
     for iSp in xrange(nDB):
-        command = ["makeblastdb", "-dbtype", "prot", "-in", dirs.workingDir + "Species%d.fa" % iSp, "-out", dirs.workingDir + "BlastDBSpecies%d" % iSp]
-        util.PrintTime("Creating Blast database %d of %d" % (iSp + 1, nDB))
+        command = ["diamond", "makedb", "--in", dirs.workingDir + "Species%d.fa", "-o",  dirs.workingDir + "BlastDBSpecies%d" % iSp ]  
+        #command = ["makeblastdb", "-dbtype", "prot", "-in", dirs.workingDir + "Species%d.fa" % iSp, "-out", dirs.workingDir + "BlastDBSpecies%d" % iSp]
+        util.PrintTime("Creating DIAMOND database %d of %d" % (iSp + 1, nDB))
         RunBlastDBCommand(command) 
 
 # 7
 def RunBlast(options, dirs, seqsInfo):
     if options.qStopAfterPrepare:
-        util.PrintUnderline("BLAST commands that must be run")
+        util.PrintUnderline("DIAMOND commands that must be run")
     else:        
-        util.PrintUnderline("Running BLAST all-versus-all")
+        util.PrintUnderline("Running DIAMOND all-versus-all")
     commands = GetOrderedBlastCommands(seqsInfo, dirs)
     if options.qStopAfterPrepare:
         for command in commands:

@@ -198,14 +198,7 @@ def GetDirectoryName(baseDirName, i):
 
 """Call GetNameForNewWorkingDirectory before a call to CreateNewWorkingDirectory to find out what directory will be created"""
 def CreateNewWorkingDirectory(baseDirectoryName):
-    dateStr = datetime.date.today().strftime("%b%d") 
-    iAppend = 0
-    newDirectoryName = GetDirectoryName(baseDirectoryName + dateStr, iAppend)
-    while os.path.exists(newDirectoryName):
-        iAppend += 1
-        newDirectoryName = GetDirectoryName(baseDirectoryName + dateStr, iAppend)
-    os.mkdir(newDirectoryName)
-    return newDirectoryName
+    return baseDirectoryName
 
 def GetUnusedFilename(baseFilename, ext):
     iAppend = 0
