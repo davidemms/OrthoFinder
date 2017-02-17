@@ -342,7 +342,7 @@ def GetNumberOfSequencesInFile(filename):
 
 """ Question: Do I want to do all BLASTs or just the required ones? It's got to be all BLASTs I think. They could potentially be 
 run after the clustering has finished."""
-def GetOrderedBlastCommands(seqsInfo, dirs):
+def GetOrderedBlastCommands(options, seqsInfo, dirs):
     """ Using the nSeq1 x nSeq2 as a rough estimate of the amount of work required for a given species-pair, returns the commands 
     ordered so that the commands predicted to take the longest come first. This allows the load to be balanced better when processing 
     the BLAST commands.
@@ -356,7 +356,8 @@ def GetOrderedBlastCommands(seqsInfo, dirs):
     taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
     commands = []
     if options.diamond:
-      commands = [["diamond", "blastp", "--evalue", "0.001", "--query", dirs.workingDir + "Species%d.fa" % iFasta, "--db", dirs.workingDir + "BlastDBSpecies%d.dmnd" % iDB, "-o", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)]
+      sensitivity = options.sensitive
+      commands = [["diamond", "blastp", "--evalue", "0.001", "--query", dirs.workingDir + "Species%d.fa" % iFasta, "--db", dirs.workingDir + "BlastDBSpecies%d.dmnd" % iDB, "-o", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB), sensitivity]
                       for iFasta, iDB in speciesPairs]
     else:
       commands = [["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", dirs.workingDir + "Species%d.fa" % iFasta, "-db", dirs.workingDir + "BlastDBSpecies%d" % iDB, "-out", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)]
@@ -803,6 +804,9 @@ to redo the BLAST searches from a previous analysis.\n""")
     Use DIAMOND Instead of BLAST. [Default is OFF]""")
     print("")
 
+    print("""--sensitive, --more-sensitive
+    Parameters for DIAMOND. Assumes --diamond. [Default is '']""")
+
     print("""--constOut
     Use the constant output directory of 'Results_WorkingDirectory' instead of default. [Default is OFF]""")
     print("")
@@ -879,6 +883,7 @@ class Options(object):#
         self.speciesTreeFN = None
         self.mclInflation = g_mclInflation
         self.diamond = False
+        self.sensitive = ""
         self.constOut = False
     
     def what(self):
@@ -1024,6 +1029,12 @@ def ProcessArgs():
             options.qStopAfterPrepare = True
         elif arg == "--diamond":
           options.diamond = True
+        elif arg == "--sensitive":
+          options.diamond = True
+          options.sensitive = arg
+        elif arg == "--more-sensitive":
+          options.diamond = True
+          options.sensitive = arg
         elif arg == "--constOut":
           options.constOut = True
         elif arg == "-og" or arg == "--only-groups":
@@ -1249,7 +1260,7 @@ def RunBlast(options, dirs, seqsInfo):
           util.PrintUnderline("Running DIAMOND all-versus-all")
         else:
           util.PrintUnderline("Running BLAST all-versus-all")
-    commands = GetOrderedBlastCommands(seqsInfo, dirs)
+    commands = GetOrderedBlastCommands(options, seqsInfo, dirs)
     if options.qStopAfterPrepare:
         for command in commands:
             print(" ".join(command))
