@@ -354,9 +354,14 @@ def GetOrderedBlastCommands(seqsInfo, dirs):
                    [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew)] 
     taskSizes = [seqsInfo.nSeqsPerSpecies[i]*seqsInfo.nSeqsPerSpecies[j] for i,j in speciesPairs]
     taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
-    commands = [["diamond", "blastp", "--evalue", "0.001", "--query", dirs.workingDir + "Species%d.fa" % iFasta, "--db", dirs.workingDir + "BlastDBSpecies%d.dmnd" % iDB, "-o", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)]
-                    for iFasta, iDB in speciesPairs]
-    return commands     
+    commands = []
+    if options.diamond:
+      commands = [["diamond", "blastp", "--evalue", "0.001", "--query", dirs.workingDir + "Species%d.fa" % iFasta, "--db", dirs.workingDir + "BlastDBSpecies%d.dmnd" % iDB, "-o", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)]
+                      for iFasta, iDB in speciesPairs]
+    else:
+      commands = [["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", dirs.workingDir + "Species%d.fa" % iFasta, "-db", dirs.workingDir + "BlastDBSpecies%d" % iDB, "-out", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)]
+                      for iFasta, iDB in speciesPairs]
+    return commands
 
 """
 Matrices
@@ -742,6 +747,15 @@ def CanRunMCL():
         print("ERROR: Cannot run MCL with the command \"%s\"" % command)
         print("Please check MCL is installed and in the system path\n")
         return False
+
+def CanRunDiamond():
+    command = "diamond help"
+    if util.CanRunCommand(command):
+        return True
+    else:
+        print("ERROR: Cannot run DIAMOND with the command \"%s\"" % command)
+        print("Please check DIAMOND is installed and in the system path\n")
+        return False
     
 def PrintHelp():  
     print("=== Simple Usage ===\n") 
@@ -784,7 +798,15 @@ to redo the BLAST searches from a previous analysis.\n""")
 
     print("Additional arguments:")
     print("")
-    
+
+    print("""--diamond
+    Use DIAMOND Instead of BLAST. [Default is OFF]""")
+    print("")
+
+    print("""--constOut
+    Use the constant output directory of 'Results_WorkingDirectory' instead of default. [Default is OFF]""")
+    print("")
+ 
     print("""-t n_blast_threads, --threads n_blast_threads
     The number of BLAST processes to be run simultaneously. [Default is %d]\n""" % util.nThreadsDefault)
     
@@ -856,6 +878,8 @@ class Options(object):#
         self.speciesXMLInfoFN = None
         self.speciesTreeFN = None
         self.mclInflation = g_mclInflation
+        self.diamond = False
+        self.constOut = False
     
     def what(self):
         for k, v in self.__dict__.items():
@@ -998,6 +1022,10 @@ def ProcessArgs():
                 util.Fail()
         elif arg == "-op" or arg == "--only-prepare":
             options.qStopAfterPrepare = True
+        elif arg == "--diamond":
+          options.diamond = True
+        elif arg == "--constOut":
+          options.constOut = True
         elif arg == "-og" or arg == "--only-groups":
             options.qStopAfterGroups = True
         elif arg == "-os" or arg == "--only-seqs":
@@ -1073,7 +1101,8 @@ def GetXMLSpeciesInfo(dirs, options):
 
 def CheckDependencies(options, dirForTempFiles):
     util.PrintUnderline("Checking required programs are installed")
-    if (options.qStartFromFasta) and (not CanRunBLAST()):
+    alnCheckFunction = CanRunDiamond if options.diamond else CanRunBLAST
+    if (options.qStartFromFasta) and (not alnCheckFunction() ):
         util.Fail()
     if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunMCL():
         util.Fail()
@@ -1196,20 +1225,30 @@ def ProcessPreviousFiles(workingDir):
     return dirs
 
 # 6
-def CreateBlastDatabases(dirs):
+def CreateBlastDatabases(options, dirs):
     nDB = max(dirs.speciesToUse) + 1
     for iSp in xrange(nDB):
-        command = ["diamond", "makedb", "--in", dirs.workingDir + "Species%d.fa" % iSp, "-d",  dirs.workingDir + "BlastDBSpecies%d" % iSp ]  
-        #command = ["makeblastdb", "-dbtype", "prot", "-in", dirs.workingDir + "Species%d.fa" % iSp, "-out", dirs.workingDir + "BlastDBSpecies%d" % iSp]
-        util.PrintTime("Creating DIAMOND database %d of %d" % (iSp + 1, nDB))
+        command = ""
+        if options.diamond:
+          command = ["diamond", "makedb", "--in", dirs.workingDir + "Species%d.fa" % iSp, "-d",  dirs.workingDir + "BlastDBSpecies%d" % iSp ]  
+          util.PrintTime("Creating DIAMOND database %d of %d" % (iSp + 1, nDB))
+        else:
+          command = ["makeblastdb", "-dbtype", "prot", "-in", dirs.workingDir + "Species%d.fa" % iSp, "-out", dirs.workingDir + "BlastDBSpecies%d" % iSp]
+          util.PrintTime("Creating BLAST database %d of %d" % (iSp + 1, nDB))
         RunBlastDBCommand(command) 
 
 # 7
 def RunBlast(options, dirs, seqsInfo):
     if options.qStopAfterPrepare:
-        util.PrintUnderline("DIAMOND commands that must be run")
-    else:        
-        util.PrintUnderline("Running DIAMOND all-versus-all")
+        if options.diamond:
+          util.PrintUnderline("DIAMOND commands that must be run")
+        else:
+          util.PrintUnderline("BLAST commands that must be run")
+    else:
+        if options.diamond:
+          util.PrintUnderline("Running DIAMOND all-versus-all")
+        else:
+          util.PrintUnderline("Running BLAST all-versus-all")
     commands = GetOrderedBlastCommands(seqsInfo, dirs)
     if options.qStopAfterPrepare:
         for command in commands:
@@ -1254,7 +1293,7 @@ def GetOrthologues_FromTrees(orthologuesDir, nHighParallel, userSpeciesTreeFN = 
     workingDir = orthologuesDir + "WorkingDirectory/"
     return get_orthologues.OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, userSpeciesTreeFN)
  
-def ProcessesNewFasta(fastaDir, existingDirs=None):
+def ProcessesNewFasta(options, fastaDir, existingDirs=None):
     """
     Process fasta files and return a Directory object with all paths completed.
     """
@@ -1269,7 +1308,7 @@ def ProcessesNewFasta(fastaDir, existingDirs=None):
         util.Fail()
     if None == existingDirs:
         dirs = Directories()
-        dirs.resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results_")
+        dirs.resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results_", options.constOut)
         dirs.workingDir = dirs.resultsDir + "WorkingDirectory" + os.sep
         util.mkdir_p(dirs.workingDir)
     else:
@@ -1341,7 +1380,7 @@ if __name__ == "__main__":
         dirs = ProcessPreviousFiles(workingDir)
         print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, dirs.workingDir))
         # 3. 
-        dirs = ProcessesNewFasta(fastaDir, dirs)
+        dirs = ProcessesNewFasta(options, fastaDir, dirs)
         options = CheckOptions(options, dirs)
         # 4.
         seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
@@ -1350,7 +1389,7 @@ if __name__ == "__main__":
             speciesInfo = GetXMLSpeciesInfo(dirs, options)
         # 6.    
         util.PrintUnderline("Dividing up work for BLAST for parallel processing")
-        CreateBlastDatabases(dirs)
+        CreateBlastDatabases(options, dirs)
         # 7.  
         RunBlast(options, dirs, seqsInfo)
         # 8.
@@ -1364,7 +1403,7 @@ if __name__ == "__main__":
             
     elif options.qStartFromFasta:
         # 3. 
-        dirs = ProcessesNewFasta(fastaDir)
+        dirs = ProcessesNewFasta(options, fastaDir)
         options = CheckOptions(options, dirs)
         # 4
         seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
@@ -1373,7 +1412,7 @@ if __name__ == "__main__":
             speciesInfo = GetXMLSpeciesInfo(dirs, options)
         # 6.    
         util.PrintUnderline("Dividing up work for BLAST for parallel processing")
-        CreateBlastDatabases(dirs)
+        CreateBlastDatabases(options, dirs)
         # 7. 
         RunBlast(options, dirs, seqsInfo)
         # 8.  
