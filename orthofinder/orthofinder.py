@@ -354,7 +354,7 @@ def GetOrderedBlastCommands(seqsInfo, dirs):
                    [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew)] 
     taskSizes = [seqsInfo.nSeqsPerSpecies[i]*seqsInfo.nSeqsPerSpecies[j] for i,j in speciesPairs]
     taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
-    commands = [["diamond", "blastp", "--evalue", "0.001", "--query", dirs.workingDir + "Species%d.fa" % iFasta, "--db", dirs.workingDir + "BlastDBSpecies%d" % iDB, "-out", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)]
+    commands = [["diamond", "blastp", "--evalue", "0.001", "--query", dirs.workingDir + "Species%d.fa" % iFasta, "--db", dirs.workingDir + "BlastDBSpecies%d.dmnd" % iDB, "-o", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)]
                     for iFasta, iDB in speciesPairs]
     return commands     
 
@@ -1199,7 +1199,7 @@ def ProcessPreviousFiles(workingDir):
 def CreateBlastDatabases(dirs):
     nDB = max(dirs.speciesToUse) + 1
     for iSp in xrange(nDB):
-        command = ["diamond", "makedb", "--in", dirs.workingDir + "Species%d.fa", "-o",  dirs.workingDir + "BlastDBSpecies%d" % iSp ]  
+        command = ["diamond", "makedb", "--in", dirs.workingDir + "Species%d.fa" % iSp, "-d",  dirs.workingDir + "BlastDBSpecies%d" % iSp ]  
         #command = ["makeblastdb", "-dbtype", "prot", "-in", dirs.workingDir + "Species%d.fa" % iSp, "-out", dirs.workingDir + "BlastDBSpecies%d" % iSp]
         util.PrintTime("Creating DIAMOND database %d of %d" % (iSp + 1, nDB))
         RunBlastDBCommand(command) 
@@ -1271,7 +1271,7 @@ def ProcessesNewFasta(fastaDir, existingDirs=None):
         dirs = Directories()
         dirs.resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results_")
         dirs.workingDir = dirs.resultsDir + "WorkingDirectory" + os.sep
-        os.mkdir(dirs.workingDir)
+        util.mkdir_p(dirs.workingDir)
     else:
         dirs = existingDirs
     iSeq = 0
