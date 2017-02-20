@@ -357,10 +357,26 @@ def GetOrderedBlastCommands(options, seqsInfo, dirs):
     commands = []
     if options.diamond:
       sensitivity = options.sensitive
-      commands = [["diamond", "blastp", "--evalue", "0.001", "--query", dirs.workingDir + "Species%d.fa" % iFasta, "--db", dirs.workingDir + "BlastDBSpecies%d.dmnd" % iDB, "-o", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB), sensitivity]
+      k_opt = "%d" % options.diamond_k
+      
+      commands = [filter(None,
+                  ["diamond", "blastp", 
+                   "-k", k_opt,
+                   sensitivity,
+                   "--no-self-hits",
+                   "--evalue", "0.001",
+                   "--query", dirs.workingDir + "Species%d.fa" % iFasta,
+                   "--db", dirs.workingDir + "BlastDBSpecies%d.dmnd" % iDB,
+                   "-o", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)])
                       for iFasta, iDB in speciesPairs]
     else:
-      commands = [["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", dirs.workingDir + "Species%d.fa" % iFasta, "-db", dirs.workingDir + "BlastDBSpecies%d" % iDB, "-out", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)]
+      commands = [filter(None,
+                  ["blastp",
+                   "-outfmt", "6",
+                   "-evalue", "0.001",
+                   "-query", dirs.workingDir + "Species%d.fa" % iFasta,
+                   "-db", dirs.workingDir + "BlastDBSpecies%d" % iDB,
+                   "-out", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)])
                       for iFasta, iDB in speciesPairs]
     return commands
 
@@ -807,6 +823,10 @@ to redo the BLAST searches from a previous analysis.\n""")
     print("""--sensitive, --more-sensitive
     Parameters for DIAMOND. Assumes --diamond. [Default is '']""")
 
+    print("""--max-target-seqs <int>
+    Number of DIAMOND hits to return. [Default is 20]""")
+    print("")
+
     print("""--constOut
     Use the constant output directory of 'Results_WorkingDirectory' instead of default. [Default is OFF]""")
     print("")
@@ -884,6 +904,7 @@ class Options(object):#
         self.mclInflation = g_mclInflation
         self.diamond = False
         self.sensitive = ""
+        self.diamond_k = 20
         self.constOut = False
     
     def what(self):
@@ -1035,6 +1056,12 @@ def ProcessArgs():
         elif arg == "--more-sensitive":
           options.diamond = True
           options.sensitive = arg
+        elif arg == "--max-target-seqs":
+          options.diamond = True
+          if len(args) == 0:
+                print("Missing option for command line argument %s" % arg)
+                util.Fail()
+          options.diamond_k = int(args.pop(0))
         elif arg == "--constOut":
           options.constOut = True
         elif arg == "-og" or arg == "--only-groups":
