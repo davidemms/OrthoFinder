@@ -1188,7 +1188,10 @@ def DoOrthogroups(options, dirs, seqsInfo):
     MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
     clustersFilename_pairs = clustersFilename + "_id_pairs.txt"
     MCLread.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
-    
+
+    # cp clustersFilename dirs.workingDir/mci_output.mci
+    util.RunCommand(["cp", clustersFilename, dirs.workingDir + "/mci_output.mci"])
+
     util.PrintUnderline("Writing orthogroups to file")
     if options.qStopAfterGroups: util.PrintCitation()
     ogs = MCLread.GetPredictedOGs(clustersFilename_pairs)
@@ -1496,18 +1499,3 @@ if __name__ == "__main__":
         util.PrintCitation() 
     else:
         raise NotImplementedError
-        
-        
-     
-
-    
-
-    
-#
-# ./orthofinder.py -f ./ExampleDataset/ --diamond --more-sensitive --constOut -og
-# ./orthofinder.py -fg ./ExampleDataset/Results/ --diamond --more-sensitive --constOut -ot
-# ./orthofinder.py -ft ./ExampleDataset/Results/Orthologues/WorkingDirectory/ --diamond --more-sensitive --constOut
-
-# ./orthofinder.py -f ./ExampleDataset/ --diamond --more-sensitive  -og
-# ./orthofinder.py -fg ./ExampleDataset/Results_Feb21/ --diamond --more-sensitive -ot
-# ./orthofinder.py -ft ./ExampleDataset/Results_Feb21/Orthologues_Feb21/ --diamond --more-sensitive
