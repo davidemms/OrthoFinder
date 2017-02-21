@@ -211,13 +211,14 @@ def GetDirectoryName(baseDirName, i):
 """Call GetNameForNewWorkingDirectory before a call to CreateNewWorkingDirectory to find out what directory will be created"""
 def CreateNewWorkingDirectory(baseDirectoryName, constOut=False):
     if constOut:
-      return baseDirectoryName
+      mkdir_p(baseDirectoryName)
+      return baseDirectoryName + os.sep
     dateStr = datetime.date.today().strftime("%b%d") 
     iAppend = 0
-    newDirectoryName = GetDirectoryName(baseDirectoryName + dateStr, iAppend)
+    newDirectoryName = GetDirectoryName(baseDirectoryName + '_' + dateStr, iAppend)
     while os.path.exists(newDirectoryName):
         iAppend += 1
-        newDirectoryName = GetDirectoryName(baseDirectoryName + dateStr, iAppend)
+        newDirectoryName = GetDirectoryName(baseDirectoryName + '_' + dateStr, iAppend)
     os.mkdir(newDirectoryName)
     return newDirectoryName
 
@@ -355,6 +356,7 @@ def RenameTreeTaxa(treeFN, newTreeFilename, idsMap, qFixNegatives=False, inForma
         if qFixNegatives:
             for n in t.traverse():
                 if n.dist < 0.0: n.dist = 0.0
+        print newTreeFilename
         t.write(outfile = newTreeFilename, format=4)  
     except:
         pass

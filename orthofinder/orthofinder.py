@@ -1327,10 +1327,10 @@ def GetOrthologues(dirs, options, clustersFilename_pairs, orthogroupsResultsFile
     if None != orthogroupsResultsFilesString: print(orthogroupsResultsFilesString)
     print(orthologuesResultsFilesString.rstrip())    
 
-def GetOrthologues_FromTrees(orthologuesDir, nHighParallel, userSpeciesTreeFN = None):
+def GetOrthologues_FromTrees(orthologuesDir, nHighParallel, constOut=False, userSpeciesTreeFN = None):
     groupsDir = orthologuesDir + "../"
     workingDir = orthologuesDir + "WorkingDirectory/"
-    return get_orthologues.OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, userSpeciesTreeFN)
+    return get_orthologues.OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, userSpeciesTreeFN, constOut=constOut)
  
 def ProcessesNewFasta(options, fastaDir, existingDirs=None):
     """
@@ -1347,8 +1347,8 @@ def ProcessesNewFasta(options, fastaDir, existingDirs=None):
         util.Fail()
     if None == existingDirs:
         dirs = Directories()
-        dirs.resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results_", options.constOut)
-        dirs.workingDir = dirs.resultsDir + "WorkingDirectory" + os.sep
+        dirs.resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results", options.constOut)
+        dirs.workingDir = dirs.resultsDir + os.sep + "WorkingDirectory" + os.sep
         util.mkdir_p(dirs.workingDir)
     else:
         dirs = existingDirs
@@ -1491,7 +1491,7 @@ if __name__ == "__main__":
         # 10
         util.PrintCitation() 
     elif options.qStartFromTrees:
-        summaryText = GetOrthologues_FromTrees(orthologuesDir, options.nBlast, options.speciesTreeFN)
+        summaryText = GetOrthologues_FromTrees(orthologuesDir, options.nBlast, constOut=options.constOut, userSpeciesTreeFN=options.speciesTreeFN)
         print(summaryText) 
         util.PrintCitation() 
     else:
@@ -1503,4 +1503,11 @@ if __name__ == "__main__":
     
 
     
+#
+# ./orthofinder.py -f ./ExampleDataset/ --diamond --more-sensitive --constOut -og
+# ./orthofinder.py -fg ./ExampleDataset/Results/ --diamond --more-sensitive --constOut -ot
+# ./orthofinder.py -ft ./ExampleDataset/Results/Orthologues/WorkingDirectory/ --diamond --more-sensitive --constOut
 
+# ./orthofinder.py -f ./ExampleDataset/ --diamond --more-sensitive  -og
+# ./orthofinder.py -fg ./ExampleDataset/Results_Feb21/ --diamond --more-sensitive -ot
+# ./orthofinder.py -ft ./ExampleDataset/Results_Feb21/Orthologues_Feb21/ --diamond --more-sensitive

@@ -222,7 +222,7 @@ class DendroBLASTTrees(object):
             i = 0
             for iSp in self.ogSet.seqsInfo.speciesToUse:
                 for jSp in self.ogSet.seqsInfo.speciesToUse:
-                    cmd_queue.put((i, (iSp, jSp)))           
+                    cmd_queue.put((i, (iSp, jSp)))
                     i+=1
             runningProcesses = [mp.Process(target=Worker_BlastScores, args=(cmd_queue, self.ogSet.seqsInfo, self.ogSet.fileInfo, self.nProcesses, i)) for i_ in xrange(self.nProcesses)]
             for proc in runningProcesses:
@@ -362,6 +362,9 @@ class DendroBLASTTrees(object):
         cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs)
         cmds_geneTrees = self.PrepareGeneTreeCommand()
         util.PrintUnderline("Inferring gene and species trees")
+
+        print cmd_spTree
+
         util.RunParallelOrderedCommandLists(self.nProcesses, [[cmd_spTree]] + cmds_geneTrees, qHideStdout = True)
         seqDict = self.ogSet.Spec_SeqDict()
         for iog in xrange(len(self.ogSet.OGs())):
@@ -626,7 +629,7 @@ def ReconciliationAndOrthologues(treesIDsPatFn, ogSet, speciesTree_fn, workingDi
     util.PrintUnderline("Inferring orthologues from gene trees" + (" (root %d)"%iSpeciesTree if iSpeciesTree != None else ""))
     rt.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir)    
                 
-def OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, speciesTree_fn = None):
+def OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, speciesTree_fn = None, constOut=False):
     """
     groupsDir - directory with orthogroups file in
     userSpeciesTree_fn - None if not supplied otherwise rooted tree using user species names (not orthofinder IDs)
@@ -646,6 +649,7 @@ def OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, speciesTree_fn = 
         nTrees = 0
         for p in possibilities:
             fn = workingDir + "Trees_ids/" + p
+            print fn
             if os.path.exists(fn): 
                 nTrees += 1
                 speciesTree_fn = fn
@@ -662,10 +666,14 @@ def OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, speciesTree_fn = 
     reconTreesRenamedDir = workingDir + "Recon_Gene_Trees/"
     resultsDir_new = workingDir + "../Orthologues"      # for the Orthologues_Species/ directories
     if os.path.exists(resultsDir_new):
-        resultsDir_new = util.CreateNewWorkingDirectory(resultsDir_new + "_")
+        resultsDir_new = util.CreateNewWorkingDirectory(resultsDir_new, constOut = constOut)
     else:
         resultsDir_new += os.sep
         os.mkdir(resultsDir_new)
+
+    print "groupsDir: %s" % groupsDir
+    print "workingDir: %s" % workingDir
+
     orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = util.GetOGsFile(groupsDir)
     speciesToUse, nSpAll = util.GetSpeciesToUse(orthofinderWorkingDir + "SpeciesIDs.txt")    
     ogSet = OrthoGroupsSet(orthofinderWorkingDir, speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor)
@@ -714,7 +722,7 @@ def OrthologuesWorkflow(workingDir_ogs,
 #        print("orthologues have not been met. Please review previous messages for more information.")
 #        sys.exit()
     
-    resultsDir = util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_", constOut=constOut)
+    resultsDir = util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues", constOut=constOut)
     if qMSA or qPhyldog:
         treeGen = msa.TreesForOrthogroups(resultsDir, workingDir_ogs)
         qStopAfterAlignments = qPhyldog
@@ -730,9 +738,9 @@ def OrthologuesWorkflow(workingDir_ogs,
         db = DendroBLASTTrees(ogSet, resultsDir, nLowParrallel)
         db.ReadAndPickle()
         nOGs, D, spTreeFN_ids = db.RunAnalysis()
-    
-    if qStopAfterTrees: 
-        return ""
+    # ORIGINAL LOCATION
+    #if qStopAfterTrees: 
+    #    return ""
     if len(ogSet.speciesToUse) < 4: 
         print("ERROR: Not enough species to infer species tree")
         util.Fail()
@@ -760,7 +768,11 @@ def OrthologuesWorkflow(workingDir_ogs,
             print("Best outgroup for species tree:")  
         for r in roots: print("  " + (", ".join([spDict[s] for s in r]))  )
         qMultiple = len(roots) > 1
-    
+   
+    # DEBUGGING LOCATION
+    if qStopAfterTrees:
+        return ""
+ 
     if qMultiple: util.PrintUnderline("\nAnalysing each of the potential species tree roots", True)
     resultsSpeciesTrees = []
     for i, (r, speciesTree_fn) in enumerate(zip(roots, rootedSpeciesTreeFN)):
@@ -769,6 +781,7 @@ def OrthologuesWorkflow(workingDir_ogs,
             resultsDir_new = resultsDir + "Orthologues_using_outgroup_%d/" % i
             reconTreesRenamedDir = db.workingDir + "Recon_Gene_Trees_using_outgroup_%d/" % i
             resultsSpeciesTrees.append(resultsDir_new + "SpeciesTree_rooted_at_outgroup_%d.txt" % i)
+            print
             print("Outgroup: " + (", ".join([spDict[s] for s in r])))
         elif userSpeciesTree:
             resultsDir_new = resultsDir + "Orthologues/"
