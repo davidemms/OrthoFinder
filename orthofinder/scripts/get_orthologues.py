@@ -690,7 +690,8 @@ def OrthologuesWorkflow(workingDir_ogs,
                        qStopAfterSeqs = False,
                        qStopAfterTrees = False, 
                        qMSA = False,
-                       qPhyldog = False):
+                       qPhyldog = False,
+                       constOut = False):
     """
     1. Setup:
         - ogSet, directories
@@ -713,7 +714,7 @@ def OrthologuesWorkflow(workingDir_ogs,
 #        print("orthologues have not been met. Please review previous messages for more information.")
 #        sys.exit()
     
-    resultsDir = util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_")
+    resultsDir = util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_", constOut=constOut)
     if qMSA or qPhyldog:
         treeGen = msa.TreesForOrthogroups(resultsDir, workingDir_ogs)
         qStopAfterAlignments = qPhyldog

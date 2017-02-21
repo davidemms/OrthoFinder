@@ -1322,7 +1322,8 @@ def GetOrthologues(dirs, options, clustersFilename_pairs, orthogroupsResultsFile
                                                                         options.qStopAfterSeqs,
                                                                         options.qStopAfterTrees,
                                                                         options.qMSATrees,
-                                                                        options.qPhyldog)
+                                                                        options.qPhyldog,
+                                                                        options.constOut)
     if None != orthogroupsResultsFilesString: print(orthogroupsResultsFilesString)
     print(orthologuesResultsFilesString.rstrip())    
 
