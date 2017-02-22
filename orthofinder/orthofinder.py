@@ -364,6 +364,7 @@ def GetOrderedBlastCommands(options, seqsInfo, dirs):
                    "-k", k_opt,
                    sensitivity,
                    "--no-self-hits",
+                   "-p", "1",
                    "--evalue", "0.001",
                    "--query", dirs.workingDir + "Species%d.fa" % iFasta,
                    "--db", dirs.workingDir + "BlastDBSpecies%d.dmnd" % iDB,
