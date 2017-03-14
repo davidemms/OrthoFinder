@@ -24,6 +24,12 @@
 #
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
+#
+#
+#
+###############################################################################
+# Heavily modifid by Thies Gehrmann: BEWARE SOME THINGS MIGHT BE BROKEN!!
+###############################################################################
 
 import sys                                      # Y
 import subprocess                               # Y
@@ -172,7 +178,22 @@ class MCL:
         nProcesses = 4 if nProcesses > 4 else nProcesses    # MCL appears to take *longer* as more than 4 processes are used
         command = ["mcl", graphFilename, "-I", str(inflation), "-o", clustersFilename, "-te", str(nProcesses), "-V", "all"]
         util.RunCommand(command)
-        util.PrintTime("Ran MCL")  
+        util.PrintTime("Ran MCL")
+
+    @staticmethod
+    def RunLouvain(graphFilename, clustersFilename, nProcesses, inflation):
+        command = [ "louvain", "-l", "-1", graphFilename + '.bin', "-q", "id_qual", "-w", graphFilename + '.weights' ]
+        print(' '.join(command))
+        with open(clustersFilename + '.louvain_out', "w") as lo:
+          subprocess.Popen(command, stdout=lo)
+        util.PrintTime("Ran Louvain")
+        print("Louvain raw output is in '%s'" % (clustersFilename + '.louvain_out'))
+        wrapper_cmd = [ "scripts/louvain_wrapper.sh", clustersFilename + '.louvain_out', graphFilename + '.solo', clustersFilename ]
+        util.RunCommand(wrapper_cmd)
+        print(' '.join(wrapper_cmd))
+        util.PrintTime("Ran Louvain Wrapper")
+        print("Louvain Output (in MCL format) is in '%s'" % clustersFilename)
+
     
     @staticmethod
     def WriteOrthogroupFiles(ogs, idsFilenames, resultsBaseFilename, clustersFilename_pairs):
@@ -569,6 +590,59 @@ class WaterfallMethod:
         return connect
 
 """
+Waterfall Method (Louvain)
+-------------------------------------------------------------------------------
+"""
+
+def WriteLouvainGraph_perSpecies(args):
+    seqsInfo, fileInfo, iSpec = args
+    # calculate the 2-way connections for one query species
+    with open(fileInfo.graphFilename + "_%d" % iSpec, 'wb') as graphFile:
+      with open(fileInfo.graphFilename + "_%d.solo" % iSpec, 'wb') as soloNodesFile:
+        connect2 = []
+        for jSpec in xrange(seqsInfo.nSpecies):
+            m1 = matrices.LoadMatrix("connect", fileInfo, iSpec, jSpec)
+            m2tr = numeric.transpose(matrices.LoadMatrix("connect", fileInfo, jSpec, iSpec))
+            connect2.append(m1 + m2tr)
+        B = matrices.LoadMatrixArray("B", fileInfo, seqsInfo, iSpec)
+        B_connect = matrices.MatricesAnd_s(connect2, B)
+
+        W = [b.sorted_indices().tolil() for b in B_connect]
+        for query in xrange(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]):
+            offset = seqsInfo.seqStartingIndices[iSpec]
+            n_neighbors = 0
+            for jSpec in xrange(seqsInfo.nSpecies):
+                row = W[jSpec].getrowview(query)
+                jOffset = seqsInfo.seqStartingIndices[jSpec]
+                for j, value in zip(row.rows[0], row.data[0]):
+                    graphFile.write("%d\t%d\t%.3f\n" % (offset + query, j + jOffset, value))
+                    n_neighbors += 1
+                    print(n_neighbors)
+            if n_neighbors == 0:
+              soloNodesFile.write("%d\n" % (offset + query))
+        if iSpec == (seqsInfo.nSpecies - 1): graphFile.write("\n")
+        util.PrintTime("Written final scores for species %d to graph file" % iSpec)
+
+class WaterfallMethodLouvain(WaterfallMethod):
+
+    @staticmethod
+    def WriteGraphParallel(seqsInfo, fileInfo, nProcess):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            pool = mp.Pool(nProcess)
+            pool.map(WriteLouvainGraph_perSpecies, [(seqsInfo, fileInfo, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
+            subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename, shell=True)
+            subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.solo" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.solo', shell=True)
+            louvain_cmd = ["louvain-convert",  "-i", fileInfo.graphFilename, "-o", fileInfo.graphFilename + ".bin", "-w", fileInfo.graphFilename + ".weights"]
+            util.RunCommand(louvain_cmd)
+            # Cleanup
+            for iSp in xrange(seqsInfo.nSpecies):
+              os.remove(fileInfo.graphFilename + "_%d" % iSp)
+              os.remove(fileInfo.graphFilename + "_%d.solo" % iSp)
+            DeleteMatrices(fileInfo)
+            print("Wrote Louvain graph file to '%s.bin'" % fileInfo.graphFilename)
+            print("Solo nodes are in file '%s.solo'" % fileInfo.graphFilename)
+"""
 Stats
 -------------------------------------------------------------------------------
 """
@@ -703,7 +777,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, resultsDir, iResultsVersion):
         writer_sum.writerow(["Median orthogroup size", np.median(l)])
         L = np.cumsum(l)
         j, _ = next((i, x) for i, x in enumerate(L) if x > nAssigned/2)
-        writer_sum.writerow(["G50 (assigned genes)",l[j]])
+        writer_sum.writerow(["G51 (assigned genes)",l[j]])
         l2 = list(reversed(map(len, ogs)))
         L2 = np.cumsum(l2)
         j2, _ = next((i, x) for i, x in enumerate(L2) if x > nGenes/2)
@@ -766,6 +840,15 @@ def CanRunMCL():
         print("Please check MCL is installed and in the system path\n")
         return False
 
+def CanRunLouvain():
+    command = "louvain -h"
+    if util.CanRunCommand(command):
+        return True
+    else:
+        print("ERROR: Cannot run Louvain with the command \"%s\"" % command)
+        print("Please check Louvain is installed and in the system path\n")
+        return False
+
 def CanRunDiamond():
     command = "diamond help"
     if util.CanRunCommand(command):
@@ -815,6 +898,10 @@ to redo the BLAST searches from a previous analysis.\n""")
     Stop after inferring gene trees, do not infer orthologues.\n""" )
 
     print("Additional arguments:")
+    print("")
+
+    print("""--louvain
+    Use LOUVAIN (https://sites.google.com/site/findcommunities/) instead of MCL [Default is OFF]""")
     print("")
 
     print("""--diamond
@@ -903,6 +990,7 @@ class Options(object):#
         self.speciesXMLInfoFN = None
         self.speciesTreeFN = None
         self.mclInflation = g_mclInflation
+        self.louvain = False
         self.diamond = False
         self.sensitive = ""
         self.diamond_k = 20
@@ -1049,6 +1137,8 @@ def ProcessArgs():
                 util.Fail()
         elif arg == "-op" or arg == "--only-prepare":
             options.qStopAfterPrepare = True
+        elif arg == "--louvain":
+          options.louvain = True
         elif arg == "--diamond":
           options.diamond = True
         elif arg == "--sensitive":
@@ -1143,6 +1233,8 @@ def CheckDependencies(options, dirForTempFiles):
     alnCheckFunction = CanRunDiamond if options.diamond else CanRunBLAST
     if (options.qStartFromFasta) and (not alnCheckFunction() ):
         util.Fail()
+    if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunLouvain():
+        util.Fail()
     if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunMCL():
         util.Fail()
     if not (options.qStopAfterPrepare or options.qStopAfterSeqs or options.qStopAfterGroups):
@@ -1181,12 +1273,18 @@ def DoOrthogroups(options, dirs, seqsInfo):
         proc.start()
     util.ManageQueue(runningProcesses, cmd_queue)
     
-    util.PrintTime("Connected putatitive homologs") 
-    WaterfallMethod.WriteGraphParallel(seqsInfo, fileInfo, options.nProcessAlg)
+    util.PrintTime("Connected putatitive homologs")
+    if options.louvain:
+      WaterfallMethodLouvain.WriteGraphParallel(seqsInfo, fileInfo, options.nProcessAlg)
+    else:
+      WaterfallMethod.WriteGraphParallel(seqsInfo, fileInfo, options.nProcessAlg)
     
-    # 5b. MCL     
+    # 5b. MCL
     clustersFilename, iResultsVersion = util.GetUnusedFilename(dirs.workingDir  + "clusters_%s_I%0.1f" % (fileIdentifierString, options.mclInflation), ".txt")
-    MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
+    if options.louvain:
+      MCL.RunLouvain(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
+    else:
+      MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
     clustersFilename_pairs = clustersFilename + "_id_pairs.txt"
     MCLread.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
 

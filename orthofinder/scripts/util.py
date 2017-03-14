@@ -87,8 +87,13 @@ def RunOrderedCommandList(commandList, qHideStdout):
 def CanRunCommand(command, qAllowStderr = False):
     PrintNoNewLine("Test can run \"%s\"" % command)       # print without newline
     capture = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
+    capture.wait()
     stdout = [x for x in capture.stdout]
     stderr = [x for x in capture.stderr]
+    rcode  = capture.returncode
+    if rcode == 0:
+       print (" - ok")
+       return True
     if len(stdout) > 0 and (qAllowStderr or len(stderr) == 0):
         print(" - ok")
         return True
