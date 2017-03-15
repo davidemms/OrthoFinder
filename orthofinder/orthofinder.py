@@ -185,7 +185,8 @@ class MCL:
         command = [ "louvain", "-l", "-1", graphFilename + '.bin', "-q", "id_qual", "-w", graphFilename + '.weights' ]
         print(' '.join(command))
         with open(clustersFilename + '.louvain_out', "w") as lo:
-          subprocess.Popen(command, stdout=lo)
+          p = subprocess.Popen(command, stdout=lo)
+          p.wait()
         util.PrintTime("Ran Louvain")
         print("Louvain raw output is in '%s'" % (clustersFilename + '.louvain_out'))
         wrapper_cmd = [ "scripts/louvain_wrapper.sh", clustersFilename + '.louvain_out', graphFilename + '.solo', clustersFilename ]
