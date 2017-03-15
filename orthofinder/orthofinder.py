@@ -189,7 +189,8 @@ class MCL:
           p.wait()
         util.PrintTime("Ran Louvain")
         print("Louvain raw output is in '%s'" % (clustersFilename + '.louvain_out'))
-        wrapper_cmd = [ "scripts/louvain_wrapper.sh", clustersFilename + '.louvain_out', graphFilename + '.solo', clustersFilename ]
+        wrapper_loc = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
+        wrapper_cmd = [ "%s/scripts/louvain_wrapper.sh" % wrapper_loc, clustersFilename + '.louvain_out', graphFilename + '.solo', clustersFilename ]
         util.RunCommand(wrapper_cmd)
         print(' '.join(wrapper_cmd))
         util.PrintTime("Ran Louvain Wrapper")
