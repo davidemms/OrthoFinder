@@ -617,7 +617,6 @@ def WriteLouvainGraph_perSpecies(args):
                 for j, value in zip(row.rows[0], row.data[0]):
                     graphFile.write("%d\t%d\t%.3f\n" % (offset + query, j + jOffset, value))
                     n_neighbors += 1
-                    print(n_neighbors)
             if n_neighbors == 0:
               soloNodesFile.write("%d\n" % (offset + query))
         if iSpec == (seqsInfo.nSpecies - 1): graphFile.write("\n")
