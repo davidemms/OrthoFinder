@@ -75,6 +75,8 @@ Command & parallel command management
 
 def RunCommand(command, shell=False):
     subprocess.call(command, env=my_env, shell=shell)
+    p = subprocess.Popen(command, env=my_env, shell=shell)
+    return p.wait();
             
 def RunOrderedCommandList(commandList, qHideStdout):
     if qHideStdout:

@@ -8,7 +8,9 @@ hierarchy="$1"
 snodes="$2"
 output="$3"
 
-louvain-hierarchy -n $hierarchy | tail -n1 > $hierarchy.highestlevel
+echo $hierarchy
+louvain-hierarchy -n "$hierarchy"
+louvain-hierarchy -n "$hierarchy" | tail -n1 > $hierarchy.highestlevel
 
 level_id=`louvain-hierarchy -n $hierarchy | tail -n1 | cut -d\  -f2 | cut -d: -f1`
 nclust=`louvain-hierarchy -n $hierarchy | tail -n1 | cut -d\  -f3`
