@@ -632,7 +632,6 @@ class WaterfallMethodLouvain(WaterfallMethod):
             warnings.simplefilter("ignore")
             pool = mp.Pool(nProcess)
             pool.map(WriteLouvainGraph_perSpecies, [(seqsInfo, fileInfo, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
-            p = subprocess.
             subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename, shell=True)
             subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.solo" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.solo', shell=True)
             louvain_cmd = ["louvain-convert",  "-i", fileInfo.graphFilename, "-o", fileInfo.graphFilename + ".bin", "-w", fileInfo.graphFilename + ".weights"]
