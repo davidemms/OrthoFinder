@@ -29,6 +29,7 @@
 #
 ###############################################################################
 # Heavily modifid by Thies Gehrmann: BEWARE SOME THINGS MIGHT BE BROKEN!!
+#  thiesgehrmann@gmail.com
 ###############################################################################
 
 import sys                                      # Y
