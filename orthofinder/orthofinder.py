@@ -197,6 +197,21 @@ class MCL:
         util.PrintTime("Ran Louvain Wrapper")
         print("Louvain Output (in MCL format) is in '%s'" % clustersFilename)
 
+    @staticmethod
+    def RunCombo(graphFilename, clustersFilename, nProcesses, inflation):
+        command = [ "comboCPP", graphFilename + '.net' ]
+        print(' '.join(command))
+        p = subprocess.Popen(command)
+        p.wait()
+        util.PrintTime("Ran Combo")
+        print("Combo raw output is in '%s_comm_comboC++.txt'" % graphFilename)
+        wrapper_loc = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
+        wrapper_cmd = [ "%s/scripts/combo_wrapper.sh" % wrapper_loc, graphFilename + '_comm_comboC++.txt', graphFilename + '.solo', clustersFilename ]
+        util.RunCommand(wrapper_cmd)
+        print(' '.join(wrapper_cmd))
+        util.PrintTime("Ran Combo Wrapper")
+        print("Combo Output (in MCL format) is in '%s'" % clustersFilename)
+
     
     @staticmethod
     def WriteOrthogroupFiles(ogs, idsFilenames, resultsBaseFilename, clustersFilename_pairs):
@@ -644,6 +659,28 @@ class WaterfallMethodLouvain(WaterfallMethod):
             DeleteMatrices(fileInfo)
             print("Wrote Louvain graph file to '%s.bin'" % fileInfo.graphFilename)
             print("Solo nodes are in file '%s.solo'" % fileInfo.graphFilename)
+
+class WaterfallMethodCombo(WaterfallMethod):
+
+    @staticmethod
+    def WriteGraphParallel(seqsInfo, fileInfo, nProcess):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            pool = mp.Pool(nProcess)
+            pool.map(WriteLouvainGraph_perSpecies, [(seqsInfo, fileInfo, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
+            wrapper_loc = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
+            wrapper_cmd = [ "%s/scripts/combo_network_header.sh" % wrapper_loc, fileInfo.graphFilename + '_', fileInfo.graphFilename + '.header' ]
+            util.RunCommand(wrapper_cmd)
+            subprocess.call("cat " + fileInfo.graphFilename + '.header ' + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.net', shell=True)
+            subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.solo" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.solo', shell=True)
+            # Cleanup
+            for iSp in xrange(seqsInfo.nSpecies):
+              #os.remove(fileInfo.graphFilename + "_%d" % iSp)
+              os.remove(fileInfo.graphFilename + "_%d.solo" % iSp)
+            DeleteMatrices(fileInfo)
+            print("Wrote Combo graph file to '%s'" % fileInfo.graphFilename)
+            print("Solo nodes are in file '%s.solo'" % fileInfo.graphFilename)
+
 """
 Stats
 -------------------------------------------------------------------------------
@@ -844,6 +881,15 @@ def CanRunMCL():
 
 def CanRunLouvain():
     command = "louvain -h"
+    if util.CanRunCommand(command):
+        return True
+    else:
+        print("ERROR: Cannot run Louvain with the command \"%s\"" % command)
+        print("Please check Louvain is installed and in the system path\n")
+        return False
+
+def CanRunCombo():
+    command = "which comboCPP"
     if util.CanRunCommand(command):
         return True
     else:
@@ -1140,7 +1186,11 @@ def ProcessArgs():
         elif arg == "-op" or arg == "--only-prepare":
             options.qStopAfterPrepare = True
         elif arg == "--louvain":
+          options.combo   = False
           options.louvain = True
+        elif arg == "--combo":
+          options.louvain = False
+          options.combo   = True;
         elif arg == "--diamond":
           options.diamond = True
         elif arg == "--sensitive":
@@ -1235,7 +1285,9 @@ def CheckDependencies(options, dirForTempFiles):
     alnCheckFunction = CanRunDiamond if options.diamond else CanRunBLAST
     if (options.qStartFromFasta) and (not alnCheckFunction() ):
         util.Fail()
-    if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunLouvain():
+    if (options.qStartFromFasta or options.qStartFromBlast) and options.louvain and not CanRunLouvain():
+        util.Fail()
+    if (options.qStartFromFasta or options.qStartFromBlast) and options.combo and not CanRunCombo():
         util.Fail()
     if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunMCL():
         util.Fail()
@@ -1278,6 +1330,8 @@ def DoOrthogroups(options, dirs, seqsInfo):
     util.PrintTime("Connected putatitive homologs")
     if options.louvain:
       WaterfallMethodLouvain.WriteGraphParallel(seqsInfo, fileInfo, options.nProcessAlg)
+    elif options.combo:
+      WaterfallMethodCombo.WriteGraphParallel(seqsInfo, fileInfo, options.nProcessAlg)
     else:
       WaterfallMethod.WriteGraphParallel(seqsInfo, fileInfo, options.nProcessAlg)
     
@@ -1285,6 +1339,8 @@ def DoOrthogroups(options, dirs, seqsInfo):
     clustersFilename, iResultsVersion = util.GetUnusedFilename(dirs.workingDir  + "clusters_%s_I%0.1f" % (fileIdentifierString, options.mclInflation), ".txt")
     if options.louvain:
       MCL.RunLouvain(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
+    if options.combo:
+      MCL.RunCombo(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
     else:
       MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
     clustersFilename_pairs = clustersFilename + "_id_pairs.txt"
