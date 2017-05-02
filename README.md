@@ -61,13 +61,15 @@ OrthoFinder runs on Linux and Mac, setup instructions are given below.
 
 To perform an analysis OrthoFinder requires some dependencies to be installed and in the system path (only the first two are needed to infer orthogroups and all four are needed to infer orthologues and gene trees as well):
 
-1. BLAST+ 
+1. BLAST+ (or DIAMOND, see below) 
 
 2. The MCL graph clustering algorithm 
 
 3. FastME (The appropriate version for your system, e.g. 'fastme-2.1.5-linux64', should be renamed `fastme', see instructions below.) 
 
 4. DLCpar
+
+5. DIAMOND
 
 Brief instructions are given below although users can refer to the installation notes provided with these packages for more detailed instructions. 
 
@@ -79,6 +81,8 @@ NCBI BLAST+ is available in the repositories from most Linux distributions and s
 - `sudo apt-get install ncbi-blast+`
 
 Alternatively, instructions are provided for installing BLAST+ on Mac and various flavours of Linux on the "Standalone BLAST Setup for Unix" page of the BLAST+ Help manual currently at http://www.ncbi.nlm.nih.gov/books/NBK1762/. Follow the instructions under "Configuration" in the BLAST+ help manual to add BLAST+ to the PATH environment variable.
+
+Note that DIAMOND aligner can be used as a faster drop-in replacement for BLAST+ (see below).
 
 #### MCL
 The mcl clustering algorithm is available in the repositories of some Linux distributions and so can be installed in the same way as any other package. For example, on Ubuntu, Debian, Linux Mint:
@@ -98,6 +102,13 @@ DLCpar can be downloaded from http://compbio.mit.edu/dlcpar/ and installed as fo
 2. Extract the package: `tar xzf dlcpar-1.0.tar.gz`
 3. `cd dlcpar-1.0/`
 4. `sudo python setup.py install`
+
+#### DIAMOND
+
+DIAMOND is a faster alternative to BLAST+. The software can be downloaded from [https://github.com/bbuchfink/diamond](https://github.com/bbuchfink/diamond).
+On Debian-based Linux distributions, it can be installed using
+- `sudo apt install diamond-aligner`
+
 
 ### Running OrthoFinder
 Once the required dependencies have been installed, try running OrthoFinder on the example data:
@@ -208,18 +219,18 @@ This option should always be used. It makes the BLAST searches, the tree inferen
 - **'-a number_of_orthofinder_threads'**
 The remainder of the algorithm, beyond these highly-parallelisable tasks, is relatively fast and efficient and so this option has less overall effect. It is most useful when running OrthoFinder using pre-calculated BLAST results since the time savings will be more noticeable in this case. Using this option will also increase the RAM requirements (see manual for more details).
 
-### Running BLAST Searches Separately (-p option)
+### Running BLAST Searches Separately (-op option)
 The '-p' option will prepare the files in the format required by OrthoFinder and print the set of BLAST commands that need to be run. 
-- `orthofinder -f fasta_files_directory -p`
+- `orthofinder -f fasta_files_directory -op`
 
 This is useful if you want to manage the BLAST searches yourself. For example, you may want to distribute them across multiple machines. Once the BLAST searches have been completed the orthogroups can be calculated using the '-b' command as described in Section "Using Pre-Computed BLAST Results".
 
 ### Using Pre-Computed BLAST Results
-It is possible to run OrthoFinder with pre-computed BLAST results provided they are in the correct format. They can be prepared in the correct format using the '-p' command and, equally, the files from a previous OrthoFinder run are also in the correct format to rerun using the '-b' option. The command is simply:
+It is possible to run OrthoFinder with pre-computed BLAST results provided they are in the correct format. They can be prepared in the correct format using the '-op' command and, equally, the files from a previous OrthoFinder run are also in the correct format to rerun using the '-b' option. The command is simply:
 
 - `orthofinder -b directory_with_processed_fasta_and_blast_results`
 
-If you are running the BLAST searches yourself it is strongly recommended that you use the '-p' option to prepare the files first (see Section "Running BLAST Searches Separately"). Should you need to prepare them manually, the required files and their formats are described in the appendix of the PDF Manual (for example, if you already have BLAST search results from another source and it will take too much computing time to redo them).
+If you are running the BLAST searches yourself it is strongly recommended that you use the '-op' option to prepare the files first (see Section "Running BLAST Searches Separately"). Should you need to prepare them manually, the required files and their formats are described in the appendix of the PDF Manual (for example, if you already have BLAST search results from another source and it will take too much computing time to redo them).
 
 ### Regression Tests
 A set of regression tests are included in the directory 'Tests' available from the github repository. They can be run by calling the script 'test_orthofinder.py'. They currently require version 2.2.28 of NCBI BLAST and the script will exit with an error message if this is not the case.
