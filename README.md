@@ -220,7 +220,7 @@ This option should always be used. It makes the BLAST searches, the tree inferen
 The remainder of the algorithm, beyond these highly-parallelisable tasks, is relatively fast and efficient and so this option has less overall effect. It is most useful when running OrthoFinder using pre-calculated BLAST results since the time savings will be more noticeable in this case. Using this option will also increase the RAM requirements (see manual for more details).
 
 ### Running BLAST Searches Separately (-op option)
-The '-p' option will prepare the files in the format required by OrthoFinder and print the set of BLAST commands that need to be run. 
+The '-op' option will prepare the files in the format required by OrthoFinder and print the set of BLAST commands that need to be run. 
 - `orthofinder -f fasta_files_directory -op`
 
 This is useful if you want to manage the BLAST searches yourself. For example, you may want to distribute them across multiple machines. Once the BLAST searches have been completed the orthogroups can be calculated using the '-b' command as described in Section "Using Pre-Computed BLAST Results".
