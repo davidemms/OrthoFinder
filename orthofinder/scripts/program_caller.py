@@ -26,14 +26,27 @@
 # david_emms@hotmail.comhor: david
 
 import os
+import json
 import shutil
+
 
 import util
 
+class InvalidEntryException(Exception):
+    pass
+
 class Method(object):
-    def __init__(self, config_list):
-        self.cmd = config_list[0]
-        self.non_default_outfn = config_list[1] if (len(config_list) > 1 and config_list[1] != '-') else None
+    def __init__(self, name, config_dict):
+        if 'cmd_line' in config_dict:
+            self.cmd = config_dict['cmd_line']
+        else:
+            print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
+            print("'cmd_line' entry is missing")
+            raise InvalidEntryException
+        if 'ouput_filename' in config_dict:
+            self.non_default_outfn = config_dict['ouput_filename'] 
+        else:
+            self.non_default_outfn = None
 
 class ProgramCaller(object):
     def __init__(self, configure_file):
@@ -42,30 +55,39 @@ class ProgramCaller(object):
         if configure_file == None:
             return
         if not os.path.exists(configure_file):
-            print("WARNING: Configuration file, '%s', does not exist. No user-confgurable multiple sequence alignment or tree inference methods have been added." % configure_file)
+            print("WARNING: Configuration file, '%s', does not exist. No user-confgurable multiple sequence alignment or tree inference methods have been added.\n" % configure_file)
             return
         with open(configure_file, 'rb') as infile:
-            for line in infile:
-                line = line.rstrip()
-                if line.startswith('#') or len(line) == 0: continue
-                tokens = line.rstrip().split("\t")
-                if len(tokens) < 3:
-                    print("WARNING: Incorrecty formatted line in configuration file, '%s'. Line is:\n%s" % (configure_file, line.rstrip()))
+            try:
+                d = json.load(infile)
+            except ValueError:
+                print("WARNING: Incorrecty formatted configuration file %s" % configure_file)
+                print("File is not in .json format. No user-confgurable multiple sequence alignment or tree inference methods have been added.\n")
+                return
+            for name, v in d.items():
+                if name == "__comment": continue
+                if " " in name:
+                    print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
+                    print("No space is allowed in name: '%s'" % name)
                     continue
-                method_name = tokens[0]
-                method_type = tokens[1]
-                if method_type == "msa":
-                    if method_name in self.msa:
-                        print("WARNING: Repeated MSA inference method in configuration file, '%s'" % configure_file)
-                        continue
-                    self.msa[method_name] = Method(tokens[2:])
-                elif method_type == "tree":
-                    if method_name in self.msa:
-                        print("WARNING: Repeated tree inference method in configuration file, '%s'" % configure_file)
-                        continue
-                    self.tree[method_name] = Method(tokens[2:])
-                else:
-                    print("WARNING: Incorrecty formatted line in configuration file, '%s'. Line is:\n%s\nMethod type, '%s', was not recognised" % (configure_file, line.rstrip(), method_type))
+                    
+                if 'program_type' not in v:
+                    print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
+                    print("'program_type' entry is missing")
+                try:
+                    if v['program_type'] == 'msa':
+                        self.msa[name] = Method(name, v)
+                    elif v['program_type'] == 'tree':
+                        self.tree[name] = Method(name, v)
+                    else:
+                        print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
+                        print("'program_type' should be 'msa' or 'tree', got '%s'" % v['program_type'])
+                except InvalidEntryException:
+                    pass
+    
+    def Add(self, other):
+        self.msa.update(other.msa)
+        self.tree.update(other.tree)
     
     def ListMSAMethods(self):
         return [key for key in self.msa]

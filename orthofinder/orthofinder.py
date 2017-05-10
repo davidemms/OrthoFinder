@@ -745,8 +745,14 @@ def CanRunMCL():
         return False
     
 def GetProgramCaller():
-    config_file = os.path.join(__location__, 'config.txt') 
-    return program_caller.ProgramCaller(config_file if os.path.exists(config_file) else None)
+    config_file = os.path.join(__location__, 'config.json') 
+    pc = program_caller.ProgramCaller(config_file if os.path.exists(config_file) else None)
+    config_file_user = os.path.join(__location__, 'config_user.json') 
+    if os.path.exists(config_file_user):
+        pc_user = program_caller.ProgramCaller(config_file_user)
+        pc.Add(pc_user)
+    return pc
+    
     
 def PrintHelp(program_options):  
     msa_ops = program_options.ListMSAMethods()

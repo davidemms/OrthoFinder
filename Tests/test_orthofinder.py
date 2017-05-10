@@ -35,7 +35,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.1.6"
+version = "1.1.7"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -105,11 +105,11 @@ Additional arguments:
 
 -A msa_program, --alignment msa_program
     Use msa_program for multiple sequence alignments (requires '-M msa' option). [Default in mafft]
-    Options: mafft, mafft-user, mergealign, muscle.
+    Options:  mafft, muscle.
 
 -T tree_program, --alignment tree_program
     Use tree_program for tree inference from multiple sequence alignments (requires '-M msa' option). [Default in fasttree]
-    Options: fasttree, iqtree, fasttree-user, raxml.
+    Options: fasttree, iqtree, raxmlAVX.
 
 -I inflation_parameter, --inflation inflation_parameter
     Specify a non-default inflation parameter for MCL. Not recommended. [Default is 1.5]
@@ -739,6 +739,15 @@ class TestCommandLine(unittest.TestCase):
             line = infile.next().rstrip().split()
             self.assertEqual('0.000001', line[1]) 
         os.remove(outFN)      
+        
+    def test_msa_tree_methods(self):
+        self.stdout, self.stderr = self.RunOrthoFinder("-h")
+        self.assertTrue("mafft" in self.stdout)
+        self.assertTrue("muscle" in self.stdout)
+        self.assertTrue("fasttree" in self.stdout)
+        self.assertTrue("raxmlAVX" in self.stdout)
+        self.assertTrue("iqtree" in self.stdout)
+        
         
 #    def test_treesExtraSpecies(self):
 #        pass

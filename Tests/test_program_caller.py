@@ -14,6 +14,8 @@ import shutil
 import filecmp
 import argparse
 import unittest
+from contextlib import contextmanager
+from StringIO import StringIO
 
 baseDir = os.path.dirname(os.path.realpath(__file__)) + os.sep
 
@@ -21,10 +23,22 @@ sys.path.append(baseDir + "../orthofinder/scripts")
 import program_caller as pc
         
 config_dir = baseDir + "Input/ConfigFiles/"
-config_std = config_dir + "configure_cmds.txt"
-config_alt = config_dir + "configure_cmds_alt.txt"
+config_std = config_dir + "configure_cmds.json"
+config_alt = config_dir + "configure_cmds_alt.json"
+config_bad_json = config_dir + "configure_bad_json.json"
+config_space = config_dir + "configure_cmds_space.json"
 
 output_dir = baseDir + "Output_ProgramCaller/"
+
+@contextmanager
+def captured_output():
+    new_out, new_err = StringIO(), StringIO()
+    old_out, old_err = sys.stdout, sys.stderr
+    try:
+        sys.stdout, sys.stderr = new_out, new_err
+        yield sys.stdout, sys.stderr
+    finally:
+        sys.stdout, sys.stderr = old_out, old_err
 
 class TestProgramCaller(unittest.TestCase):
     @classmethod
@@ -35,7 +49,7 @@ class TestProgramCaller(unittest.TestCase):
         
     def test_normal_construct(self):
         c = pc.ProgramCaller(config_std)
-        methods_msa = "mafft mergealign muscle".split()
+        methods_msa = "mafft mergealign muscle another_msa".split()
         methods_trees = "fasttree raxml iqtree".split()
         msa = c.ListMSAMethods()
         self.assertEqual(len(msa), len(methods_msa))
@@ -147,6 +161,41 @@ class TestProgramCaller(unittest.TestCase):
         for n in expectedTree:
             x = (actualTree & n.name).dist
             self.assertLess(abs(x-n.dist)/n.dist, 0.3, (n.dist, (actualTree & n.name).dist))
+            
+    def test_malformatted_json(self):
+        with captured_output() as (out, err):
+            c = pc.ProgramCaller(config_bad_json)
+        self.assertTrue(len(c.msa) == 0)
+        self.assertTrue(len(c.tree) == 0)
+        output = out.getvalue().strip()
+        expected_out = """WARNING: Incorrecty formatted configuration file /home/david/workspace/git/OrthoFinder/Tests/Input/ConfigFiles/configure_bad_json.json
+File is not in .json format. No user-confgurable multiple sequence alignment or tree inference methods have been added."""
+        self.assertEqual(output, expected_out)
+        error = err.getvalue().strip()
+        self.assertEqual(error, "")
+        
+    def test_add(self):
+        c = pc.ProgramCaller(config_std)
+        c_alt = pc.ProgramCaller(config_alt)
+        c.Add(c_alt)
+        self.assertEqual(len(c.msa), 5)
+        self.assertEqual(len(c.tree), 5)
+        for x in "mafft mergealign muscle another_msa bad_method".split():
+            self.assertTrue(x in c.msa)
+        for x in "fasttree raxml iqtree false_method raxml_no_path".split():
+            self.assertTrue(x in c.tree)
+        
+    def test_space(self):
+        with captured_output() as (out, err):
+            c = pc.ProgramCaller(config_space)
+        self.assertTrue(len(c.msa) == 1)
+        self.assertTrue("mergealign" in c.msa)
+        self.assertFalse("maf ft" in c.msa)
+        output = out.getvalue().strip()
+        expected_out = """WARNING: Incorrecty formatted configuration file entry: maf ft\nNo space is allowed in name: 'maf ft'"""
+        self.assertEqual(output, expected_out)
+        error = err.getvalue().strip()
+        self.assertEqual(error, "")
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
