@@ -297,7 +297,7 @@ class FullAccession(IDExtractor):
                 id, accession = line.rstrip().split(": ", 1)
                 id = id.replace("#", "")
                 # Replace problematic characters
-                accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_")
+                accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_") #.replace(".", "_")
                 if id in self.idToNameDict:
                     raise RuntimeError("ERROR: A duplicate id was found in the fasta files: % s" % id)
                 self.idToNameDict[id] = accession                
@@ -319,7 +319,7 @@ class FirstWordExtractor(IDExtractor):
                 id, rest = line.split(": ", 1)
                 accession = rest.split(None, 1)[0]
                 # Replace problematic characters
-                accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_")
+                accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_") #.replace(".", "_")
                 if accession in self.nameToIDDict:
                     raise RuntimeError("A duplicate accession was found using just first part: % s" % accession)
                 if id in self.idToNameDict:
@@ -344,8 +344,10 @@ def RenameTreeTaxa(treeFN, newTreeFilename, idsMap, qFixNegatives=False, inForma
         for node in t.get_leaves():
             node.name = idsMap[node.name]
         if qFixNegatives:
+            tree_length = sum([n.dist for n in t.traverse() if n != t])
+            sliver = tree_length * 1e-6
             for n in t.traverse():
-                if n.dist < 0.0: n.dist = 0.0
+                if n.dist < 0.0: n.dist = sliver
         t.write(outfile = newTreeFilename, format=4)  
     except:
         pass
