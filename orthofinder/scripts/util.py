@@ -47,7 +47,7 @@ SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStar
 FileInfo = namedtuple("FileInfo", "workingDir graphFilename")     
 
 picProtocol = 1
-version = "1.1.5"
+version = "1.1.6"
 
 # Fix LD_LIBRARY_PATH when using pyinstaller 
 my_env = os.environ.copy()
@@ -72,8 +72,11 @@ Command & parallel command management
 -------------------------------------------------------------------------------
 """
 
-def RunCommand(command, shell=False):
-    subprocess.call(command, env=my_env, shell=shell)
+def RunCommand(command, shell=False, qHideOutput = False):
+    if qHideOutput:
+        subprocess.call(command, env=my_env, shell=shell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    else:
+        subprocess.call(command, env=my_env, shell=shell)
             
 def RunOrderedCommandList(commandList, qHideStdout):
     if qHideStdout:
@@ -83,16 +86,18 @@ def RunOrderedCommandList(commandList, qHideStdout):
         for cmd in commandList:
             subprocess.call(cmd, shell=True, env=my_env)
     
-def CanRunCommand(command, qAllowStderr = False):
-    PrintNoNewLine("Test can run \"%s\"" % command)       # print without newline
+def CanRunCommand(command, qAllowStderr = False, qPrint = True):
+    if qPrint: PrintNoNewLine("Test can run \"%s\"" % command)       # print without newline
     capture = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
     stdout = [x for x in capture.stdout]
     stderr = [x for x in capture.stderr]
+#    print(stdout)
+#    print(stderr)
     if len(stdout) > 0 and (qAllowStderr or len(stderr) == 0):
-        print(" - ok")
+        if qPrint: print(" - ok")
         return True
     else:
-        print(" - failed")
+        if qPrint: print(" - failed")
         return False
         
 def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qShell=False):

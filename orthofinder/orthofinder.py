@@ -24,7 +24,6 @@
 #
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
-
 import sys                                      # Y
 import subprocess                               # Y
 import os                                       # Y
@@ -48,7 +47,9 @@ import warnings                                 # Y
 
 import scripts.mcl as MCLread
 import scripts.blast_file_processor as BlastFileProcessor
-from scripts import util, matrices, get_orthologues
+from scripts import util, matrices, get_orthologues, program_caller
+
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
 if sys.platform.startswith("linux"):
@@ -83,7 +84,7 @@ def SpeciesNameDict(speciesIDsFN):
         for line in speciesNamesFile:
             if line.startswith("#"): continue
             short, full = line.rstrip().split(": ")
-            speciesNamesDict[int(short)] = full.split(".", 1)[0]
+            speciesNamesDict[int(short)] = full.rsplit(".", 1)[0]
     return speciesNamesDict
     
 """
@@ -743,7 +744,13 @@ def CanRunMCL():
         print("Please check MCL is installed and in the system path\n")
         return False
     
-def PrintHelp():  
+def GetProgramCaller():
+    config_file = os.path.join(__location__, 'config.txt') 
+    return program_caller.ProgramCaller(config_file if os.path.exists(config_file) else None)
+    
+def PrintHelp(program_options):  
+    msa_ops = program_options.ListMSAMethods()
+    tree_ops = program_options.ListTreeMethods()
     print("=== Simple Usage ===\n") 
     print("orthofinder -f fasta_directory [-t n_blast_threads]")
     print("\n    Infers orthogroups for the proteomes contained in fasta_directory using")
@@ -779,6 +786,9 @@ to redo the BLAST searches from a previous analysis.\n""")
     print("""-os, --only-seqs
     Stop after inferring orthogroups and writing out sequence files for each orthogroup\n""")
     
+    print("""-oa, --only-alignments
+    Stop after inferring multiple sequence alignments for each orthogroup\n""")
+    
     print("""-ot, --only-trees
     Stop after inferring gene trees, do not infer orthologues.\n""" )
 
@@ -794,6 +804,14 @@ to redo the BLAST searches from a previous analysis.\n""")
     
     print("""-M tree_inference_method, --method tree_inference_method
     Use tree_inference_method for gene trees. Valid options are 'dendroblast' & 'msa'. [Default is dendroblast]\n""")
+    
+    print("""-A msa_program, --alignment msa_program
+    Use msa_program for multiple sequence alignments (requires '-M msa' option). [Default in mafft]
+    Options: """ + ", ".join(['mafft'] + msa_ops) + ".\n")
+    
+    print("""-T tree_program, --alignment tree_program
+    Use tree_program for tree inference from multiple sequence alignments (requires '-M msa' option). [Default in fasttree]
+    Options: """ + ", ".join(['fasttree'] + tree_ops) + ".\n")
     
     print("""-I inflation_parameter, --inflation inflation_parameter
     Specify a non-default inflation parameter for MCL. Not recommended. [Default is %0.1f]\n""" % g_mclInflation)
@@ -850,8 +868,11 @@ class Options(object):#
         self.qStopAfterPrepare = False
         self.qStopAfterGroups = False
         self.qStopAfterSeqs = False
+        self.qStopAfterAlignments = False
         self.qStopAfterTrees = False
         self.qMSATrees = False
+        self.msa_program = "mafft"
+        self.tree_program = "fasttree"
         self.qPhyldog = False
         self.speciesXMLInfoFN = None
         self.speciesTreeFN = None
@@ -876,7 +897,7 @@ class Directories(object):
     def SpeciesIdsFilename(self):
         return self.workingDir + "SpeciesIDs.txt"
                                  
-def ProcessArgs():
+def ProcessArgs(program_options):
     """ 
     Workflow
     | 1. Fasta Files | 2.  Prepare files    | 3.   Blast    | 4. Orthogroups    | 5.   Gene Trees     | 6.   Reconciliations/Orthologues   |
@@ -892,7 +913,7 @@ def ProcessArgs():
     -og: 4           (orthogroups, --only-groups)
     """
     if len(sys.argv) == 1 or sys.argv[1] == "--help" or sys.argv[1] == "help" or sys.argv[1] == "-h":
-        PrintHelp()
+        PrintHelp(program_options)
         sys.exit() 
 
     options = Options()
@@ -913,64 +934,65 @@ def ProcessArgs():
         arg = args.pop(0)    
         if arg == "-f" or arg == "--fasta":
             if options.qStartFromFasta:
-                print("Repeated argument: -f/--fasta")
+                print("Repeated argument: -f/--fasta\n")
                 util.Fail()
             options.qStartFromFasta = True
             fastaDir = GetDirectoryArgument(arg, args)
         elif arg == "-b" or arg == "--blast":
             if options.qStartFromBlast:
-                print("Repeated argument: -b/--blast")
+                print("Repeated argument: -b/--blast\n")
                 util.Fail()
             options.qStartFromBlast = True
             workingDir = GetDirectoryArgument(arg, args)
         elif arg == "-fg" or arg == "--from-groups":
             if options.qStartFromGroups:
-                print("Repeated argument: -fg/--from-groups")
+                print("Repeated argument: -fg/--from-groups\n")
                 util.Fail()
             options.qStartFromGroups = True
             workingDir = GetDirectoryArgument(arg, args)
         elif arg == "-ft" or arg == "--from-trees":
             if options.qStartFromTrees:
-                print("Repeated argument: -ft/--from-trees")
+                print("Repeated argument: -ft/--from-trees\n")
                 util.Fail()
             options.qStartFromTrees = True
             orthologuesDir = GetDirectoryArgument(arg, args)
+            workingDir = orthologuesDir + "../"
         elif arg == "-t" or arg == "--threads":
             if len(args) == 0:
-                print("Missing option for command line argument %s" % arg)
+                print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
             arg = args.pop(0)
             try:
                 options.nBlast = int(arg)
             except:
-                print("Incorrect argument for number of BLAST threads: %s" % arg)
+                print("Incorrect argument for number of BLAST threads: %s\n" % arg)
                 util.Fail()    
         elif arg == "-a" or arg == "--algthreads":
             if len(args) == 0:
-                print("Missing option for command line argument %s" % arg)
+                print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
             arg = args.pop(0)
             try:
                 options.nProcessAlg = int(arg)
             except:
-                print("Incorrect argument for number of BLAST threads: %s" % arg)
+                print("Incorrect argument for number of BLAST threads: %s\n" % arg)
                 util.Fail()   
         elif arg == "-I" or arg == "--inflation":
             if len(args) == 0:
-                print("Missing option for command line argument %s" % arg)
+                print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
             arg = args.pop(0)
             try:
                 options.mclInflation = float(arg)
             except:
-                print("Incorrect argument for MCL inflation parameter: %s" % arg)
+                print("Incorrect argument for MCL inflation parameter: %s\n" % arg)
                 util.Fail()    
         elif arg == "-x" or arg == "--orthoxml":  
             if options.speciesXMLInfoFN:
                 print("Repeated argument: -x/--orthoxml")
                 util.Fail()
             if len(args) == 0:
-                print("Missing option for command line argument %s" % arg)
+                print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
             options.speciesXMLInfoFN = args.pop(0)
         elif arg == "-s" or arg == "--speciestree":  
@@ -978,13 +1000,13 @@ def ProcessArgs():
                 print("Repeated argument: -s/--speciestree")
                 util.Fail()
             if len(args) == 0:
-                print("Missing option for command line argument %s" % arg)
+                print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
             options.speciesTreeFN = args.pop(0)
         elif arg == "-M" or arg == "--method":
             arg_M_or_msa = arg
             if len(args) == 0:
-                print("Missing option for command line argument %s" % arg)
+                print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
             arg = args.pop(0)
             if arg == "msa": options.qMSATrees = True
@@ -994,7 +1016,33 @@ def ProcessArgs():
             elif arg == "dendroblast": options.qMSATrees = False    
             else:
                 print("Invalid argument for option %s: %s" % (arg_M_or_msa, arg))
-                print("Valid options are 'dendroblast' and 'msa'")
+                print("Valid options are 'dendroblast' and 'msa'\n")
+                util.Fail()
+        elif arg == "-A" or arg == "--msa_program":
+            choices = ['mafft'] + program_options.ListMSAMethods()
+            switch_used = arg
+            if len(args) == 0:
+                print("Missing option for command line argument %s\n" % arg)
+                util.Fail()
+            arg = args.pop(0)
+            if arg in choices:
+                options.msa_program = arg
+            else:
+                print("Invalid argument for option %s: %s" % (switch_used, arg))
+                print("Valid options are: {%s}\n" % (", ".join(choices)))
+                util.Fail()
+        elif arg == "-T" or arg == "--tree_program":
+            choices = ['fasttree'] + program_options.ListTreeMethods()
+            switch_used = arg
+            if len(args) == 0:
+                print("Missing option for command line argument %s\n" % arg)
+                util.Fail()
+            arg = args.pop(0)
+            if arg in choices:
+                options.tree_program = arg
+            else:
+                print("Invalid argument for option %s: %s" % (switch_used, arg))
+                print("Valid options are: {%s}\n" % (", ".join(choices)))
                 util.Fail()
         elif arg == "-op" or arg == "--only-prepare":
             options.qStopAfterPrepare = True
@@ -1002,10 +1050,12 @@ def ProcessArgs():
             options.qStopAfterGroups = True
         elif arg == "-os" or arg == "--only-seqs":
             options.qStopAfterSeqs = True
+        elif arg == "-oa" or arg == "--only-alignments":
+            options.qStopAfterAlignments = True
         elif arg == "-ot" or arg == "--only-trees":
             options.qStopAfterTrees = True
         elif arg == "-h" or arg == "--help":
-            PrintHelp()
+            PrintHelp(program_options)
             sys.exit()
         else:
             print("Unrecognised argument: %s\n" % arg)
@@ -1022,7 +1072,15 @@ def ProcessArgs():
 
     if options.qStartFromTrees and options.qStartFromGroups:
         print("ERROR: Incompatible arguments, -fg (start from orthogroups) and -ft (start from trees)")
-        util.Fail()      
+        util.Fail()    
+
+    if options.qStopAfterSeqs and (not options.qMSATrees):
+        print("ERROR: Argument '-os' (stop after sequences) also requires option '-M msa'")
+        util.Fail()   
+
+    if options.qStopAfterAlignments and (not options.qMSATrees):
+        print("ERROR: Argument '-oa' (stop after alignments) also requires option '-M msa'")
+        util.Fail()         
         
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
     print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
@@ -1071,14 +1129,14 @@ def GetXMLSpeciesInfo(dirs, options):
         util.Fail()
     return speciesInfo
 
-def CheckDependencies(options, dirForTempFiles):
+def CheckDependencies(options, program_options, dirForTempFiles):
     util.PrintUnderline("Checking required programs are installed")
     if (options.qStartFromFasta) and (not CanRunBLAST()):
         util.Fail()
     if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunMCL():
         util.Fail()
     if not (options.qStopAfterPrepare or options.qStopAfterSeqs or options.qStopAfterGroups):
-        if not get_orthologues.CanRunOrthologueDependencies(dirForTempFiles, options.qMSATrees, options.qPhyldog, options.qStopAfterTrees, options.speciesTreeFN == None):
+        if not get_orthologues.CanRunOrthologueDependencies(dirForTempFiles, options.qMSATrees, options.qPhyldog, options.qStopAfterTrees, options.msa_program, options.tree_program, program_options, options.speciesTreeFN == None, options.qStopAfterAlignments):
             print("Dependencies have been met for inference of orthogroups but not for the subsequent orthologue inference.")
             print("Either install the required dependencies or use the option '-og' to stop the analysis after the inference of orthogroups.\n")
             util.Fail()
@@ -1230,7 +1288,7 @@ def RunBlast(options, dirs, seqsInfo):
         os.remove(f)
 
 # 9
-def GetOrthologues(dirs, options, clustersFilename_pairs, orthogroupsResultsFilesString=None):
+def GetOrthologues(dirs, options, program_options, clustersFilename_pairs, orthogroupsResultsFilesString=None):
     util.PrintUnderline("Running Orthologue Prediction", True)
 
     orthologuesResultsFilesString = get_orthologues.OrthologuesWorkflow(dirs.workingDir, 
@@ -1238,6 +1296,9 @@ def GetOrthologues(dirs, options, clustersFilename_pairs, orthogroupsResultsFile
                                                                         dirs.speciesToUse, 
                                                                         dirs.nSpAll, 
                                                                         clustersFilename_pairs, 
+                                                                        program_options,
+                                                                        options.msa_program,
+                                                                        options.tree_program,
                                                                         options.nBlast,
                                                                         options.nProcessAlg,
                                                                         options.speciesTreeFN, 
@@ -1317,8 +1378,12 @@ def CheckOptions(options, dirs):
         expSpecies = SpeciesNameDict(dirs.SpeciesIdsFilename()).values()
         get_orthologues.CheckUserSpeciesTree(options.speciesTreeFN, expSpecies)
         
-#    if options.qStopAfterTrees:
-#        options.qMSATrees = True
+    if options.qStopAfterSeqs and (not options.qMSATrees):
+        print("ERROR: Must use '-M msa' option to generate sequence files for orthogroups")
+        util.Fail()
+    if options.qStopAfterAlignments and (not options.qMSATrees):
+        print("ERROR: Must use '-M msa' option to generate sequence files and infer multiple sequence alignments for orthogroups")
+        util.Fail()
     
     return options
 
@@ -1327,12 +1392,13 @@ if __name__ == "__main__":
     print("""    This program comes with ABSOLUTELY NO WARRANTY.
     This is free software, and you are welcome to redistribute it under certain conditions.
     For details please see the License.md that came with this software.\n""")
-    options, fastaDir, workingDir, orthologuesDir = ProcessArgs()  
+    program_options = GetProgramCaller()
+    options, fastaDir, workingDir, orthologuesDir = ProcessArgs(program_options)  
     # 2.
-    if options.qStartFromGroups:
+    if options.qStartFromGroups or options.qStartFromTrees:
         # User can specify it using clusters_id_pairs file, process this first to get the workingDirectory
         workingDir, orthofinderResultsDir, clustersFilename_pairs = util.GetOGsFile(workingDir)
-    CheckDependencies(options, next(d for d in [fastaDir, workingDir, orthologuesDir] if  d != None)) 
+    CheckDependencies(options, program_options, next(d for d in [fastaDir, workingDir, orthologuesDir] if  d != None)) 
     
     # if using previous Trees etc., check these are all present - Job for get_orthologues
     if options.qStartFromBlast and options.qStartFromFasta:
@@ -1356,7 +1422,7 @@ if __name__ == "__main__":
         clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo)
         # 9.
         if not options.qStopAfterGroups:
-            GetOrthologues(dirs, options, clustersFilename_pairs, orthogroupsResultsFilesString)
+            GetOrthologues(dirs, options, program_options, clustersFilename_pairs, orthogroupsResultsFilesString)
         # 10.
         print("\n" + statsFile + "\n\n" + summaryText) 
         util.PrintCitation()
@@ -1379,7 +1445,7 @@ if __name__ == "__main__":
         clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo)    
         # 9. 
         if not options.qStopAfterGroups:
-            GetOrthologues(dirs, options, clustersFilename_pairs, orthogroupsResultsFilesString)
+            GetOrthologues(dirs, options, program_options, clustersFilename_pairs, orthogroupsResultsFilesString)
         # 10.
         print("\n" + statsFile + "\n\n" + summaryText) 
         util.PrintCitation()
@@ -1398,7 +1464,7 @@ if __name__ == "__main__":
         clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo)    
         # 9
         if not options.qStopAfterGroups:
-            GetOrthologues(dirs, options, clustersFilename_pairs, orthogroupsResultsFilesString)
+            GetOrthologues(dirs, options, program_options, clustersFilename_pairs, orthogroupsResultsFilesString)
         # 10
         print("\n" + statsFile + "\n\n" + summaryText) 
         util.PrintCitation() 
@@ -1408,10 +1474,12 @@ if __name__ == "__main__":
         dirs.resultsDir = orthofinderResultsDir       
         options = CheckOptions(options, dirs)
         # 9
-        GetOrthologues(dirs, options, clustersFilename_pairs)
+        GetOrthologues(dirs, options, program_options, clustersFilename_pairs)
         # 10
         util.PrintCitation() 
     elif options.qStartFromTrees:
+        dirs = ProcessPreviousFiles(workingDir)
+        options = CheckOptions(options, dirs)
         summaryText = GetOrthologues_FromTrees(orthologuesDir, options.nBlast, options.speciesTreeFN)
         print(summaryText) 
         util.PrintCitation() 

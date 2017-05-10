@@ -35,7 +35,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.1.5"
+version = "1.1.6"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -85,6 +85,9 @@ Control where analysis stops (optional):
 -os, --only-seqs
     Stop after inferring orthogroups and writing out sequence files for each orthogroup
 
+-oa, --only-alignments
+    Stop after inferring multiple sequence alignments for each orthogroup
+
 -ot, --only-trees
     Stop after inferring gene trees, do not infer orthologues.
 
@@ -99,6 +102,14 @@ Additional arguments:
 
 -M tree_inference_method, --method tree_inference_method
     Use tree_inference_method for gene trees. Valid options are 'dendroblast' & 'msa'. [Default is dendroblast]
+
+-A msa_program, --alignment msa_program
+    Use msa_program for multiple sequence alignments (requires '-M msa' option). [Default in mafft]
+    Options: mafft, mafft-user, mergealign, muscle.
+
+-T tree_program, --alignment tree_program
+    Use tree_program for tree inference from multiple sequence alignments (requires '-M msa' option). [Default in fasttree]
+    Options: fasttree, iqtree, fasttree-user, raxml.
 
 -I inflation_parameter, --inflation inflation_parameter
     Specify a non-default inflation parameter for MCL. Not recommended. [Default is 1.5]

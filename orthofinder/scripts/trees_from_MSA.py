@@ -85,7 +85,10 @@ def WriteTestFile(workingDir):
     return testFN, d
       
 class TreesForOrthogroups(object):
-    def __init__(self, resultsDir, ogsWorkingDir):
+    def __init__(self, program_caller, msa_program, tree_program, resultsDir, ogsWorkingDir):
+        self.program_caller = program_caller
+        self.msa_program = msa_program
+        self.tree_program = tree_program
         self.baseOgFormat = "OG%07d"
         self.resultsDir = resultsDir
         self.workingDir = resultsDir + "WorkingDirectory/"
@@ -123,32 +126,43 @@ class TreesForOrthogroups(object):
             fastaWriter.WriteSeqsToFasta(og, self.GetFastaFilename(iOg))
               
     def GetAlignmentCommands(self, ogs, nSwitchToMafft):
-        commands = []
-        for i, og in enumerate(ogs):
-            if len(og) < 2: break
-            ogFastaFilename = self.GetFastaFilename(i)
-            alignedFilename = self.GetAlignmentFilename(i)
-            reportFilename = "/dev/null"
-            if len(og) < nSwitchToMafft:
-                commands.append(self.Align_linsi(ogFastaFilename, alignedFilename, reportFilename))
-            else:
-                commands.append(self.Align_mafft(ogFastaFilename, alignedFilename, reportFilename))
-        return commands
+        if self.msa_program != "mafft":
+            infn_list = [self.GetFastaFilename(i) for i, og in enumerate(ogs) if len(og) >= 2]
+            outfn_list = [self.GetAlignmentFilename(i) for i, og in enumerate(ogs) if len(og) >= 2]
+            id_list = ["OG%07d" % i for i, og in enumerate(ogs) if len(og) >= 2]
+            return self.program_caller.GetMSACommands(self, self.msa_program, infn_list, outfn_list, id_list) 
+        else:
+            commands = []
+            for i, og in enumerate(ogs):
+                if len(og) < 2: break
+                ogFastaFilename = self.GetFastaFilename(i)
+                alignedFilename = self.GetAlignmentFilename(i)
+                reportFilename = "/dev/null"
+                if len(og) < nSwitchToMafft:
+                    commands.append(self.Align_linsi(ogFastaFilename, alignedFilename, reportFilename))
+                else:
+                    commands.append(self.Align_mafft(ogFastaFilename, alignedFilename, reportFilename))
+            return commands
         
     def GetTreeCommands(self, alignmentsForTree, ogs):
-        commands = []
-        for i, (alignFN, og) in enumerate(zip(alignmentsForTree, ogs)):
-            if len(og) < 4: break
-            treeFilename = self.GetTreeFilename(i)
-            commands.append("FastTree %s > %s 2> /dev/null" % (alignFN, treeFilename))
-        return commands
+        if self.tree_program != "fasttree":
+            outfn_list = [self.GetTreeFilename(i) for i, og in enumerate(ogs) if len(og) >= 2]
+            id_list = ["OG%07d" % i for i, og in enumerate(ogs) if len(og) >= 2]
+            return self.program_caller.GetTreeCommands(self.tree_program, alignmentsForTree, outfn_list, id_list) 
+        else:
+            commands = []
+            for i, (alignFN, og) in enumerate(zip(alignmentsForTree, ogs)):
+                if len(og) < 4: break
+                treeFilename = self.GetTreeFilename(i)
+                commands.append("FastTree %s > %s 2> /dev/null" % (alignFN, treeFilename))
+            return commands
                
     def DoTrees(self, ogs, idDict, nProcesses, qStopAfterSeqs, qStopAfterAlignments, nSwitchToMafft=500):
         # 0       
         resultsDirsFullPath = []
         for fn in [self.GetFastaFilename, self.GetAlignmentFilename, self.GetTreeFilename]:
             for qIDs in [True, False]:
-                d = os.path.split(fn(0, qIDs))[0]
+                d = os.path.split(fn(0, not qIDs))[0]
                 if not os.path.exists(d): os.mkdir(d)
                 if not qIDs: resultsDirsFullPath.append(d)
             if qStopAfterSeqs: break
