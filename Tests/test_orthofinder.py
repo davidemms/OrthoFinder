@@ -797,6 +797,10 @@ class TestCommandLine(unittest.TestCase):
         self.CompareFile(goldResultsDir + "Orthogroups.csv", resultsDir + "Orthogroups.csv")
         self.CompareFile(goldResultsDir + "Orthogroups_UnassignedGenes.csv", resultsDir + "Orthogroups_UnassignedGenes.csv")
         self.CompareFile(goldResultsDir + "Orthogroups.txt", resultsDir + "Orthogroups.txt")
+        self.CompareFile(goldResultsDir + "SingleCopyOrthogroups.txt", resultsDir + "SingleCopyOrthogroups.txt")
+        self.CompareFile(goldResultsDir + "Statistics_Overall.csv", resultsDir + "Statistics_Overall.csv")
+        self.CompareFile(goldResultsDir + "Statistics_PerSpecies.csv", resultsDir + "Statistics_PerSpecies.csv")
+        self.CompareFile(goldResultsDir + "Orthogroups_SpeciesOverlaps.csv", resultsDir + "Orthogroups_SpeciesOverlaps.csv")
          
     def CleanCurrentResultsDir(self):
         if self.currentResultsDir == None: return

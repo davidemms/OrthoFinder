@@ -627,6 +627,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, resultsDir, iResultsVersion):
     filename_sp = resultsDir +  "Statistics_PerSpecies" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
     filename_sum = resultsDir +  "Statistics_Overall" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
     filename_overlap = resultsDir +  "Orthogroups_SpeciesOverlaps" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
+    filename_single_copy = resultsDir +  "SingleCopyOrthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".txt"
     percentFormat = "%0.1f"
     with open(filename_sp, 'wb') as outfile_species, open(filename_sum, 'wb') as outfile_sum:
         writer_sp = csv.writer(outfile_species, delimiter="\t")
@@ -700,6 +701,8 @@ def Stats(ogs, speciesNamesDict, iSpecies, resultsDir, iResultsVersion):
         nSingleCopy = len(singleCopyOGs)
         writer_sum.writerow(["Number of orthogroups with all species present", nCompleteOGs])
         writer_sum.writerow(["Number of single-copy orthogroups", nSingleCopy])
+        with open(filename_single_copy, 'wb') as outfile_singlecopy:
+            outfile_singlecopy.write("\n".join(["OG%07d" % i_ for i_ in singleCopyOGs]))
         
         # Results filenames
         writer_sum.writerow(["Date", str(datetime.datetime.now()).split()[0]])
