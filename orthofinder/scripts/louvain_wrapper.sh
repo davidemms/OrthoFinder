@@ -7,13 +7,16 @@
 hierarchy="$1"
 snodes="$2"
 output="$3"
+udl="$4"
 
 echo $hierarchy
 louvain-hierarchy -n "$hierarchy"
-louvain-hierarchy -n "$hierarchy" | tail -n1 > $hierarchy.highestlevel
 
-level_id=`louvain-hierarchy -n $hierarchy | tail -n1 | cut -d\  -f2 | cut -d: -f1`
-nclust=`louvain-hierarchy -n $hierarchy | tail -n1 | cut -d\  -f3`
+if [ "$udl" == "-1" ]; then
+  level_id=`louvain-hierarchy -n $hierarchy | tail -n1 | cut -d\  -f2 | cut -d: -f1`
+else
+  level_id="$udl"
+fi
 
 louvain-hierarchy -n $hierarchy
 echo "Chosen level: $level_id"

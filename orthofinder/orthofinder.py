@@ -182,7 +182,7 @@ class MCL:
         util.PrintTime("Ran MCL")
 
     @staticmethod
-    def RunLouvain(graphFilename, clustersFilename, nProcesses, inflation):
+    def RunLouvain(graphFilename, clustersFilename, nProcesses, louvain_level):
         command = [ "louvain", "-l", "-1", graphFilename + '.bin', "-q", "id_qual", "-w", graphFilename + '.weights' ]
         print(' '.join(command))
         with open(clustersFilename + '.louvain_out', "w") as lo:
@@ -191,7 +191,8 @@ class MCL:
         util.PrintTime("Ran Louvain")
         print("Louvain raw output is in '%s'" % (clustersFilename + '.louvain_out'))
         wrapper_loc = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
-        wrapper_cmd = [ "%s/scripts/louvain_wrapper.sh" % wrapper_loc, clustersFilename + '.louvain_out', graphFilename + '.solo', clustersFilename ]
+        
+        wrapper_cmd = [ "%s/scripts/louvain_wrapper.sh" % wrapper_loc, clustersFilename + '.louvain_out', graphFilename + '.solo', clustersFilename, str(louvain_level) ]
         util.RunCommand(wrapper_cmd)
         print(' '.join(wrapper_cmd))
         util.PrintTime("Ran Louvain Wrapper")
@@ -952,6 +953,10 @@ to redo the BLAST searches from a previous analysis.\n""")
     Use LOUVAIN (https://sites.google.com/site/findcommunities/) instead of MCL [Default is OFF]""")
     print("")
 
+    print("""--louvain-level
+    The level of output to use for louvain. -1 for highest level [Default is 1]""")
+    print("")
+
     print("""--diamond
     Use DIAMOND Instead of BLAST. [Default is OFF]""")
     print("")
@@ -1039,6 +1044,8 @@ class Options(object):#
         self.speciesTreeFN = None
         self.mclInflation = g_mclInflation
         self.louvain = False
+        self.louvain_level = 1
+        self.combo = False
         self.diamond = False
         self.sensitive = ""
         self.diamond_k = 20
@@ -1191,6 +1198,13 @@ def ProcessArgs():
         elif arg == "--combo":
           options.louvain = False
           options.combo   = True;
+        elif arg == "--louvain-level":
+          options.louvain = True
+          options.combo   = False
+          if len(args) == 0:
+                print("Missing option for command line argument %s" % arg)
+                util.Fail()
+          options.louvain_level = int(args.pop(0))
         elif arg == "--diamond":
           options.diamond = True
         elif arg == "--sensitive":
@@ -1338,7 +1352,7 @@ def DoOrthogroups(options, dirs, seqsInfo):
     # 5b. MCL
     clustersFilename, iResultsVersion = util.GetUnusedFilename(dirs.workingDir  + "clusters_%s_I%0.1f" % (fileIdentifierString, options.mclInflation), ".txt")
     if options.louvain:
-      MCL.RunLouvain(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
+      MCL.RunLouvain(graphFilename, clustersFilename, options.nProcessAlg, options.louvain_level)
     if options.combo:
       MCL.RunCombo(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
     else:
