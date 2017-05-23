@@ -36,6 +36,7 @@ import multiprocessing as mp
 from collections import Counter
 
 import util
+import newick
 
 def cmp_equal(exp, act):
     """exp - expected set of species
@@ -325,14 +326,17 @@ Parallelisation wrappers
 
 def SupportedHierachies_wrapper(treeName, GeneToSpecies, species, dict_clades, clade_names):
     if not os.path.exists(treeName): return []
-    t = tree.Tree(treeName, format=1)
-    G = set(t.get_leaf_names())
-    S = list(set(map(GeneToSpecies, G)))
-    if len(S) < 4:
+    try:    
+        t = tree.Tree(treeName, format=1)
+        G = set(t.get_leaf_names())
+        S = list(set(map(GeneToSpecies, G)))
+        if len(S) < 4:
+            return []
+        result = SupportedHierachies(t, G, S, GeneToSpecies, species, dict_clades, clade_names, treeName)    
+    #    print(treeName)
+        return result
+    except newick.NewickError:
         return []
-    result = SupportedHierachies(t, G, S, GeneToSpecies, species, dict_clades, clade_names, treeName)    
-#    print(treeName)
-    return result
     
 def SupportedHierachies_wrapper2(args):
     return SupportedHierachies_wrapper(*args)
