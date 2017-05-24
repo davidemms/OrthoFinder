@@ -47,7 +47,8 @@ import warnings                                 # Y
 
 import scripts.mcl as MCLread
 import scripts.blast_file_processor as BlastFileProcessor
-from scripts import util, matrices, get_orthologues, program_caller
+from scripts import util, matrices, get_orthologues
+from scripts import program_caller as pcs
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
@@ -222,13 +223,16 @@ class MCL:
     
         # write out
         outputFilename = resultsBaseFilename + ".csv"
+        outputFilename_counts = resultsBaseFilename + ".GeneCount.csv"
         singleGeneFilename = resultsBaseFilename + "_UnassignedGenes.csv"
-        with open(outputFilename, 'wb') as outputFile, open(singleGeneFilename, 'wb') as singleGeneFile:
+        with open(outputFilename, 'wb') as outputFile, open(singleGeneFilename, 'wb') as singleGeneFile, open(outputFilename_counts, 'wb') as outFile_counts:
             fileWriter = csv.writer(outputFile, delimiter="\t")
+            fileWriter_counts = csv.writer(outFile_counts, delimiter="\t")
             singleGeneWriter = csv.writer(singleGeneFile, delimiter="\t")
             for writer in [fileWriter, singleGeneWriter]:
                 row = [""] + [speciesNamesDict[index] for index in speciesToUse]
                 writer.writerow(row)
+            fileWriter_counts.writerow(row + ['Total'])
             
             for iOg, (og, og_names) in enumerate(zip(ogs_ints, ogs_names)):
                 ogDict = defaultdict(list)
@@ -244,6 +248,9 @@ class MCL:
                         ogDict[speciesToUse.index(iSpecies)].append(name)
                     for iSpecies in xrange(nSpecies):
                         row.append(", ".join(sorted(ogDict[iSpecies])))
+                    counts = Counter([iSpecies for iSpecies, _ in og])
+                    counts_row = [counts[iSpecies] for iSpecies in speciesToUse]
+                    fileWriter_counts.writerow(row[:1] + counts_row + [sum(counts_row)])
                 thisOutputWriter.writerow(row)
         resultsFilesString = "Orthogroups have been written to tab-delimited files:\n   %s\n   %s (OrthoMCL format)\n   %s" % (outputFilename, outputFilename[:-3] + "txt", singleGeneFilename)
         return resultsFilesString
@@ -751,10 +758,10 @@ def CanRunMCL():
     
 def GetProgramCaller():
     config_file = os.path.join(__location__, 'config.json') 
-    pc = program_caller.ProgramCaller(config_file if os.path.exists(config_file) else None)
+    pc = pcs.ProgramCaller(config_file if os.path.exists(config_file) else None)
     config_file_user = os.path.join(__location__, 'config_user.json') 
     if os.path.exists(config_file_user):
-        pc_user = program_caller.ProgramCaller(config_file_user)
+        pc_user = pcs.ProgramCaller(config_file_user)
         pc.Add(pc_user)
     return pc
     
