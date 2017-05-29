@@ -478,6 +478,10 @@ def WriteGraph_perSpecies(args):
     seqsInfo, fileInfo, iSpec = args            
     # calculate the 2-way connections for one query species
     with open(fileInfo.graphFilename + "_%d" % iSpec, 'wb') as graphFile:
+      with open(fileInfo.graphFilename + "_%d.pairs" % iSpec, 'wb') as pairNodesFile:
+
+        sequenceIDsFile = fileInfo.workingDir + "/SequenceIDs.txt"
+        sequenceIDs = [ line.strip().split()[1] for line in open(sequenceIDsFile, "r") ]
         connect2 = []
         for jSpec in xrange(seqsInfo.nSpecies):
             m1 = matrices.LoadMatrix("connect", fileInfo, iSpec, jSpec)
@@ -495,6 +499,7 @@ def WriteGraph_perSpecies(args):
                 jOffset = seqsInfo.seqStartingIndices[jSpec]
                 for j, value in zip(row.rows[0], row.data[0]):
                     graphFile.write("%d:%.3f " % (j + jOffset, value))
+                    pairNodesFile.write("%s\t%s\n" % (sequenceIDs[offset + query], sequenceIDs[j + jOffset]))
             graphFile.write("$\n")
         if iSpec == (seqsInfo.nSpecies - 1): graphFile.write(")\n")
         util.PrintTime("Written final scores for species %d to graph file" % iSpec)
@@ -568,6 +573,7 @@ class WaterfallMethod:
             pool = mp.Pool(nProcess)
             pool.map(WriteGraph_perSpecies, [(seqsInfo, fileInfo, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
             subprocess.call("cat " + fileInfo.graphFilename + "_header " + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename, shell=True)
+            subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.pairs" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.pairs', shell=True)
             # Cleanup
             os.remove(fileInfo.graphFilename + "_header")
             for iSp in xrange(seqsInfo.nSpecies): os.remove(fileInfo.graphFilename + "_%d" % iSp)
@@ -618,28 +624,32 @@ def WriteLouvainGraph_perSpecies(args):
     # calculate the 2-way connections for one query species
     with open(fileInfo.graphFilename + "_%d" % iSpec, 'wb') as graphFile:
       with open(fileInfo.graphFilename + "_%d.solo" % iSpec, 'wb') as soloNodesFile:
-        connect2 = []
-        for jSpec in xrange(seqsInfo.nSpecies):
-            m1 = matrices.LoadMatrix("connect", fileInfo, iSpec, jSpec)
-            m2tr = numeric.transpose(matrices.LoadMatrix("connect", fileInfo, jSpec, iSpec))
-            connect2.append(m1 + m2tr)
-        B = matrices.LoadMatrixArray("B", fileInfo, seqsInfo, iSpec)
-        B_connect = matrices.MatricesAnd_s(connect2, B)
-
-        W = [b.sorted_indices().tolil() for b in B_connect]
-        for query in xrange(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]):
-            offset = seqsInfo.seqStartingIndices[iSpec]
-            n_neighbors = 0
-            for jSpec in xrange(seqsInfo.nSpecies):
-                row = W[jSpec].getrowview(query)
-                jOffset = seqsInfo.seqStartingIndices[jSpec]
-                for j, value in zip(row.rows[0], row.data[0]):
-                    graphFile.write("%d\t%d\t%.3f\n" % (offset + query, j + jOffset, value))
-                    n_neighbors += 1
-            if n_neighbors == 0:
-              soloNodesFile.write("%d\n" % (offset + query))
-        if iSpec == (seqsInfo.nSpecies - 1): graphFile.write("\n")
-        util.PrintTime("Written final scores for species %d to graph file" % iSpec)
+        with open(fileInfo.graphFilename + "_%d.pairs" % iSpec, 'wb') as pairNodesFile:
+          sequenceIDsFile = fileInfo.workingDir + "/SequenceIDs.txt"
+          sequenceIDs = [ line.strip().split()[1] for line in open(sequenceIDsFile, "r") ]
+          connect2 = []
+          for jSpec in xrange(seqsInfo.nSpecies):
+              m1 = matrices.LoadMatrix("connect", fileInfo, iSpec, jSpec)
+              m2tr = numeric.transpose(matrices.LoadMatrix("connect", fileInfo, jSpec, iSpec))
+              connect2.append(m1 + m2tr)
+          B = matrices.LoadMatrixArray("B", fileInfo, seqsInfo, iSpec)
+          B_connect = matrices.MatricesAnd_s(connect2, B)
+  
+          W = [b.sorted_indices().tolil() for b in B_connect]
+          for query in xrange(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]):
+              offset = seqsInfo.seqStartingIndices[iSpec]
+              n_neighbors = 0
+              for jSpec in xrange(seqsInfo.nSpecies):
+                  row = W[jSpec].getrowview(query)
+                  jOffset = seqsInfo.seqStartingIndices[jSpec]
+                  for j, value in zip(row.rows[0], row.data[0]):
+                      graphFile.write("%d\t%d\t%.3f\n" % (offset + query, j + jOffset, value))
+                      pairNodesFile.write("%s\t%s\n" % (sequenceIDs[offset + query], sequenceIDs[j + jOffset]))
+                      n_neighbors += 1
+              if n_neighbors == 0:
+                soloNodesFile.write("%d\n" % (offset + query))
+          if iSpec == (seqsInfo.nSpecies - 1): graphFile.write("\n")
+          util.PrintTime("Written final scores for species %d to graph file" % iSpec)
 
 class WaterfallMethodLouvain(WaterfallMethod):
 
@@ -648,9 +658,16 @@ class WaterfallMethodLouvain(WaterfallMethod):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             pool = mp.Pool(nProcess)
+
+            sequenceIDsFile = fileInfo.workingDir + "/SequenceIDs.txt"
+            print "-------%s----" % sequenceIDsFile
+
+
             pool.map(WriteLouvainGraph_perSpecies, [(seqsInfo, fileInfo, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
             subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename, shell=True)
             subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.solo" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.solo', shell=True)
+            subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.pairs" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.pairs', shell=True)
+
             louvain_cmd = ["louvain-convert",  "-i", fileInfo.graphFilename, "-o", fileInfo.graphFilename + ".bin", "-w", fileInfo.graphFilename + ".weights"]
             util.RunCommand(louvain_cmd)
             # Cleanup
@@ -674,6 +691,7 @@ class WaterfallMethodCombo(WaterfallMethod):
             util.RunCommand(wrapper_cmd)
             subprocess.call("cat " + fileInfo.graphFilename + '.header ' + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.net', shell=True)
             subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.solo" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.solo', shell=True)
+            subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.pairs" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.pairs', shell=True)
             # Cleanup
             for iSp in xrange(seqsInfo.nSpecies):
               #os.remove(fileInfo.graphFilename + "_%d" % iSp)
