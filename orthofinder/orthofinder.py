@@ -573,8 +573,8 @@ class WaterfallMethod:
             pool = mp.Pool(nProcess)
             pool.map(WriteGraph_perSpecies, [(seqsInfo, fileInfo, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
             subprocess.call("cat " + fileInfo.graphFilename + "_header " + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename, shell=True)
-            print "Writing pairs to %s" %  (fileInfo.graphFilename + '.pairs')
-            subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.pairs" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.pairs', shell=True)
+            print "Writing pairs to %s" %  (fileInfo.workingDir + '/network.pairs')
+            subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.pairs" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.workingDir + '/network.pairs', shell=True)
             # Cleanup
             os.remove(fileInfo.graphFilename + "_header")
             for iSp in xrange(seqsInfo.nSpecies): os.remove(fileInfo.graphFilename + "_%d" % iSp)
@@ -667,8 +667,8 @@ class WaterfallMethodLouvain(WaterfallMethod):
             pool.map(WriteLouvainGraph_perSpecies, [(seqsInfo, fileInfo, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
             subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename, shell=True)
             subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.solo" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.solo', shell=True)
-            print "Writing pairs to %s" %  (fileInfo.graphFilename + '.pairs')
-            subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.pairs" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.pairs', shell=True)
+            print "Writing pairs to %s" %  (fileInfo.workingDir + '/network.pairs')
+            subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.pairs" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.workingDir + '/network.pairs', shell=True)
 
             louvain_cmd = ["louvain-convert",  "-i", fileInfo.graphFilename, "-o", fileInfo.graphFilename + ".bin", "-w", fileInfo.graphFilename + ".weights"]
             util.RunCommand(louvain_cmd)
@@ -693,8 +693,8 @@ class WaterfallMethodCombo(WaterfallMethod):
             util.RunCommand(wrapper_cmd)
             subprocess.call("cat " + fileInfo.graphFilename + '.header ' + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.net', shell=True)
             subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.solo" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.solo', shell=True)
-            print "Writing pairs to %s" %  (fileInfo.graphFilename + '.pairs')
-            subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.pairs" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename + '.pairs', shell=True)
+            print "Writing pairs to %s" %  (fileInfo.workingDir + '/network.pairs')
+            subprocess.call("cat " + " ".join([fileInfo.graphFilename + "_%d.pairs" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.workingDir + '/network.pairs', shell=True)
             # Cleanup
             for iSp in xrange(seqsInfo.nSpecies):
               #os.remove(fileInfo.graphFilename + "_%d" % iSp)
