@@ -55,7 +55,7 @@ def make_dicts(dlcparResultsDir, outputDir):
             for line in rec:
                 reconlist.append(line.split())
         speclist = [x[0] for x in reconlist if 'spec' == x[2]]
-        speclist = [t&n for n in speclist]
+        speclist = [t&n if n in t else t for n in speclist]
         for node in speclist:
             c1, c2 = node.get_children()
             for leaf1 in c1.get_leaf_names():

@@ -12,7 +12,7 @@
     "cmd_line": "muscle -in INPUT -out OUTPUT"
     },
         
-    "raxmlAVX":{ 
+    "raxml":{ 
     "program_type": "tree",
     "cmd_line": "raxmlHPC-AVX -m PROTGAMMALG -p 12345 -s INPUT -n IDENTIFIER",
     "ouput_filename": "PATH/RAxML_bestTree_IDENTIFIER"

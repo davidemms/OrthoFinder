@@ -35,7 +35,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.1.7"
+version = "1.1.8"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -109,7 +109,7 @@ Additional arguments:
 
 -T tree_program, --alignment tree_program
     Use tree_program for tree inference from multiple sequence alignments (requires '-M msa' option). [Default in fasttree]
-    Options: fasttree, iqtree, raxmlAVX.
+    Options: fasttree, iqtree, raxml.
 
 -I inflation_parameter, --inflation inflation_parameter
     Specify a non-default inflation parameter for MCL. Not recommended. [Default is 1.5]
@@ -745,7 +745,7 @@ class TestCommandLine(unittest.TestCase):
         self.assertTrue("mafft" in self.stdout)
         self.assertTrue("muscle" in self.stdout)
         self.assertTrue("fasttree" in self.stdout)
-        self.assertTrue("raxmlAVX" in self.stdout)
+        self.assertTrue("raxml" in self.stdout)
         self.assertTrue("iqtree" in self.stdout)
         
         
