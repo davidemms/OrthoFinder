@@ -50,8 +50,12 @@ import scripts.blast_file_processor as BlastFileProcessor
 from scripts import util, matrices, get_orthologues
 from scripts import program_caller as pcs
 
-__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-
+# Get directory containing script/bundle
+if getattr(sys, 'frozen', False):
+    __location__ = os.path.split(sys.executable)[0]
+else:
+    __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+    
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
 if sys.platform.startswith("linux"):
     with open(os.devnull, "w") as f:
