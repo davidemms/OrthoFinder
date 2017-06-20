@@ -260,8 +260,9 @@ def GetSpeciesToUse(speciesIDsFN):
     nSkipped = 0
     with open(speciesIDsFN, 'rb') as speciesF:
         for line in speciesF:
-            if len(line) == 0: continue
-            elif line[0] == "#": nSkipped += 1
+            line = line.rstrip()
+            if not line: continue
+            if line.startswith("#"): nSkipped += 1
             else: speciesToUse.append(int(line.split(":")[0]))
     return speciesToUse, len(speciesToUse) + nSkipped
     
@@ -293,8 +294,10 @@ class FullAccession(IDExtractor):
         self.nameToIDDict = dict()
         with open(idsFilename, 'rb') as idsFile:
             for line in idsFile:
+                line = line.rstrip()
+                if not line: continue
 #                if line.startswith("#"): continue
-                id, accession = line.rstrip().split(": ", 1)
+                id, accession = line.split(": ", 1)
                 id = id.replace("#", "")
                 # Replace problematic characters
                 accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_") #.replace(".", "_")

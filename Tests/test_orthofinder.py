@@ -43,7 +43,7 @@ citation = """When publishing work that uses OrthoFinder please cite:
     dramatically improves orthogroup inference accuracy, Genome Biology 16:157.
 """ 
 
-expectedHelp="""OrthoFinder version %s Copyright (C) 2014 David Emms
+expectedHelp1="""OrthoFinder version %s Copyright (C) 2014 David Emms
 
     This program comes with ABSOLUTELY NO WARRANTY.
     This is free software, and you are welcome to redistribute it under certain conditions.
@@ -101,17 +101,21 @@ Additional arguments:
     There are speed/memory trade-offs involved, see manual for details. [Default is 1]
 
 -M tree_inference_method, --method tree_inference_method
-    Use tree_inference_method for gene trees. Valid options are 'dendroblast' & 'msa'. [Default is dendroblast]
+    Use tree_inference_method for gene trees. Valid options are 'dendroblast' & 'msa'. [Default is dendroblast]"""  % version
+
+help_not_checked="""-S search_program, --search search_program
+    Use search_program for alignment search. [Default in blast]
+    Options: blast, diamond, diamond_more_sensitive.
 
 -A msa_program, --alignment msa_program
     Use msa_program for multiple sequence alignments (requires '-M msa' option). [Default in mafft]
-    Options:  mafft, muscle.
+    Options: mafft, mergealign, muscle.
 
 -T tree_program, --alignment tree_program
     Use tree_program for tree inference from multiple sequence alignments (requires '-M msa' option). [Default in fasttree]
-    Options: fasttree, iqtree, raxml.
+    Options: fasttree, iqtree, iqtreeDavid, raxmlDavid, raxml."""
 
--I inflation_parameter, --inflation inflation_parameter
+expectedHelp2="""-I inflation_parameter, --inflation inflation_parameter
     Specify a non-default inflation parameter for MCL. Not recommended. [Default is 1.5]
 
 -x speciesInfoFilename, --orthoxml speciesInfoFilename
@@ -127,7 +131,7 @@ Additional arguments:
 When publishing work that uses OrthoFinder please cite:
     D.M. Emms & S. Kelly (2015), OrthoFinder: solving fundamental biases in whole genome comparisons
     dramatically improves orthogroup inference accuracy, Genome Biology 16:157.
-""" % version
+"""
 
 class CleanUp(object):
     """Cleans up after arbitrary code that could create any/all of the 'newFiles'
@@ -165,6 +169,7 @@ class CleanUp(object):
         for fn in self.newFiles:
             if os.path.exists(fn): os.remove(fn)
         for d in self.newDirs:
+            if not os.path.exists(d): continue
             if self.qSaveFiles:
                 while d[-1] == "/": d = d[:-1]
                 shutil.move(d, d + "_bak/")
@@ -318,15 +323,18 @@ class TestCommandLine(unittest.TestCase):
 
     def test_help(self):
         self.stdout, self.stderr = self.RunOrthoFinder("")
-        self.assertTrue(expectedHelp in self.stdout)
+        self.assertTrue(expectedHelp1 in self.stdout)
+        self.assertTrue(expectedHelp2 in self.stdout)
         self.assertEqual(len(self.stderr), 0)
         
         self.stdout, self.stderr = self.RunOrthoFinder("-h")
-        self.assertTrue(expectedHelp in self.stdout)
+        self.assertTrue(expectedHelp1 in self.stdout)
+        self.assertTrue(expectedHelp2 in self.stdout)
         self.assertEqual(len(self.stderr), 0)
          
         self.stdout, self.stderr = self.RunOrthoFinder("--help")
-        self.assertTrue(expectedHelp in self.stdout)
+        self.assertTrue(expectedHelp1 in self.stdout)
+        self.assertTrue(expectedHelp2 in self.stdout)
         self.assertEqual(len(self.stderr), 0)        
         self.test_passed = True     
          
@@ -748,6 +756,12 @@ class TestCommandLine(unittest.TestCase):
         self.assertTrue("raxml" in self.stdout)
         self.assertTrue("iqtree" in self.stdout)
         
+    def test_issue83(self):
+        d = baseDir + "/Input/ISSUES/Issue83/"
+        resultsDir = d + "Orthologues_%s/" % Date() 
+        newFiles = [d + f for f in ("Orthogroups.orthoxml Orthogroups.csv Orthogroups.GeneCount.csv Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv SingleCopyOrthogroups.txt" % (version, version, version)).split()]
+        with CleanUp(newFiles, [], [resultsDir]):    
+            self.CheckOrthoFinderSuccess("-b %s" % d)
         
 #    def test_treesExtraSpecies(self):
 #        pass
@@ -771,6 +785,12 @@ class TestCommandLine(unittest.TestCase):
             capture = subprocess.Popen("python %s %s" % (orthofinder, commands), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
         stdout = "".join([x for x in capture.stdout])
         stderr = "".join([x for x in capture.stderr])
+        return stdout, stderr
+        
+    def CheckOrthoFinderSuccess(self, commands):
+        stdout, stderr = self.RunOrthoFinder(commands)
+        self.assertEqual(len(stderr), 0)
+        self.assertTrue("When publishing work that uses OrthoFinder please cite" in stdout)
         return stdout, stderr
         
     def RunTrees(self, commands):

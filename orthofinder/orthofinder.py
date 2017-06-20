@@ -88,7 +88,9 @@ def SpeciesNameDict(speciesIDsFN):
     with open(speciesIDsFN, 'rb') as speciesNamesFile:
         for line in speciesNamesFile:
             if line.startswith("#"): continue
-            short, full = line.rstrip().split(": ")
+            line = line.rstrip()
+            if not line: continue
+            short, full = line.split(": ")
             speciesNamesDict[int(short)] = full.rsplit(".", 1)[0]
     return speciesNamesDict
     
