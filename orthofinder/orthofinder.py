@@ -1379,6 +1379,7 @@ def ProcessesNewFasta(fastaDir, existingDirs=None):
     Process fasta files and return a Directory object with all paths completed.
     """
     # Check files present
+    qOk = True
     if not os.path.exists(fastaDir):
         print("\nDirectory does not exist: %s" % fastaDir)
         util.Fail()
@@ -1412,19 +1413,29 @@ def ProcessesNewFasta(fastaDir, existingDirs=None):
             fastaFilename = fastaFilename.rstrip()
             speciesFile.write("%d: %s\n" % (iSpecies, fastaFilename))
             baseFilename, extension = os.path.splitext(fastaFilename)
+            mLinesToCheck = 100
+            qHasAA = False
             with open(fastaDir + os.sep + fastaFilename, 'rb') as fastaFile:
-                for line in fastaFile:
+                for iLine, line in enumerate(fastaFile):
                     if len(line) > 0 and line[0] == ">":
                         newID = "%d_%d" % (iSpecies, iSeq)
                         idsFile.write("%s: %s" % (newID, line[1:]))
                         outputFasta.write(">%s\n" % newID)    
                         iSeq += 1
                     else:
+                        if not qHasAA and (iLine < mLinesToCheck):
+#                            qHasAA = qHasAA or any([c in line for c in ['D','E','F','H','I','K','L','M','N','P','Q','R','S','V','W','Y']])
+                            qHasAA = qHasAA or any([c in line for c in ['E','F','I','L','P','Q']]) # AAs minus nucleotide ambiguity codes
                         outputFasta.write(line)
                 outputFasta.write("\n")
+            if not qHasAA:
+                qOk = False
+                print("ERROR: %s appears to contain nucleotide sequences instead of amino acid sequences." % fastaFilename)
             iSpecies += 1
             iSeq = 0
             outputFasta.close()
+        if not qOk:
+            util.Fail()
     if len(originalFastaFilenames) > 0: outputFasta.close()
     dirs.speciesToUse = dirs.speciesToUse + newSpeciesIDs
     dirs.nSpAll = max(dirs.speciesToUse) + 1      # will be one of the new species

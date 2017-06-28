@@ -762,6 +762,13 @@ class TestCommandLine(unittest.TestCase):
         newFiles = [d + f for f in ("Orthogroups.orthoxml Orthogroups.csv Orthogroups.GeneCount.csv Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv SingleCopyOrthogroups.txt" % (version, version, version)).split()]
         with CleanUp(newFiles, [], [resultsDir]):    
             self.CheckOrthoFinderSuccess("-b %s" % d)
+            
+    def test_nucleotide_sequences(self):
+        d = baseDir + "Input/NucleotideSequences/"
+        resultsDir = d + "Results_%s/" % Date() 
+        with CleanUp([], [], [resultsDir]):
+            self.stdout, self.stderr = self.RunOrthoFinder("-f %s -og" % d)
+            self.assertTrue("ERROR: Mycoplasma_agalactiae_n.fa appears to contain nucleotide sequences instead of amino acid sequences." in self.stdout)
         
 #    def test_treesExtraSpecies(self):
 #        pass
