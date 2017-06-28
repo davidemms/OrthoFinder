@@ -351,7 +351,7 @@ def RenameTreeTaxa(treeFN, newTreeFilename, idsMap, qFixNegatives=False, inForma
             sliver = tree_length * 1e-6
             for n in t.traverse():
                 if n.dist < 0.0: n.dist = sliver
-        t.write(outfile = newTreeFilename, format=4)  
+        t.write(outfile = newTreeFilename, format=5)  # internal + terminal branch lengths, leaf names
     except:
         pass
 

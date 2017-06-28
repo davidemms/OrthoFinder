@@ -417,7 +417,7 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, treeFmt=3):
         speciesTree = RootAtClade(speciesTree, r) 
         speciesTree_rootedFN = os.path.splitext(speciesTreeFN)[0] + "_%d_rooted.txt" % i 
 #    speciesTree = LabelNodes()
-        speciesTree.write(outfile=speciesTree_rootedFN, format=4)
+        speciesTree.write(outfile=speciesTree_rootedFN, format=5)
         speciesTrees_rootedFNs.append(speciesTree_rootedFN)
     return roots, clusters, speciesTrees_rootedFNs, nSupport
        
