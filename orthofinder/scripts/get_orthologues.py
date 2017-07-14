@@ -545,8 +545,8 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
     
     # FastTree & MAFFT
     if qMSAGeneTrees or qPhyldog:
-        testFN, temp_dir = msa.WriteTestFile(workingDir)
         if msa_method == "mafft":
+            testFN, temp_dir = msa.WriteTestFile(workingDir)
             if not util.CanRunCommand("mafft %s" % testFN, qAllowStderr=True):
                 print("ERROR: Cannot run mafft")
                 print("Please check MAFFT is installed and that the executables are in the system path\n")
@@ -557,6 +557,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
                 print("Please check program is installed and that it is correctly configured in the ~/.orthofinder.config file\n")
                 return False
         if tree_method == "fasttree":
+            testFN, temp_dir = msa.WriteTestFile(workingDir)
             if qMSAGeneTrees and (not qStopAfterAlignments) and not util.CanRunCommand("FastTree %s" % testFN, qAllowStderr=True):
                 print("ERROR: Cannot run FastTree")
                 print("Please check FastTree is installed and that the executables are in the system path\n")
