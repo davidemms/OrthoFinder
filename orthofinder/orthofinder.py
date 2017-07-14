@@ -834,12 +834,12 @@ to redo the BLAST searches from a previous analysis.\n""")
     Use search_program for alignment search. [Default in blast]
     Options: """ + ", ".join(['blast'] + search_ops) + ".\n")
     
-    print("""-A msa_program, --alignment msa_program
-    Use msa_program for multiple sequence alignments (requires '-M msa' option). [Default in mafft]
+    print("""-A program, --msa_program program
+    Use 'program' for multiple sequence alignments (requires '-M msa' option). [Default in mafft]
     Options: """ + ", ".join(['mafft'] + msa_ops) + ".\n")
     
-    print("""-T tree_program, --alignment tree_program
-    Use tree_program for tree inference from multiple sequence alignments (requires '-M msa' option). [Default in fasttree]
+    print("""-T program, --tree_program program
+    Use 'program' for tree inference from multiple sequence alignments (requires '-M msa' option). [Default in fasttree]
     Options: """ + ", ".join(['fasttree'] + tree_ops) + ".\n")
     
     print("""-I inflation_parameter, --inflation inflation_parameter
