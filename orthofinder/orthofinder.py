@@ -676,7 +676,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, resultsDir, iResultsVersion):
         nOgs = len(properOGs)
         writer_sum.writerow(["Number of orthogroups", nOgs])
         writer_sp.writerow(["Number of orthogroups containing species"] + [sum([iSp in og_sp for og_sp in speciesPresence]) for iSp in iSpecies])
-        writer_sp.writerow(["Percentage of orthogroups containing species"] + [percentFormat % (100.*sum([iSp in og_sp for og_sp in speciesPresence])/len(properOGs)) for iSp in iSpecies])
+        writer_sp.writerow(["Percentage of orthogroups containing species"] + [percentFormat % ((100.*sum([iSp in og_sp for og_sp in speciesPresence])/len(properOGs)) if len(properOGs) > 0 else 0.) for iSp in iSpecies])
         
         # Species specific orthogroups - orthogroups-based
         speciesSpecificOGsCounter = Counter([next(iter(og_sp)) for og_sp in speciesPresence if len(og_sp) == 1])
