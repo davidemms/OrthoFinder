@@ -13,7 +13,7 @@ Emms, D.M. and Kelly, S. **(2015)** OrthoFinder: solving fundamental biases in w
 https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2
 
 ## Contents
-* [Orthogroups, orthologues & paralogues](#orthogroups-orthologues--paralogues)
+* [What are orthogroups, orthologues & paralogues?](#orthogroups-orthologues--paralogues)
 * [Why use orthogroups in your analysis](#why-orthogroups)
 * [Installing OrthoFinder](#setting-up-orthofinder)
 * [Running OrthoFinder](#running-orthofinder)
