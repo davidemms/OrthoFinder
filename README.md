@@ -8,30 +8,20 @@ OrthoFinder is a fast, accurate and comprehensive analysis tool for comparative 
 
 For more details see the OrthoFinder paper below.
 
-**Emms, D.M. and Kelly, S. (2015) OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy, Genome Biology 16:157**
+Emms, D.M. and Kelly, S. **(2015)** _OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy._ **Genome Biology** 16:157
 
 https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2
 
-http://www.stevekellylab.com/software/orthofinder
+## Contents
+* [What are orthogroups, orthologues & paralogues?](#orthogroups-orthologues--paralogues)
+* [Why use orthogroups in your analysis](#why-orthogroups)
+* [Installing OrthoFinder](#setting-up-orthofinder)
+* [Running OrthoFinder](#running-orthofinder)
+* [OrthoFinder results files and statistics](#results-files)
+* [Adding and removing species from a completed OrthoFinder run](#advanced-usage)
+* [Preparing and using seperately run BLAST files](#running-blast-searches-separately--p-option)
 
-https://github.com/davidemms/OrthoFinder
-
-## What's New
-**Oct. 2016**:  Check out the new **PDF Manual**!
-
-**Sep. 2016**: OrthoFinder now infers the gene trees for the orthogroups, the rooted species tree, all **orthologues** between all species and calculates summary statistics.
-
-**Jul. 2016**: OrthoFinder now outputs **summary statistics** for the orthogroups produced. Statistics are in the files Statistics_Overall.csv, Statistics_PerSpecies.csv and Orthogroups_SpeciesOverlaps.csv.
-
-**Jul. 2016**: Provided **standalone binaries** for those without access to python (download the package from OrthoFinder's GitHub releases tab).
-
-**Jun. 2016**: **Parallelised** the remainder of the OrthoFinder algorithm. 
-
-**Jan. 2016**: Added the ability to **add and remove species**.
-
-**Sept. 2015**: Added the **trees_from_MSA** utility to automatically calculate multiple sequence alignments and gene trees for the orthogroups calcualted using OrthoFinder.
-
-## Orthogroups, Orthologues & Paralogues
+### Orthogroups, Orthologues & Paralogues
 'Orthologue' is a term that applies to genes from two species. Orthologues are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Figure 2A & B). An orthogroup is the natural extension of the concept of orthology to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). 
 When looking at the gene tree, the first divergence between the genes in an orthogroup is a speciation event and the same is true for orthologues.  
 
