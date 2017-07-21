@@ -8,7 +8,7 @@ OrthoFinder is a fast, accurate and comprehensive analysis tool for comparative 
 
 For more details see the OrthoFinder paper below.
 
-Emms, D.M. and Kelly, S. **(2015)** OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy, **Genome Biology** 16:157
+Emms, D.M. and Kelly, S. **(2015)** _OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy._ **Genome Biology** 16:157
 
 https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2
 
