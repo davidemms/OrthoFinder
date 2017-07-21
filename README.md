@@ -8,20 +8,19 @@ OrthoFinder is a fast, accurate and comprehensive analysis tool for comparative 
 
 For more details see the OrthoFinder paper below.
 
-**Emms, D.M. and Kelly, S. (2015) OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy, Genome Biology 16:157**
+Emms, D.M. and Kelly, S. **(2015)** OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy, **Genome Biology** 16:157
 
 https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2
 
 ## Contents
 * [Orthogroups, orthologues & paralogues](#orthogroups-orthologues--paralogues)
-* [Why use orthogroups](#why-orthogroups)
-* [Setting up OrthoFinder](#setting-up-orthofinder)
-* [Running up OrthoFinder](#running-orthofinder)
-* [OrthoFinder results files](#results-files)
+* [Why use orthogroups in your analysis](#why-orthogroups)
+* [Installing OrthoFinder](#setting-up-orthofinder)
+* [Running OrthoFinder](#running-orthofinder)
+* [OrthoFinder results files and statistics](#results-files)
 * [Adding extra species to a completed OrthoFinder run](#advanced-usage)
 * [Removing species from a completed OrthoFinder run](#advanced-usage)
-* [Preparing BLAST files to be run seperatly](#running-blast-searches-separately--p-option)
-* [Using Pre-Computed BLAST Results](#using-pre-computed-blast-results)
+* [Preparing and using seperately run BLAST files](#running-blast-searches-separately--p-option)
 
 ### Orthogroups, Orthologues & Paralogues
 'Orthologue' is a term that applies to genes from two species. Orthologues are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Figure 2A & B). An orthogroup is the natural extension of the concept of orthology to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). 
