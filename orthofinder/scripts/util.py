@@ -44,10 +44,10 @@ Utilities
 -------------------------------------------------------------------------------
 """
 SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")
-FileInfo = namedtuple("FileInfo", "workingDir graphFilename")     
+FileInfo = namedtuple("FileInfo", "workingDir graphFilename separatePickleDir")     
 
 picProtocol = 1
-version = "1.1.9"
+version = "1.1.10"
 
 # Fix LD_LIBRARY_PATH when using pyinstaller 
 my_env = os.environ.copy()

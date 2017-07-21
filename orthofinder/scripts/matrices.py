@@ -24,12 +24,17 @@
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
 
+import os
+import glob
 import cPickle as pic
 
 import util
 
+def PickleDir(fileInfo):
+    return fileInfo.separatePickleDir if fileInfo.separatePickleDir != None else fileInfo.workingDir
+
 def DumpMatrix(name, m, fileInfo, iSpecies, jSpecies):
-    with open(fileInfo.workingDir + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'wb') as picFile:
+    with open(PickleDir(fileInfo) + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'wb') as picFile:
         pic.dump(m, picFile, protocol=util.picProtocol)
     
 def DumpMatrixArray(name, matrixArray, fileInfo, iSpecies):
@@ -37,7 +42,7 @@ def DumpMatrixArray(name, matrixArray, fileInfo, iSpecies):
         DumpMatrix(name, m, fileInfo, iSpecies, jSpecies)
 
 def LoadMatrix(name, fileInfo, iSpecies, jSpecies): 
-    with open(fileInfo.workingDir + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'rb') as picFile:  
+    with open(PickleDir(fileInfo) + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'rb') as picFile:  
         M = pic.load(picFile)
     return M
         
@@ -61,3 +66,7 @@ def MatricesAndTr_s(Xarr, Yarr):
     for x, y in zip(Xarr, Yarr):
         Zarr.append(x.multiply(y.transpose()))
     return Zarr   
+    
+def DeleteMatrices(baseName, fileInfo):
+    for f in glob.glob(PickleDir(fileInfo) + baseName + "*_*.pic"):
+        if os.path.exists(f): os.remove(f)

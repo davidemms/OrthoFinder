@@ -31,18 +31,17 @@ import glob
 import itertools
 import numpy as np
 import cPickle as pic
-import tree
 from scipy import sparse
 from collections import defaultdict
 
+import tree
 import util
 
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(_nsre, s)]
 
 #make_dicts checks every leaf against every other leaf to find the ancestor node and checks this node against speclist and duplist to see which dictionary the gene-pair should be placed in.
-def make_dicts(dlcparResultsDir, outputDir):
-    if not os.path.exists(outputDir): os.mkdir(outputDir) 
+def make_dicts(dlcparResultsDir):
     treeFNs = glob.glob(dlcparResultsDir + '/*.locus.tree')
     recons = glob.glob(dlcparResultsDir + '/*.locus.recon')
     treeFNs.sort(key = natural_sort_key)
@@ -62,10 +61,7 @@ def make_dicts(dlcparResultsDir, outputDir):
                 for leaf2 in c2.get_leaf_names(): 
                   Orthologs[leaf1].append(leaf2)
                   Orthologs[leaf2].append(leaf1)     
-    picFN = outputDir + 'totalorthodict_fast.pic'
-    with open(picFN, 'wb') as F:
-        pic.dump(Orthologs, F)
-    return Orthologs, picFN
+    return Orthologs
     
 def GetSpeciesGenesInfo(ogSet):
     speciesLabels, nSpAll = util.GetSpeciesToUse(ogSet.speciesIDsFN) 
@@ -74,7 +70,7 @@ def GetSpeciesGenesInfo(ogSet):
     genenumbers.append(seqsInfo.nSeqs - seqsInfo.seqStartingIndices[-1])
     return speciesLabels, genenumbers
         
-def one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, outputDir):
+def one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, pickleDir):
     """ speciesLabels is an ordered list of the speciesIDs
         try to mostly deal with iSpecies which is the ordinal number not the label it is given
     """
@@ -97,13 +93,15 @@ def one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, output
             jSp = speciesLabelsReverse[jSpLabel]
             if iSpecies > jSp:
                 matrixlist[jSp][iGene, jGene] = 1
+#    matrices.DumpMatrixArray("ortholog", matrixlist, fileInfo, iSpecies)
     for j, m in enumerate(matrixlist):    
-        with open(outputDir + 'ortholog_%d_%d_matrix.pic' % (iSpecies, j), 'wb') as file:
+        with open(pickleDir + 'ortholog_%d_%d_matrix.pic' % (iSpecies, j), 'wb') as file:
             pic.dump(m, file)
     return matrixlist   
     
-def multiply(specmin, specmax, matrixDir):
-    with open(matrixDir + 'ortholog_%d_%d_matrix.pic' % (specmax, specmin), 'rb') as F:
+def multiply(specmin, specmax, pickleDir):
+#    M = matrices.LoadMatrix("ortholog", fileInfo, specmax, specmin)
+    with open(pickleDir + 'ortholog_%d_%d_matrix.pic' % (specmax, specmin), 'rb') as F:
         M = pic.load(F)    
     M = M.tocsr()
     product = M.dot(M.transpose())
@@ -144,7 +142,7 @@ def find_all(matrix, orig_matrix):
         orthologues.append((orthologuesSp1, orthologuesSp2))
     return orthologues
         
-def species_write_all(ogSet, matrixDir, resultsDir):
+def species_write_all(ogSet, pickleDir, resultsDir):
     speciesDict = ogSet.SpeciesDict()
     # Calls multiply and find_all on each species pair, and appends the numbers from find_all's output to the relevant csv lists.
     speciesIDs = ogSet.speciesToUse
@@ -154,21 +152,25 @@ def species_write_all(ogSet, matrixDir, resultsDir):
         if not os.path.exists(d): os.mkdir(d)
     for index1, index2 in itertools.product(xrange(nspecies), xrange(nspecies)):      
         if index1 >= index2: continue
-        product, M = multiply(index1, index2, matrixDir)
+        product, M = multiply(index1, index2, pickleDir)
         orthologues = find_all(product, M)
         WriteOrthologues(resultsDir, speciesIDs[index2], speciesIDs[index1], orthologues, ogSet)    
     
-def create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir):
+def create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir):
     # -> Matrices
-    matrixDir = workingDir + "matrices_orthologues/"
-    orthodict, orthodictFN = make_dicts(dlcparResultsDir, matrixDir)
+#    matrixDir = workingDir + "matrices_orthologues/" 
+    orthodict = make_dicts(dlcparResultsDir)
     
     # -> dictionary
     speciesLabels, genenumbers = GetSpeciesGenesInfo(ogSet)
     for iSpecies in xrange(len(speciesLabels)):
-        one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, matrixDir)
+        one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, pickleDir)
         
     # -> csv files
-    species_write_all(ogSet, matrixDir, resultsDir)
+    species_write_all(ogSet, pickleDir, resultsDir)
+    for fn in glob.glob(pickleDir + "ortholog_*.pic"):
+        if os.path.exists(fn): os.remove(fn)
+    
+    
     
         

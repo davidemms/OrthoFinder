@@ -32,7 +32,6 @@ import time
 import shutil
 import numpy as np
 from collections import Counter, defaultdict
-import cPickle as pic
 import itertools
 import multiprocessing as mp
 import Queue
@@ -94,7 +93,7 @@ class Seq(object):
 # ==============================================================================================================================
         
 class OrthoGroupsSet(object):
-    def __init__(self, orthofinderWorkingDir, speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor):
+    def __init__(self, orthofinderWorkingDir, speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor, pickleDir=None):
         self.workingDirOF = orthofinderWorkingDir
         self.seqIDsFN = orthofinderWorkingDir + "SequenceIDs.txt"
         self.speciesIDsFN = orthofinderWorkingDir + "SpeciesIDs.txt"
@@ -107,7 +106,7 @@ class OrthoGroupsSet(object):
         self.iOgs4 = 0
         self.speciesToUse = speciesToUse
         self.seqsInfo = util.GetSeqsInfo(orthofinderWorkingDir, self.speciesToUse, nSpAll)
-        self.fileInfo = util.FileInfo(workingDir = orthofinderWorkingDir, graphFilename="")
+        self.fileInfo = util.FileInfo(workingDir = orthofinderWorkingDir, graphFilename="", separatePickleDir=pickleDir)
         self.id_to_og = None
 
     def SequenceDict(self):
@@ -189,8 +188,7 @@ def Worker_BlastScores(cmd_queue, seqsInfo, fileInfo, nProcesses, nToDo):
             if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
                 util.PrintTime("Done %d of %d" % (nDone, nToDo))
             B = BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, *args, qExcludeSelfHits = False)
-            with open(fileInfo.workingDir + "Bit%d_%d.pic" % args, 'wb') as outfile:
-                pic.dump(B, outfile, protocol = util.picProtocol)
+            matrices.DumpMatrix("Bit", B, fileInfo, args[0], args[1])
         except Queue.Empty:
             return 
                 
@@ -259,8 +257,7 @@ class DendroBLASTTrees(object):
             return ogs, ogMatrices
     
     def DeleteBlastMatrices(self):
-        for f in glob.glob(self.ogSet.fileInfo.workingDir + "Bit*_*.pic"):
-            if os.path.exists(f): os.remove(f)
+        matrices.DeleteMatrices("Bit", self.ogSet.fileInfo)
         
     def CompleteOGMatrices(self, ogs, ogMatrices):
         newMatrices = []
@@ -623,7 +620,7 @@ def GetResultsFilesString(rootedSpeciesTreeFN, seqs_alignments_dirs=None, qHaveO
     return st
             
 def CleanWorkingDir(workingDir):
-    dirs = ['Distances/', "matrices_orthologues/"]
+    dirs = ['Distances/']
     for d in dirs:
         dFull = workingDir + d
         if os.path.exists(dFull): 
@@ -633,7 +630,7 @@ def CleanWorkingDir(workingDir):
                 time.sleep(1)
                 shutil.rmtree(dFull, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
 
-def ReconciliationAndOrthologues(treesIDsPatFn, ogSet, speciesTree_fn, workingDir, resultsDir, reconTreesRenamedDir, nParallel, iSpeciesTree=None):
+def ReconciliationAndOrthologues(treesIDsPatFn, ogSet, speciesTree_fn, workingDir, resultsDir, reconTreesRenamedDir, nParallel, iSpeciesTree=None, pickleDir = None):
     """
     treesPatFn - function returning name of filename
     ogSet - info about the orthogroups, species etc
@@ -650,9 +647,21 @@ def ReconciliationAndOrthologues(treesIDsPatFn, ogSet, speciesTree_fn, workingDi
 
     # Orthologue lists
     util.PrintUnderline("Inferring orthologues from gene trees" + (" (root %d)"%iSpeciesTree if iSpeciesTree != None else ""))
-    rt.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, workingDir)    
+    qDelDir = False
+    if pickleDir == None: 
+        pickleDir = workingDir + "matrices_orthologues/"
+        if not os.path.exists(pickleDir): os.mkdir(pickleDir)
+        qDelDir = True    
+    rt.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir)  
+    # If a temporary matrices directory was created, delete it now
+    if qDelDir:
+        if os.path.exists(pickleDir): 
+            try:
+                os.rmdir(pickleDir)
+            except OSError:
+                pass
                 
-def OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, speciesTree_fn = None):
+def OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, speciesTree_fn = None, pickleDir=None):
     """
     groupsDir - directory with orthogroups file in
     userSpeciesTree_fn - None if not supplied otherwise rooted tree using user species names (not orthofinder IDs)
@@ -701,7 +710,7 @@ def OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, speciesTree_fn = 
         speciesTree_fn = ConvertUserSpeciesTree(workingDir + "Trees_ids/", speciesTree_fn, ogSet.SpeciesDict())
     util.PrintUnderline("Running Orthologue Prediction", True)
     util.PrintUnderline("Reconciling gene and species trees") 
-    ReconciliationAndOrthologues(TreePatIDs, ogSet, speciesTree_fn, workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel)
+    ReconciliationAndOrthologues(TreePatIDs, ogSet, speciesTree_fn, workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, pickleDir=pickleDir)
     util.PrintUnderline("Writing results files")
     CleanWorkingDir(workingDir)
     return "Species-by-species orthologues directory:\n   %s\n" % resultsDir_new
@@ -719,7 +728,8 @@ def OrthologuesWorkflow(workingDir_ogs,
                        qStopAfterSeqs = False,
                        qStopAfterTrees = False, 
                        qMSA = False,
-                       qPhyldog = False):
+                       qPhyldog = False,
+                       pickleDir=None):
     """
     1. Setup:
         - ogSet, directories
@@ -734,7 +744,7 @@ def OrthologuesWorkflow(workingDir_ogs,
     Variables:
     - ogSet - all the relevant information about the orthogroups, species etc.
     """
-    ogSet = OrthoGroupsSet(workingDir_ogs, speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor)
+    ogSet = OrthoGroupsSet(workingDir_ogs, speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor, pickleDir=pickleDir)
     
     # Class that is going to run the analysis needs to check the dependencies
 #    if not CanRunOrthologueDependencies(workingDir_ogs, qMSA, qStopAfterTrees, userSpeciesTree == None): 
@@ -846,7 +856,7 @@ def OrthologuesWorkflow(workingDir_ogs,
             print("Outgroup: " + (", ".join([spDict[s] for s in r])))
         os.mkdir(resultsDir_new)
         util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True)
-        ReconciliationAndOrthologues(db.TreeFilename_IDs, db.ogSet, speciesTree_fn, db.workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, i if qMultiple else None) 
+        ReconciliationAndOrthologues(db.TreeFilename_IDs, db.ogSet, speciesTree_fn, db.workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, i if qMultiple else None, pickleDir=pickleDir) 
     
     db.DeleteBlastMatrices()
     CleanWorkingDir(db.workingDir)

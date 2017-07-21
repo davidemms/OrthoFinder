@@ -378,12 +378,6 @@ def GetOrderedSearchCommands(seqsInfo, dirs, search_program, program_caller):
 Matrices
 -------------------------------------------------------------------------------
 """ 
-
-def DeleteMatrices(fileInfo):
-    for f in glob.glob(fileInfo.workingDir + "B*_*.pic"):
-        if os.path.exists(f): os.remove(f)
-    for f in glob.glob(fileInfo.workingDir + "connect*_*.pic"):
-        if os.path.exists(f): os.remove(f)
             
 def GetBH_s(pairwiseScoresMatrices, seqsInfo, iSpecies, tol=1e-3):
     nSeqs_i = seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpecies]]
@@ -524,8 +518,9 @@ class WaterfallMethod:
             # Cleanup
             os.remove(fileInfo.graphFilename + "_header")
             for iSp in xrange(seqsInfo.nSpecies): os.remove(fileInfo.graphFilename + "_%d" % iSp)
-            DeleteMatrices(fileInfo) 
-                
+            matrices.DeleteMatrices("B", fileInfo) 
+            matrices.DeleteMatrices("connect", fileInfo) 
+            
     @staticmethod
     def GetMostDistant_s(RBH, B, seqsInfo, iSpec):
         mostDistant = numeric.transpose(np.ones(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]])*1e9)
@@ -848,6 +843,9 @@ to redo the BLAST searches from a previous analysis.\n""")
     print("""-x speciesInfoFilename, --orthoxml speciesInfoFilename
     Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.\n""")
     
+    print("""--pickledir directory
+    Write the temporary pickle files to the specified directory.\n""")
+    
     print("""-s rootedSpeciesTree, --speciestree rootedSpeciesTree
     Use rootedSpeciesTree for gene-tree/species-tree reconciliation (i.e. orthologue inference).\n""")
         
@@ -907,6 +905,7 @@ class Options(object):#
         self.speciesXMLInfoFN = None
         self.speciesTreeFN = None
         self.mclInflation = g_mclInflation
+        self.separatePickleDir = None
     
     def what(self):
         for k, v in self.__dict__.items():
@@ -917,6 +916,7 @@ class Directories(object):
     def __init__(self):
         self.resultsDir = None           # directory for orthogroup results files
         self.workingDir = None           # Orthogroup inference workingDir
+        self.separatePickleDir = None
                                          # Will need to store 3 bits of information in total    
         self.speciesToUse = []           #       seqsInfo.iSpeciesToUse   - which to include for this analysis 
         self.nSpAll = None               #       seqsInfo.nSpAll => 0, 1, ..., nSpAll - 1 are valid species indices
@@ -1087,6 +1087,8 @@ def ProcessArgs(program_caller):
                 print("Invalid argument for option %s: %s" % (switch_used, arg))
                 print("Valid options are: {%s}\n" % (", ".join(choices)))
                 util.Fail()
+        elif arg == "--pickledir":
+            options.separatePickleDir = GetDirectoryArgument(arg, args)
         elif arg == "-op" or arg == "--only-prepare":
             options.qStopAfterPrepare = True
         elif arg == "-og" or arg == "--only-groups":
@@ -1127,7 +1129,7 @@ def ProcessArgs(program_caller):
         
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
     print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
-    return options, fastaDir, workingDir, orthologuesDir              
+    return options, fastaDir, workingDir, orthologuesDir            
 
 def GetXMLSpeciesInfo(dirs, options):
     # speciesInfo:  name, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile
@@ -1194,7 +1196,7 @@ def CheckDependencies(options, program_caller, dirForTempFiles):
             print("Either install the required dependencies or use the option '-og' to stop the analysis after the inference of orthogroups.\n")
             util.Fail()
 
-def DoOrthogroups(options, dirs, seqsInfo):
+def DoOrthogroups(options, dirs, seqsInfo, separatePickleDir=None):
     # Run Algorithm, cluster and output cluster files with original accessions
     util.PrintUnderline("Running OrthoFinder algorithm")
     fileIdentifierString = "OrthoFinder_v%s" % util.version
@@ -1202,8 +1204,8 @@ def DoOrthogroups(options, dirs, seqsInfo):
     # it's important to free up the memory from python used for processing the genomes
     # before launching MCL becuase both use sizeable ammounts of memory. The only
     # way I can find to do this is to launch the memory intensive python code 
-    # as separate process that exitsbefore MCL is launched.
-    fileInfo = util.FileInfo(workingDir = dirs.workingDir, graphFilename=graphFilename) 
+    # as separate process that exits before MCL is launched.
+    fileInfo = util.FileInfo(workingDir = dirs.workingDir, graphFilename=graphFilename, separatePickleDir=separatePickleDir) 
     Lengths = GetSequenceLengths(seqsInfo, fileInfo)
     
     # Process BLAST hits
@@ -1365,14 +1367,15 @@ def GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthog
                                                                         options.qStopAfterSeqs,
                                                                         options.qStopAfterTrees,
                                                                         options.qMSATrees,
-                                                                        options.qPhyldog)
+                                                                        options.qPhyldog,
+                                                                        options.separatePickleDir)
     if None != orthogroupsResultsFilesString: print(orthogroupsResultsFilesString)
     print(orthologuesResultsFilesString.rstrip())    
 
-def GetOrthologues_FromTrees(orthologuesDir, nHighParallel, userSpeciesTreeFN = None):
+def GetOrthologues_FromTrees(orthologuesDir, nHighParallel, userSpeciesTreeFN = None, pickleDir=None):
     groupsDir = orthologuesDir + "../"
     workingDir = orthologuesDir + "WorkingDirectory/"
-    return get_orthologues.OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, userSpeciesTreeFN)
+    return get_orthologues.OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, userSpeciesTreeFN, pickleDir=pickleDir)
  
 def ProcessesNewFasta(fastaDir, existingDirs=None):
     """
@@ -1490,7 +1493,7 @@ if __name__ == "__main__":
         # 7.  
         RunSearch(options, dirs, seqsInfo, program_caller)
         # 8.
-        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo)
+        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.separatePickleDir)
         # 9.
         if not options.qStopAfterGroups:
             GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
@@ -1513,7 +1516,7 @@ if __name__ == "__main__":
         # 7. 
         RunSearch(options, dirs, seqsInfo, program_caller)
         # 8.  
-        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo)    
+        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.separatePickleDir)    
         # 9. 
         if not options.qStopAfterGroups:
             GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
@@ -1532,7 +1535,7 @@ if __name__ == "__main__":
         if options.speciesXMLInfoFN:   
             speciesInfo = GetXMLSpeciesInfo(dirs, options)
         # 8        
-        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo)    
+        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.separatePickleDir)    
         # 9
         if not options.qStopAfterGroups:
             GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
@@ -1551,7 +1554,7 @@ if __name__ == "__main__":
     elif options.qStartFromTrees:
         dirs = ProcessPreviousFiles(workingDir)
         options = CheckOptions(options, dirs)
-        summaryText = GetOrthologues_FromTrees(orthologuesDir, options.nBlast, options.speciesTreeFN)
+        summaryText = GetOrthologues_FromTrees(orthologuesDir, options.nBlast, options.speciesTreeFN, options.separatePickleDir)
         print(summaryText) 
         util.PrintCitation() 
     else:

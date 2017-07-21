@@ -35,7 +35,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.1.9"
+version = "1.1.10"
 requiredBlastVersion = "2.2.28+"
 
 citation = """When publishing work that uses OrthoFinder please cite:
@@ -120,6 +120,9 @@ expectedHelp2="""-I inflation_parameter, --inflation inflation_parameter
 
 -x speciesInfoFilename, --orthoxml speciesInfoFilename
     Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.
+
+--pickledir directory
+    Write the temporary pickle files to the specified directory.
 
 -s rootedSpeciesTree, --speciestree rootedSpeciesTree
     Use rootedSpeciesTree for gene-tree/species-tree reconciliation (i.e. orthologue inference).
