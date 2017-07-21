@@ -18,8 +18,7 @@ https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2
 * [Installing OrthoFinder](#setting-up-orthofinder)
 * [Running OrthoFinder](#running-orthofinder)
 * [OrthoFinder results files and statistics](#results-files)
-* [Adding extra species to a completed OrthoFinder run](#advanced-usage)
-* [Removing species from a completed OrthoFinder run](#advanced-usage)
+* [Adding and removing species from a completed OrthoFinder run](#advanced-usage)
 * [Preparing and using seperately run BLAST files](#running-blast-searches-separately--p-option)
 
 ### Orthogroups, Orthologues & Paralogues
