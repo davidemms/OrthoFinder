@@ -1106,7 +1106,11 @@ def ProcessArgs(program_caller):
             print("Unrecognised argument: %s\n" % arg)
             util.Fail()    
     
-    # check argument combinations           
+    # check argument combinations       
+    if not (options.qStartFromFasta or options.qStartFromBlast or options.qStartFromGroups or options.qStartFromTrees):
+        print("ERROR: Please specify the input directory for OrthoFinder using one of the options: '-f', '-b', '-fg' or '-ft'.")
+        util.Fail()
+    
     if options.qStartFromFasta and (options.qStartFromTrees or options.qStartFromGroups):
         print("ERROR: Incompatible arguments, -f (start from fasta files) and" + (" -fg (start from orthogroups)" if options.qStartFromGroups else " -ft (start from trees)"))
         util.Fail()
