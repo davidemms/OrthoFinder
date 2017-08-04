@@ -174,7 +174,10 @@ class TreesForOrthogroups(object):
         if qStopAfterSeqs: return resultsDirsFullPath
         
         # 2
-        util.PrintUnderline("Inferring multiple sequence alignments and gene trees") 
+        if qStopAfterAlignments:
+            util.PrintUnderline("Inferring multiple sequence alignments") 
+        else:
+            util.PrintUnderline("Inferring multiple sequence alignments and gene trees") 
         
         # 3
         alignCommands = self.GetAlignmentCommands(ogs, nSwitchToMafft)

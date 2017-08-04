@@ -726,6 +726,7 @@ def OrthologuesWorkflow(workingDir_ogs,
                        nLowParrallel,
                        userSpeciesTree = None, 
                        qStopAfterSeqs = False,
+                       qStopAfterAlign = False,
                        qStopAfterTrees = False, 
                        qMSA = False,
                        qPhyldog = False,
@@ -763,10 +764,16 @@ def OrthologuesWorkflow(workingDir_ogs,
      """
     if qMSA or qPhyldog:
         treeGen = msa.TreesForOrthogroups(tree_options, msa_method, tree_method, resultsDir, workingDir_ogs)
-        qStopAfterAlignments = qPhyldog
-        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.Spec_SeqDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlignments, nSwitchToMafft=500) 
+        qStopAfterAlign = qStopAfterAlign or qPhyldog
+        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.Spec_SeqDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlign, nSwitchToMafft=500) 
         if qStopAfterSeqs:
+            print("")
             return ("\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0])
+        elif qStopAfterAlign:
+            print("")
+            st = "\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0]
+            st += "\nMultiple sequence alignments:\n   %s\n" % seqs_alignments_dirs[1]
+            return st
         db = DendroBLASTTrees(ogSet, resultsDir, nLowParrallel)
         if not userSpeciesTree:
             util.PrintUnderline("Inferring species tree (calculating gene distances)")

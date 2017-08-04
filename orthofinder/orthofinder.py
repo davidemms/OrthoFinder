@@ -1191,7 +1191,15 @@ def CheckDependencies(options, program_caller, dirForTempFiles):
     if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunMCL():
         util.Fail()
     if not (options.qStopAfterPrepare or options.qStopAfterSeqs or options.qStopAfterGroups):
-        if not get_orthologues.CanRunOrthologueDependencies(dirForTempFiles, options.qMSATrees, options.qPhyldog, options.qStopAfterTrees, options.msa_program, options.tree_program, program_caller, options.speciesTreeFN == None, options.qStopAfterAlignments):
+        if not get_orthologues.CanRunOrthologueDependencies(dirForTempFiles, 
+                                                            options.qMSATrees, 
+                                                            options.qPhyldog, 
+                                                            options.qStopAfterTrees, 
+                                                            options.msa_program, 
+                                                            options.tree_program, 
+                                                            program_caller, 
+                                                            options.speciesTreeFN == None, 
+                                                            options.qStopAfterAlignments):
             print("Dependencies have been met for inference of orthogroups but not for the subsequent orthologue inference.")
             print("Either install the required dependencies or use the option '-og' to stop the analysis after the inference of orthogroups.\n")
             util.Fail()
@@ -1351,7 +1359,7 @@ def RunSearch(options, dirs, seqsInfo, program_caller):
 
 # 9
 def GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString=None):
-    util.PrintUnderline("Running Orthologue Prediction", True)
+    util.PrintUnderline("Analysing Orthogroups", True)
 
     orthologuesResultsFilesString = get_orthologues.OrthologuesWorkflow(dirs.workingDir, 
                                                                         dirs.resultsDir, 
@@ -1365,6 +1373,7 @@ def GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthog
                                                                         options.nProcessAlg,
                                                                         options.speciesTreeFN, 
                                                                         options.qStopAfterSeqs,
+                                                                        options.qStopAfterAlignments,
                                                                         options.qStopAfterTrees,
                                                                         options.qMSATrees,
                                                                         options.qPhyldog,
