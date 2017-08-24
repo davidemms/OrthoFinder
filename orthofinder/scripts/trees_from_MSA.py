@@ -130,7 +130,8 @@ class TreesForOrthogroups(object):
             infn_list = [self.GetFastaFilename(i) for i, og in enumerate(ogs) if len(og) >= 2]
             outfn_list = [self.GetAlignmentFilename(i) for i, og in enumerate(ogs) if len(og) >= 2]
             id_list = ["OG%07d" % i for i, og in enumerate(ogs) if len(og) >= 2]
-            return self.program_caller.GetMSACommands(self, self.msa_program, infn_list, outfn_list, id_list) 
+            print "GetMSACommmand params:", self, "\n", self.msa_program, "\n", infn_list[:5], "\n", outfn_list[:5], "\n", id_list[:5]
+            return self.program_caller.GetMSACommands(self.msa_program, infn_list, outfn_list, id_list) 
         else:
             commands = []
             for i, og in enumerate(ogs):
