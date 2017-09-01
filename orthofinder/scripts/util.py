@@ -79,12 +79,13 @@ def RunCommand(command, shell=False, qHideOutput = False):
         subprocess.call(command, env=my_env, shell=shell)
             
 def RunOrderedCommandList(commandList, qHideStdout):
+    FNULL = open(os.devnull, 'w')
     if qHideStdout:
         for cmd in commandList:
-            subprocess.call(cmd, shell=True, stdout=subprocess.PIPE, env=my_env)
+            subprocess.call(cmd, shell=True, stdout=subprocess.PIPE, stderr=FNULL, close_fds=True, env=my_env)
     else:
         for cmd in commandList:
-            subprocess.call(cmd, shell=True, env=my_env)
+            subprocess.call(cmd, shell=True, stderr=FNULL, close_fds=True, env=my_env)
     
 def CanRunCommand(command, qAllowStderr = False, qPrint = True):
     if qPrint: PrintNoNewLine("Test can run \"%s\"" % command)       # print without newline
@@ -110,6 +111,40 @@ def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qShell=False):
             subprocess.call(command, env=my_env, shell=qShell)
         except Queue.Empty:
             return   
+            
+def Worker_RunCommands_And_Move(cmd_and_filename_queue, nProcesses, nToDo, qListOfLists):
+    """
+    Continuously takes commands that need to be run from the cmd_and_filename_queue until the queue is empty. If required, moves 
+    the output filename produced by the cmd to a specified filename. The elements of the queue can be single cmd_filename tuples
+    or an ordered list of tuples that must be run in the provided order.
+  
+    Args:
+        cmd_and_filename_queue - queue containing (cmd, actual_target_fn) tuples (if qListOfLists is False) of a list of such 
+            tuples (if qListOfLists is True).
+        nProcesses - the number of processes that are working on the queue.
+        nToDo - The total number of elements in the original queue
+        qListOfLists - Boolean, whether each element of the queue corresponds to a single command or a list of ordered commands
+        qShell - Boolean, should a shell be used to run the command.
+        
+    Implementation:
+        nProcesses and nToDo are used to print out the progress.
+    """
+    while True:
+        try:
+            i, command_fns_list = cmd_and_filename_queue.get(True, 1)
+            nDone = i - nProcesses + 1
+            if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
+                PrintTime("Done %d of %d" % (nDone, nToDo))
+            if not qListOfLists:
+                command_fns_list = [command_fns_list]
+            for command, fns in command_fns_list:
+                subprocess.call(command, env=my_env, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if fns != None:
+                    actual, target = fns
+                    if os.path.exists(actual):
+                        os.rename(actual, target)
+        except Queue.Empty:
+            return               
                             
 def Worker_RunOrderedCommandList(cmd_queue, nProcesses, nToDo, qHideStdout):
     """ repeatedly takes items to process from the queue until it is empty at which point it returns. Does not take a new task

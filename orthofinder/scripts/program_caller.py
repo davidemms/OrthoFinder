@@ -27,8 +27,10 @@
 
 import os
 import json
+import time
 import shutil
-
+import subprocess
+import multiprocessing as mp
 
 import util
 
@@ -47,6 +49,13 @@ class Method(object):
             self.non_default_outfn = config_dict['ouput_filename'] 
         else:
             self.non_default_outfn = None
+        # Non-advertised methods, switch to a faster method if number of sequences is greater than X
+        if "cmd_line_fast" in config_dict and "n_seqs_use_fast" in config_dict:
+            self.cmd_fast = config_dict['cmd_line_fast']
+            self.n_seqs_use_fast = int(config_dict['n_seqs_use_fast'])
+        else:
+            self.cmd_fast = None
+            self.n_seqs_use_fast = None
 
 class ProgramCaller(object):
     def __init__(self, configure_file):
@@ -54,6 +63,9 @@ class ProgramCaller(object):
         self.tree = dict()
         self.search_db = dict()
         self.search_search = dict()
+        # Add default methods
+        self.msa['mafft'] = Method('mafft', {"cmd_line": "mafft --localpair --maxiterate 1000 --anysymbol INPUT > OUTPUT 2> /dev/null", "cmd_line_fast": "mafft --anysymbol INPUT > OUTPUT 2> /dev/null", "n_seqs_use_fast" : "500"})
+        self.tree['fasttree'] = Method('fasttree', {"cmd_line": "FastTree INPUT > OUTPUT 2> /dev/null"})
         if configure_file == None:
             return
         if not os.path.exists(configure_file):
@@ -78,19 +90,28 @@ class ProgramCaller(object):
                     print("'program_type' entry is missing")
                 try:
                     if v['program_type'] == 'msa':
-                        self.msa[name] = Method(name, v)
+                        if name in self.msa:
+                            print("Multiple sequence alignment method '%s' has already been defined, skipping config file entry." % name)
+                        else:
+                            self.msa[name] = Method(name, v)
                     elif v['program_type'] == 'tree':
-                        self.tree[name] = Method(name, v)
+                        if name in self.tree:
+                            print("Tree inference method '%s' has already been defined, skipping config file entry." % name)
+                        else:
+                            self.tree[name] = Method(name, v)
                     elif v['program_type'] == 'search':
                         if ('db_cmd' not in v) or ('search_cmd' not in v):
                             print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
                             print("'cmd_line' entry is missing")
                             raise InvalidEntryException
-                        self.search_db[name] = Method(name, {'cmd_line':v['db_cmd']})
-                        self.search_search[name] = Method(name, {'cmd_line':v['search_cmd']})
-                        if 'ouput_filename' in v:
-                            print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
-                            print("'ouput_filename' option is not supported for 'program_type' 'search'")
+                        if name in self.search_db:
+                            print("Sequence search method '%s' has already been defined, skipping config file entry." % name)
+                        else:
+                            self.search_db[name] = Method(name, {'cmd_line':v['db_cmd']})
+                            self.search_search[name] = Method(name, {'cmd_line':v['search_cmd']})
+                            if 'ouput_filename' in v:
+                                print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
+                                print("'ouput_filename' option is not supported for 'program_type' 'search'")
                     else:
                         print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
                         print("'program_type' should be 'msa' or 'tree', got '%s'" % v['program_type'])
@@ -110,21 +131,27 @@ class ProgramCaller(object):
     def ListSearchMethods(self):
         return [key for key in self.search_db]
 
-    def GetMSAMethodCommand(self, method_name, infilename, outfilename_proposed, identifier):
-        return self._GetCommand('msa', method_name, infilename, outfilename_proposed, identifier)
-    def GetTreeMethodCommand(self, method_name, infilename, outfilename_proposed, identifier):
-        return self._GetCommand('tree', method_name, infilename, outfilename_proposed, identifier)
+    def GetMSAMethodCommand(self, method_name, infilename, outfilename_proposed, identifier, nSeqs=None):
+        return self._GetCommand('msa', method_name, infilename, outfilename_proposed, identifier, nSeqs=nSeqs)
+    def GetTreeMethodCommand(self, method_name, infilename, outfilename_proposed, identifier, nSeqs=None):
+        return self._GetCommand('tree', method_name, infilename, outfilename_proposed, identifier, nSeqs=nSeqs)
     def GetSearchMethodCommand_DB(self, method_name, infilename, outfilename):
         return self._GetCommand('search_db', method_name, infilename, outfilename)[0]  # output filename isn't returned
     def GetSearchMethodCommand_Search(self, method_name, queryfilename, dbfilename, outfilename):
         return self._GetCommand('search_search', method_name, queryfilename, outfilename, None, dbfilename)[0]  # output filename isn't returned
     
     
-    def GetMSACommands(self, method_name, infn_list, outfn_list, id_list):        
-        return [self.GetMSAMethodCommand(method_name, infn, outfn, ident) for infn, outfn, ident in zip(infn_list, outfn_list, id_list)]
+    def GetMSACommands(self, method_name, infn_list, outfn_list, id_list, nSeqs=None):
+        if nSeqs == None:        
+            return [self.GetMSAMethodCommand(method_name, infn, outfn, ident) for infn, outfn, ident in zip(infn_list, outfn_list, id_list)]
+        else:        
+            return [self.GetMSAMethodCommand(method_name, infn, outfn, ident, n) for infn, outfn, ident, n in zip(infn_list, outfn_list, id_list, nSeqs)]
         
-    def GetTreeCommands(self, method_name, infn_list, outfn_list, id_list):        
-        return [self.GetTreeMethodCommand(method_name, infn, outfn, ident) for infn, outfn, ident in zip(infn_list, outfn_list, id_list)]
+    def GetTreeCommands(self, method_name, infn_list, outfn_list, id_list, nSeqs=None):        
+        if nSeqs == None:        
+            return [self.GetTreeMethodCommand(method_name, infn, outfn, ident) for infn, outfn, ident in zip(infn_list, outfn_list, id_list)]
+        else:
+            return [self.GetTreeMethodCommand(method_name, infn, outfn, ident, n) for infn, outfn, ident, n in zip(infn_list, outfn_list, id_list, nSeqs)]
         
     def GetSearchCommands_DB(self, method_name,  infn_list, outfn_list):        
         return [self.GetSearchMethodCommand_DB(method_name, infn, outfn) for infn, outfn in zip(infn_list, outfn_list)]
@@ -133,17 +160,17 @@ class ProgramCaller(object):
         return [self.GetSearchMethodCommand_Search(method_name, querryfn, dbname, outfn) for querryfn, dbname, outfn in zip(querryfn_list, dblist, outfn_list)]
     
     
-    def CallMSAMethod(self, method_name, infilename, outfilename, identifier):
-        return self._CallMethod('msa', method_name, infilename, outfilename, identifier)
+    def CallMSAMethod(self, method_name, infilename, outfilename, identifier, nSeqs=None):
+        self._CallMethod('msa', method_name, infilename, outfilename, identifier, nSeqs=nSeqs)
         
-    def CallTreeMethod(self, method_name, infilename, outfilename, identifier):
-        return self._CallMethod('tree', method_name, infilename, outfilename, identifier)   
+    def CallTreeMethod(self, method_name, infilename, outfilename, identifier, nSeqs=None):
+        self._CallMethod('tree', method_name, infilename, outfilename, identifier, nSeqs=nSeqs)   
         
     def CallSearchMethod_DB(self, method_name, infilename, outfilename):
-        return self._CallMethod('search_db', method_name, infilename, outfilename)     
+        self._CallMethod('search_db', method_name, infilename, outfilename)     
         
     def CallSearchMethod_Search(self, method_name, queryfilename, dbfilename, outfilename):
-        return self._CallMethod('search_search', method_name, queryfilename, outfilename, dbname=dbfilename)  
+        self._CallMethod('search_search', method_name, queryfilename, outfilename, dbname=dbfilename)  
         
         
     def TestMSAMethod(self, working_dir, method_name):
@@ -171,24 +198,36 @@ class ProgramCaller(object):
         shutil.rmtree(d)
         return success
     
-    def _CallMethod(self, method_type, method_name, infilename, outfilename, identifier=None, dbname=None):
-        cmd, outfilename = self._GetCommand(method_type, method_name, infilename, outfilename, identifier, dbname)
-#        print(cmd)
-        util.RunCommand(cmd, shell=True, qHideOutput=False)
-        return outfilename
+    def _CallMethod(self, method_type, method_name, infilename, outfilename, identifier=None, dbname=None, nSeqs=None):
+        cmd, actual_target_fns = self._GetCommand(method_type, method_name, infilename, outfilename, identifier, dbname, nSeqs)
+        capture = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=util.my_env)
+        stdout = [x for x in capture.stdout]
+        stderr = [x for x in capture.stderr]
+        capture.communicate()
+        if actual_target_fns != None:
+            actual, target = actual_target_fns
+            if os.path.exists(actual): 
+                os.rename(actual, target)
+        return stdout, stderr
     
     def _TestMethod(self, working_dir, method_type, method_name):
+        util.PrintNoNewLine("Test can run \"%s\"" % method_name) 
         d = working_dir + "temp_83583209132/"
         os.mkdir(d)
         try:
             infn = self._WriteTestSequence(d)
             propossed_outfn = infn + "output.txt"
-            outfilename = self._CallMethod(method_type, method_name, infn, propossed_outfn, "test")
-            success = os.path.exists(outfilename)
+            stdout, stderr = self._CallMethod(method_type, method_name, infn, propossed_outfn, "test")
+            success = os.path.exists(propossed_outfn)
         except:
             shutil.rmtree(d)
             raise
         shutil.rmtree(d)
+        if success: print(" - ok")
+        else:
+            print(" - failed")
+            print("".join(stdout))
+            print("".join(stderr))
         return success
 
     def _ReplaceVariables(self, instring, infilename, outfilename, identifier=None, dbname=None):
@@ -210,7 +249,15 @@ class ProgramCaller(object):
         else:
             raise NotImplementedError
         
-    def _GetCommand(self, method_type, method_name, infilename, outfilename_proposed, identifier=None, dbname=None):
+    def _GetCommand(self, method_type, method_name, infilename, outfilename_proposed, identifier=None, dbname=None, nSeqs=None):
+        """
+        Returns:
+            cmd, actual_target_fn
+            Where:
+                cmd - The command line that should be called
+                actual_target_fn - None if the cmd will save the results file to outfilename_proposed 
+                                   otherwise (actual_fn, outfilename_proposed)
+        """
         if method_type == 'msa':
             dictionary = self.msa
         elif method_type == 'tree':
@@ -224,11 +271,16 @@ class ProgramCaller(object):
         if method_name not in dictionary:
             raise Exception("No %s method called '%s'" % (self._GetMethodTypeName(method_type), method_name))
         method_parameters = dictionary[method_name]
-        cmd = self._ReplaceVariables(method_parameters.cmd, infilename, outfilename_proposed, identifier, dbname)
-        outfilename = outfilename_proposed
+        if nSeqs != None and method_parameters.cmd_fast != None and nSeqs >= method_parameters.n_seqs_use_fast:
+            cmd = self._ReplaceVariables(method_parameters.cmd_fast, infilename, outfilename_proposed, identifier, dbname)
+        else:
+            cmd = self._ReplaceVariables(method_parameters.cmd, infilename, outfilename_proposed, identifier, dbname)
+        actual_target_fn = None
         if method_parameters.non_default_outfn:
-            outfilename = self._ReplaceVariables(method_parameters.non_default_outfn, infilename, outfilename_proposed, identifier)
-        return cmd, outfilename
+            actual_fn = self._ReplaceVariables(method_parameters.non_default_outfn, infilename, outfilename_proposed, identifier)
+            target_fn = outfilename_proposed
+            actual_target_fn = (actual_fn, target_fn)
+        return cmd, actual_target_fn
         
     def _WriteTestSequence(self, working_dir):
         fn = working_dir + "Test.fa"
@@ -256,24 +308,31 @@ QKGINVRINQPNKNEIIQIFKQKFKENNLEKYMDDHVIEEISDFDEGDIRKIEGSVSTLVFMNQMYGSTK
 TKDQILKSFIEKVTNRKNLILSKDPKYVFDKIKYHFNVSEDVLKSSKRKKEIVQARHICMYVLKNVYNKN
 LSQIGKLLRKDHTTVRHGIDKVEEELENDPNLKSFLDLFKN""")
         return fn
+   
+def RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, qListOfList):
+    """
+    Calls the commands in paralell and if required moves the results file to the required new filename
+    Args:
+        nProcess - the number of parallel process to use
+        commands_and_filenames : tuple (cmd, actual_target_fn) where actual_target_fn = None if no move is required 
+                                 and actual_target_fn = (actual_fn, target_fn) is actual_fn is produced by cmd and this 
+                                 file should be moved to target_fn
+        actual_target_fn - None if the cmd will save the results file to outfilename_proposed 
+                           otherwise (actual_fn, outfilename_proposed)
+        qListOfList - if False then commands_and_filenames is a list of (cmd, actual_target_fn) tuples
+                      if True then commands_and_filenames is a list of lists of (cmd, actual_target_fn) tuples where the elements 
+                      of the inner list need to be run in the order they appear.
+    """
+    # Setup the workers and run
+    cmd_queue = mp.Queue()
+    for i, cmd in enumerate(commands_and_filenames):
+        cmd_queue.put((i, cmd))
+    runningProcesses = [mp.Process(target=util.Worker_RunCommands_And_Move, args=(cmd_queue, nProcesses, i+1, qListOfList)) for i_ in xrange(nProcesses)]
+    for proc in runningProcesses:
+        proc.start()
     
-#    def TestMSAMethods(self, working_dir):
-#        methods = self.ListMSAMethods()
-#        successes = []
-#        messages = []
-#        for method in methods:
-#            success, message = self.TestMSAMethod(working_dir, method)
-#            successes.append(success)
-#            messages.append(message)
-#        return methods, successes, messages          
-#   
-#    def TestTreeMethods(self, working_dir):
-#        methods = self.ListTreeMethods()
-#        successes = []
-#        messages = []
-#        for method in methods:
-#            success, message = self.TestTreeMethod(working_dir, method)
-#            successes.append(success)
-#            messages.append(message)
-#        return methods, successes, messages
-                   
+    for proc in runningProcesses:
+        while proc.is_alive():
+            proc.join(10.)
+            time.sleep(2)
+                  
