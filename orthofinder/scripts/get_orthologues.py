@@ -27,7 +27,6 @@
 
 import os
 import sys
-import glob
 import time
 import shutil
 import numpy as np
@@ -542,8 +541,8 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
     
     # FastTree & MAFFT
     if qMSAGeneTrees or qPhyldog:
+        testFN, temp_dir = msa.WriteTestFile(workingDir)
         if msa_method == "mafft":
-            testFN, temp_dir = msa.WriteTestFile(workingDir)
             if not util.CanRunCommand("mafft %s" % testFN, qAllowStderr=True):
                 print("ERROR: Cannot run mafft")
                 print("Please check MAFFT is installed and that the executables are in the system path\n")
@@ -555,7 +554,6 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
                 print("Please check program is installed and that it is correctly configured in the ~/.orthofinder.config file\n")
                 return False
         if tree_method == "fasttree":
-            testFN, temp_dir = msa.WriteTestFile(workingDir)
             if qMSAGeneTrees and (not qStopAfterAlignments) and not util.CanRunCommand("FastTree %s" % testFN, qAllowStderr=True):
                 print("ERROR: Cannot run FastTree")
                 print("Please check FastTree is installed and that the executables are in the system path\n")
@@ -762,11 +760,10 @@ def OrthologuesWorkflow(workingDir_ogs,
     MSA (ust):         Sequences    Alignments                        GeneTrees    db
     Phyldog (ust):     Sequences    Alignments                        GeneTrees    db      
     Dendroblast (ust):                            DistanceMatrices    GeneTrees    db        
-     """
+    """
     if qMSA or qPhyldog:
         treeGen = msa.TreesForOrthogroups(tree_options, msa_method, tree_method, resultsDir, workingDir_ogs)
-        qStopAfterAlign = qStopAfterAlign or qPhyldog
-        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.Spec_SeqDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlign, nSwitchToMafft=500) 
+        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.Spec_SeqDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlign or qPhyldog) 
         if qStopAfterSeqs:
             print("")
             return ("\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0])

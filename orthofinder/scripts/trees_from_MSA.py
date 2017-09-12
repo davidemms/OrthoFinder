@@ -33,7 +33,7 @@ Created on Thu Sep 25 13:15:22 2014
 import os
 import glob
 
-import util 
+import util, program_caller as pc
 
 class FastaWriter(object):
     def __init__(self, fastaFileDir):
@@ -95,13 +95,6 @@ class TreesForOrthogroups(object):
         if not os.path.exists(self.workingDir): os.mkdir(self.workingDir)
         self.ogsWorkingDir = ogsWorkingDir
     
-    def Align_linsi(self, fasta, alignedFasta, alignmentReport):
-        return "mafft --localpair --maxiterate 1000 --anysymbol %s > %s 2> %s" % (fasta, alignedFasta, alignmentReport)   
-        
-    def Align_mafft(self, fasta, alignedFasta, alignmentReport):
-        """ For larger numbers of sequences (>500 perhaps)"""
-        return "mafft --anysymbol %s > %s 2> %s" % (fasta, alignedFasta, alignmentReport)   
-    
     def GetFastaFilename(self, iOG, qResults=False):
         if qResults:
             return self.resultsDir + "Sequences/" + (self.baseOgFormat % iOG) + ".fa"
@@ -125,39 +118,21 @@ class TreesForOrthogroups(object):
             fastaWriter.WriteSeqsToFasta_withNewAccessions(og, self.GetFastaFilename(iOg, True), idDict)
             fastaWriter.WriteSeqsToFasta(og, self.GetFastaFilename(iOg))
               
-    def GetAlignmentCommands(self, ogs, nSwitchToMafft):
-        if self.msa_program != "mafft":
-            infn_list = [self.GetFastaFilename(i) for i, og in enumerate(ogs) if len(og) >= 2]
-            outfn_list = [self.GetAlignmentFilename(i) for i, og in enumerate(ogs) if len(og) >= 2]
-            id_list = ["OG%07d" % i for i, og in enumerate(ogs) if len(og) >= 2]
-            return self.program_caller.GetMSACommands(self.msa_program, infn_list, outfn_list, id_list) 
-        else:
-            commands = []
-            for i, og in enumerate(ogs):
-                if len(og) < 2: break
-                ogFastaFilename = self.GetFastaFilename(i)
-                alignedFilename = self.GetAlignmentFilename(i)
-                reportFilename = "/dev/null"
-                if len(og) < nSwitchToMafft:
-                    commands.append(self.Align_linsi(ogFastaFilename, alignedFilename, reportFilename))
-                else:
-                    commands.append(self.Align_mafft(ogFastaFilename, alignedFilename, reportFilename))
-            return commands
+    def GetAlignmentCommandsAndNewFilenames(self, ogs):
+#        if self.msa_program != "mafft":
+        infn_list = [self.GetFastaFilename(i) for i, og in enumerate(ogs) if len(og) >= 2]
+        outfn_list = [self.GetAlignmentFilename(i) for i, og in enumerate(ogs) if len(og) >= 2]
+        id_list = ["OG%07d" % i for i, og in enumerate(ogs) if len(og) >= 2]
+        nSeqs = [len(og) for og in ogs if len(og) >= 2]
+        return self.program_caller.GetMSACommands(self.msa_program, infn_list, outfn_list, id_list, nSeqs) 
         
     def GetTreeCommands(self, alignmentsForTree, ogs):
-        if self.tree_program != "fasttree":
-            outfn_list = [self.GetTreeFilename(i) for i, og in enumerate(ogs) if len(og) >= 2]
-            id_list = ["OG%07d" % i for i, og in enumerate(ogs) if len(og) >= 2]
-            return self.program_caller.GetTreeCommands(self.tree_program, alignmentsForTree, outfn_list, id_list) 
-        else:
-            commands = []
-            for i, (alignFN, og) in enumerate(zip(alignmentsForTree, ogs)):
-                if len(og) < 4: break
-                treeFilename = self.GetTreeFilename(i)
-                commands.append("FastTree %s > %s 2> /dev/null" % (alignFN, treeFilename))
-            return commands
+        outfn_list = [self.GetTreeFilename(i) for i, og in enumerate(ogs) if len(og) >= 3]
+        id_list = ["OG%07d" % i for i, og in enumerate(ogs) if len(og) >= 3]
+        nSeqs = [len(og) for og in ogs if len(og) >= 3]
+        return self.program_caller.GetTreeCommands(self.tree_program, alignmentsForTree, outfn_list, id_list, nSeqs) 
                
-    def DoTrees(self, ogs, idDict, nProcesses, qStopAfterSeqs, qStopAfterAlignments, nSwitchToMafft=500):
+    def DoTrees(self, ogs, idDict, nProcesses, qStopAfterSeqs, qStopAfterAlignments):
         # 0       
         resultsDirsFullPath = []
         for fn in [self.GetFastaFilename, self.GetAlignmentFilename, self.GetTreeFilename]:
@@ -180,18 +155,20 @@ class TreesForOrthogroups(object):
             util.PrintUnderline("Inferring multiple sequence alignments and gene trees") 
         
         # 3
-        alignCommands = self.GetAlignmentCommands(ogs, nSwitchToMafft)
+        alignCommands_and_filenames = self.GetAlignmentCommandsAndNewFilenames(ogs)
         if qStopAfterAlignments:
-            util.RunParallelCommands(nProcesses, alignCommands, qShell=True)
+            pc.RunParallelCommandsAndMoveResultsFile(nProcesses, alignCommands_and_filenames, False)
             return resultsDirsFullPath[:2]
-        alignmentFilesToUse = [self.GetAlignmentFilename(i) for i, _ in enumerate(alignCommands)]
-        treeCommands = self.GetTreeCommands(alignmentFilesToUse, ogs)
-        commandsSet = []
-        for i in xrange(len(treeCommands)):
-            commandsSet.append([alignCommands[i], treeCommands[i]])
-        for i in xrange(len(treeCommands), len(alignCommands)):
-            commandsSet.append([alignCommands[i]])
-        util.RunParallelOrderedCommandLists(nProcesses, commandsSet)
+        
+        # Otherwise, alignments and trees
+        alignmentFilesToUse = [self.GetAlignmentFilename(i) for i, _ in enumerate(alignCommands_and_filenames)]
+        treeCommands_and_filenames = self.GetTreeCommands(alignmentFilesToUse, ogs)
+        commands_and_filenames = []
+        for i in xrange(len(treeCommands_and_filenames)):
+            commands_and_filenames.append([alignCommands_and_filenames[i], treeCommands_and_filenames[i]])
+        for i in xrange(len(treeCommands_and_filenames), len(alignCommands_and_filenames)):
+            commands_and_filenames.append([alignCommands_and_filenames[i]])
+        pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
         
         # Convert ids to accessions
         for i, alignFN in enumerate(alignmentFilesToUse):
