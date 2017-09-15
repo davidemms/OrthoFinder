@@ -47,7 +47,7 @@ import warnings                                 # Y
 
 import scripts.mcl as MCLread
 import scripts.blast_file_processor as BlastFileProcessor
-from scripts import util, matrices, get_orthologues
+from scripts import util, matrices, orthologues
 from scripts import program_caller as pcs
 
 # Get directory containing script/bundle
@@ -1195,7 +1195,7 @@ def CheckDependencies(options, program_caller, dirForTempFiles):
     if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunMCL():
         util.Fail()
     if not (options.qStopAfterPrepare or options.qStopAfterSeqs or options.qStopAfterGroups):
-        if not get_orthologues.CanRunOrthologueDependencies(dirForTempFiles, 
+        if not orthologues.CanRunOrthologueDependencies(dirForTempFiles, 
                                                             options.qMSATrees, 
                                                             options.qPhyldog, 
                                                             options.qStopAfterTrees, 
@@ -1365,7 +1365,7 @@ def RunSearch(options, dirs, seqsInfo, program_caller):
 def GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString=None):
     util.PrintUnderline("Analysing Orthogroups", True)
 
-    orthologuesResultsFilesString = get_orthologues.OrthologuesWorkflow(dirs.workingDir, 
+    orthologuesResultsFilesString = orthologues.OrthologuesWorkflow(dirs.workingDir, 
                                                                         dirs.resultsDir, 
                                                                         dirs.speciesToUse, 
                                                                         dirs.nSpAll, 
@@ -1388,7 +1388,7 @@ def GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthog
 def GetOrthologues_FromTrees(orthologuesDir, nHighParallel, userSpeciesTreeFN = None, pickleDir=None):
     groupsDir = orthologuesDir + "../"
     workingDir = orthologuesDir + "WorkingDirectory/"
-    return get_orthologues.OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, userSpeciesTreeFN, pickleDir=pickleDir)
+    return orthologues.OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, userSpeciesTreeFN, pickleDir=pickleDir)
  
 def ProcessesNewFasta(fastaDir, existingDirs=None):
     """
@@ -1463,7 +1463,7 @@ def CheckOptions(options, dirs):
     """
     if options.speciesTreeFN:
         expSpecies = SpeciesNameDict(dirs.SpeciesIdsFilename()).values()
-        get_orthologues.CheckUserSpeciesTree(options.speciesTreeFN, expSpecies)
+        orthologues.CheckUserSpeciesTree(options.speciesTreeFN, expSpecies)
         
     if options.qStopAfterSeqs and (not options.qMSATrees):
         print("ERROR: Must use '-M msa' option to generate sequence files for orthogroups")
@@ -1487,7 +1487,7 @@ if __name__ == "__main__":
         workingDir, orthofinderResultsDir, clustersFilename_pairs = util.GetOGsFile(workingDir)
     CheckDependencies(options, program_caller, next(d for d in [fastaDir, workingDir, orthologuesDir] if  d != None)) 
     
-    # if using previous Trees etc., check these are all present - Job for get_orthologues
+    # if using previous Trees etc., check these are all present - Job for orthologues
     if options.qStartFromBlast and options.qStartFromFasta:
         # 0. Check Files
         dirs = ProcessPreviousFiles(workingDir)

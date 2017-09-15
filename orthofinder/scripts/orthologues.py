@@ -41,10 +41,10 @@ import tree
 import matrices
 import mcl as MCL
 import root_from_duplications as rfd
-import orthologues_from_recon_trees as rt
+import trees2olog_dlcpar
 import blast_file_processor as BlastFileProcessor
-import trees_from_MSA as msa
-import trees_from_phyldog
+import trees_msa
+import wrapper_phyldog
 
 nThreads = util.nThreadsDefault
 
@@ -541,7 +541,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
     
     # FastTree & MAFFT
     if qMSAGeneTrees or qPhyldog:
-        testFN, temp_dir = msa.WriteTestFile(workingDir)
+        testFN, temp_dir = trees_msa.WriteTestFile(workingDir)
         if msa_method == "mafft":
             if not util.CanRunCommand("mafft %s" % testFN, qAllowStderr=True):
                 print("ERROR: Cannot run mafft")
@@ -572,8 +572,8 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
 def PrintHelp():
     print("Usage")    
     print("-----")
-    print("get_orthologues.py orthofinder_results_directory [-t max_number_of_threads]")
-    print("get_orthologues.py -h")
+    print("orthologues.py orthofinder_results_directory [-t max_number_of_threads]")
+    print("orthologues.py -h")
     print("\n")
     
     print("Arguments")
@@ -650,7 +650,7 @@ def ReconciliationAndOrthologues(treesIDsPatFn, ogSet, speciesTree_fn, workingDi
         pickleDir = workingDir + "matrices_orthologues/"
         if not os.path.exists(pickleDir): os.mkdir(pickleDir)
         qDelDir = True    
-    rt.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir)  
+    trees2olog_dlcpar.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir)  
     # If a temporary matrices directory was created, delete it now
     if qDelDir:
         if os.path.exists(pickleDir): 
@@ -761,7 +761,7 @@ def OrthologuesWorkflow(workingDir_ogs,
     Dendroblast (ust):                            DistanceMatrices    GeneTrees    db        
     """
     if qMSA or qPhyldog:
-        treeGen = msa.TreesForOrthogroups(tree_options, msa_method, tree_method, resultsDir, workingDir_ogs)
+        treeGen = trees_msa.TreesForOrthogroups(tree_options, msa_method, tree_method, resultsDir, workingDir_ogs)
         seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.Spec_SeqDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlign or qPhyldog) 
         if qStopAfterSeqs:
             print("")
@@ -778,7 +778,7 @@ def OrthologuesWorkflow(workingDir_ogs,
             db.ReadAndPickle()
             spTreeFN_ids, spTreeUnrootedFN = db.SpeciesTreeOnly()
         if qPhyldog:
-            trees_from_phyldog.RunPhyldogAnalysis(resultsDir + "WorkingDirectory/phyldog/", ogSet.OGs(), speciesToUse)
+            wrapper_phyldog.RunPhyldogAnalysis(resultsDir + "WorkingDirectory/phyldog/", ogSet.OGs(), speciesToUse)
             return "Running Phyldog" + "\n".join(seqs_alignments_dirs)       
     else:
         util.PrintUnderline("Calculating gene distances")
