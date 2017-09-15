@@ -5,7 +5,7 @@ Created on Thu Jul 27 14:15:17 2017
 @author: david
 """  
 import argparse
-import ete2 as ete
+import tree as tree_lib
 
 import trees2ologs_of as om1
     
@@ -161,7 +161,7 @@ def resolve(n, M):
     Cost of Moves+Dupliciations+Losses after is guaranteed to be lower than cost of Dups+Losses before.
     M=1, D=1, L=2
     Args:
-        n - ete node with overlapping species sets on it's children
+        n - tree_lib node with overlapping species sets on it's children
         M - function taking a gene name and returning the species name
         
     Implementation:
@@ -338,11 +338,11 @@ def resolve(n, M):
             raise NotImplemented
 
 def Resolve_Main(trees_fn, species_tree_rooted_fn, GeneToSpecies):
-    species_tree_rooted = ete.Tree(species_tree_rooted_fn)
+    species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
     try:
-        tree = ete.Tree(trees_fn)
+        tree = tree_lib.Tree(trees_fn)
     except:
-        tree = ete.Tree(trees_fn, format=3)
+        tree = tree_lib.Tree(trees_fn, format=3)
     tree.prune(tree.get_leaf_names())
     if len(tree) == 1: return tree
 #        print(tree)

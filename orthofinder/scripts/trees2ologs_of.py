@@ -11,7 +11,7 @@ Perform directed 'reconciliation' first and then apply EggNOG method
 """
 import os
 import glob
-import ete2 as ete
+import tree as tree_lib
 import argparse
 
 import sys
@@ -334,16 +334,16 @@ def Resolve(tree, GeneToSpecies):
         resolve.resolve(n, GeneToSpecies)
 
 def GetOrthologues(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree, qPrune=False):
-    species_tree_rooted = ete.Tree(species_tree_rooted_fn)
+    species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
     for fn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")):
         print("")
         print(fn)
         outfn = output_dir + os.path.split(fn)[1]
         if (not os.path.exists(fn)) or os.stat(fn).st_size == 0: continue
         try:
-            tree = ete.Tree(fn)
+            tree = tree_lib.Tree(fn)
         except:
-            tree = ete.Tree(fn, format=3)
+            tree = tree_lib.Tree(fn, format=3)
         if qPrune: tree.prune(tree.get_leaf_names())
         if len(tree) == 1: continue
         root = GetRoot(tree, species_tree_rooted, GeneToSpecies)
@@ -365,12 +365,12 @@ if __name__ == "__main__":
     output_dir = os.path.split(args.trees_dir)[0]
     qSingleTree = False
     try:
-        ete.Tree(args.trees_dir)
+        tree_lib.Tree(args.trees_dir)
         qSingleTree = True
         print("Analysing single tree")
     except:
         try:
-            tree = ete.Tree(args.trees_dir)
+            tree = tree_lib.Tree(args.trees_dir)
             qSingleTree = True
         except:
             pass
