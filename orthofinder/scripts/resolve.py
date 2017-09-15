@@ -3,12 +3,11 @@
 Created on Thu Jul 27 14:15:17 2017
 
 @author: david
-"""
-import os   
+"""  
 import argparse
 import ete2 as ete
 
-import orthologue_method_1 as om1
+import orthologue_method_1c as om1
     
 def DetachAndCleanup(top, n):
     """
@@ -156,7 +155,7 @@ def ContainsMonophyletic(e, O, i, I):
 
 depth = 2 # check down to A, B, C & D. Can't just change this without checking rest of code
 
-def rearrange(n, M):
+def resolve(n, M):
     """
     Rearrange node in more parsimonious configuration. 
     Cost of Moves+Dupliciations+Losses after is guaranteed to be lower than cost of Dups+Losses before.
@@ -338,7 +337,7 @@ def rearrange(n, M):
         else:
             raise NotImplemented
 
-def Rearrange(trees_fn, species_tree_rooted_fn, GeneToSpecies):
+def Resolve_Main(trees_fn, species_tree_rooted_fn, GeneToSpecies):
     species_tree_rooted = ete.Tree(species_tree_rooted_fn)
     try:
         tree = ete.Tree(trees_fn)
@@ -355,7 +354,7 @@ def Rearrange(trees_fn, species_tree_rooted_fn, GeneToSpecies):
         tree.set_outgroup(root)
     om1.StoreSpeciesSets(tree, GeneToSpecies)
     for n in tree.traverse("postorder"):
-        rearrange(n, GeneToSpecies)
+        resolve(n, GeneToSpecies)
     return tree
            
 if __name__ == "__main__":
@@ -364,7 +363,7 @@ if __name__ == "__main__":
     parser.add_argument("rooted_species_tree")
     parser.add_argument("-s", "--separator", choices=("dot", "dash", "second_dash", "3rd_dash", "hyphen"), help="Separator been species name and gene name in gene tree taxa")
     args = parser.parse_args()
-    tree = Rearrange(args.gene_tree, args.rooted_species_tree, om1.GetGeneToSpeciesMap(args))
+    tree = Resolve_Main(args.gene_tree, args.rooted_species_tree, om1.GetGeneToSpeciesMap(args))
     tree.write(outfile=args.gene_tree + ".rec.tre")
                 
 

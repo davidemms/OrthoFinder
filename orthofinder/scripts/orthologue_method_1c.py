@@ -17,19 +17,12 @@ Version 1c:
 
 import os
 import sys
-import time
 import ete3 as ete
 import glob
 import argparse
-import itertools
 import operator
-#import random
-#import cProfile
 from collections import Counter
-from Bio import Phylo
-
-import orthologue_method_1 as om1
-  
+ 
 def GeneToSpecies_dash(g):
   return g.split("_", 1)[0]
   
@@ -46,35 +39,179 @@ def GeneToSpecies_dot(g):
   
 def GeneToSpecies_hyphen(g):
   return g.split("-", 1)[0]  
+  
+#SpeciesName = OrthoFinderIDs
+#SpeciesName = GeneToSpecies_3rdDash
+#SpeciesName = GeneToSpecies_dash
+  
+class RootMap(object):
+    def __init__(self, setA, setB, GeneToSpecies):
+        self.setA = setA
+        self.setB = setB
+        self.GeneToSpecies = GeneToSpecies
         
-def IsDup(node, node_identities, GeneToSpecies, qPrint = False):
-    """
-    Is node a duplication node
-    Args:
-        node - is this node a duplication node
-        node_identities - dictionary of the identities of nodes already calculated
-        GeneToSpecies - Function taking genes names and returning species names
-    """
-    parent = None if node.is_root() else node.up
-    if node in node_identities:
-        parent_c, type_c = node_identities[node]
-        if parent_c == parent:
-            return type_c
-    descendents = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in node.get_children()]
-    if qPrint: print(descendents)
-    # *** What if non-binary? Should really compare the relevant two branches
-    dup = len(descendents[0].intersection(descendents[1])) != 0
-    node_identities[node] = (parent, dup)
-    return dup
+    def GeneMap(self, gene_name):
+        sp = self.GeneToSpecies(gene_name)
+        if sp in self.setA: return True 
+        elif sp in self.setB: return False
+        else: raise Exception
+        
+def StoreSpeciesSets(t, GeneMap):
+    for node in t.traverse('postorder'):
+        if node.is_leaf():
+            node.add_feature('sp_down', {GeneMap(node.name)})
+        elif node.is_root():
+            continue
+        else:
+            node.add_feature('sp_down', set.union(*[ch.sp_down for ch in node.get_children()]))
+    for node in t.traverse('preorder'):
+        if node.is_root():
+            node.add_feature('sp_up', set())
+        else:
+            parent = node.up
+            if parent.is_root():
+                others = [ch for ch in parent.get_children() if ch != node]
+                node.add_feature('sp_up', set.union(*[other.sp_down for other in others]))
+            else:
+                others = [ch for ch in parent.get_children() if ch != node]
+                sp_downs = set.union(*[other.sp_down for other in others])
+                node.add_feature('sp_up', parent.sp_up.union(sp_downs))
+    t.add_feature('sp_down', set.union(*[ch.sp_down for ch in t.get_children()]))
+
+def GetRoots(tree, species_tree_rooted, GeneToSpecies):
+    species = set([GeneToSpecies(g) for g in tree.get_leaf_names()])
+    if len(species) == 1:
+        return [], 0, None
+    n1, n2 = species_tree_rooted.get_children()
+    t1 = set(n1.get_leaf_names())
+    t2 = set(n2.get_leaf_names())
+    have1 = len(species.intersection(t1)) != 0
+    have2 = len(species.intersection(t2)) != 0
+#    print(tree)
+    while not (have1 and have2):
+        # Doesn't contain outgroup, step down in species tree until it does
+        if have1:
+            n = n1
+#            print(1)
+        else:
+            n = n2
+#            print(2)
+#        print(n1)
+#        print(n2)
+        n1, n2 = n.get_children()
+        t1 = n1.get_leaf_names()
+        t2 = n2.get_leaf_names()
+        have1 = len(species.intersection(t1)) != 0
+        have2 = len(species.intersection(t2)) != 0
+        
+    n1, n2 = species_tree_rooted.get_children()
+    root_mapper = RootMap(t1, t2, GeneToSpecies)    
+    GeneMap = root_mapper.GeneMap
+    StoreSpeciesSets(tree, GeneMap)
+    found = set()
+    TF = set([True, False])
+    TFfr = frozenset([True, False])
+    Tfr = frozenset([True])
+    Ffr = frozenset([False])
+    fail = 0
+    for m in tree:
+        n = m.up
+#        print("")
+#        print(m)
+#        print(n)
+#        print(n.sp_down)
+        while not n.is_root() and n.sp_down != TF:
+            m = n
+            n = m.up
+#            print(n)
+#            print(n.sp_down)
+        if n.sp_down == TF:
+            children = n.get_children()
+            if n.is_root():
+                colour = m.sp_down
+                if any([x.sp_down != colour and len(x.sp_down) == 1 for x in children]):
+                    comb = Counter([frozenset(x.sp_down) for x in children])
+                    # case 0
+                    if comb[TFfr] == 0:
+                        # case 0A - one of the branches is the root
+                        for c in children:
+                            if sum([c.sp_down == x.sp_down for x in children]) == 1:
+                                found.add(c) # only holds for one of them
+                                break
+                    elif comb[TFfr] == 1 and (comb[Tfr] == 2 or comb[Ffr] == 2):
+                        # case 0B - one mixed branch, two identical True/False branches
+                        # we don't know this is the division, stepping down in the mixed branch might still be all same as the single state ones
+                        # we'll find this division while walking up the tree
+                        pass
+                    elif comb[TFfr] == 1 and comb[Tfr] == 1:
+                        # case 0C - one mixed branch, one True & one False
+                        found.add([c for c in children if c.sp_down == TF][0])
+                    else:
+                        # case 0D - two mixed branches
+                        # while find the transition while walking up the tree
+                        pass 
+#                    found.add(n)
+#                    print("*** Root1 ***")
+            elif len(children) == 2:
+#                found.add(n)
+                c1, c2 = children
+                single_state = c1.sp_down if len(c1.sp_down) == 1 else c2.sp_down
+                if len(c1.sp_down) == 1 and len(c2.sp_down) == 1:
+                    # Case 1 - Both single state
+                    if len(n.sp_up) == 1:
+                        # Case 1A - 3rd clade also single state
+                        # Root is the bipartition separating True from False
+                        found.add(c1 if n.sp_up == c2.sp_down else c2)
+                    else:
+                        # Case 1B - 3rd clade is mixed
+                        found.add(n)
+#                    print("*** Root2 ***")
+#                    print(c1.sp_down)
+#                    print(c2.sp_down)
+#                    print(n.sp_up)
+#                    print("------")
+                else:
+                    # Case 2 - only one is single state and it's not the same as the 3rd clade
+                    if single_state != n.sp_up:
+                        # Case 2A - only one is single state and it's not the same as the 3rd clade
+#                        print("*** Root3 ***")
+                        found.add(c1 if len(c1.sp_down) == 1 else c2)
+#                    else:
+#                        # Case 2A - only one is single state and it's the same as the 3rd clade
+#                        # root is in the mixed clade and will be found while walking up that
+#                        pass
+            else:
+                fail += 1
+#    for f in found:
+#        print(f)
+#        print(len(f.get_leaf_names()))
+    return list(found), fail, GeneMap  
+
+def WriteQfO(ortho_pairs, outfilename, qForQFO = True):
+    with open(outfilename, 'ab' if qForQFO else 'wb') as outfile:
+        for p in ortho_pairs:
+            g1, g2 = list(p)
+            if qForQFO:
+                g1 = g1.split("_")[-1]
+                g2 = g2.split("_")[-1]
+            outfile.write("%s\t%s\n" % (g1, g2))
     
-def IsDup_Simple(node, GeneToSpecies):
-    descendents = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in node.get_children()]
-    try:
-        return len(descendents[0].intersection(descendents[1])) != 0
-    except:
-        print(node)
-        raise
-            
+def GetGeneToSpeciesMap(args):
+    GeneToSpecies = GeneToSpecies_dash
+    if args.separator and args.separator == "dot":
+        GeneToSpecies = GeneToSpecies_dot  
+    elif args.separator and args.separator == "second_dash":
+        GeneToSpecies = GeneToSpecies_secondDash  
+    elif args.separator and args.separator == "3rd_dash":
+        GeneToSpecies = GeneToSpecies_3rdDash  
+    elif args.separator and args.separator == "hyphen":
+        GeneToSpecies = GeneToSpecies_hyphen  
+    return GeneToSpecies
+  
+def GeneToSpecies_dash(g):
+  return g.split("_", 1)[0]
+  
+OrthoFinderIDs = GeneToSpecies_dash
     
 def IsDup_Overlaps(node, GeneToSpecies):
     """
@@ -148,7 +285,7 @@ def IsDup_Overlaps(node, GeneToSpecies):
         return True, None, None
 
 def GetRoot(tree, species_tree_rooted, GeneToSpecies):
-        roots, j, GeneMap = om1.GetRoots(tree, species_tree_rooted, GeneToSpecies)
+        roots, j, GeneMap = GetRoots(tree, species_tree_rooted, GeneToSpecies)
         print("%d roots" % len(roots))
         # 1. Store distance of each root from each leaf
 #        for root in roots:
@@ -187,7 +324,7 @@ def GetOrthologues_for_tree(tree, species_tree_rooted, GeneToSpecies, outfn, qPr
 #                orthologues2 += [(l0,l1) for l0 in ch[0].get_leaf_names() for l1 in ch[1].get_leaf_names()]
         orthologues2 = set(orthologues2)
         print("%d orthologues" % len(orthologues2))
-        om1.WriteQfO(orthologues2, outfn, False)
+        WriteQfO(orthologues2, outfn, False)
 
     
 def GetOrthologues(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree, qPrune=False):
@@ -199,20 +336,7 @@ def GetOrthologues(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir,
             tree = ete.Tree(fn)
         except:
             tree = ete.Tree(fn, format=3)
-        GetOrthologues_for_tree(tree, species_tree_rooted, GeneToSpecies, outfn, qPrune)
-
-def GetGeneToSpeciesMap(args):
-    GeneToSpecies = GeneToSpecies_dash
-    if args.separator and args.separator == "dot":
-        GeneToSpecies = GeneToSpecies_dot  
-    elif args.separator and args.separator == "second_dash":
-        GeneToSpecies = GeneToSpecies_secondDash  
-    elif args.separator and args.separator == "3rd_dash":
-        GeneToSpecies = GeneToSpecies_3rdDash  
-    elif args.separator and args.separator == "hyphen":
-        GeneToSpecies = GeneToSpecies_hyphen  
-    return GeneToSpecies
-    
+        GetOrthologues_for_tree(tree, species_tree_rooted, GeneToSpecies, outfn, qPrune)   
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
