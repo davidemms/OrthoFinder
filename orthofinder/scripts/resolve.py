@@ -7,7 +7,7 @@ Created on Thu Jul 27 14:15:17 2017
 import argparse
 import ete2 as ete
 
-import orthologue_method_1c as om1
+import trees2ologs_of as om1
     
 def DetachAndCleanup(top, n):
     """
