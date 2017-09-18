@@ -258,7 +258,7 @@ def resolve(n, M):
                 O = Y # Y is a single species
                 successX, nX, dX = ContainsMonophyletic(x, O, 0, depth + 1) # can go one deeper if len(Y) == 1 since requires one fewer move on that half
                 if not successX: return False
-                print("Do I need to consider doing something if ¬successX?")
+#                print("Do I need to consider doing something if ¬successX?")
                 assert(dX != 0) # Can't have dX == 0
                 if dX == 1:
                     return GraftAndUpdate(n, nX, y) 

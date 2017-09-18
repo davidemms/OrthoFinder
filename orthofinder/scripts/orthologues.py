@@ -41,7 +41,8 @@ import tree
 import matrices
 import mcl as MCL
 import root_from_duplications as rfd
-import trees2olog_dlcpar
+import trees2ologs_dlcpar
+import trees2ologs_of
 import blast_file_processor as BlastFileProcessor
 import trees_msa
 import wrapper_phyldog
@@ -662,7 +663,7 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
             pickleDir = workingDir + "matrices_orthologues/"
             if not os.path.exists(pickleDir): os.mkdir(pickleDir)
             qDelDir = True    
-        trees2olog_dlcpar.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir)  
+        trees2ologs_dlcpar.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir)  
         # If a temporary matrices directory was created, delete it now
         if qDelDir:
             if os.path.exists(pickleDir): 
@@ -671,7 +672,7 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
                 except OSError:
                     pass
     else:
-        print("Method not implemented yet")
+        trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, resultsDir, qSingleTree=False, qPrune=True, qQfO=False)
         
                 
 def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, speciesTree_fn = None, pickleDir=None):
