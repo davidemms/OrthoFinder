@@ -40,7 +40,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.1.10"
+version = "1.1.11"
 requiredBlastVersion = "2.2.28+"
 
 standard_new_files = ("Orthogroups.csv Orthogroups.GeneCount.csv SingleCopyOrthogroups.txt Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv" % (version, version, version)).split()
@@ -70,7 +70,7 @@ Control where analysis starts (at least one must be specified):
     Perform full OrthoFinder analysis for the proteins in the fasta files in fasta_dir/.
 
 -b blast_results_dir, --blast blast_results_dir
-    Perform full OrthoFinder analysis using the pre-calcualted BLAST results in blast_results_dir/.
+    Perform full OrthoF0inder analysis using the pre-calcualted BLAST results in blast_results_dir/.
 
 -f & -b options can be combined in order to add new species to an analysis without needing
 to redo the BLAST searches from a previous analysis.

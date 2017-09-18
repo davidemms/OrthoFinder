@@ -47,7 +47,7 @@ SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStar
 FileInfo = namedtuple("FileInfo", "workingDir graphFilename separatePickleDir")     
 
 picProtocol = 1
-version = "1.1.10"
+version = "1.1.11"
 
 # Fix LD_LIBRARY_PATH when using pyinstaller 
 my_env = os.environ.copy()
