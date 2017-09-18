@@ -551,6 +551,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
                 print("Please check MAFFT is installed and that the executables are in the system path\n")
                 return False
         else:
+            testFN, temp_dir = msa.WriteTestFile(workingDir)
             if not tree_options.TestMSAMethod(temp_dir, msa_method):
                 print("ERROR: Cannot run user-configured MSA method '%s'" % msa_method)
                 print("Please check program is installed and that it is correctly configured in the ~/.orthofinder.config file\n")
