@@ -837,6 +837,10 @@ to redo the BLAST searches from a previous analysis.\n""")
     Use 'program' for tree inference from multiple sequence alignments (requires '-M msa' option). [Default in fasttree]
     Options: """ + ", ".join(['fasttree'] + tree_ops) + ".\n")
     
+    print("""-R method, --recon_method method
+    Use 'method' for tree reconciliation and orthologue inference. [Default in of_recon]
+    Options: of_recon, dlcpar, dlcpar_deepsearch\n""")
+    
     print("""-I inflation_parameter, --inflation inflation_parameter
     Specify a non-default inflation parameter for MCL. Not recommended. [Default is %0.1f]\n""" % g_mclInflation)
     
@@ -901,6 +905,7 @@ class Options(object):#
         self.search_program = "blast"
         self.msa_program = "mafft"
         self.tree_program = "fasttree"
+        self.recon_method = "of_recon"
         self.qPhyldog = False
         self.speciesXMLInfoFN = None
         self.speciesTreeFN = None
@@ -1087,6 +1092,19 @@ def ProcessArgs(program_caller):
                 print("Invalid argument for option %s: %s" % (switch_used, arg))
                 print("Valid options are: {%s}\n" % (", ".join(choices)))
                 util.Fail()
+        elif arg == "-R" or arg == "--recon_method":
+            choices = ['of_recon', 'dlcpar', 'dlcpar_deepsearch']
+            switch_used = arg
+            if len(args) == 0:
+                print("Missing option for command line argument %s\n" % arg)
+                util.Fail()
+            arg = args.pop(0)
+            if arg in choices:
+                options.recon_method = arg
+            else:
+                print("Invalid argument for option %s: %s" % (switch_used, arg))
+                print("Valid options are: {%s}\n" % (", ".join(choices)))
+                util.Fail()
         elif arg == "--pickledir":
             options.separatePickleDir = GetDirectoryArgument(arg, args)
         elif arg == "-op" or arg == "--only-prepare":
@@ -1201,6 +1219,7 @@ def CheckDependencies(options, program_caller, dirForTempFiles):
                                                             options.qStopAfterTrees, 
                                                             options.msa_program, 
                                                             options.tree_program, 
+                                                            options.recon_method,
                                                             program_caller, 
                                                             options.speciesTreeFN == None, 
                                                             options.qStopAfterAlignments):
@@ -1373,6 +1392,7 @@ def GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthog
                                                                         program_caller,
                                                                         options.msa_program,
                                                                         options.tree_program,
+                                                                        options.recon_method,
                                                                         options.nBlast,
                                                                         options.nProcessAlg,
                                                                         options.speciesTreeFN, 
@@ -1385,10 +1405,10 @@ def GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthog
     if None != orthogroupsResultsFilesString: print(orthogroupsResultsFilesString)
     print(orthologuesResultsFilesString.rstrip())    
 
-def GetOrthologues_FromTrees(orthologuesDir, nHighParallel, userSpeciesTreeFN = None, pickleDir=None):
+def GetOrthologues_FromTrees(orthologuesDir, options):
     groupsDir = orthologuesDir + "../"
     workingDir = orthologuesDir + "WorkingDirectory/"
-    return orthologues.OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, userSpeciesTreeFN, pickleDir=pickleDir)
+    return orthologues.OrthologuesFromTrees(options.recon_method, groupsDir, workingDir, options.nBlast, options.speciesTreeFN, pickleDir=options.separatePickleDir)
  
 def ProcessesNewFasta(fastaDir, existingDirs=None):
     """
@@ -1567,7 +1587,7 @@ if __name__ == "__main__":
     elif options.qStartFromTrees:
         dirs = ProcessPreviousFiles(workingDir)
         options = CheckOptions(options, dirs)
-        summaryText = GetOrthologues_FromTrees(orthologuesDir, options.nBlast, options.speciesTreeFN, options.separatePickleDir)
+        summaryText = GetOrthologues_FromTrees(orthologuesDir, options)
         print(summaryText) 
         util.PrintCitation() 
     else:

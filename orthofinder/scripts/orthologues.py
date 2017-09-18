@@ -442,7 +442,7 @@ def WriteGeneSpeciesMap(d, speciesDict):
             outfile.write("%s_*\t%s\n" % (iSp, iSp))
     return fn
 
-def RunDlcpar(treesIDsPatFn, ogSet, speciesTreeFN, workingDir, nParallel):
+def RunDlcpar(treesIDsPatFn, ogSet, speciesTreeFN, workingDir, nParallel, qDeepSearch):
     """
     
     Implementation:
@@ -458,7 +458,13 @@ def RunDlcpar(treesIDsPatFn, ogSet, speciesTreeFN, workingDir, nParallel):
     RootGeneTreesArbitrarily(treesIDsPatFn, nOGs, dlcparResultsDir)
     geneMapFN = WriteGeneSpeciesMap(dlcparResultsDir, ogSet.SpeciesDict())
     filenames = [dlcparResultsDir + os.path.split(treesIDsPatFn(i))[1] for i in xrange(nOGs)]
-    dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -x 1' % (speciesTreeFN, geneMapFN, fn) for fn in filenames]
+    if qDeepSearch:
+        nTaxa = [len(og) for og in ogs[:nOGs]]
+        nIter =     [1000 if n < 25 else 25000 if n < 200 else 50000 for n in nTaxa]
+        nNoImprov = [ 100 if n < 25 else  1000 if n < 200 else  2000 for n in nTaxa]
+        dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -i %d --nprescreen 100 -n %d' % (speciesTreeFN, geneMapFN, fn, i, n) for (fn, i, n) in zip(filenames, nIter, nNoImprov)]
+    else:
+        dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -x 1' % (speciesTreeFN, geneMapFN, fn) for fn in filenames]
     util.RunParallelOrderedCommandLists(nParallel, [[c] for c in dlcCommands], qHideStdout = True)
     return dlcparResultsDir
 
@@ -520,7 +526,7 @@ def WriteTestDistancesFile(testFN):
         outfile.write("4\n1_1 0 0 0.2 0.25\n0_2 0 0 0.21 0.28\n3_1 0.21 0.21 0 0\n4_1 0.25 0.28 0 0")
     return testFN
 
-def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfterTrees, msa_method, tree_method, tree_options, qInferSpeciesTree, qStopAfterAlignments):  
+def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfterTrees, msa_method, tree_method, recon_method, program_caller, qInferSpeciesTree, qStopAfterAlignments):  
     # FastME
     if (not qMSAGeneTrees) or qInferSpeciesTree:
         testFN = workingDir + "SimpleTest.phy"
@@ -536,7 +542,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
         fastme_stat_fn = workingDir + "SimpleTest.phy_fastme_stat.txt"
         if os.path.exists(fastme_stat_fn): os.remove(fastme_stat_fn)
     # DLCPar
-    if not (qStopAfterTrees or qStopAfterAlignments):
+    if ("dlcpar" in recon_method) and not (qStopAfterTrees or qStopAfterAlignments):
         if not util.CanRunCommand("dlcpar_search --version", qAllowStderr=False):
             print("ERROR: Cannot run dlcpar_search")
             print("Please check DLCpar is installed and that the executables are in the system path.\n")
@@ -551,7 +557,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
                 print("Please check MAFFT is installed and that the executables are in the system path\n")
                 return False
         else:
-            if not tree_options.TestMSAMethod(temp_dir, msa_method):
+            if not program_caller.TestMSAMethod(temp_dir, msa_method):
                 print("ERROR: Cannot run user-configured MSA method '%s'" % msa_method)
                 print("Please check program is installed and that it is correctly configured in the ~/.orthofinder.config file\n")
                 return False
@@ -561,7 +567,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
                 print("Please check FastTree is installed and that the executables are in the system path\n")
                 return False      
         else:
-            if not tree_options.TestTreeMethod(temp_dir, tree_method):
+            if not program_caller.TestTreeMethod(temp_dir, tree_method):
                 print("ERROR: Cannot run user-configured tree method '%s'" % tree_method)
                 print("Please check program is installed and that it is correctly configured in the ~/.orthofinder.config file\n")
                 return False
@@ -631,7 +637,7 @@ def CleanWorkingDir(workingDir):
                 time.sleep(1)
                 shutil.rmtree(dFull, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
 
-def ReconciliationAndOrthologues(treesIDsPatFn, ogSet, speciesTree_fn, workingDir, resultsDir, reconTreesRenamedDir, nParallel, iSpeciesTree=None, pickleDir = None):
+def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree_fn, workingDir, resultsDir, reconTreesRenamedDir, nParallel, iSpeciesTree=None, pickleDir = None):
     """
     treesPatFn - function returning name of filename
     ogSet - info about the orthogroups, species etc
@@ -640,29 +646,35 @@ def ReconciliationAndOrthologues(treesIDsPatFn, ogSet, speciesTree_fn, workingDi
     resultsDir - where the Orthologues top level results directory will go (should exist already)
     reconTreesRenamedDir - where to put the reconcilled trees that use the gene accessions
     iSpeciesTree - which of the potential roots of the species tree is this
+    method - can be dlcpar, dlcpar_deep, of_recon
     """
-    dlcparResultsDir = RunDlcpar(treesIDsPatFn, ogSet, speciesTree_fn, workingDir, nParallel)
-    if not os.path.exists(reconTreesRenamedDir): os.mkdir(reconTreesRenamedDir)
-    for iog in xrange(len(ogSet.OGs())):
-        util.RenameTreeTaxa(dlcparResultsDir + "OG%07d_tree_id.dlcpar.locus.tree" % iog, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=False, inFormat=8)
-
-    # Orthologue lists
-    util.PrintUnderline("Inferring orthologues from gene trees" + (" (root %d)"%iSpeciesTree if iSpeciesTree != None else ""))
-    qDelDir = False
-    if pickleDir == None: 
-        pickleDir = workingDir + "matrices_orthologues/"
-        if not os.path.exists(pickleDir): os.mkdir(pickleDir)
-        qDelDir = True    
-    trees2olog_dlcpar.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir)  
-    # If a temporary matrices directory was created, delete it now
-    if qDelDir:
-        if os.path.exists(pickleDir): 
-            try:
-                os.rmdir(pickleDir)
-            except OSError:
-                pass
+    if "dlcpar" in recon_method:
+        qDeepSearch = (recon_method == "dlcpar_deepsearch")
+        dlcparResultsDir = RunDlcpar(treesIDsPatFn, ogSet, speciesTree_fn, workingDir, nParallel, qDeepSearch)
+        if not os.path.exists(reconTreesRenamedDir): os.mkdir(reconTreesRenamedDir)
+        for iog in xrange(len(ogSet.OGs())):
+            util.RenameTreeTaxa(dlcparResultsDir + "OG%07d_tree_id.dlcpar.locus.tree" % iog, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=False, inFormat=8)
+    
+        # Orthologue lists
+        util.PrintUnderline("Inferring orthologues from gene trees" + (" (root %d)"%iSpeciesTree if iSpeciesTree != None else ""))
+        qDelDir = False
+        if pickleDir == None: 
+            pickleDir = workingDir + "matrices_orthologues/"
+            if not os.path.exists(pickleDir): os.mkdir(pickleDir)
+            qDelDir = True    
+        trees2olog_dlcpar.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir)  
+        # If a temporary matrices directory was created, delete it now
+        if qDelDir:
+            if os.path.exists(pickleDir): 
+                try:
+                    os.rmdir(pickleDir)
+                except OSError:
+                    pass
+    else:
+        print("Method not implemented yet")
+        
                 
-def OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, speciesTree_fn = None, pickleDir=None):
+def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, speciesTree_fn = None, pickleDir=None):
     """
     groupsDir - directory with orthogroups file in
     userSpeciesTree_fn - None if not supplied otherwise rooted tree using user species names (not orthofinder IDs)
@@ -711,7 +723,7 @@ def OrthologuesFromTrees(groupsDir, workingDir, nHighParallel, speciesTree_fn = 
         speciesTree_fn = ConvertUserSpeciesTree(workingDir + "Trees_ids/", speciesTree_fn, ogSet.SpeciesDict())
     util.PrintUnderline("Running Orthologue Prediction", True)
     util.PrintUnderline("Reconciling gene and species trees") 
-    ReconciliationAndOrthologues(TreePatIDs, ogSet, speciesTree_fn, workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, pickleDir=pickleDir)
+    ReconciliationAndOrthologues(recon_method, TreePatIDs, ogSet, speciesTree_fn, workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, pickleDir=pickleDir)
     util.PrintUnderline("Writing results files")
     CleanWorkingDir(workingDir)
     return "Species-by-species orthologues directory:\n   %s\n" % resultsDir_new
@@ -723,6 +735,7 @@ def OrthologuesWorkflow(workingDir_ogs,
                        tree_options,
                        msa_method,
                        tree_method,
+                       recon_method,
                        nHighParallel,
                        nLowParrallel,
                        userSpeciesTree = None, 
@@ -747,13 +760,7 @@ def OrthologuesWorkflow(workingDir_ogs,
     - ogSet - all the relevant information about the orthogroups, species etc.
     """
     ogSet = OrthoGroupsSet(workingDir_ogs, speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor, pickleDir=pickleDir)
-    
-    # Class that is going to run the analysis needs to check the dependencies
-#    if not CanRunOrthologueDependencies(workingDir_ogs, qMSA, qStopAfterTrees, userSpeciesTree == None): 
-#        print("Orthogroups have been inferred but the dependencies for inferring gene trees and")
-#        print("orthologues have not been met. Please review previous messages for more information.")
-#        sys.exit()
-    
+        
     resultsDir = util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_")
     """ === 1 === ust = UserSpeciesTree
     MSA:               Sequences    Alignments                        GeneTrees    db    SpeciesTree
@@ -863,7 +870,7 @@ def OrthologuesWorkflow(workingDir_ogs,
             print("Outgroup: " + (", ".join([spDict[s] for s in r])))
         os.mkdir(resultsDir_new)
         util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True)
-        ReconciliationAndOrthologues(db.TreeFilename_IDs, db.ogSet, speciesTree_fn, db.workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, i if qMultiple else None, pickleDir=pickleDir) 
+        ReconciliationAndOrthologues(recon_method, db.TreeFilename_IDs, db.ogSet, speciesTree_fn, db.workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, i if qMultiple else None, pickleDir=pickleDir) 
     
     db.DeleteBlastMatrices()
     CleanWorkingDir(db.workingDir)

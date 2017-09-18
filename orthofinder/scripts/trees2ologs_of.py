@@ -13,7 +13,7 @@ import os
 import glob
 import tree as tree_lib
 import argparse
-
+import csv
 import sys
 import operator
 from collections import Counter
@@ -293,36 +293,39 @@ def GetRoot(tree, species_tree_rooted, GeneToSpecies):
             i, _ = max(enumerate(root_dists), key=operator.itemgetter(1))
             return roots[i]
     
-def GetOrthologues_for_tree(tree, species_tree_rooted, GeneToSpecies, outfn, qPrune, qRoot=True):
-        orthologues2 = []
+def GetOrthologues_for_tree(tree, species_tree_rooted, GeneToSpecies, qPrune, qRoot=True):
+        orthologues = []
         if qPrune: tree.prune(tree.get_leaf_names())
         if len(tree) == 1: return
         if qRoot:
             root = GetRoot(tree, species_tree_rooted, GeneToSpecies)
-    #        if root == None: 
-    #            print("No root")
-    #            return
-            # Walk through tree
-            # for each node, look through all pairs for which this is the divergence
             if root != tree:
                 print(root)
                 tree.set_outgroup(root)
-#        ch = tree.get_children()
-#        print(ch[0] if len(ch[0]) < len(ch[1]) else ch[1])
-#        print(tree.write())
         for n in tree.traverse('postorder'):
             ch = n.get_children()
             if len(ch) != 2: continue
             dup, elim0, elim1 = IsDup_Overlaps(n, GeneToSpecies)
             if not dup:
-                orthologues2 += [(l0,l1) for l0 in ch[0].get_leaf_names() if l0 not in elim0 for l1 in ch[1].get_leaf_names() if l1 not in elim1]
-#            dup = IsDup_Simple(n, GeneToSpecies)
-#            if not dup:
-#                orthologues2 += [(l0,l1) for l0 in ch[0].get_leaf_names() for l1 in ch[1].get_leaf_names()]
-        orthologues2 = set(orthologues2)
-        print("%d orthologues" % len(orthologues2))
-        WriteQfO(orthologues2, outfn, False)
+                orthologues += [(l0,l1) for l0 in ch[0].get_leaf_names() if l0 not in elim0 for l1 in ch[1].get_leaf_names() if l1 not in elim1]
+        return set(orthologues)
 
+
+def WriteOrthologues(resultsDir, spec1, spec2, orthologues, ogSet):
+    speciesDict = ogSet.SpeciesDict()
+    id_to_og = ogSet.ID_to_OG_Dict()
+    sequenceDict = ogSet.SequenceDict()
+    d1 = resultsDir + "Orthologues_" + speciesDict[str(spec1)] + "/"
+    d2 = resultsDir + "Orthologues_" + speciesDict[str(spec2)] + "/"
+    with open(d1 + '%s__v__%s.csv' % (speciesDict[str(spec1)], speciesDict[str(spec2)]), 'wb') as outfile1, open(d2 + '%s__v__%s.csv' % (speciesDict[str(spec2)], speciesDict[str(spec1)]), 'wb') as outfile2:
+        writer1 = csv.writer(outfile1)
+        writer2 = csv.writer(outfile2)
+        writer1.writerow(("Orthogroup", speciesDict[str(spec1)], speciesDict[str(spec2)]))
+        writer2.writerow(("Orthogroup", speciesDict[str(spec2)], speciesDict[str(spec1)]))
+        for genes1, genes2 in orthologues:
+            og = "OG%07d" % id_to_og["%d_%d" % (spec1, genes1[0])]
+            writer1.writerow((og, ", ".join([sequenceDict["%d_%d" % (spec1, o)] for o in genes1]), ", ".join([sequenceDict["%d_%d" % (spec2, o)] for o in genes2])))
+            writer2.writerow((og, ", ".join([sequenceDict["%d_%d" % (spec2, o)] for o in genes2]), ", ".join([sequenceDict["%d_%d" % (spec1, o)] for o in genes1])))
 
 """
 ------- Original ------------
@@ -333,11 +336,12 @@ def Resolve(tree, GeneToSpecies):
     for n in tree.traverse("postorder"):
         resolve.resolve(n, GeneToSpecies)
 
-def GetOrthologues(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree, qPrune=False):
+def GetOrthologues(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree, qPrune=False, qQfO=False):
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
     for fn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")):
-        print("")
-        print(fn)
+        if qQfO:
+            print("")
+            print(fn)
         outfn = output_dir + os.path.split(fn)[1]
         if (not os.path.exists(fn)) or os.stat(fn).st_size == 0: continue
         try:
@@ -353,7 +357,13 @@ def GetOrthologues(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir,
             tree.set_outgroup(root)
 
         Resolve(tree, GeneToSpecies)
-        GetOrthologues_for_tree(tree, species_tree_rooted, GeneToSpecies, outfn, qPrune=False, qRoot=False)
+        orthologues = GetOrthologues_for_tree(tree, species_tree_rooted, GeneToSpecies, qPrune=False, qRoot=False)
+        print("%d orthologues" % len(orthologues))
+        if qQfO: 
+            WriteQfO(orthologues, outfn, False)
+        else:
+            pass
+        print("Inferred orthologues")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -382,4 +392,4 @@ if __name__ == "__main__":
     print(output_dir)
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
-    GetOrthologues(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree, qPrune=args.prune)
+    GetOrthologues(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree, qPrune=args.prune, qQfO=True)
