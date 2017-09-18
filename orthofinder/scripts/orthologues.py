@@ -332,11 +332,14 @@ class DendroBLASTTrees(object):
             speciesMatrixFN = self.workingDir + "SpeciesMatrix.phy"
         else:
             speciesMatrixFN = os.path.split(self.distPat)[0] + "/SpeciesMatrix.phy"
+        sliver = 1e-6
         with open(speciesMatrixFN, 'wb') as outfile:
             outfile.write("%d\n" % n)
             for i in xrange(n):
                 outfile.write(str(self.ogSet.seqsInfo.speciesToUse[i]) + " ")
-                values = " ".join(["%.6g" % (0. + M[i,j]) for j in range(n)])   # hack to avoid printing out "-0"
+                V = [(0. + M[i,j]) for j in range(n)]  # hack to avoid printing out "-0"
+                V = [sliver if 0 < v < sliver else v for v in V]  # make sure scientific notation is not used (not accepted by fastme)
+                values = " ".join(["%.6f" % v for v in V])   
                 outfile.write(values + "\n")       
         treeFN = os.path.split(self.treesPatIDs)[0] + "/SpeciesTree_ids.txt"
         cmd = " ".join(["fastme", "-i", speciesMatrixFN, "-o", treeFN, "-w", "O"] + (["-s"] if n < 1000 else []))
