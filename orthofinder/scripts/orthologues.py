@@ -30,6 +30,7 @@ import sys
 import time
 import shutil
 import numpy as np
+import subprocess
 from collections import Counter, defaultdict
 import itertools
 import multiprocessing as mp
@@ -548,6 +549,28 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
             print("ERROR: Cannot run dlcpar_search")
             print("Please check DLCpar is installed and that the executables are in the system path.\n")
             return False
+        if recon_method == "dlcpar_deepsearch":
+            capture = subprocess.Popen("dlcpar_search --version", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
+            stdout = "".join([x for x in capture.stdout])
+            version = stdout.split()[-1]
+            major, minor, release = map(int, version.split("."))
+            # require 1.0.1 or above            
+            actual = (major, minor, release)
+            required = [1,0,1]
+            versionOK = True
+            for r, a in zip(required, actual):
+                if a > r:
+                    versionOK = True
+                    break
+                elif a < r:
+                    versionOK = False
+                    break
+                else:
+                    pass
+                    # need to check next level down
+            if not versionOK:
+                print("ERROR: dlcpar_deepsearch requires dlcpar_search version 1.0.1 or above")
+                return False                   
     
     # FastTree & MAFFT
     if qMSAGeneTrees or qPhyldog:
