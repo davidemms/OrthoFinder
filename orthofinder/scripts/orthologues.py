@@ -649,10 +649,10 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
     iSpeciesTree - which of the potential roots of the species tree is this
     method - can be dlcpar, dlcpar_deep, of_recon
     """
+    if not os.path.exists(reconTreesRenamedDir): os.mkdir(reconTreesRenamedDir)
     if "dlcpar" in recon_method:
         qDeepSearch = (recon_method == "dlcpar_deepsearch")
         dlcparResultsDir = RunDlcpar(treesIDsPatFn, ogSet, speciesTree_fn, workingDir, nParallel, qDeepSearch)
-        if not os.path.exists(reconTreesRenamedDir): os.mkdir(reconTreesRenamedDir)
         for iog in xrange(len(ogSet.OGs())):
             util.RenameTreeTaxa(dlcparResultsDir + "OG%07d_tree_id.dlcpar.locus.tree" % iog, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=False, inFormat=8)
     
@@ -672,7 +672,7 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
                 except OSError:
                     pass
     else:
-        trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, resultsDir, qSingleTree=False, qPrune=True, qQfO=False)
+        trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir, qSingleTree=False, qPrune=True, qQfO=False)
         
                 
 def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, speciesTree_fn = None, pickleDir=None):

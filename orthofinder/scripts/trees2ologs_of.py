@@ -18,7 +18,7 @@ import sys
 import operator
 from collections import Counter, defaultdict
 
-import resolve
+import resolve, util
 
 def GeneToSpecies_dash(g):
   return g.split("_", 1)[0]
@@ -36,11 +36,7 @@ def GeneToSpecies_dot(g):
   
 def GeneToSpecies_hyphen(g):
   return g.split("-", 1)[0]  
-  
-#SpeciesName = OrthoFinderIDs
-#SpeciesName = GeneToSpecies_3rdDash
-#SpeciesName = GeneToSpecies_dash
-  
+    
 class RootMap(object):
     def __init__(self, setA, setB, GeneToSpecies):
         self.setA = setA
@@ -89,12 +85,8 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
         # Doesn't contain outgroup, step down in species tree until it does
         if have1:
             n = n1
-#            print(1)
         else:
             n = n2
-#            print(2)
-#        print(n1)
-#        print(n2)
         n1, n2 = n.get_children()
         t1 = n1.get_leaf_names()
         t2 = n2.get_leaf_names()
@@ -113,15 +105,9 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
     fail = 0
     for m in tree:
         n = m.up
-#        print("")
-#        print(m)
-#        print(n)
-#        print(n.sp_down)
         while not n.is_root() and n.sp_down != TF:
             m = n
             n = m.up
-#            print(n)
-#            print(n.sp_down)
         if n.sp_down == TF:
             children = n.get_children()
             if n.is_root():
@@ -162,11 +148,6 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
                     else:
                         # Case 1B - 3rd clade is mixed
                         found.add(n)
-#                    print("*** Root2 ***")
-#                    print(c1.sp_down)
-#                    print(c2.sp_down)
-#                    print(n.sp_up)
-#                    print("------")
                 else:
                     # Case 2 - only one is single state and it's not the same as the 3rd clade
                     if single_state != n.sp_up:
@@ -179,9 +160,6 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
 #                        pass
             else:
                 fail += 1
-#    for f in found:
-#        print(f)
-#        print(len(f.get_leaf_names()))
     return list(found), fail, GeneMap  
 
 def WriteQfO(ortho_pairs, outfilename, qForQFO = True):
@@ -295,7 +273,7 @@ def GetRoot(tree, species_tree_rooted, GeneToSpecies):
     
 def GetOrthologues_for_tree(treeFN, species_tree_rooted, GeneToSpecies, qPrune, qRoot=True):
         orthologues = []
-        if (not os.path.exists(treeFN)) or os.stat(treeFN).st_size == 0: return set(orthologues)
+        if (not os.path.exists(treeFN)) or os.stat(treeFN).st_size == 0: return set(orthologues), treeFN
         try:
             tree = tree_lib.Tree(treeFN)
         except:
@@ -303,7 +281,7 @@ def GetOrthologues_for_tree(treeFN, species_tree_rooted, GeneToSpecies, qPrune, 
         if qPrune: tree.prune(tree.get_leaf_names())
         if len(tree) == 1: return set(orthologues)
         root = GetRoot(tree, species_tree_rooted, GeneToSpecies)
-        if root == None: return set(orthologues)
+        if root == None: return set(orthologues), tree
         # Pick the first root for now
         if root != tree:
             tree.set_outgroup(root)
@@ -311,7 +289,7 @@ def GetOrthologues_for_tree(treeFN, species_tree_rooted, GeneToSpecies, qPrune, 
         Resolve(tree, GeneToSpecies)
         
         if qPrune: tree.prune(tree.get_leaf_names())
-        if len(tree) == 1: return
+        if len(tree) == 1: return set(orthologues), tree
         if qRoot:
             root = GetRoot(tree, species_tree_rooted, GeneToSpecies)
             if root != tree:
@@ -323,26 +301,8 @@ def GetOrthologues_for_tree(treeFN, species_tree_rooted, GeneToSpecies, qPrune, 
             dup, elim0, elim1 = IsDup_Overlaps(n, GeneToSpecies)
             if not dup:
                 orthologues += [(l0,l1) for l0 in ch[0].get_leaf_names() if l0 not in elim0 for l1 in ch[1].get_leaf_names() if l1 not in elim1]
-        return set(orthologues)
+        return set(orthologues), tree
 
-
-#def WriteOrthologues(resultsDir, spec1, spec2, orthologues, ogSet):
-#    speciesDict = ogSet.SpeciesDict()
-#    id_to_og = ogSet.ID_to_OG_Dict()
-#    sequenceDict = ogSet.SequenceDict()
-#    d1 = resultsDir + "Orthologues_" + speciesDict[str(spec1)] + "/"
-#    d2 = resultsDir + "Orthologues_" + speciesDict[str(spec2)] + "/"
-#    with open(d1 + '%s__v__%s.csv' % (speciesDict[str(spec1)], speciesDict[str(spec2)]), 'wb') as outfile1, open(d2 + '%s__v__%s.csv' % (speciesDict[str(spec2)], speciesDict[str(spec1)]), 'wb') as outfile2:
-#        writer1 = csv.writer(outfile1)
-#        writer2 = csv.writer(outfile2)
-#        writer1.writerow(("Orthogroup", speciesDict[str(spec1)], speciesDict[str(spec2)]))
-#        writer2.writerow(("Orthogroup", speciesDict[str(spec2)], speciesDict[str(spec1)]))
-#        for genes1, genes2 in orthologues:
-#            og = "OG%07d" % id_to_og["%d_%d" % (spec1, genes1[0])]
-#            writer1.writerow((og, ", ".join([sequenceDict["%d_%d" % (spec1, o)] for o in genes1]), ", ".join([sequenceDict["%d_%d" % (spec2, o)] for o in genes2])))
-#            writer2.writerow((og, ", ".join([sequenceDict["%d_%d" % (spec2, o)] for o in genes2]), ", ".join([sequenceDict["%d_%d" % (spec1, o)] for o in genes1])))
-#
-#
 def AppendOrthologuesToFiles(orthologues, speciesDict, sequenceDict, iog, resultsDir):
     # Sort the orthologues according to speices pairs
     o_byspeciespair = defaultdict(list)
@@ -375,13 +335,13 @@ def GetOrthologuesStandalone(trees_dir, species_tree_rooted_fn, GeneToSpecies, o
     for treeFn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")):
         print("")
         print(treeFn)
-        orthologues = GetOrthologues_for_tree(treeFn, species_tree_rooted, GeneToSpecies, qPrune=False, qRoot=False)
+        orthologues, recon_tree = GetOrthologues_for_tree(treeFn, species_tree_rooted, GeneToSpecies, qPrune=False, qRoot=False)
         print("%d orthologues" % len(orthologues))
         outfn = output_dir + os.path.split(treeFn)[1]
         WriteQfO(orthologues, outfn, False)
 
 
-def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree, qPrune=False, qQfO=False):    # Create directory structure
+def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, GeneToSpecies, workingDir, output_dir, reconTreesRenamedDir, qSingleTree, qPrune=False, qQfO=False):    # Create directory structure
     speciesDict = ogSet.SpeciesDict()
     SequenceDict = ogSet.SequenceDict()
     # Write directory and file structure
@@ -399,7 +359,8 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
     nOgs = len(ogSet.OGs())
     for iog in xrange(nOgs):
-        orthologues = GetOrthologues_for_tree(treesIDsPatFn(iog), species_tree_rooted, GeneToSpecies, qPrune=False, qRoot=False)
+        orthologues, recon_tree = GetOrthologues_for_tree(treesIDsPatFn(iog), species_tree_rooted, GeneToSpecies, qPrune=False, qRoot=False)
+        util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=True)
         AppendOrthologuesToFiles(orthologues, speciesDict, SequenceDict, iog, output_dir)
 
 if __name__ == "__main__":

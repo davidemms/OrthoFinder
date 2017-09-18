@@ -372,13 +372,15 @@ class FirstWordExtractor(IDExtractor):
         return self.nameToIDDict    
 
 
-def RenameTreeTaxa(treeFN, newTreeFilename, idsMap, qFixNegatives=False, inFormat=None):     
-#        with open(treeFN, "rb") as inputTree: treeString = inputTree.next()
+def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qFixNegatives=False, inFormat=None):     
     try:
-        if inFormat == None:
-            t = tree.Tree(treeFN)
+        if type(treeFN_or_tree) == tree.TreeNode:
+            t = treeFN_or_tree
         else:
-            t = tree.Tree(treeFN, format=inFormat)
+            if inFormat == None:
+                t = tree.Tree(treeFN_or_tree)
+            else:
+                t = tree.Tree(treeFN_or_tree, format=inFormat)
         for node in t.get_leaves():
             node.name = idsMap[node.name]
         if qFixNegatives:
@@ -388,6 +390,7 @@ def RenameTreeTaxa(treeFN, newTreeFilename, idsMap, qFixNegatives=False, inForma
                 if n.dist < 0.0: n.dist = sliver
         t.write(outfile = newTreeFilename, format=5)  # internal + terminal branch lengths, leaf names
     except:
+        print(newTreeFilename)
         pass
 
 def IsWorkingDirectory(orthofinderWorkingDir):
