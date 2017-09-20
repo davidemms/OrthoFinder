@@ -10,14 +10,17 @@ Perform directed 'reconciliation' first and then apply EggNOG method
 2 - infer orthologues
 """
 import os
-import glob
-import tree as tree_lib
-import argparse
 import csv
-import sys
+import glob
+import time
+import argparse
 import operator
-from collections import Counter, defaultdict
+import itertools
+import Queue
+import multiprocessing as mp
+from collections import Counter
 
+import tree as tree_lib
 import resolve, util
 
 def GeneToSpecies_dash(g):
@@ -170,6 +173,18 @@ def WriteQfO(ortho_pairs, outfilename, qForQFO = True):
                 g1 = g1.split("_")[-1]
                 g2 = g2.split("_")[-1]
             outfile.write("%s\t%s\n" % (g1, g2))
+            
+def WriteQfO2(orthologues_list_pairs_list, outfilename, qForQFO = True):
+    """ takes a list where each entry is a pair, (genes1, genes2), which are orthologues of one another
+    """
+    with open(outfilename, 'ab' if qForQFO else 'wb') as outfile:
+        for gs1, gs2 in orthologues_list_pairs_list:
+            for g1 in gs1:
+                for g2 in gs2:
+                    if qForQFO:
+                        g1 = g1.split("_")[-1]
+                        g2 = g2.split("_")[-1]
+                    outfile.write("%s\t%s\n" % (g1, g2))
     
 def GetGeneToSpeciesMap(args):
     GeneToSpecies = GeneToSpecies_dash
@@ -182,83 +197,25 @@ def GetGeneToSpeciesMap(args):
     elif args.separator and args.separator == "hyphen":
         GeneToSpecies = GeneToSpecies_hyphen  
     return GeneToSpecies
-  
-def GeneToSpecies_dash(g):
-  return g.split("_", 1)[0]
-  
-OrthoFinderIDs = GeneToSpecies_dash
-    
-def IsDup_Overlaps(node, GeneToSpecies):
-    """
-    Determine whether a node is a duplication based on the overlapping species. Also return genes that should be ignored if it is a speciation
-    Args:
-        node - the node to detmine duplication/speciation identity of
-        GeneToSpecies - function taking a gene name and returning the species name
-    Returns:
-        isDup - boolean
-        ignore - list of genes to be ignored (genes are from the species that overlap and the genes appear to be incorrectly placed
-            and so orthology shouldn't be inferred for them across the node)
-    """
-    """
-    Is node a duplication node
-    Args:
-        node - is this node a duplication node
-        node_identities - dictionary of the identities of nodes already calculated
-        GeneToSpecies - Function taking genes names and returning species names
+   
+def IsDup(node, GeneToSpecies):
+    descendents = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in node.get_children()]
+    try:
+        return len(descendents[0].intersection(descendents[1])) != 0
+    except:
+        print(node)
+        raise
         
-    6861133 v 7084653 or 6856703
-    """
-    NULL = set()
-    ch = node.get_children()
-    if len(ch) < 2:
-        return True, NULL, NULL
-    elif len(ch) >2:
-        l = map(len, ch)
-        x = sorted(zip(l,ch), reverse=True)
-        ch = [x[0][1], x[1][1]]
-    g0 = ch[0].get_leaf_names()
-    g1 = ch[1].get_leaf_names()
-    s0 = map(GeneToSpecies, g0)
-    s1 = map(GeneToSpecies, g1)
-    d0 = set(s0)
-    d1 = set(s1)
-#    descendents = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in node.get_children()] # this could be cached or iteratively determined
-    # *** What if non-binary? Should really compare the relevant two branches
-    overlap = d0.intersection(d1)
-    ns0 = len(d0)
-    ns1 = len(d1)
-    o = len(overlap)
-    genes_overlap0 = len([True for s in s0 if s in overlap])
-    genes_overlap1 = len([True for s in s1 if s in overlap])
-    if o > 0 and (genes_overlap0 != len(g0) and genes_overlap1 != len(g1)):
-        sys.stderr.write("%d\t%d\t%d\t%d\t%d\t%d\t%d\n" % (o, ns0, ns1, genes_overlap0, genes_overlap1, len(g0), len(g1)))
-#        if (0 < genes_overlap0 < 3 or 0 < genes_overlap1 < 3) and len(g0)*len(g1) > 5 and (genes_overlap0 != len(g0) and genes_overlap1 != len(g1)):
-#            sys.stderr.write(node.get_ascii(compact=False, show_internal=False) + "\n")
-    if o == 0:
-        return False, NULL, NULL
-#    else:
-#        return True, None, None
-    # Can't have more than 1/3 of either species sets in the overlap w/o it being a duplication
-    if 4*o > ns0 or 4*o > ns1:
-        return True, None, None
-    # How many genes would have to be eliminated compared to the size of the clade? Can we eliminate fewer than a tenth?
-    e0 = set([g for g,s in zip(g0,s0) if s in overlap])
-    e1 = set([g for g,s in zip(g0,s0) if s in overlap])
-#    print(("Elim", len(e0), len(e1)))
-    qElim0 = 4*len(e0) <= len(g0)
-    qElim1 = 4*len(e1) <= len(g1)
-    if qElim0 and qElim1:
-        print(1)
-        return False, e0 if len(e0) <= len(e1) else NULL, NULL if len(e0) <= len(e1) else e1
-    elif qElim0:
-        print(1)
-        return False, e0, NULL
-    elif qElim1:
-        print(1)
-        return False, NULL, e1
-    else: 
-        return True, None, None
-
+#def IsDup_nonbinary(node, GeneToSpecies):
+#    descendents = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in node.get_children()]
+#    try:
+#        for c1, c2 in itertools.combinations(descendents, 2):
+#            if len(c1.intersection(c2)) != 0: return True
+#        return False
+#    except:
+#        print(node)
+#        raise
+        
 def GetRoot(tree, species_tree_rooted, GeneToSpecies):
         roots, j, GeneMap = GetRoots(tree, species_tree_rooted, GeneToSpecies)
 #        print("%d roots" % len(roots))
@@ -271,7 +228,8 @@ def GetRoot(tree, species_tree_rooted, GeneToSpecies):
             i, _ = max(enumerate(root_dists), key=operator.itemgetter(1))
             return roots[i]
     
-def GetOrthologues_for_tree(treeFN, species_tree_rooted, GeneToSpecies, qPrune, qRoot=True):
+def GetOrthologues_for_tree(treeFN, species_tree_rooted, GeneToSpecies):
+        qPrune=True
         orthologues = []
         if (not os.path.exists(treeFN)) or os.stat(treeFN).st_size == 0: return set(orthologues), treeFN
         try:
@@ -287,61 +245,127 @@ def GetOrthologues_for_tree(treeFN, species_tree_rooted, GeneToSpecies, qPrune, 
             tree.set_outgroup(root)
 
         Resolve(tree, GeneToSpecies)
-        
         if qPrune: tree.prune(tree.get_leaf_names())
         if len(tree) == 1: return set(orthologues), tree
-        if qRoot:
-            root = GetRoot(tree, species_tree_rooted, GeneToSpecies)
-            if root != tree:
-                print(root)
-                tree.set_outgroup(root)
         for n in tree.traverse('postorder'):
+            if n.is_leaf(): continue
             ch = n.get_children()
-            if len(ch) != 2: continue
-            dup, elim0, elim1 = IsDup_Overlaps(n, GeneToSpecies)
-            if not dup:
-                orthologues += [(l0,l1) for l0 in ch[0].get_leaf_names() if l0 not in elim0 for l1 in ch[1].get_leaf_names() if l1 not in elim1]
-        return set(orthologues), tree
+            if len(ch) == 2: 
+                if not IsDup(n, GeneToSpecies):
+#                    orthologues += [(l0,l1) for l0 in ch[0].get_leaf_names() for l1 in ch[1].get_leaf_names()]
+                    orthologues.append((ch[0].get_leaf_names(), ch[1].get_leaf_names()))
+            elif len(ch) > 2:
+                species = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in ch]
+                for (n0, s0), (n1, s1) in itertools.combinations(zip(ch, species), 2):
+                    if len(s0.intersection(s1)) == 0:
+#                        orthologues += [(l0,l1)  for l0 in n0.get_leaf_names() for l1 in n1.get_leaf_names()]
+                        orthologues.append((n0.get_leaf_names(), n1.get_leaf_names()))
+#        WriteQfO2(orthologues, "/home/david/projects/OrthoFinder/Development/Orthologues/ReplacingDLCpar/ExampleData/Euk/ids_branch_lengths//DendroBLAST/Orthologues_M2c_no_overlap_check_pairwise/" + os.path.split(treeFN)[1], False)
+        return orthologues, tree
 
 def AppendOrthologuesToFiles(orthologues, speciesDict, sequenceDict, iog, resultsDir):
     # Sort the orthologues according to speices pairs
-    o_byspeciespair = defaultdict(list)
-    for o in orthologues:
-        o_byspeciespair[frozenset([o[0].split("_")[0], o[1].split("_")[0]])].append(o)
-    # For each pair, append the orthologues to existing files
-    for (spec1, spec2), genepairs in o_byspeciespair.items():
-        d1 = resultsDir + "Orthologues_" + speciesDict[str(spec1)] + "/"
-        d2 = resultsDir + "Orthologues_" + speciesDict[str(spec2)] + "/"
-        with open(d1 + '%s__v__%s.csv' % (speciesDict[str(spec1)], speciesDict[str(spec2)]), 'ab') as outfile1, open(d2 + '%s__v__%s.csv' % (speciesDict[str(spec2)], speciesDict[str(spec1)]), 'ab') as outfile2:
-            writer1 = csv.writer(outfile1)
-            writer2 = csv.writer(outfile2)
-            for gene1, gene2 in genepairs:
-                og = "OG%07d" % iog
-                writer1.writerow((og, sequenceDict[gene1], sequenceDict[gene2]))
-                writer2.writerow((og, sequenceDict[gene2], sequenceDict[gene1]))
-                
+    species = speciesDict.keys()
+#    print(species)
+    for leaves0, leaves1 in orthologues:
+#        print([g.split("_")[0] for g in leaves0])
+#        sys.exit()
+        genes_per_species0 = [(sp, [g for g in leaves0 if g.split("_")[0] == sp]) for sp in species] 
+        genes_per_species1 = [(sp, [g for g in leaves1 if g.split("_")[0] == sp]) for sp in species] 
+#        print([len(x[1]) for x in genes_per_species0])
+#        print([len(x[1]) for x in genes_per_species1])
+#        print()        
+        for sp0, genes0 in genes_per_species0:
+            if len(genes0) == 0: continue
+            for sp1, genes1 in genes_per_species1:
+                if len(genes1) == 0: continue
+                d0 = resultsDir + "Orthologues_" + speciesDict[sp0] + "/"
+                d1 = resultsDir + "Orthologues_" + speciesDict[sp1] + "/"
+                with open(d0 + '%s__v__%s.csv' % (speciesDict[sp0], speciesDict[sp1]), 'ab') as outfile1, open(d1 + '%s__v__%s.csv' % (speciesDict[sp1], speciesDict[sp0]), 'ab') as outfile2:
+                    writer1 = csv.writer(outfile1)
+                    writer2 = csv.writer(outfile2)
+                    og = "OG%07d" % iog
+#                    print("row")
+                    writer1.writerow((og, ", ".join([sequenceDict[g] for g in genes0]), ", ".join([sequenceDict[g] for g in genes1])))
+                    writer2.writerow((og, ", ".join([sequenceDict[g] for g in genes1]), ", ".join([sequenceDict[g] for g in genes0])))
             
-"""
-------- Original ------------
-"""
-
+##        o_byspeciespair = defaultdict(list)
+##        for g0 in leaves0:
+##            for g1 in leaves1:
+##                o_byspeciespair[frozenset([g0.split("_")[0], g1.split("_")[0]])].append((g0, g1))
+#        # For each pair, append the orthologues to existing files
+#        for (spec1, spec2), genepairs in o_byspeciespair.items():
+#            d1 = resultsDir + "Orthologues_" + speciesDict[str(spec1)] + "/"
+#            d2 = resultsDir + "Orthologues_" + speciesDict[str(spec2)] + "/"
+#            with open(d1 + '%s__v__%s.csv' % (speciesDict[str(spec1)], speciesDict[str(spec2)]), 'ab') as outfile1, open(d2 + '%s__v__%s.csv' % (speciesDict[str(spec2)], speciesDict[str(spec1)]), 'ab') as outfile2:
+#                writer1 = csv.writer(outfile1)
+#                writer2 = csv.writer(outfile2)
+#                for gene1, gene2 in genepairs:
+#                    og = "OG%07d" % iog
+#                    writer1.writerow((og, sequenceDict[gene1], sequenceDict[gene2]))
+#                    writer2.writerow((og, sequenceDict[gene2], sequenceDict[gene1]))
+                          
 def Resolve(tree, GeneToSpecies):
     StoreSpeciesSets(tree, GeneToSpecies)
     for n in tree.traverse("postorder"):
         resolve.resolve(n, GeneToSpecies)
 
-def GetOrthologuesStandalone(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree, qPrune=False):
+def GetOrthologuesStandalone_Parallel(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree):
+    species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
+    args_queue = mp.Queue()
+    for treeFn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")): args_queue.put((treeFn, species_tree_rooted, GeneToSpecies))
+    util.RunMethodParallel(GetOrthologues_for_tree, args_queue, 8)
+
+def Worker_WriteToFile(write_to_file_queue):
+    qQueueComplete = False
+    while True:
+        try:
+            orthologues_and_fn = write_to_file_queue.get(True, 1)
+            if orthologues_and_fn == None:
+                qQueueComplete = True
+            orthologues, outfn = orthologues_and_fn
+            WriteQfO(orthologues, outfn, False)
+        except Queue.Empty:
+            if qQueueComplete: 
+                return
+            else:
+                time.sleep(1) 
+
+def Wrapper_GetOrthologues_for_tree_and_write(treeFN, species_tree_rooted, GeneToSpecies, write_to_file_queue):
+    orthologues, recon_tree = GetOrthologues_for_tree(treeFN, species_tree_rooted, GeneToSpecies)
+    write_to_file_queue.put(orthologues) 
+
+#def GetOrthologuesStandalone_Parallel(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree):
+#    species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn) 
+#    args_queue = mp.Queue()
+#    # Setup a queue for ortholgoues that need to be written   
+#    write_to_file_queue = mp.Queue()
+#    for treeFn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")): args_queue.put((treeFn, species_tree_rooted, GeneToSpecies, write_to_file_queue))
+#    # start the Writer (manager)
+#    writer_proc = mp.Process(target=Worker_WriteToFile, args=(write_to_file_queue, ))
+#    time.sleep(2)
+#    print("Created writer process")
+#    writer_proc.start()
+#    time.sleep(2)
+#    print("Started Writer")
+#    util.RunMethodParallel(Wrapper_GetOrthologues_for_tree_and_write, args_queue, 7)
+#    time.sleep(2)
+#    print("Asked writer to stop")
+#    writer_proc.join()
+#    time.sleep(2)
+#    print("Writer stopped")
+    
+def GetOrthologuesStandalone(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree):
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
     for treeFn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")):
         print("")
         print(treeFn)
-        orthologues, recon_tree = GetOrthologues_for_tree(treeFn, species_tree_rooted, GeneToSpecies, qPrune=False, qRoot=False)
+        orthologues, recon_tree = GetOrthologues_for_tree(treeFn, species_tree_rooted, GeneToSpecies)
         print("%d orthologues" % len(orthologues))
         outfn = output_dir + os.path.split(treeFn)[1]
         WriteQfO(orthologues, outfn, False)
 
-
-def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, GeneToSpecies, workingDir, output_dir, reconTreesRenamedDir, qSingleTree, qPrune=False, qQfO=False):    # Create directory structure
+def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, GeneToSpecies, workingDir, output_dir, reconTreesRenamedDir):    # Create directory structure
     speciesDict = ogSet.SpeciesDict()
     SequenceDict = ogSet.SequenceDict()
     # Write directory and file structure
@@ -359,7 +383,7 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
     nOgs = len(ogSet.OGs())
     for iog in xrange(nOgs):
-        orthologues, recon_tree = GetOrthologues_for_tree(treesIDsPatFn(iog), species_tree_rooted, GeneToSpecies, qPrune=False, qRoot=False)
+        orthologues, recon_tree = GetOrthologues_for_tree(treesIDsPatFn(iog), species_tree_rooted, GeneToSpecies)
         util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=True)
         AppendOrthologuesToFiles(orthologues, speciesDict, SequenceDict, iog, output_dir)
 
@@ -367,7 +391,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("trees_dir")
     parser.add_argument("rooted_species_tree")
-    parser.add_argument("-p", "--prune", action='store_true')
+#    parser.add_argument("-p", "--prune", action='store_true')
     parser.add_argument("-s", "--separator", choices=("dot", "dash", "second_dash", "3rd_dash", "hyphen"), help="Separator been species name and gene name in gene tree taxa")
     args = parser.parse_args()
     output_dir = os.path.split(args.trees_dir)[0]
@@ -390,4 +414,6 @@ if __name__ == "__main__":
     print(output_dir)
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
-    GetOrthologuesStandalone(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree, qPrune=args.prune)
+    GetOrthologuesStandalone_Parallel(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
+#    GetOrthologuesStandalone(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
+

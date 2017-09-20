@@ -695,7 +695,7 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
                 except OSError:
                     pass
     else:
-        trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir, qSingleTree=False, qPrune=True, qQfO=False)
+        trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir)
         
                 
 def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, speciesTree_fn = None, pickleDir=None):

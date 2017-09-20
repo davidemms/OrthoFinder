@@ -225,6 +225,31 @@ def ManageQueue(runningProcesses, cmd_queue):
                 runningProcesses[i] = None
     if qError:
         Fail()              
+
+""" 
+Run a method in parallel
+"""      
+              
+def Worker_RunMethod(Function, args_queue):
+    while True:
+        try:
+            args = args_queue.get(True, 1)
+            Function(*args)
+        except Queue.Empty:
+            return 
+
+def RunMethodParallel(Function, args_queue, nProcesses):
+    runningProcesses = [mp.Process(target=Worker_RunMethod, args=(Function, args_queue)) for i_ in xrange(nProcesses)]
+    for proc in runningProcesses:
+        proc.start()
+    ManageQueue(runningProcesses, args_queue)
+    
+def ExampleRunMethodParallel():
+    F = lambda x, y: x**2
+    args_queue = mp.Queue()
+    for i in xrange(100): args_queue.put((3,i))
+    RunMethodParallel(F, args_queue, 16)
+       
 """
 Directory and file management
 -------------------------------------------------------------------------------
