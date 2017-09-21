@@ -267,7 +267,9 @@ def AppendOrthologuesToFiles(orthologues, speciesDict, sequenceDict, iog, result
     # Sort the orthologues according to speices pairs
     species = speciesDict.keys()
 #    print(species)
+    nOrthologues = 0
     for leaves0, leaves1 in orthologues:
+        nOrthologues += len(leaves0) * len(leaves1)
 #        print([g.split("_")[0] for g in leaves0])
 #        sys.exit()
         genes_per_species0 = [(sp, [g for g in leaves0 if g.split("_")[0] == sp]) for sp in species] 
@@ -288,6 +290,7 @@ def AppendOrthologuesToFiles(orthologues, speciesDict, sequenceDict, iog, result
 #                    print("row")
                     writer1.writerow((og, ", ".join([sequenceDict[g] for g in genes0]), ", ".join([sequenceDict[g] for g in genes1])))
                     writer2.writerow((og, ", ".join([sequenceDict[g] for g in genes1]), ", ".join([sequenceDict[g] for g in genes0])))
+    return nOrthologues
             
 ##        o_byspeciespair = defaultdict(list)
 ##        for g0 in leaves0:
@@ -382,12 +385,14 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
     # Infer orthologues and write them to file           
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
     nOgs = len(ogSet.OGs())
+    nOrthologues = 0
     for iog in xrange(nOgs):
         orthologues, recon_tree = GetOrthologues_for_tree(treesIDsPatFn(iog), species_tree_rooted, GeneToSpecies)
         util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=True)
         if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
             util.PrintTime("Done %d of %d" % (iog, nOgs))
-        AppendOrthologuesToFiles(orthologues, speciesDict, SequenceDict, iog, output_dir)
+        nOrthologues += AppendOrthologuesToFiles(orthologues, speciesDict, SequenceDict, iog, output_dir)
+    return nOrthologues
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

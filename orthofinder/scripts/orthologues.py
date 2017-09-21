@@ -686,7 +686,7 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
             pickleDir = workingDir + "matrices_orthologues/"
             if not os.path.exists(pickleDir): os.mkdir(pickleDir)
             qDelDir = True    
-        trees2ologs_dlcpar.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir)  
+        nOrthologues = trees2ologs_dlcpar.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir)  
         # If a temporary matrices directory was created, delete it now
         if qDelDir:
             if os.path.exists(pickleDir): 
@@ -695,7 +695,8 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
                 except OSError:
                     pass
     else:
-        trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir)
+        nOrthologues = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir)
+    print("Identified %d orthologues" % nOrthologues)
         
                 
 def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, speciesTree_fn = None, pickleDir=None):
