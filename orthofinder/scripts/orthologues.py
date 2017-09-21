@@ -661,6 +661,35 @@ def CleanWorkingDir(workingDir):
                 time.sleep(1)
                 shutil.rmtree(dFull, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
 
+def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
+    speciesDict = ogSet.SpeciesDict()
+    sequenceDict = ogSet.SequenceDict()
+    ogs = ogSet.OGs(qInclAll=True)
+    nOrthologues = 0
+    for iog, og in enumerate(ogs):
+        n = len(og) 
+        if n == 1: break
+        elif n == 2:
+            orthologues = [([og[0].ToString()], [og[1].ToString()]),]
+            nOrthologues += 1
+        elif n == 3:
+            sp = [g.iSp for g in og]
+            c = Counter(sp) 
+            nSp = len(c)
+            if nSp == 3:
+                orthologues = [([og[0].ToString()], [og[1].ToString(), og[2].ToString()]), ] + [([og[1].ToString(), ], [og[2].ToString(), ]), ]
+                nOrthologues += 3
+            elif nSp == 2:             
+                sp1, sp2 = c.keys()
+                orthologues = [([g.ToString() for g in og if g.iSp == sp1], [g.ToString() for g in og if g.iSp == sp2])]
+                nOrthologues += 2
+            else: 
+                continue # no orthologues
+        elif n >= 4:
+            continue
+        trees2ologs_of.AppendOrthologuesToFiles(orthologues, speciesDict, sequenceDict, iog, resultsDir)
+    return nOrthologues
+
 def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree_fn, workingDir, resultsDir, reconTreesRenamedDir, nParallel, iSpeciesTree=None, pickleDir = None):
     """
     treesPatFn - function returning name of filename
@@ -696,6 +725,7 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
                     pass
     else:
         nOrthologues = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir)
+    nOrthologues += TwoAndThreeGeneOrthogroups(ogSet, resultsDir)
     print("Identified %d orthologues" % nOrthologues)
         
                 
