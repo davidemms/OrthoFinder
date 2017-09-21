@@ -41,7 +41,7 @@ import util
 import tree
 import matrices
 import mcl as MCL
-import root_from_duplications as rfd
+import stride
 import trees2ologs_dlcpar
 import trees2ologs_of
 import blast_file_processor as BlastFileProcessor
@@ -844,12 +844,15 @@ def OrthologuesWorkflow(workingDir_ogs,
     else:
         util.PrintUnderline("Best outgroup(s) for species tree") 
         spDict = ogSet.SpeciesDict()
-        roots, clusters, rootedSpeciesTreeFN, nSupport = rfd.GetRoot(spTreeFN_ids, os.path.split(db.TreeFilename_IDs(0))[0] + "/", rfd.GeneToSpecies_dash, nHighParallel, treeFmt = 1)
+        roots, clusters_counter, rootedSpeciesTreeFN, nSupport, _, _ = stride.GetRoot(spTreeFN_ids, os.path.split(db.TreeFilename_IDs(0))[0] + "/", stride.GeneToSpecies_dash, nHighParallel, treeFmt = 1, qWriteRootedTree=True)
+        nAll = sum(clusters_counter.values())
+        nFP_mp = nAll - nSupport
+        n_non_trivial = sum([v for k, v in clusters_counter.items() if len(k) > 1])
         if len(roots) > 1:
-            print("Observed %d duplications. %d support the best roots and %d contradict them." % (len(clusters), nSupport, len(clusters) - nSupport))
+            print("Observed %d well-supported, non-terminal duplications. %d support the best roots and %d contradict them." % (n_non_trivial, n_non_trivial-nFP_mp, nFP_mp))
             print("Best outgroups for species tree:")  
         else:
-            print("Observed %d duplications. %d support the best root and %d contradict it." % (len(clusters), nSupport, len(clusters) - nSupport))
+            print("Observed %d well-supported, non-terminal duplications. %d support the best root and %d contradict it." % (n_non_trivial, n_non_trivial-nFP_mp, nFP_mp))
             print("Best outgroup for species tree:")  
         for r in roots: print("  " + (", ".join([spDict[s] for s in r]))  )
         qMultiple = len(roots) > 1

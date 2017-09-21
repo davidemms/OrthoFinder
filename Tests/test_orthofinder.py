@@ -725,7 +725,7 @@ class TestCommandLine(unittest.TestCase):
     def test_DistanceMatrixEvalues(self):
         if qBinary:
             self.skipTest("Skipping unit test. Test can be run on sourcecode version of OrthoFinder.") 
-        import get_orthologues
+        import orthologues
         m = np.zeros((2,2))
         m = np.matrix([[0, 1e-9, 0.1, 1], [1e-9, 0, 1, 1], [0.1, 1, 0, 1], [1, 1, 1, 0]])
 #        m[0,1] = 
@@ -733,7 +733,7 @@ class TestCommandLine(unittest.TestCase):
         names = ["a", "b", "c", "d"]
         outFN = baseDir + "Input/Distances.phy"
         max_og = 1.
-        get_orthologues.DendroBLASTTrees.WritePhylipMatrix(m, names, outFN, max_og)
+        orthologues.DendroBLASTTrees.WritePhylipMatrix(m, names, outFN, max_og)
         # read values and check they are written in the corect format
         with open(outFN, 'rb') as infile:
             infile.next()
