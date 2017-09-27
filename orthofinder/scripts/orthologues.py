@@ -726,7 +726,7 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
     else:
         nOrthologues = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir)
     nOrthologues += TwoAndThreeGeneOrthogroups(ogSet, resultsDir)
-    print("Identified %d orthologues" % nOrthologues)
+#    print("Identified %d orthologues" % nOrthologues)
         
                 
 def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, speciesTree_fn = None, pickleDir=None):
@@ -908,27 +908,31 @@ def OrthologuesWorkflow(workingDir_ogs,
         CleanWorkingDir(db.workingDir)
         return GetResultsFilesString(resultsSpeciesTrees, seqs_alignments_dirs if qMSA else None, False)
     
-    if qMultiple: util.PrintUnderline("\nAnalysing each of the potential species tree roots", True)
+    if qMultiple: util.PrintUnderline("\nMultiple potential species tree roots were identified, only one will be analyed.", True)
     resultsSpeciesTrees = []
-    for i, (r, speciesTree_fn) in enumerate(zip(roots, rootedSpeciesTreeFN)):
-        util.PrintUnderline("Reconciling gene trees and species tree" + (" (root %d)"%i if qMultiple else "")) 
-        if qMultiple: 
-            resultsDir_new = resultsDir + "Orthologues_using_outgroup_%d/" % i
-            reconTreesRenamedDir = db.workingDir + "Recon_Gene_Trees_using_outgroup_%d/" % i
-            resultsSpeciesTrees.append(resultsDir_new + "SpeciesTree_rooted_at_outgroup_%d.txt" % i)
-            print("Outgroup: " + (", ".join([spDict[s] for s in r])))
-        elif userSpeciesTree:
-            resultsDir_new = resultsDir + "Orthologues/"
-            reconTreesRenamedDir = db.workingDir + "Recon_Gene_Trees/"
-            resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
-        else:
-            resultsDir_new = resultsDir + "Orthologues/"
-            reconTreesRenamedDir = db.workingDir + "Recon_Gene_Trees/"
-            resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
-            print("Outgroup: " + (", ".join([spDict[s] for s in r])))
-        os.mkdir(resultsDir_new)
-        util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True)
-        ReconciliationAndOrthologues(recon_method, db.TreeFilename_IDs, db.ogSet, speciesTree_fn, db.workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, i if qMultiple else None, pickleDir=pickleDir) 
+    i = 0
+    r = roots[0]
+    speciesTree_fn = rootedSpeciesTreeFN[0]
+    util.PrintUnderline("Reconciling gene trees and species tree") 
+    if userSpeciesTree:
+        resultsDir_new = resultsDir + "Orthologues/"
+        reconTreesRenamedDir = db.workingDir + "Recon_Gene_Trees/"
+        resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
+    else:
+        resultsDir_new = resultsDir + "Orthologues/"
+        reconTreesRenamedDir = db.workingDir + "Recon_Gene_Trees/"
+        resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
+        print("Outgroup: " + (", ".join([spDict[s] for s in r])))
+    os.mkdir(resultsDir_new)
+    util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True)
+    ReconciliationAndOrthologues(recon_method, db.TreeFilename_IDs, db.ogSet, speciesTree_fn, db.workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, i if qMultiple else None, pickleDir=pickleDir) 
+    
+    if qMultiple:
+        rooted_species_tree_dir = resultsDir + "Potential_Rooted_Species_Trees/"
+        os.mkdir(rooted_species_tree_dir)
+        for i, (r, speciesTree_fn) in enumerate(zip(roots, rootedSpeciesTreeFN)):
+            unanalysedSpeciesTree = rooted_species_tree_dir + "SpeciesTree_rooted_at_outgroup_%d.txt" % i
+            util.RenameTreeTaxa(speciesTree_fn, unanalysedSpeciesTree, db.ogSet.SpeciesDict(), qFixNegatives=True)
     
     db.DeleteBlastMatrices()
     CleanWorkingDir(db.workingDir)

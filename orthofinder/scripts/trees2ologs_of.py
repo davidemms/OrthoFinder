@@ -260,7 +260,8 @@ def GetOrthologues_for_tree(treeFN, species_tree_rooted, GeneToSpecies):
                     if len(s0.intersection(s1)) == 0:
 #                        orthologues += [(l0,l1)  for l0 in n0.get_leaf_names() for l1 in n1.get_leaf_names()]
                         orthologues.append((n0.get_leaf_names(), n1.get_leaf_names()))
-#        WriteQfO2(orthologues, "/home/david/projects/OrthoFinder/Development/Orthologues/ReplacingDLCpar/ExampleData/Euk/ids_branch_lengths//DendroBLAST/Orthologues_M2c_no_overlap_check_pairwise/" + os.path.split(treeFN)[1], False)
+#        directory = os.path.split(treeFN)[0]
+#        WriteQfO2(orthologues, directory + "/../Orthologues_M3/" + os.path.split(treeFN)[1], False)
         return orthologues, tree
 
 def AppendOrthologuesToFiles(orthologues, speciesDict, sequenceDict, iog, resultsDir):

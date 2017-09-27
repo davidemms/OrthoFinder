@@ -477,12 +477,28 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, treeFmt=3, q
     roots, nSupport = ParsimonyRoot(species, dict_clades.keys(), clusters)
     roots = list(set(roots))
     speciesTrees_rootedFNs =[]
+    # Get distance of each from a supported clade
+    topDist = []
+    branchDist = []
+    for r in roots:
+        speciesTree = RootAtClade(speciesTree, r)
+        topDist.append(min([speciesTree.get_distance(n, topology_only=True) for n in speciesTree.traverse('preorder') if frozenset(n.get_leaf_names()) in clusters]))
+        branchDist.append(min([speciesTree.get_distance(n) for n in speciesTree.traverse('preorder') if (frozenset(n.get_leaf_names()) in clusters and speciesTree.get_distance(n, topology_only=True) == topDist[-1])]))        
+    maxTopDist = max(topDist)
+    bestDist = -1
+    for i, (t, d) in enumerate(zip(topDist, branchDist)):
+        if t == maxTopDist and d > bestDist:
+            bestDist = d
+            iRootToUse = i
+    rootToUse = roots.pop(iRootToUse)
+    roots = [rootToUse] + roots
+        
     if qWriteRootedTree:
         for i, r in enumerate(roots):
             speciesTree = RootAtClade(speciesTree, r) 
             speciesTree_rootedFN = os.path.splitext(speciesTreeFN)[0] + "_%d_rooted.txt" % i 
     #    speciesTree = LabelNodes()
-            speciesTree.write(outfile=speciesTree_rootedFN, format=4)
+            speciesTree.write(outfile=speciesTree_rootedFN, format=5)
             speciesTrees_rootedFNs.append(speciesTree_rootedFN)
     return roots, clusters, speciesTrees_rootedFNs, nSupport, dict_clades.keys(), species
 
