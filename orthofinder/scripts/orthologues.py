@@ -706,7 +706,7 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
         qDeepSearch = (recon_method == "dlcpar_deepsearch")
         dlcparResultsDir = RunDlcpar(treesIDsPatFn, ogSet, speciesTree_fn, workingDir, nParallel, qDeepSearch)
         for iog in xrange(len(ogSet.OGs())):
-            util.RenameTreeTaxa(dlcparResultsDir + "OG%07d_tree_id.dlcpar.locus.tree" % iog, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=False, inFormat=8)
+            util.RenameTreeTaxa(dlcparResultsDir + "OG%07d_tree_id.dlcpar.locus.tree" % iog, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=False, inFormat=8, qLabel=True)
     
         # Orthologue lists
         util.PrintUnderline("Inferring orthologues from gene trees" + (" (root %d)"%iSpeciesTree if iSpeciesTree != None else ""))
@@ -762,8 +762,8 @@ def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, spe
     
     def TreePatIDs(iog):
         return workingDir + ("Trees_ids/OG%07d_tree_id.txt" % iog)
-    reconTreesRenamedDir = workingDir + "Recon_Gene_Trees/"
     resultsDir_new = workingDir + "../Orthologues"      # for the Orthologues_Species/ directories
+    reconTreesRenamedDir = resultsDir_new + "/Recon_Gene_Trees/"
 #    if os.path.exists(resultsDir_new):
     resultsDir_new = util.CreateNewWorkingDirectory(resultsDir_new + "_")
 #    else:
@@ -916,11 +916,11 @@ def OrthologuesWorkflow(workingDir_ogs,
     util.PrintUnderline("Reconciling gene trees and species tree") 
     if userSpeciesTree:
         resultsDir_new = resultsDir + "Orthologues/"
-        reconTreesRenamedDir = db.workingDir + "Recon_Gene_Trees/"
+        reconTreesRenamedDir = resultsDir_new + "/Recon_Gene_Trees/"
         resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
     else:
         resultsDir_new = resultsDir + "Orthologues/"
-        reconTreesRenamedDir = db.workingDir + "Recon_Gene_Trees/"
+        reconTreesRenamedDir = resultsDir_new + "/Recon_Gene_Trees/"
         resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
         print("Outgroup: " + (", ".join([spDict[s] for s in r])))
     os.mkdir(resultsDir_new)

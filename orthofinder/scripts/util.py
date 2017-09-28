@@ -397,7 +397,7 @@ class FirstWordExtractor(IDExtractor):
         return self.nameToIDDict    
 
 
-def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qFixNegatives=False, inFormat=None):     
+def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qFixNegatives=False, inFormat=None, qLabel=False):
     try:
         if type(treeFN_or_tree) == tree.TreeNode:
             t = treeFN_or_tree
@@ -411,9 +411,18 @@ def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qFixNegatives=False,
         if qFixNegatives:
             tree_length = sum([n.dist for n in t.traverse() if n != t])
             sliver = tree_length * 1e-6
-            for n in t.traverse():
-                if n.dist < 0.0: n.dist = sliver
-        t.write(outfile = newTreeFilename, format=5)  # internal + terminal branch lengths, leaf names
+        iNode = 1
+        for n in t.traverse():
+            if qFixNegatives and n.dist < 0.0: n.dist = sliver
+            if qLabel:
+                if (not n.is_leaf()) and (not n.is_root()):
+                    n.name = "n%d" % iNode
+                    iNode += 1
+        if qLabel:
+            with open(newTreeFilename, 'wb') as outfile:
+                outfile.write(t.write(format=3)[:-1] + "n0;")  # internal + terminal branch lengths, leaf names, node names. (tree library won't label root node)
+        else:
+            t.write(outfile = newTreeFilename, format=5)  # internal + terminal branch lengths, leaf names
     except:
         print(newTreeFilename)
         pass

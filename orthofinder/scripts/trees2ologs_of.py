@@ -310,7 +310,7 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
     nOrthologues = 0
     for iog in xrange(nOgs):
         orthologues, recon_tree = GetOrthologues_for_tree(treesIDsPatFn(iog), species_tree_rooted, GeneToSpecies)
-        util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=True)
+        util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=True, qLabel=True)
         if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
             util.PrintTime("Done %d of %d" % (iog, nOgs))
         nOrthologues += AppendOrthologuesToFiles(orthologues, speciesDict, SequenceDict, iog, output_dir)
