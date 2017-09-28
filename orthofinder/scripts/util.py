@@ -397,7 +397,7 @@ class FirstWordExtractor(IDExtractor):
         return self.nameToIDDict    
 
 
-def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qFixNegatives=False, inFormat=None, qLabel=False):
+def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qFixNegatives=False, inFormat=None, label=None): 
     try:
         if type(treeFN_or_tree) == tree.TreeNode:
             t = treeFN_or_tree
@@ -414,17 +414,18 @@ def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qFixNegatives=False,
         iNode = 1
         for n in t.traverse():
             if qFixNegatives and n.dist < 0.0: n.dist = sliver
-            if qLabel:
+            if label != None:
                 if (not n.is_leaf()) and (not n.is_root()):
-                    n.name = "n%d" % iNode
+                    n.name = label + ("%d" % iNode)
                     iNode += 1
-        if qLabel:
+        if label != None: 
             with open(newTreeFilename, 'wb') as outfile:
-                outfile.write(t.write(format=3)[:-1] + "n0;")  # internal + terminal branch lengths, leaf names, node names. (tree library won't label root node)
+                outfile.write(t.write(format=3)[:-1] + label + "0;")  # internal + terminal branch lengths, leaf names, node names. (tree library won't label root node)
         else:
             t.write(outfile = newTreeFilename, format=5)  # internal + terminal branch lengths, leaf names
     except:
         print(newTreeFilename)
+        raise
         pass
 
 def IsWorkingDirectory(orthofinderWorkingDir):
