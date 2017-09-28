@@ -903,7 +903,7 @@ def OrthologuesWorkflow(workingDir_ogs,
                 resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
             else:
                 resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted_at_outgroup_%d.txt" % i)
-            util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True)
+            util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True, qLabel=True)
         db.DeleteBlastMatrices()
         CleanWorkingDir(db.workingDir)
         return GetResultsFilesString(resultsSpeciesTrees, seqs_alignments_dirs if qMSA else None, False)
@@ -924,7 +924,7 @@ def OrthologuesWorkflow(workingDir_ogs,
         resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
         print("Outgroup: " + (", ".join([spDict[s] for s in r])))
     os.mkdir(resultsDir_new)
-    util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True)
+    util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True, qLabel=True)
     ReconciliationAndOrthologues(recon_method, db.TreeFilename_IDs, db.ogSet, speciesTree_fn, db.workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, i if qMultiple else None, pickleDir=pickleDir) 
     
     if qMultiple:
@@ -932,7 +932,7 @@ def OrthologuesWorkflow(workingDir_ogs,
         os.mkdir(rooted_species_tree_dir)
         for i, (r, speciesTree_fn) in enumerate(zip(roots, rootedSpeciesTreeFN)):
             unanalysedSpeciesTree = rooted_species_tree_dir + "SpeciesTree_rooted_at_outgroup_%d.txt" % i
-            util.RenameTreeTaxa(speciesTree_fn, unanalysedSpeciesTree, db.ogSet.SpeciesDict(), qFixNegatives=True)
+            util.RenameTreeTaxa(speciesTree_fn, unanalysedSpeciesTree, db.ogSet.SpeciesDict(), qFixNegatives=True, qLabel=True)
     
     db.DeleteBlastMatrices()
     CleanWorkingDir(db.workingDir)
