@@ -690,7 +690,7 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
         trees2ologs_of.AppendOrthologuesToFiles(orthologues, speciesDict, sequenceDict, iog, resultsDir)
     return nOrthologues
 
-def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree_fn, workingDir, resultsDir, reconTreesRenamedDir, nParallel, iSpeciesTree=None, pickleDir = None):
+def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree_fn, workingDir, resultsDir, reconTreesRenamedDir, nParallel, iSpeciesTree=None, pickleDir = None, all_stride_dup_genes=None):
     """
     treesPatFn - function returning name of filename
     ogSet - info about the orthogroups, species etc
@@ -724,7 +724,7 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
                 except OSError:
                     pass
     else:
-        nOrthologues = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir)
+        nOrthologues = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir, all_stride_dup_genes)
     nOrthologues += TwoAndThreeGeneOrthogroups(ogSet, resultsDir)
 #    print("Identified %d orthologues" % nOrthologues)
         
@@ -875,7 +875,7 @@ def OrthologuesWorkflow(workingDir_ogs,
     else:
         util.PrintUnderline("Best outgroup(s) for species tree") 
         spDict = ogSet.SpeciesDict()
-        roots, clusters_counter, rootedSpeciesTreeFN, nSupport, _, _ = stride.GetRoot(spTreeFN_ids, os.path.split(db.TreeFilename_IDs(0))[0] + "/", stride.GeneToSpecies_dash, nHighParallel, treeFmt = 1, qWriteRootedTree=True)
+        roots, clusters_counter, rootedSpeciesTreeFN, nSupport, _, _, all_stride_dup_genes = stride.GetRoot(spTreeFN_ids, os.path.split(db.TreeFilename_IDs(0))[0] + "/", stride.GeneToSpecies_dash, nHighParallel, treeFmt = 1, qWriteRootedTree=True)
         nAll = sum(clusters_counter.values())
         nFP_mp = nAll - nSupport
         n_non_trivial = sum([v for k, v in clusters_counter.items() if len(k) > 1])
@@ -925,7 +925,7 @@ def OrthologuesWorkflow(workingDir_ogs,
         print("Outgroup: " + (", ".join([spDict[s] for s in r])))
     os.mkdir(resultsDir_new)
     util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True, label='N')
-    ReconciliationAndOrthologues(recon_method, db.TreeFilename_IDs, db.ogSet, speciesTree_fn, db.workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, i if qMultiple else None, pickleDir=pickleDir) 
+    ReconciliationAndOrthologues(recon_method, db.TreeFilename_IDs, db.ogSet, speciesTree_fn, db.workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, i if qMultiple else None, pickleDir=pickleDir, all_stride_dup_genes=all_stride_dup_genes) 
     
     if qMultiple:
         rooted_species_tree_dir = resultsDir + "Potential_Rooted_Species_Trees/"

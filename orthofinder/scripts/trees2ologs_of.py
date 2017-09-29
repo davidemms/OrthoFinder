@@ -205,7 +205,7 @@ def GetRoot(tree, species_tree_rooted, GeneToSpecies):
             i, _ = max(enumerate(root_dists), key=operator.itemgetter(1))
             return roots[i]
     
-def GetOrthologues_for_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None):
+def GetOrthologues_for_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None):
     """ if dupsWriter != None then seqIDs and spIDs must also be provided"""
     qPrune=True
     orthologues = []
@@ -241,9 +241,11 @@ def GetOrthologues_for_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, qWr
                     sp_present = sp0.union(sp1)
                     if len(sp_present) == 1:
                         stNode = species_tree_rooted & next(sp for sp in sp_present)
+                        isSTRIDE = "Terminal"
                     else:
                         stNode = species_tree_rooted.get_common_ancestor(sp_present)
-                    dupsWriter.writerow(["OG%07d" % iog, spIDs[stNode.name] if len(stNode) == 1 else stNode.name, n.name, float(o)/(len(stNode)), "STRIDE?", ", ".join([seqIDs[g] for g in ch[0].get_leaf_names()]), ", ".join([seqIDs[g] for g in ch[1].get_leaf_names()])]) 
+                        isSTRIDE = "" if all_stride_dup_genes == None else "STRIDE" if frozenset(n.get_leaf_names()) in all_stride_dup_genes else ""
+                    dupsWriter.writerow(["OG%07d" % iog, spIDs[stNode.name] if len(stNode) == 1 else stNode.name, n.name, float(o)/(len(stNode)), isSTRIDE, ", ".join([seqIDs[g] for g in ch[0].get_leaf_names()]), ", ".join([seqIDs[g] for g in ch[1].get_leaf_names()])]) 
             else:
                 orthologues.append((ch[0].get_leaf_names(), ch[1].get_leaf_names()))
         elif len(ch) > 2:
@@ -301,7 +303,7 @@ def GetOrthologuesStandalone_Parallel(trees_dir, species_tree_rooted_fn, GeneToS
 #    orthologues, recon_tree = GetOrthologues_for_tree(iog, treeFN, species_tree_rooted, GeneToSpecies)
 #    write_to_file_queue.put(orthologues) 
 
-def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, GeneToSpecies, workingDir, output_dir, reconTreesRenamedDir):    # Create directory structure
+def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, GeneToSpecies, workingDir, output_dir, reconTreesRenamedDir, all_stride_dup_genes):    # Create directory structure
     speciesDict = ogSet.SpeciesDict()
     SequenceDict = ogSet.SequenceDict()
     # Write directory and file structure
@@ -330,7 +332,7 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
         dupWriter = csv.writer(outfile)
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "",	"Genes 1", "Genes 2"])
         for iog in xrange(nOgs):
-            orthologues, recon_tree = GetOrthologues_for_tree(iog, treesIDsPatFn(iog), species_tree_rooted, GeneToSpecies, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict())
+            orthologues, recon_tree = GetOrthologues_for_tree(iog, treesIDsPatFn(iog), species_tree_rooted, GeneToSpecies, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes)
             util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=True, label='n') 
             if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
                 util.PrintTime("Done %d of %d" % (iog, nOgs))

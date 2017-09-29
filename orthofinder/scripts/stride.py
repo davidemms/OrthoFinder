@@ -60,6 +60,8 @@ criteria = "crit_all"
 nProcs = mp.cpu_count()
 spTreeFormat = 1  
 
+tooLarge = frozenset(["Too many genes"])
+
 class Node(object):
     """ The class allows the user to get the 'child' nodes in any of the three directions
     rather than just for the two 'child' nodes in the tree model
@@ -124,6 +126,39 @@ class Node(object):
             return [c1clades, [c21clade, c22clade]]
         else:
             raise Exception("Expected binary tree")
+      
+    def get_up_genes(self, nMax):
+        if self.node.is_root(): 
+            raise Exception("Error in duplicate gene identification, no 'up' node.")
+        nUp = len(self.node.get_tree_root()) - len(self.node)
+        if nUp > nMax: return tooLarge
+        else:
+            return frozenset(self.node.get_tree_root().get_leaf_names()).difference(frozenset(self.node.get_leaf_names()))        
+      
+    def get_gene_sets(self, i, j, nMax=2000):
+        """
+        Mirrors get_grandrelative_clades_stored. 
+        i - 0,1,2: set of clades with respect to order in get_grandrelative_clades_stored
+        j - 0,1,2: set of clades with respect to order in get_grandrelative_clades_stored
+        
+        Returns the actuall genes in the clades
+        """
+        if self.node.is_root():
+            children = self.node.get_children()
+            if len(children) != 3: return None
+            return (tooLarge if len(children[i]) > nMax else frozenset(children[i].get_leaf_names()), tooLarge if len(children[j]) > nMax else frozenset(children[j].get_leaf_names()))
+        else:
+            children = self.node.get_children()
+            if len(children) != 2: return frozenset([]), frozenset([])
+            if i <= 1:
+                iGenes = frozenset(children[i].get_leaf_names()) if len(children[i]) < nMax else tooLarge
+            else:
+                iGenes = frozenset(self.get_up_genes(nMax))
+            if j <=1:
+                jGenes = frozenset(children[j].get_leaf_names()) if len(children[j]) < nMax else tooLarge
+            else:
+                jGenes = frozenset(self.get_up_genes(nMax))
+            return iGenes, jGenes
       
     def get_grandrelative_clades_stored(self):
         """
@@ -307,6 +342,7 @@ def SupportedHierachies(t, G, S, GeneToSpecies, species, dict_clades, clade_name
     """
     qAncient = False
     supported = defaultdict(int)
+    genesPostDup = set()
     # Pre-calcualte species sets on tree: traverse tree from leaves inwards
     StoreSpeciesSets(t, GeneToSpecies, G)
     if qWriteDupTrees:
@@ -366,6 +402,8 @@ def SupportedHierachies(t, G, S, GeneToSpecies, species, dict_clades, clade_name
                         if clades == None: break   # locally non-binary in vicinity of node, skip to next node
                     if not LocalCheck_clades(clades[i], clades[j], dict_clades[k1], GeneToSpecies): continue
                     supported[frozenset(k1)] +=1
+                    genes = N.get_gene_sets(i, j)
+                    genesPostDup.add(genes[0].union(genes[1]))
                     if qWriteDupTrees:
                         if t_write == None: 
                             try:
@@ -376,7 +414,7 @@ def SupportedHierachies(t, G, S, GeneToSpecies, species, dict_clades, clade_name
                         gSets = GetStoredGeneSets(n)
                         SaveTree(t_write, gSets[ii], clade_names[k1], treeName, iExample)
                         iExample += 1       
-    return supported   
+    return supported, genesPostDup  
     
 """
 Parallelisation wrappers
@@ -384,7 +422,7 @@ Parallelisation wrappers
 """
 
 def SupportedHierachies_wrapper(treeName, GeneToSpecies, species, dict_clades, clade_names, qWriteDupTrees=False):
-    if not os.path.exists(treeName): return []
+    if not os.path.exists(treeName): return [], []
     t = ete.Tree(treeName, format=1)
     G = set(t.get_leaf_names())
     S = set(map(GeneToSpecies, G))
@@ -394,7 +432,7 @@ def SupportedHierachies_wrapper(treeName, GeneToSpecies, species, dict_clades, c
         print(S.difference(species))
         return None
     if len(S) < 4:
-        return []
+        return [], []
     result = SupportedHierachies(t, G, S, GeneToSpecies, species, dict_clades, clade_names, treeName, qWriteDupTrees)
     return result
     
@@ -470,10 +508,12 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, treeFmt=3, q
     pool = mp.Pool(nProcessors, maxtasksperchild=1)       
     list_of_dicts = pool.map(SupportedHierachies_wrapper2, [(fn, GeneToSpeciesMap, species, dict_clades, clade_names, qWriteDupTrees) for fn in glob.glob(treesDir + "/*")])
     clusters = Counter()
-    for l in list_of_dicts:
+    all_stride_dup_genes = set()
+    for l, stride_dup_genes in list_of_dicts:
         if l == None:
             sys.exit()
         clusters.update(l)
+        all_stride_dup_genes.update(stride_dup_genes)
     roots, nSupport = ParsimonyRoot(species, dict_clades.keys(), clusters)
     roots = list(set(roots))
     speciesTrees_rootedFNs =[]
@@ -500,7 +540,7 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, treeFmt=3, q
     #    speciesTree = LabelNodes()
             speciesTree.write(outfile=speciesTree_rootedFN, format=5)
             speciesTrees_rootedFNs.append(speciesTree_rootedFN)
-    return roots, clusters, speciesTrees_rootedFNs, nSupport, dict_clades.keys(), species
+    return roots, clusters, speciesTrees_rootedFNs, nSupport, dict_clades.keys(), species, all_stride_dup_genes
 
 def PrintRootingSummary(roots, clusters_counter, nSupport):
     nAll = sum(clusters_counter.values())
@@ -669,14 +709,14 @@ def Main_Full(args):
     if not args.directory:
         speciesTree = ete.Tree(args.Species_tree, format=spTreeFormat)
         species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
-        c = SupportedHierachies_wrapper(args.gene_trees, GeneToSpecies, species, dict_clades, clade_names)      
+        c, stride_dup_genes = SupportedHierachies_wrapper(args.gene_trees, GeneToSpecies, species, dict_clades, clade_names)      
         for k, v in c.items(): print((k, v))
 #    elif args.debug:
 #        speciesTree = ete.Tree(args.Species_tree, format=spTreeFormat)
 #        species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
 #        clusters_counter = Counter()
 #        for fn in glob.glob(args.gene_trees + "/*"):
-#            c = SupportedHierachies_wrapper(fn, GeneToSpecies, species, dict_clades, clade_names)
+#            c, stride_dup_genes = SupportedHierachies_wrapper(fn, GeneToSpecies, species, dict_clades, clade_names)
 #            clusters_counter.update(c)
 #        roots, nSupport = ParsimonyRoot(species, dict_clades.keys(), clusters_counter)
 #        PrintRootingSummary(roots, clusters_counter, nSupport)
@@ -687,7 +727,7 @@ def Main_Full(args):
             sys.exit()
         print("Analysing %d gene trees" % nTrees)
 #        roots, clusters_counter, _, nSupport, clades, species = GetRoot(args.Species_tree, args.gene_trees, GeneToSpecies, nProcs, treeFmt = 1, qWriteDupTrees=args.output)
-        roots, clusters_counter, _, nSupport, clades, species = GetRoot(args.Species_tree, args.gene_trees, GeneToSpecies, nProcs, treeFmt = 1)
+        roots, clusters_counter, _, nSupport, clades, species, all_stride_dup_genes = GetRoot(args.Species_tree, args.gene_trees, GeneToSpecies, nProcs, treeFmt = 1)
         PrintRootingSummary(roots, clusters_counter, nSupport)
         outputDir = CreateNewWorkingDirectory(args.gene_trees + "/../STRIDE_Results")
 #        shelveFN = outputDir + "STRIDE_data.shv"
