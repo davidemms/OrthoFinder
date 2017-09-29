@@ -22,7 +22,7 @@
 #      improves orthogroup inference accuracy, Genome Biology 16:157
 #
 # For any enquiries send an email to David Emms
-# david_emms@hotmail.com
+# david_emms@hotmail.com 
 
 nThreadsDefault = 16
 nAlgDefault = 1
