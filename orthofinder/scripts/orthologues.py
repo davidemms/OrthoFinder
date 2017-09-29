@@ -762,13 +762,13 @@ def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, spe
     
     def TreePatIDs(iog):
         return workingDir + ("Trees_ids/OG%07d_tree_id.txt" % iog)
-    resultsDir_new = workingDir + "../Orthologues"      # for the Orthologues_Species/ directories
-    reconTreesRenamedDir = resultsDir_new + "/Recon_Gene_Trees/"
-#    if os.path.exists(resultsDir_new):
+        
+    resultsDir_new = workingDir + "../New_Analysis_From_Trees"      # for the Orthologues_Species/ directories
     resultsDir_new = util.CreateNewWorkingDirectory(resultsDir_new + "_")
-#    else:
-#        resultsDir_new += os.sep
-#        os.mkdir(resultsDir_new)
+    resultsDir_new += "Orthologues/"
+    os.mkdir(resultsDir_new)
+    reconTreesRenamedDir = resultsDir_new + "../Recon_Gene_Trees/"
+
     orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = util.GetOGsFile(groupsDir)
     speciesToUse, nSpAll = util.GetSpeciesToUse(orthofinderWorkingDir + "SpeciesIDs.txt")    
     ogSet = OrthoGroupsSet(orthofinderWorkingDir, speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor)
@@ -916,11 +916,11 @@ def OrthologuesWorkflow(workingDir_ogs,
     util.PrintUnderline("Reconciling gene trees and species tree") 
     if userSpeciesTree:
         resultsDir_new = resultsDir + "Orthologues/"
-        reconTreesRenamedDir = resultsDir_new + "/Recon_Gene_Trees/"
+        reconTreesRenamedDir = resultsDir + "/Recon_Gene_Trees/"
         resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
     else:
         resultsDir_new = resultsDir + "Orthologues/"
-        reconTreesRenamedDir = resultsDir_new + "/Recon_Gene_Trees/"
+        reconTreesRenamedDir = resultsDir + "/Recon_Gene_Trees/"
         resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
         print("Outgroup: " + (", ".join([spDict[s] for s in r])))
     os.mkdir(resultsDir_new)

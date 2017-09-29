@@ -328,7 +328,7 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
             iNode += 1
     nOgs = len(ogSet.OGs())
     nOrthologues = 0
-    with open(output_dir + "Duplications.csv", 'wb') as outfile:
+    with open(reconTreesRenamedDir + "../Duplications.csv", 'wb') as outfile:
         dupWriter = csv.writer(outfile)
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "",	"Genes 1", "Genes 2"])
         for iog in xrange(nOgs):
