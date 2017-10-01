@@ -37,18 +37,8 @@ import multiprocessing as mp
 from collections import Counter, defaultdict
 
 import probroot
+import tree 
 
-qete = False
-try:
-    import ete3 as ete
-    qete = True
-except ImportError:
-    try:
-        import ete2 as ete
-        qete = True
-    except ImportError:
-        pass
-   
 def compare(exp, act):
     """exp - expected set of species
     act - actual set of species
@@ -409,7 +399,7 @@ def SupportedHierachies(t, G, S, GeneToSpecies, species, dict_clades, clade_name
                             try:
                                 t_write = t.copy()
                             except:
-                                t_write = ete.Tree(treeName, format=1)
+                                t_write = tree.Tree(treeName, format=1)
                         ii = 0 if (0!= i and 0!=j) else 1 if (1!=i and 1!=j) else 2
                         gSets = GetStoredGeneSets(n)
                         SaveTree(t_write, gSets[ii], clade_names[k1], treeName, iExample)
@@ -423,7 +413,7 @@ Parallelisation wrappers
 
 def SupportedHierachies_wrapper(treeName, GeneToSpecies, species, dict_clades, clade_names, qWriteDupTrees=False):
     if not os.path.exists(treeName): return [], []
-    t = ete.Tree(treeName, format=1)
+    t = tree.Tree(treeName, format=1)
     G = set(t.get_leaf_names())
     S = set(map(GeneToSpecies, G))
     if not S.issubset(species):
@@ -503,7 +493,7 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, treeFmt=3, q
     """ 
                     ******* The Main method ******* 
     """
-    speciesTree = ete.Tree(speciesTreeFN, format=treeFmt)
+    speciesTree = tree.Tree(speciesTreeFN, format=treeFmt)
     species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
     pool = mp.Pool(nProcessors, maxtasksperchild=1)       
     list_of_dicts = pool.map(SupportedHierachies_wrapper2, [(fn, GeneToSpeciesMap, species, dict_clades, clade_names, qWriteDupTrees) for fn in glob.glob(treesDir + "/*")])
@@ -591,7 +581,7 @@ def WriteResults(species_tree_fn_or_text, roots, S, clades, clusters_counter, ou
 #        print((clusters_counter[c], c))
     print("\nResults written to:\n" + os.path.realpath(output_dir))
     # Label species tree nodes
-    species_tree = ete.Tree(species_tree_fn_or_text)
+    species_tree = tree.Tree(species_tree_fn_or_text)
     thisRoot = roots[0]
     species_tree = RootAtClade(species_tree, thisRoot) 
     iNode = 0
@@ -601,12 +591,12 @@ def WriteResults(species_tree_fn_or_text, roots, S, clades, clusters_counter, ou
             iNode+=1
     species_tree.write(outfile=output_dir + "Species_tree_labelled.tre", format=1)
 #    print(species_tree)
-#    species_tree = ete.Tree(output_dir + "Species_tree_labelled.tre", format=1)
+#    species_tree = tree.Tree(output_dir + "Species_tree_labelled.tre", format=1)
     # Calculate probabilities
     p_final = probroot.GetProbabilities(species_tree, S, clades, clusters_counter)
     # Write numbers of duplications
     table = dict()
-    new_tree = ete.Tree(output_dir + "Species_tree_labelled.tre", format=1)
+    new_tree = tree.Tree(output_dir + "Species_tree_labelled.tre", format=1)
     for clade in clades + [frozenset([s]) for s in S]:
 #        print(clade)
         qAnti = False
@@ -707,12 +697,12 @@ def Main_Full(args):
         GeneToSpecies = GeneToSpecies_hyphen 
         
     if not args.directory:
-        speciesTree = ete.Tree(args.Species_tree, format=spTreeFormat)
+        speciesTree = tree.Tree(args.Species_tree, format=spTreeFormat)
         species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
         c, stride_dup_genes = SupportedHierachies_wrapper(args.gene_trees, GeneToSpecies, species, dict_clades, clade_names)      
         for k, v in c.items(): print((k, v))
 #    elif args.debug:
-#        speciesTree = ete.Tree(args.Species_tree, format=spTreeFormat)
+#        speciesTree = tree.Tree(args.Species_tree, format=spTreeFormat)
 #        species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
 #        clusters_counter = Counter()
 #        for fn in glob.glob(args.gene_trees + "/*"):
