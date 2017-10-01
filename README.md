@@ -57,7 +57,7 @@ To perform an analysis OrthoFinder requires some dependencies to be installed an
 
 3. FastME (The appropriate version for your system, e.g. 'fastme-2.1.5-linux64', should be renamed `fastme', see instructions below.) 
 
-4. DLCpar
+4. DLCpar (This is no longer required as of version 2.0)
 
 Brief instructions are given below although users can refer to the installation notes provided with these packages for more detailed instructions. 
 
