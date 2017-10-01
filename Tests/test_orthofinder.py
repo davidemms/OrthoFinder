@@ -40,7 +40,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "1.1.11"
+version = "2.0.0"
 requiredBlastVersion = "2.2.28+"
 
 standard_new_files = ("Orthogroups.csv Orthogroups.GeneCount.csv SingleCopyOrthogroups.txt Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv" % (version, version, version)).split()
@@ -502,7 +502,7 @@ class TestCommandLine(unittest.TestCase):
         expectedExtraFiles = [orthologuesDir + "SpeciesTree_rooted.txt"]
         expExtraDir = [orthologuesDir + d for d in ["Gene_Trees/", "Orthologues/", "WorkingDirectory/", ""]]
         with CleanUp(expectedExtraFiles, expectedChangedFiles, expExtraDir):        
-            self.stdout, self.stderr = self.RunOrthoFinder("-fg " + inputDir)
+            self.stdout, self.stderr = self.RunOrthoFinder("-R dlcpar -fg " + inputDir )
             self.assertEquals(312, len(glob.glob(orthologuesDir + "Gene_Trees/*tree.txt")))
             self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae"))
             self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_hyopneumoniae"))
@@ -518,7 +518,7 @@ class TestCommandLine(unittest.TestCase):
         expectedExtraFiles = [orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum.csv"]
         expExtraDir = [resultsDir]
         with CleanUp(expectedExtraFiles, expectedChangedFiles, expExtraDir):        
-            self.stdout, self.stderr = self.RunOrthoFinder("-f " + inputDir + (" -s %sInput/RootedSpeciesTree2.txt"%baseDir) ) 
+            self.stdout, self.stderr = self.RunOrthoFinder("-R dlcpar -f " + inputDir + (" -s %sInput/RootedSpeciesTree2.txt"%baseDir) ) 
             self.assertEquals(312, len(glob.glob(orthologuesDir + "Gene_Trees/*tree.txt")))
             self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae"))
             self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_hyopneumoniae"))
@@ -533,7 +533,7 @@ class TestCommandLine(unittest.TestCase):
         expectedExtraFiles = []
         expExtraDir = [orthologuesDir + d for d in ["Gene_Trees/", "Orthologues/", "WorkingDirectory/", ""]]
         with CleanUp(expectedExtraFiles, expectedChangedFiles, expExtraDir):        
-            self.stdout, self.stderr = self.RunOrthoFinder("-fg " + inputDir + (" -s %sInput/RootedSpeciesTree2.txt"%baseDir) ) 
+            self.stdout, self.stderr = self.RunOrthoFinder("-R dlcpar -fg " + inputDir + (" -s %sInput/RootedSpeciesTree2.txt"%baseDir) ) 
             self.assertEquals(312, len(glob.glob(orthologuesDir + "Gene_Trees/*tree.txt")))
             self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae"))
             self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_hyopneumoniae"))
@@ -548,7 +548,7 @@ class TestCommandLine(unittest.TestCase):
         expectedExtraFiles = []
         expExtraDir = [orthologuesDir + "../WorkingDirectory/dlcpar/", orthologuesDir + "../WorkingDirectory/Recon_Gene_Trees/", orthologuesDir]
         with CleanUp(expectedExtraFiles, expectedChangedFiles, expExtraDir):        
-            self.stdout, self.stderr = self.RunOrthoFinder("-ft " + inputDir + (" -s %sInput/RootedSpeciesTree2.txt"%baseDir) ) 
+            self.stdout, self.stderr = self.RunOrthoFinder("-R dlcpar -ft " + inputDir + (" -s %sInput/RootedSpeciesTree2.txt"%baseDir) ) 
             self.assertTrue(os.path.exists(orthologuesDir + "Orthologues_Mycoplasma_agalactiae"))
             self.assertTrue(os.path.exists(orthologuesDir + "Orthologues_Mycoplasma_hyopneumoniae"))
             self.assertTrue(os.path.exists(orthologuesDir + "Orthologues_Mycoplasma_agalactiae/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum.csv"))
@@ -725,7 +725,7 @@ class TestCommandLine(unittest.TestCase):
     def test_DistanceMatrixEvalues(self):
         if qBinary:
             self.skipTest("Skipping unit test. Test can be run on sourcecode version of OrthoFinder.") 
-        import get_orthologues
+        import orthologues
         m = np.zeros((2,2))
         m = np.matrix([[0, 1e-9, 0.1, 1], [1e-9, 0, 1, 1], [0.1, 1, 0, 1], [1, 1, 1, 0]])
 #        m[0,1] = 
@@ -733,7 +733,7 @@ class TestCommandLine(unittest.TestCase):
         names = ["a", "b", "c", "d"]
         outFN = baseDir + "Input/Distances.phy"
         max_og = 1.
-        get_orthologues.DendroBLASTTrees.WritePhylipMatrix(m, names, outFN, max_og)
+        orthologues.DendroBLASTTrees.WritePhylipMatrix(m, names, outFN, max_og)
         # read values and check they are written in the corect format
         with open(outFN, 'rb') as infile:
             infile.next()

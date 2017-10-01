@@ -47,7 +47,7 @@ SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStar
 FileInfo = namedtuple("FileInfo", "workingDir graphFilename separatePickleDir")     
 
 picProtocol = 1
-version = "1.1.11"
+version = "2.0.0"
 
 # Fix LD_LIBRARY_PATH when using pyinstaller 
 my_env = os.environ.copy()
@@ -225,6 +225,31 @@ def ManageQueue(runningProcesses, cmd_queue):
                 runningProcesses[i] = None
     if qError:
         Fail()              
+
+""" 
+Run a method in parallel
+"""      
+              
+def Worker_RunMethod(Function, args_queue):
+    while True:
+        try:
+            args = args_queue.get(True, 1)
+            Function(*args)
+        except Queue.Empty:
+            return 
+
+def RunMethodParallel(Function, args_queue, nProcesses):
+    runningProcesses = [mp.Process(target=Worker_RunMethod, args=(Function, args_queue)) for i_ in xrange(nProcesses)]
+    for proc in runningProcesses:
+        proc.start()
+    ManageQueue(runningProcesses, args_queue)
+    
+def ExampleRunMethodParallel():
+    F = lambda x, y: x**2
+    args_queue = mp.Queue()
+    for i in xrange(100): args_queue.put((3,i))
+    RunMethodParallel(F, args_queue, 16)
+       
 """
 Directory and file management
 -------------------------------------------------------------------------------
@@ -372,21 +397,32 @@ class FirstWordExtractor(IDExtractor):
         return self.nameToIDDict    
 
 
-def RenameTreeTaxa(treeFN, newTreeFilename, idsMap, qFixNegatives=False, inFormat=None):     
-#        with open(treeFN, "rb") as inputTree: treeString = inputTree.next()
+def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qFixNegatives=False, inFormat=None, label=None): 
     try:
-        if inFormat == None:
-            t = tree.Tree(treeFN)
+        if type(treeFN_or_tree) == tree.TreeNode:
+            t = treeFN_or_tree
         else:
-            t = tree.Tree(treeFN, format=inFormat)
+            if inFormat == None:
+                t = tree.Tree(treeFN_or_tree)
+            else:
+                t = tree.Tree(treeFN_or_tree, format=inFormat)
         for node in t.get_leaves():
             node.name = idsMap[node.name]
         if qFixNegatives:
             tree_length = sum([n.dist for n in t.traverse() if n != t])
             sliver = tree_length * 1e-6
-            for n in t.traverse():
-                if n.dist < 0.0: n.dist = sliver
-        t.write(outfile = newTreeFilename, format=5)  # internal + terminal branch lengths, leaf names
+        iNode = 1
+        for n in t.traverse():
+            if qFixNegatives and n.dist < 0.0: n.dist = sliver
+            if label != None:
+                if (not n.is_leaf()) and (not n.is_root()):
+                    n.name = label + ("%d" % iNode)
+                    iNode += 1
+        if label != None: 
+            with open(newTreeFilename, 'wb') as outfile:
+                outfile.write(t.write(format=3)[:-1] + label + "0;")  # internal + terminal branch lengths, leaf names, node names. (tree library won't label root node)
+        else:
+            t.write(outfile = newTreeFilename, format=5)  # internal + terminal branch lengths, leaf names
     except:
         pass
 
