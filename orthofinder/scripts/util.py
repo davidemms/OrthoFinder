@@ -424,8 +424,6 @@ def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qFixNegatives=False,
         else:
             t.write(outfile = newTreeFilename, format=5)  # internal + terminal branch lengths, leaf names
     except:
-        print(newTreeFilename)
-        raise
         pass
 
 def IsWorkingDirectory(orthofinderWorkingDir):

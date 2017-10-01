@@ -502,7 +502,7 @@ class TestCommandLine(unittest.TestCase):
         expectedExtraFiles = [orthologuesDir + "SpeciesTree_rooted.txt"]
         expExtraDir = [orthologuesDir + d for d in ["Gene_Trees/", "Orthologues/", "WorkingDirectory/", ""]]
         with CleanUp(expectedExtraFiles, expectedChangedFiles, expExtraDir):        
-            self.stdout, self.stderr = self.RunOrthoFinder("-R dlcpar-fg " + inputDir )
+            self.stdout, self.stderr = self.RunOrthoFinder("-R dlcpar -fg " + inputDir )
             self.assertEquals(312, len(glob.glob(orthologuesDir + "Gene_Trees/*tree.txt")))
             self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae"))
             self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_hyopneumoniae"))

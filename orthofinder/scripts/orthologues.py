@@ -872,6 +872,7 @@ def OrthologuesWorkflow(workingDir_ogs,
         rootedSpeciesTreeFN = [userSpeciesTree]
         roots = [None]
         qMultiple = False
+        all_stride_dup_genes = None
     else:
         util.PrintUnderline("Best outgroup(s) for species tree") 
         spDict = ogSet.SpeciesDict()
