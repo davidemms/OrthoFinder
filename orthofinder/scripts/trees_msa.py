@@ -351,7 +351,6 @@ class TreesForOrthogroups(object):
         # 1. Do alignments (and trees) require for species tree
         # 2. Create concatenated alignment
         # 3. Create second list of commands [speciestree] + [remaining alignments and trees]
-            
         alignmentFilesToUse = [self.GetAlignmentFilename(i) for i, _ in enumerate(alignCommands_and_filenames)]
         treeCommands_and_filenames = self.GetTreeCommands(alignmentFilesToUse, ogs)
         commands_and_filenames = []
