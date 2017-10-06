@@ -32,6 +32,7 @@ Created on Thu Sep 25 13:15:22 2014
 """
 import os
 import glob
+import numpy as np
 
 import util, program_caller as pc
 
@@ -83,7 +84,106 @@ def WriteTestFile(workingDir):
     with open(testFN, 'wb') as outfile:
         outfile.write(">a\nA\n>b\nA")
     return testFN, d
-      
+ 
+""" 
+-----------------------------------------------------------------------------
+                    Identify orthogroups for species tree            
+-----------------------------------------------------------------------------
+"""
+
+def GetMulticopyCutoff(nSpecies, factor = 0.25, pMax = 0.25):
+    """ Get the maximum number of species with multicopy genes for each number of non-single copy genes. A species is non-single
+    copy if it is absent or if it is multicopy
+    Args:
+        nSpecies - number of species in the analysis
+        factor - probability that a single copy gene is actually non-orthologous relative to the proportion of multi-copy species
+        pMax - maximum allowed probability that one of the genes is non-orthologous
+    Returns:
+        maxMulticopy - array, i-th element is maximum number of allowed multicopy species if ispecies are non-single copy
+    """        
+    allowed_multicopy = []
+    for iNonSingle in xrange(nSpecies):
+        nSingle = nSpecies - iNonSingle
+        qFoundMax = False
+        for nMultiple in xrange(iNonSingle+1):
+            pFalse = factor*nMultiple/float(nSpecies)
+            pAnyFalse = 1.-(1-pFalse)**nSingle
+            if pAnyFalse > pMax:
+                allowed_multicopy.append(nMultiple - 1)
+                qFoundMax = True
+                break
+        if not qFoundMax:
+            allowed_multicopy.append(iNonSingle)
+    return allowed_multicopy  
+  
+def SingleCopy_WithProbabilityTest(fraction, ogMatrix):
+    """ X fraction of species have a single copy of the gene, all other species can have whatever number of copies including 0"""
+    nSpecies = ogMatrix.shape[1]
+    allowed_multicopy = GetMulticopyCutoff(nSpecies)
+    multi = (ogMatrix > 1 * np.ones((1, nSpecies))).sum(1) # multicopy
+    excluded = nSpecies - (ogMatrix == 1 * np.ones((1, nSpecies))).sum(1) # single-copy
+    temp2 = (ogMatrix == np.ones((1, nSpecies))).sum(1) / float(nSpecies)   # proportion of species with gene present
+    c2 = temp2 > fraction 
+    passFracOGs = c2.nonzero()[0] 
+    ok_ogs = [iog for iog in passFracOGs if multi[iog] <= allowed_multicopy[excluded[iog]]]
+    return ok_ogs 
+    
+def GetOrthogroupStats(m):
+    """
+    Args:
+        m - orthogroup matrix
+    """
+    N = m.shape[1]
+    f = 1./N
+    fractions = []
+    nOrtho = []
+    for n in xrange(N):
+        F = 1.-n*f
+        fractions.append(F)
+        nOrtho.append(len(SingleCopy_WithProbabilityTest(F-1e-5, m)))
+    return fractions, nOrtho
+    
+def DetermineOrthogroupsForSpeciesTree(m, nOGsMin=100, p=2.):
+    """Orthogroups can be used if at least a fraction f of the species in the orthogroup are single copy, f is determined as described 
+    below. Species that aren't single copy are allowed in the orthogroup as long as there aren't too many (criterion is quite strict). 
+    The presence of species with multiple copies suggests that the single copy species might actually have arisen from duplication 
+    and loss. Therefore, we use a probability model to detemine how many of the excluded species can be multicopy before it is likely
+    that the single copy genes are actually hidden paralogues.
+    Args:
+        m - the orthogroup matrix shape=(nOGs, nSpecies), each entry is number of genes from that species
+        nOGsMin - the minimum number of orthogroups. Need to have at least this many before considering the next criteria
+        p - proportionalIncreaseMin: Each decrease in the proportion of single copy species should bring about a relative increase 
+        in the number of orthogroups that will be used of 'p', otherwise it is not worth lowering the bar
+    """
+    fractions, nOrtho = GetOrthogroupStats(m)
+    if nOrtho[0] > 1000:
+        ogsToUse = SingleCopy_WithProbabilityTest(1.0-1e-5, m)
+        return ogsToUse, 1.0
+    previous = [0] + nOrtho[:-1]
+    change = np.array(nOrtho)-np.array(previous)
+    proportionalGain = fractions[1:]*(change[1:])/np.array(previous[1:])/(fractions[0]-fractions[1])
+    # Start with demanding all species in the selected OGs be single copy and reduce until required trade-off is met
+    for i, (f, thisP, n) in enumerate(zip(fractions[1:], proportionalGain, nOrtho)):
+        if f < 0.5 and n > 2*nOGsMin:
+            # if fewer than half the species are in any orthogroup then set highr bar for reducing fraction further
+            if (n > nOGsMin) and thisP < 2*p:
+                break
+        else:
+            if (n > nOGsMin) and thisP < p:
+                break
+    f = fractions[i]
+#    print(i)        
+#    print(f)   
+#    print(nOrtho[i])  
+    ogsToUse = SingleCopy_WithProbabilityTest(f-1e-5, m)
+    return ogsToUse, f   
+        
+""" 
+-----------------------------------------------------------------------------
+                             TreesForOrthogroups            
+-----------------------------------------------------------------------------
+"""    
+     
 class TreesForOrthogroups(object):
     def __init__(self, program_caller, msa_program, tree_program, resultsDir, ogsWorkingDir):
         self.program_caller = program_caller
@@ -132,7 +232,7 @@ class TreesForOrthogroups(object):
         nSeqs = [len(og) for og in ogs if len(og) >= 3]
         return self.program_caller.GetTreeCommands(self.tree_program, alignmentsForTree, outfn_list, id_list, nSeqs) 
                
-    def DoTrees(self, ogs, idDict, nProcesses, qStopAfterSeqs, qStopAfterAlignments):
+    def DoTrees(self, ogs, ogMatrix, idDict, nProcesses, qStopAfterSeqs, qStopAfterAlignments, qDoSpeciesTree):
         # 0       
         resultsDirsFullPath = []
         for fn in [self.GetFastaFilename, self.GetAlignmentFilename, self.GetTreeFilename]:
@@ -147,17 +247,21 @@ class TreesForOrthogroups(object):
         fastaWriter = FastaWriter(self.ogsWorkingDir)
         self.WriteFastaFiles(fastaWriter, ogs, idDict)
         if qStopAfterSeqs: return resultsDirsFullPath
-        
-        # 2
+               
+        # 2b
         if qStopAfterAlignments:
             util.PrintUnderline("Inferring multiple sequence alignments") 
         else:
             util.PrintUnderline("Inferring multiple sequence alignments and gene trees") 
         
         # 3
+        # Get OGs to use for species tree
+        if qDoSpeciesTree:
+            ogsForSpeciesTree, fSingleCopy = DetermineOrthogroupsForSpeciesTree(ogMatrix)            
         alignCommands_and_filenames = self.GetAlignmentCommandsAndNewFilenames(ogs)
         if qStopAfterAlignments:
             pc.RunParallelCommandsAndMoveResultsFile(nProcesses, alignCommands_and_filenames, False)
+            print("Using %d orthogroups with minimum of %0.1f%% of species having single-copy genes in any orthogroup" % (len(ogsForSpeciesTree), 100.*fSingleCopy))
             return resultsDirsFullPath[:2]
         
         # Otherwise, alignments and trees
@@ -169,6 +273,7 @@ class TreesForOrthogroups(object):
         for i in xrange(len(treeCommands_and_filenames), len(alignCommands_and_filenames)):
             commands_and_filenames.append([alignCommands_and_filenames[i]])
         pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
+        print("Using %d orthogroups with minimum %0.1f%% species with single-copy genes" % (len(ogsForSpeciesTree), 100.*fSingleCopy))
         
         # Convert ids to accessions
         for i, alignFN in enumerate(alignmentFilesToUse):

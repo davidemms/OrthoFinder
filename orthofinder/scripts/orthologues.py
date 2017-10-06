@@ -150,6 +150,21 @@ class OrthoGroupsSet(object):
         else:
             return self.ogs_all[:self.iOgs4]
         
+    def OrthogroupMatrix(self):
+        """ qReduce give a matrix with only as many columns as species for cases when 
+        clustering has been performed on a subset of species"""
+        ogs = self.OGs()
+        iSpecies = sorted(set([gene.iSp for og in ogs for gene in og]))
+        speciesIndexDict = {iSp:iCol for iCol, iSp in enumerate(iSpecies)}
+        nSpecies = len(iSpecies)
+        nGroups = len(ogs)
+        # (i, j)-th entry of ogMatrix gives the number of genes from i in orthologous group j
+        ogMatrix = np.zeros((nGroups, nSpecies)) 
+        for i_og, og in enumerate(ogs):
+            for gene in og:
+                ogMatrix[i_og, speciesIndexDict[gene.iSp]] += 1
+        return ogMatrix
+        
     def ID_to_OG_Dict(self):
         if self.id_to_og != None:
             return self.id_to_og
@@ -827,7 +842,7 @@ def OrthologuesWorkflow(workingDir_ogs,
     """
     if qMSA or qPhyldog:
         treeGen = trees_msa.TreesForOrthogroups(tree_options, msa_method, tree_method, resultsDir, workingDir_ogs)
-        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.Spec_SeqDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlign or qPhyldog) 
+        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.OrthogroupMatrix(), ogSet.Spec_SeqDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlign or qPhyldog, qDoSpeciesTree=(not userSpeciesTree)) 
         if qStopAfterSeqs:
             print("")
             return ("\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0])
