@@ -209,7 +209,7 @@ def ReadAlignment(fn):
             msa[accession] = seq
     return MSA(msa)
 
-def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, output_filename):
+def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, output_filename, fSingleCopy):
     allSpecies = {str(gene.iSp) for og in ogs for gene in og}
     concatentaedAlignments = defaultdict(str)
     for iOg in ogsToUse_ids:
@@ -226,12 +226,21 @@ def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, 
         # now put blanks for the missing species
         for iSp in allSpecies.difference(speciesInThisOg):
             concatentaedAlignments[iSp] += "-"*(alignment.length)
-    # Trim the completed alignment
-    pass
+    # Trim the completed alignment: to 50% of fraction of species present
+    species_ordered = concatentaedAlignments.keys()
+    trimmedAlignment = {iSp:"" for iSp in species_ordered}
+    maxGap = (1.-0.5*fSingleCopy)*len(allSpecies)
+    for iCol in xrange(len(concatentaedAlignments.values()[0])):
+        col = [concatentaedAlignments[iSp][iCol] for iSp in species_ordered]
+        if col.count("-") <= maxGap:
+            for c, iSp in zip(col, species_ordered):
+                trimmedAlignment[iSp] += c
     # Write to file
+#    print("Original length %d" % len(concatentaedAlignments.values()[0]))
+#    print("Trimmed length %d" % len(trimmedAlignment.values()[0]))
     nChar = 80
     with open(output_filename, 'wb') as outfile:
-        for name, seq in concatentaedAlignments.items():
+        for name, seq in trimmedAlignment.items():
             outfile.write(">%s\n" % name)
             for i in xrange(0, len(seq), nChar):
                 outfile.write(seq[i:i+nChar] + "\n")
@@ -328,8 +337,7 @@ class TreesForOrthogroups(object):
         if qStopAfterAlignments:
             util.PrintUnderline("Inferring multiple sequence alignments")
             pc.RunParallelCommandsAndMoveResultsFile(nProcesses, alignCommands_and_filenames, False)
-            print("Using %d orthogroups with minimum of %0.1f%% of species having single-copy genes in any orthogroup" % (len(iOgsForSpeciesTree), 100.*fSingleCopy))
-            CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn)
+            CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn, fSingleCopy)
             # ids -> accessions
             alignmentFilesToUse = [self.GetAlignmentFilename(i) for i, _ in enumerate(alignCommands_and_filenames)]        
             accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in xrange(len(alignmentFilesToUse))]
@@ -348,13 +356,14 @@ class TreesForOrthogroups(object):
         treeCommands_and_filenames = self.GetTreeCommands(alignmentFilesToUse, ogs)
         commands_and_filenames = []
         if qDoSpeciesTree:
+            print("Species tree: Using %d orthogroups with minimum of %0.1f%% of species having single-copy genes in any orthogroup" % (len(iOgsForSpeciesTree), 100.*fSingleCopy))
             util.PrintUnderline("Inferring multiple sequence alignments for species tree") 
             # Do required alignments and trees
             speciesTreeFN_ids = os.path.split(self.GetTreeFilename(i))[0] + "/SpeciesTree_unrooted.txt"
             for i in iOgsForSpeciesTree:
                 commands_and_filenames.append([alignCommands_and_filenames[i], treeCommands_and_filenames[i]])
             pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
-            CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn)
+            CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn, fSingleCopy)
             # Add species tree to list of commands to run
             commands_and_filenames = [self.program_caller.GetTreeCommands(self.tree_program, [concatenated_algn_fn], [speciesTreeFN_ids], ["SpeciesTree"])]
             util.PrintUnderline("Inferring remaining multiple sequence alignments and gene trees") 
@@ -370,8 +379,6 @@ class TreesForOrthogroups(object):
             if i in iOgsForSpeciesTree: continue
             commands_and_filenames.append([alignCommands_and_filenames[i]])
         pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
-        print("Using %d orthogroups with minimum %0.1f%% species with single-copy genes" % (len(iOgsForSpeciesTree), 100.*fSingleCopy))
-#        pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
         
         # Convert ids to accessions
         accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in xrange(len(alignmentFilesToUse))]
