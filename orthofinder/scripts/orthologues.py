@@ -494,7 +494,12 @@ def CheckUserSpeciesTree(speciesTreeFN, expSpecies):
         print("Species tree file does not exist: %s" % speciesTreeFN)
         util.Fail()
     # Species in tree are unique
-    t = tree.Tree(speciesTreeFN)
+    try:
+        t = tree.Tree(speciesTreeFN, format=1)
+    except Exception as e:
+        print("\nERROR: Incorrectly formated user-supplied species tree")
+        print(e.message)
+        util.Fail()
     actSpecies = (t.get_leaf_names())
     c = Counter(actSpecies)
     if 1 != c.most_common()[0][1]:
@@ -530,7 +535,7 @@ def CheckUserSpeciesTree(speciesTreeFN, expSpecies):
         util.Fail()
 
 def ConvertUserSpeciesTree(workingDir, speciesTreeFN, speciesDict):
-    t = tree.Tree(speciesTreeFN)  
+    t = tree.Tree(speciesTreeFN, format=1)  
     revDict = {v:k for k,v in speciesDict.items()}
     for sp in t:
         sp.name = revDict[sp.name]       
