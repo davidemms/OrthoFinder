@@ -33,6 +33,7 @@ Created on Thu Sep 25 13:15:22 2014
 import os
 import glob
 import numpy as np
+from collections import Counter, defaultdict
 
 import util, program_caller as pc
 
@@ -177,7 +178,65 @@ def DetermineOrthogroupsForSpeciesTree(m, nOGsMin=100, p=2.):
 #    print(nOrtho[i])  
     ogsToUse = SingleCopy_WithProbabilityTest(f-1e-5, m)
     return ogsToUse, f   
-        
+
+class MSA(object):
+    def __init__(self, msa_dict):
+        self.seqs = msa_dict
+        self.length = len(msa_dict.values()[0])
+
+def ReadAlignment(fn):
+    msa = dict()
+    accession = None
+    length = None
+    seq = ""
+    with open(fn, 'rb') as infile:
+        for line in infile:
+            line = line.rstrip()
+            if line.startswith(">"):
+                if accession != None:
+                    if length != None and len(seq) != length:
+                        print("ERROR: Sequence length mismatch in MSA: %s & %d" % (length, len(seq)))
+                        util.Fail()
+                    msa[accession] = seq
+                accession = line[1:]
+                seq = ""
+            else:
+                seq += line
+        if accession != None:
+            if length != None and len(seq) != length:
+                print("Error: Sequence length mismatch in MSA: %s & %d" % (length, len(seq)))
+                util.Fail()
+            msa[accession] = seq
+    return MSA(msa)
+
+def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, output_filename):
+    allSpecies = {str(gene.iSp) for og in ogs for gene in og}
+    concatentaedAlignments = defaultdict(str)
+    for iOg in ogsToUse_ids:
+        speciesCounts = Counter([gene.iSp for gene in ogs[iOg]])
+        selectedSeqs = {gene.ToString() for gene in ogs[iOg] if speciesCounts[gene.iSp] == 1}
+        alignment = ReadAlignment(alignment_filename_function(iOg))
+        speciesInThisOg = set()
+        for name, al in alignment.seqs.items():
+            if name.split()[0] in selectedSeqs:
+                iSp = name.split("_")[0]
+                speciesInThisOg.add(iSp)  # this allows for the MSa method to have failed to put the sequence in the MSA
+                al = al.replace('*', '-')
+                concatentaedAlignments[iSp] += al
+        # now put blanks for the missing species
+        for iSp in allSpecies.difference(speciesInThisOg):
+            concatentaedAlignments[iSp] += "-"*(alignment.length)
+    # Trim the completed alignment
+    pass
+    # Write to file
+    nChar = 80
+    with open(output_filename, 'wb') as outfile:
+        for name, seq in concatentaedAlignments.items():
+            outfile.write(">%s\n" % name)
+            for i in xrange(0, len(seq), nChar):
+                outfile.write(seq[i:i+nChar] + "\n")
+            
+    
 """ 
 -----------------------------------------------------------------------------
                              TreesForOrthogroups            
@@ -257,11 +316,13 @@ class TreesForOrthogroups(object):
         # 3
         # Get OGs to use for species tree
         if qDoSpeciesTree:
-            ogsForSpeciesTree, fSingleCopy = DetermineOrthogroupsForSpeciesTree(ogMatrix)            
+            iOgsForSpeciesTree, fSingleCopy = DetermineOrthogroupsForSpeciesTree(ogMatrix)            
+            concatenated_algn_fn = os.path.split(self.GetAlignmentFilename(0))[0] + "/SpeciesTreeAlignment.fa"
         alignCommands_and_filenames = self.GetAlignmentCommandsAndNewFilenames(ogs)
         if qStopAfterAlignments:
             pc.RunParallelCommandsAndMoveResultsFile(nProcesses, alignCommands_and_filenames, False)
-            print("Using %d orthogroups with minimum of %0.1f%% of species having single-copy genes in any orthogroup" % (len(ogsForSpeciesTree), 100.*fSingleCopy))
+            print("Using %d orthogroups with minimum of %0.1f%% of species having single-copy genes in any orthogroup" % (len(iOgsForSpeciesTree), 100.*fSingleCopy))
+            CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn)
             return resultsDirsFullPath[:2]
         
         # Otherwise, alignments and trees
@@ -273,7 +334,8 @@ class TreesForOrthogroups(object):
         for i in xrange(len(treeCommands_and_filenames), len(alignCommands_and_filenames)):
             commands_and_filenames.append([alignCommands_and_filenames[i]])
         pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
-        print("Using %d orthogroups with minimum %0.1f%% species with single-copy genes" % (len(ogsForSpeciesTree), 100.*fSingleCopy))
+        print("Using %d orthogroups with minimum %0.1f%% species with single-copy genes" % (len(iOgsForSpeciesTree), 100.*fSingleCopy))
+        CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn)
         
         # Convert ids to accessions
         for i, alignFN in enumerate(alignmentFilesToUse):
