@@ -290,8 +290,18 @@ class TreesForOrthogroups(object):
         id_list = ["OG%07d" % i for i, og in enumerate(ogs) if len(og) >= 3]
         nSeqs = [len(og) for og in ogs if len(og) >= 3]
         return self.program_caller.GetTreeCommands(self.tree_program, alignmentsForTree, outfn_list, id_list, nSeqs) 
-               
-    def DoTrees(self, ogs, ogMatrix, idDict, nProcesses, qStopAfterSeqs, qStopAfterAlignments, qDoSpeciesTree):
+     
+    def RenameAlignmentTaxa(self, idsAlignFNS, accAlignFNs, idsDict):
+        for i, (alignFN, outAlignFN) in enumerate(zip(idsAlignFNS, accAlignFNs)):
+            with open(alignFN, 'rb') as infile, open(outAlignFN, 'wb') as outfile:
+                for line in infile:
+                    if line.startswith(">"):
+                        outfile.write(">" + idsDict[line[1:].rstrip()] + "\n")
+                    else:
+                        outfile.write(line)
+          
+    def DoTrees(self, ogs, ogMatrix, idDict, speciesIdDict, nProcesses, qStopAfterSeqs, qStopAfterAlignments, qDoSpeciesTree):
+        idDict.update(speciesIdDict) # smae code will then also convert concatenated alignment for species tree
         # 0       
         resultsDirsFullPath = []
         for fn in [self.GetFastaFilename, self.GetAlignmentFilename, self.GetTreeFilename]:
@@ -323,6 +333,12 @@ class TreesForOrthogroups(object):
             pc.RunParallelCommandsAndMoveResultsFile(nProcesses, alignCommands_and_filenames, False)
             print("Using %d orthogroups with minimum of %0.1f%% of species having single-copy genes in any orthogroup" % (len(iOgsForSpeciesTree), 100.*fSingleCopy))
             CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn)
+            # ids -> accessions
+            alignmentFilesToUse = [self.GetAlignmentFilename(i) for i, _ in enumerate(alignCommands_and_filenames)]        
+            accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in xrange(len(alignmentFilesToUse))]
+            alignmentFilesToUse.append(concatenated_algn_fn)
+            accessionAlignmentFNs.append(os.path.split(self.GetAlignmentFilename(0, True))[0] + "/SpeciesTreeAlignment.fa")
+            self.RenameAlignmentTaxa(alignmentFilesToUse, accessionAlignmentFNs, idDict)
             return resultsDirsFullPath[:2]
         
         # Otherwise, alignments and trees
@@ -338,13 +354,12 @@ class TreesForOrthogroups(object):
         CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn)
         
         # Convert ids to accessions
-        for i, alignFN in enumerate(alignmentFilesToUse):
-            with open(alignFN, 'rb') as infile, open(self.GetAlignmentFilename(i, True), 'wb') as outfile:
-                for line in infile:
-                    if line.startswith(">"):
-                        outfile.write(">" + idDict[line[1:].rstrip()] + "\n")
-                    else:
-                        outfile.write(line)
+        accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in xrange(len(alignmentFilesToUse))]
+        # Add concatenated Alignment
+        alignmentFilesToUse.append(concatenated_algn_fn)
+        accessionAlignmentFNs.append(os.path.split(self.GetAlignmentFilename(0, True))[0] + "/SpeciesTreeAlignment.fa")
+        self.RenameAlignmentTaxa(alignmentFilesToUse, accessionAlignmentFNs, idDict)
+        for i in xrange(len(treeCommands_and_filenames)):
             if os.path.exists(self.GetTreeFilename(i)):
                 util.RenameTreeTaxa(self.GetTreeFilename(i), self.GetTreeFilename(i, True), idDict, qFixNegatives=True)
         

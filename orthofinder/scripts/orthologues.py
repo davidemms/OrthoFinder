@@ -842,7 +842,7 @@ def OrthologuesWorkflow(workingDir_ogs,
     """
     if qMSA or qPhyldog:
         treeGen = trees_msa.TreesForOrthogroups(tree_options, msa_method, tree_method, resultsDir, workingDir_ogs)
-        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.OrthogroupMatrix(), ogSet.Spec_SeqDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlign or qPhyldog, qDoSpeciesTree=(not userSpeciesTree)) 
+        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.OrthogroupMatrix(), ogSet.Spec_SeqDict(), ogSet.SpeciesDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlign or qPhyldog, qDoSpeciesTree=(not userSpeciesTree)) 
         if qStopAfterSeqs:
             print("")
             return ("\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0])
