@@ -316,20 +316,17 @@ class TreesForOrthogroups(object):
         fastaWriter = FastaWriter(self.ogsWorkingDir)
         self.WriteFastaFiles(fastaWriter, ogs, idDict)
         if qStopAfterSeqs: return resultsDirsFullPath
-               
-        # 2b
-        if qStopAfterAlignments:
-            util.PrintUnderline("Inferring multiple sequence alignments") 
-        else:
-            util.PrintUnderline("Inferring multiple sequence alignments and gene trees") 
-        
+
         # 3
         # Get OGs to use for species tree
         if qDoSpeciesTree:
             iOgsForSpeciesTree, fSingleCopy = DetermineOrthogroupsForSpeciesTree(ogMatrix)            
             concatenated_algn_fn = os.path.split(self.GetAlignmentFilename(0))[0] + "/SpeciesTreeAlignment.fa"
+        else:
+            iOgsForSpeciesTree = []
         alignCommands_and_filenames = self.GetAlignmentCommandsAndNewFilenames(ogs)
         if qStopAfterAlignments:
+            util.PrintUnderline("Inferring multiple sequence alignments")
             pc.RunParallelCommandsAndMoveResultsFile(nProcesses, alignCommands_and_filenames, False)
             print("Using %d orthogroups with minimum of %0.1f%% of species having single-copy genes in any orthogroup" % (len(iOgsForSpeciesTree), 100.*fSingleCopy))
             CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn)
@@ -342,16 +339,39 @@ class TreesForOrthogroups(object):
             return resultsDirsFullPath[:2]
         
         # Otherwise, alignments and trees
+        # Strategy is
+        # 1. Do alignments (and trees) require for species tree
+        # 2. Create concatenated alignment
+        # 3. Create second list of commands [speciestree] + [remaining alignments and trees]
+            
         alignmentFilesToUse = [self.GetAlignmentFilename(i) for i, _ in enumerate(alignCommands_and_filenames)]
         treeCommands_and_filenames = self.GetTreeCommands(alignmentFilesToUse, ogs)
         commands_and_filenames = []
+        if qDoSpeciesTree:
+            util.PrintUnderline("Inferring multiple sequence alignments for species tree") 
+            # Do required alignments and trees
+            speciesTreeFN_ids = os.path.split(self.GetTreeFilename(i))[0] + "/SpeciesTree_unrooted.txt"
+            for i in iOgsForSpeciesTree:
+                commands_and_filenames.append([alignCommands_and_filenames[i], treeCommands_and_filenames[i]])
+            pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
+            CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn)
+            # Add species tree to list of commands to run
+            commands_and_filenames = [self.program_caller.GetTreeCommands(self.tree_program, [concatenated_algn_fn], [speciesTreeFN_ids], ["SpeciesTree"])]
+            util.PrintUnderline("Inferring remaining multiple sequence alignments and gene trees") 
+        else:
+            util.PrintUnderline("Inferring multiple sequence alignments and gene trees") 
+
+        # Now continue as before
+        iOgsForSpeciesTree = set(iOgsForSpeciesTree)                         
         for i in xrange(len(treeCommands_and_filenames)):
+            if i in iOgsForSpeciesTree: continue
             commands_and_filenames.append([alignCommands_and_filenames[i], treeCommands_and_filenames[i]])
         for i in xrange(len(treeCommands_and_filenames), len(alignCommands_and_filenames)):
+            if i in iOgsForSpeciesTree: continue
             commands_and_filenames.append([alignCommands_and_filenames[i]])
         pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
         print("Using %d orthogroups with minimum %0.1f%% species with single-copy genes" % (len(iOgsForSpeciesTree), 100.*fSingleCopy))
-        CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn)
+#        pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
         
         # Convert ids to accessions
         accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in xrange(len(alignmentFilesToUse))]
@@ -362,5 +382,11 @@ class TreesForOrthogroups(object):
         for i in xrange(len(treeCommands_and_filenames)):
             if os.path.exists(self.GetTreeFilename(i)):
                 util.RenameTreeTaxa(self.GetTreeFilename(i), self.GetTreeFilename(i, True), idDict, qFixNegatives=True)
+        if qDoSpeciesTree:
+            if os.path.exists(speciesTreeFN_ids):
+                util.RenameTreeTaxa(speciesTreeFN_ids, self.workingDir + "SpeciesTree_unrooted.txt", idDict, qFixNegatives=True)
+            else:
+                print("ERROR: Species tree inference failed")
+                util.Fail()
         
         return resultsDirsFullPath[:2]

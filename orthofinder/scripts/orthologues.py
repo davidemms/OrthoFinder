@@ -840,9 +840,13 @@ def OrthologuesWorkflow(workingDir_ogs,
     Phyldog (ust):     Sequences    Alignments                        GeneTrees    db      
     Dendroblast (ust):                            DistanceMatrices    GeneTrees    db        
     """
+    qDB_SpeciesTree = False
     if qMSA or qPhyldog:
         treeGen = trees_msa.TreesForOrthogroups(tree_options, msa_method, tree_method, resultsDir, workingDir_ogs)
         seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.OrthogroupMatrix(), ogSet.Spec_SeqDict(), ogSet.SpeciesDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlign or qPhyldog, qDoSpeciesTree=(not userSpeciesTree)) 
+        if not userSpeciesTree:
+            spTreeFN_ids = resultsDir + "WorkingDirectory/Trees_ids/SpeciesTree_unrooted.txt"
+            spTreeUnrootedFN = resultsDir + "WorkingDirectory/" + "SpeciesTree_unrooted.txt"
         if qStopAfterSeqs:
             print("")
             return ("\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0])
@@ -852,7 +856,7 @@ def OrthologuesWorkflow(workingDir_ogs,
             st += "\nMultiple sequence alignments:\n   %s\n" % seqs_alignments_dirs[1]
             return st
         db = DendroBLASTTrees(ogSet, resultsDir, nLowParrallel)
-        if not userSpeciesTree:
+        if qDB_SpeciesTree and not userSpeciesTree:
             util.PrintUnderline("Inferring species tree (calculating gene distances)")
             print("Loading BLAST scores")
             db.ReadAndPickle()
