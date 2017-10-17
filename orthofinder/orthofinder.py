@@ -765,42 +765,54 @@ def GetProgramCaller():
         pc_user = pcs.ProgramCaller(config_file_user)
         pc.Add(pc_user)
     return pc
-    
-    
+
 def PrintHelp(program_caller):  
     msa_ops = program_caller.ListMSAMethods()
     tree_ops = program_caller.ListTreeMethods()
     search_ops = program_caller.ListSearchMethods()
     
-
     print("Simple usage:") 
     print(" orthofinder [options] -f <dir>")
-    print("""\n    Infers orthogroups, gene trees, species tree, orthologues and statistics 
-    for the FASTA format proteomes contained in the directory <dir>""")
+    print("      Infers orthogroups, gene trees, species tree, orthologues and statistics")
+    print("      for the FASTA format proteomes contained in the directory <dir>""")
     print("")          
       
     print("Options:")
-    print(" -t <int>        Number of parallel threads [Default = %d]" % util.nThreadsDefault)
-    print(" -a <int>        Number of high RAM parallel threads [Default = %d]" % util.nAlgDefault)
-    print(" -M <txt>        Method for gene tree inference. Options 'dendroblast' & 'msa'")
-    print("                 [Default = dendroblast]")
-    print(" -s <file>       User-specified rooted species tree to use for gene tree rooting")
-    print(" -I <int>        MCL inflation parameter [Default = %0.1f]" % g_mclInflation)
-    print(" -x <file>       Additional  OrthoXML info for outputting results in OrthoXML format")
-    print(" -h, --help      Print this help text")
+    print(" -t <int>          Number of parallel threads [Default = %d]" % util.nThreadsDefault)
+    print(" -a <int>          Number of parallel threads for high RAM usage tasks [Default = %d]" % util.nAlgDefault)
+    print(" -M <txt>          Method for gene tree inference. Options 'dendroblast' & 'msa'")
+    print("                   [Default = dendroblast]")
+    print(" -S <txt>          Use sequence search program <txt> [Default is blast]")
+    print("                   Options: " + ", ".join(['blast'] + search_ops))
+    print(" -A <txt>          Use alignment program <txt>, requires '-M msa' [Default is mafft]")
+    print("                   Options: " + ", ".join(['mafft'] + msa_ops))
+    print(" -T <txt>          Use tree program <txt>, requires '-M msa' [Default is fasttree]")
+    print("                   Options: " + ", ".join(['mafft'] + tree_ops))
+    print(" -R <txt>          Use tree reconciliation method <txt> [Default is of_recon]")
+    print("                   Options: of_recon, dlcpar, dlcpar_deepsearch")
+    print(" -s <file>         User-specified rooted species tree to use for gene tree rooting")
+    print(" -I <int>          MCL inflation parameter [Default = %0.1f]" % g_mclInflation)
+    print(" -x <file>         Info for outputting results in OrthoXML format")
+    print(" --pickledir <dir> Write the temporary pickle files to <dir>")
+    print(" -h                Print this help text")
+
+    print("")    
+    print("Workflow stopping options:")   
+    print(" -op   Stop after preparing input files for BLAST" )
+    print(" -og   Stop after inferring orthogroups")
+    print(" -os   Stop after writing sequence files for orthogroups (requires '-M msa')")
+    print(" -oa   Stop after inferring alignments for orthogroups (requires '-M msa')")
+    print(" -ot   Stop after inferring gene trees for orthogroups " )
    
     print("")   
     print("Advanced usage:") 
     print(" orthofinder [options] -b  <dir>  Start OrthoFinder from BLAST results in <dir>")
     print(" orthofinder [options] -fg <dir>  Start OrthoFinder from orthogroups in <dir>")
     print(" orthofinder [options] -ft <dir>  Start OrthoFinder from trees in <dir>")
-
-    print("")    
-    print ("Algorithm control:")   
-    print(""" -op   Stop after preparing input files for BLAST""" )
-    print(""" -og   Stop after inferring orthogroups""")
-    print(""" -os   Stop after inferring orthogroups and writing sequence files for orthogroups""")
-    print(""" -ot   Stop after inferring gene trees""" )
+    print(" orthofinder [options] -f <dir1> -b  <dir2>  ")
+    print("                                  Add proteomes in <dir1> to previous OrthoFinder")
+    print("                                  BLAST results in <dir2> and infer orthogroups,")
+    print("                                  trees, orthologues etc.")
 
     util.PrintCitation() 
     
@@ -1441,7 +1453,7 @@ def CheckOptions(options, dirs):
     return options
 
 if __name__ == "__main__":    
-    print("\nOrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version)
+    print("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version)
     print("""    This program comes with ABSOLUTELY NO WARRANTY.
     This is free software, and you are welcome to redistribute it 
     under certain conditions. For details please see the License.md 
