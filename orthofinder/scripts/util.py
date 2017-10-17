@@ -507,10 +507,10 @@ def GetOGsFile(userArg):
         print("and corresponding clusters file:\n    %s" % clustersFiles[0])
         return orthofinderWorkingDir, userArg, clustersFiles[0]
 
-def PrintCitation():
-    print("""\nWhen publishing work that uses OrthoFinder please cite:
-    D.M. Emms & S. Kelly (2015), OrthoFinder: solving fundamental biases in whole genome comparisons
-    dramatically improves orthogroup inference accuracy, Genome Biology 16:157.\n""")         
+def PrintCitation():  
+    print ("\nCitation:")  
+    print (" When publishing work that uses OrthoFinder please cite:")
+    print (" Emms D.M. & Kelly S. (2015), Genome Biology 16:157\n")         
 
 def PrintUnderline(text, qHeavy=False):
     print("\n" + text)
