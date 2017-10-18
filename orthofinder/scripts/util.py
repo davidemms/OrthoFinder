@@ -508,7 +508,7 @@ def GetOGsFile(userArg):
         return orthofinderWorkingDir, userArg, clustersFiles[0]
 
 def PrintCitation():  
-    print ("\nCitation:")  
+    print ("\nCITATION:")  
     print (" When publishing work that uses OrthoFinder please cite:")
     print (" Emms D.M. & Kelly S. (2015), Genome Biology 16:157\n")         
 
