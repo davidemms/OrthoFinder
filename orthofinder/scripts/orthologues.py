@@ -730,8 +730,6 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
     method - can be dlcpar, dlcpar_deep, of_recon
     """
     if not os.path.exists(reconTreesRenamedDir): os.mkdir(reconTreesRenamedDir)
-    n = len(ogSet.speciesToUse)
-    nOrthologues_SpPair = np.zeros((n, n))
     if "dlcpar" in recon_method:
         qDeepSearch = (recon_method == "dlcpar_deepsearch")
         dlcparResultsDir = RunDlcpar(treesIDsPatFn, ogSet, speciesTree_fn, workingDir, nParallel, qDeepSearch)
@@ -745,7 +743,7 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
             pickleDir = workingDir + "matrices_orthologues/"
             if not os.path.exists(pickleDir): os.mkdir(pickleDir)
             qDelDir = True    
-        nOrthologues = trees2ologs_dlcpar.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir)  
+        nOrthologues_SpPair = trees2ologs_dlcpar.create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir)  
         # If a temporary matrices directory was created, delete it now
         if qDelDir:
             if os.path.exists(pickleDir): 
@@ -754,7 +752,7 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
                 except OSError:
                     pass
     else:
-        nOrthologues_SpPair += trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir, all_stride_dup_genes)
+        nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir, all_stride_dup_genes)
     nOrthologues_SpPair += TwoAndThreeGeneOrthogroups(ogSet, resultsDir)
     WriteOrthologuesStats(ogSet, nOrthologues_SpPair, resultsDir)
 #    print("Identified %d orthologues" % nOrthologues)
