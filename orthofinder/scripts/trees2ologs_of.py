@@ -15,6 +15,7 @@ import glob
 import argparse
 import operator
 import itertools
+import numpy as np
 import multiprocessing as mp
 from collections import Counter
 
@@ -259,34 +260,31 @@ def GetOrthologues_for_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, qWr
         WriteQfO2(orthologues, directory + "/../Orthologues_M3/" + os.path.split(treeFN)[1], qAppend=False)
     return orthologues, tree
 
-def AppendOrthologuesToFiles(orthologues, speciesDict, sequenceDict, iog, resultsDir):
+def AppendOrthologuesToFiles(orthologues, speciesDict, iSpeciesToUse, sequenceDict, iog, resultsDir):
     # Sort the orthologues according to speices pairs
+    sp_to_index = {str(sp):i for i, sp in enumerate(iSpeciesToUse)}
+    nOrthologues_SpPair = np.zeros((len(iSpeciesToUse), len(iSpeciesToUse)))
+    
     species = speciesDict.keys()
-#    print(species)
-    nOrthologues = 0
+    nOrthologues_SpPair = np.zeros((len(sp_to_index), len(sp_to_index)))
     for leaves0, leaves1 in orthologues:
-        nOrthologues += len(leaves0) * len(leaves1)
-#        print([g.split("_")[0] for g in leaves0])
-#        sys.exit()
         genes_per_species0 = [(sp, [g for g in leaves0 if g.split("_")[0] == sp]) for sp in species] 
         genes_per_species1 = [(sp, [g for g in leaves1 if g.split("_")[0] == sp]) for sp in species] 
-#        print([len(x[1]) for x in genes_per_species0])
-#        print([len(x[1]) for x in genes_per_species1])
-#        print()        
         for sp0, genes0 in genes_per_species0:
+            d0 = resultsDir + "Orthologues_" + speciesDict[sp0] + "/"
             if len(genes0) == 0: continue
             for sp1, genes1 in genes_per_species1:
                 if len(genes1) == 0: continue
-                d0 = resultsDir + "Orthologues_" + speciesDict[sp0] + "/"
+                nOrthologues_SpPair[sp_to_index[sp0], sp_to_index[sp1]] += len(genes0)
+                nOrthologues_SpPair[sp_to_index[sp1], sp_to_index[sp0]] += len(genes1)
                 d1 = resultsDir + "Orthologues_" + speciesDict[sp1] + "/"
                 with open(d0 + '%s__v__%s.csv' % (speciesDict[sp0], speciesDict[sp1]), 'ab') as outfile1, open(d1 + '%s__v__%s.csv' % (speciesDict[sp1], speciesDict[sp0]), 'ab') as outfile2:
                     writer1 = csv.writer(outfile1)
                     writer2 = csv.writer(outfile2)
                     og = "OG%07d" % iog
-#                    print("row")
                     writer1.writerow((og, ", ".join([sequenceDict[g] for g in genes0]), ", ".join([sequenceDict[g] for g in genes1])))
                     writer2.writerow((og, ", ".join([sequenceDict[g] for g in genes1]), ", ".join([sequenceDict[g] for g in genes0])))
-    return nOrthologues
+    return nOrthologues_SpPair
                                       
 def Resolve(tree, GeneToSpecies):
     StoreSpeciesSets(tree, GeneToSpecies)
@@ -327,7 +325,8 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
             n.name = "N%d" % iNode
             iNode += 1
     nOgs = len(ogSet.OGs())
-    nOrthologues = 0
+#    nOrthologues = 0
+    nOrthologues_SpPair = np.zeros((nspecies,nspecies))
     with open(reconTreesRenamedDir + "../Duplications.csv", 'wb') as outfile:
         dupWriter = csv.writer(outfile)
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "",	"Genes 1", "Genes 2"])
@@ -336,8 +335,8 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
             util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=True, label='n') 
             if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
                 util.PrintTime("Done %d of %d" % (iog, nOgs))
-            nOrthologues += AppendOrthologuesToFiles(orthologues, speciesDict, SequenceDict, iog, output_dir)
-    return nOrthologues
+            nOrthologues_SpPair += AppendOrthologuesToFiles(orthologues, speciesDict, ogSet.speciesToUse, SequenceDict, iog, output_dir)
+    return nOrthologues_SpPair
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

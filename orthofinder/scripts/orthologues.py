@@ -27,6 +27,7 @@
 
 import os
 import sys
+import csv
 import time
 import shutil
 import numpy as np
@@ -681,34 +682,41 @@ def CleanWorkingDir(workingDir):
                 time.sleep(1)
                 shutil.rmtree(dFull, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
 
+def WriteOrthologuesStats(ogSet, nOrthologues_SpPair, resultsDir):
+    speciesDict = ogSet.SpeciesDict()
+    with open(resultsDir + "../Orthologues_SpeciesOverlaps.csv", 'wb') as outfile:
+        writer = csv.writer(outfile) # , delimiter="\t")
+        writer.writerow([""] + [speciesDict[str(index)] for index in ogSet.speciesToUse])
+        for iSp in ogSet.speciesToUse:
+            overlap = [nOrthologues_SpPair[iSp, jSp] for jSp in ogSet.speciesToUse]
+            writer.writerow([speciesDict[str(iSp)]] + overlap)
+
 def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
     speciesDict = ogSet.SpeciesDict()
     sequenceDict = ogSet.SequenceDict()
     ogs = ogSet.OGs(qInclAll=True)
-    nOrthologues = 0
+    nOrthologues_SpPair = np.zeros((len(ogSet.speciesToUse), len(ogSet.speciesToUse)))
     for iog, og in enumerate(ogs):
         n = len(og) 
         if n == 1: break
         elif n == 2:
+            if og[0].iSp == og[1].iSp: continue
             orthologues = [([og[0].ToString()], [og[1].ToString()]),]
-            nOrthologues += 1
         elif n == 3:
             sp = [g.iSp for g in og]
             c = Counter(sp) 
             nSp = len(c)
             if nSp == 3:
                 orthologues = [([og[0].ToString()], [og[1].ToString(), og[2].ToString()]), ] + [([og[1].ToString(), ], [og[2].ToString(), ]), ]
-                nOrthologues += 3
             elif nSp == 2:             
                 sp1, sp2 = c.keys()
                 orthologues = [([g.ToString() for g in og if g.iSp == sp1], [g.ToString() for g in og if g.iSp == sp2])]
-                nOrthologues += 2
             else: 
                 continue # no orthologues
         elif n >= 4:
             continue
-        trees2ologs_of.AppendOrthologuesToFiles(orthologues, speciesDict, sequenceDict, iog, resultsDir)
-    return nOrthologues
+        nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles(orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, iog, resultsDir)
+    return nOrthologues_SpPair
 
 def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree_fn, workingDir, resultsDir, reconTreesRenamedDir, nParallel, iSpeciesTree=None, pickleDir = None, all_stride_dup_genes=None):
     """
@@ -722,6 +730,8 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
     method - can be dlcpar, dlcpar_deep, of_recon
     """
     if not os.path.exists(reconTreesRenamedDir): os.mkdir(reconTreesRenamedDir)
+    n = len(ogSet.speciesToUse)
+    nOrthologues_SpPair = np.zeros((n, n))
     if "dlcpar" in recon_method:
         qDeepSearch = (recon_method == "dlcpar_deepsearch")
         dlcparResultsDir = RunDlcpar(treesIDsPatFn, ogSet, speciesTree_fn, workingDir, nParallel, qDeepSearch)
@@ -744,8 +754,9 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
                 except OSError:
                     pass
     else:
-        nOrthologues = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir, all_stride_dup_genes)
-    nOrthologues += TwoAndThreeGeneOrthogroups(ogSet, resultsDir)
+        nOrthologues_SpPair += trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir, all_stride_dup_genes)
+    nOrthologues_SpPair += TwoAndThreeGeneOrthogroups(ogSet, resultsDir)
+    WriteOrthologuesStats(ogSet, nOrthologues_SpPair, resultsDir)
 #    print("Identified %d orthologues" % nOrthologues)
         
                 
