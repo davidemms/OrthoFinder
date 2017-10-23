@@ -107,9 +107,13 @@ def multiply(specmin, specmax, pickleDir):
     product = M.dot(M.transpose())
     return product, M
 
-def WriteOrthologues(resultsDir, spec1, spec2, orthologues, ogSet):
-    nOrthologues1 = 0    
-    nOrthologues2 = 0    
+def WriteOrthologues(resultsDir, spec1, spec2, orthologues, ogSet, nOrtho_sp, i, j): 
+    """
+    spec1 (int) - the ID for the first species
+    spec2 (int) - the ID for the second species
+    i (int) - the ordinal for the first species (after excluded species have been removed)
+    j (int) - the ordinal for the second species (after excluded species have been removed)
+    """
     speciesDict = ogSet.SpeciesDict()
     id_to_og = ogSet.ID_to_OG_Dict()
     sequenceDict = ogSet.SequenceDict()
@@ -121,12 +125,25 @@ def WriteOrthologues(resultsDir, spec1, spec2, orthologues, ogSet):
         writer1.writerow(("Orthogroup", speciesDict[str(spec1)], speciesDict[str(spec2)]))
         writer2.writerow(("Orthogroup", speciesDict[str(spec2)], speciesDict[str(spec1)]))
         for genes1, genes2 in orthologues:
-            nOrthologues1 += len(genes1) 
-            nOrthologues2 += len(genes2)
+            n1 = len(genes1)
+            n2 = len(genes2)
+            nOrtho_sp.n[i, j] += n1 
+            nOrtho_sp.n[j, i] += n2 
+            if n1 == 1 and n2 == 1:
+                nOrtho_sp.n_121[i, j] += 1
+                nOrtho_sp.n_121[j, i] += 1
+            elif n1 == 1:
+                nOrtho_sp.n_12m[i, j] += 1
+                nOrtho_sp.n_m21[j, i] += n2
+            elif n2 == 1:
+                nOrtho_sp.n_m21[i, j] += n1
+                nOrtho_sp.n_12m[j, i] += 1
+            else:
+                nOrtho_sp.n_m2m[i, j] += n1
+                nOrtho_sp.n_m2m[j, i] += n2
             og = "OG%07d" % id_to_og["%d_%d" % (spec1, genes1[0])]
             writer1.writerow((og, ", ".join([sequenceDict["%d_%d" % (spec1, o)] for o in genes1]), ", ".join([sequenceDict["%d_%d" % (spec2, o)] for o in genes2])))
             writer2.writerow((og, ", ".join([sequenceDict["%d_%d" % (spec2, o)] for o in genes2]), ", ".join([sequenceDict["%d_%d" % (spec1, o)] for o in genes1])))
-    return nOrthologues1, nOrthologues2
 
 def GetOrthologues(orig_matrix, orig_matrix_csc, index):
     orthologues = orig_matrix.getrowview(index).nonzero()[1]
@@ -152,7 +169,7 @@ def species_write_all(ogSet, pickleDir, resultsDir):
     # Calls multiply and find_all on each species pair, and appends the numbers from find_all's output to the relevant csv lists.
     speciesIDs = ogSet.speciesToUse
     nspecies = len(speciesIDs)           
-    nOrthologues_SpPair = np.zeros((nspecies, nspecies))
+    nOrthologues_SpPair = util.nOrtho_sp(nspecies)
     for index1 in xrange(nspecies):
         d = resultsDir + "Orthologues_" + speciesDict[str(speciesIDs[index1])]
         if not os.path.exists(d): os.mkdir(d)
@@ -160,9 +177,7 @@ def species_write_all(ogSet, pickleDir, resultsDir):
         if index1 >= index2: continue
         product, M = multiply(index1, index2, pickleDir)
         orthologues = find_all(product, M)
-        nOrthologues1, nOrthologues2 = WriteOrthologues(resultsDir, speciesIDs[index2], speciesIDs[index1], orthologues, ogSet)   
-        nOrthologues_SpPair[index1, index2] = nOrthologues1
-        nOrthologues_SpPair[index2, index1] = nOrthologues2
+        WriteOrthologues(resultsDir, speciesIDs[index2], speciesIDs[index1], orthologues, ogSet, nOrthologues_SpPair, index2 ,index1)   
     return nOrthologues_SpPair
     
 def create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir):
@@ -177,7 +192,6 @@ def create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir):
         
     # -> csv files
     nOrthologues_SpPair = species_write_all(ogSet, pickleDir, resultsDir)
-    return nOrthologues
     for fn in glob.glob(pickleDir + "ortholog_*.pic"):
         if os.path.exists(fn): os.remove(fn)
     return nOrthologues_SpPair

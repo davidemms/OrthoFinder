@@ -682,20 +682,32 @@ def CleanWorkingDir(workingDir):
                 time.sleep(1)
                 shutil.rmtree(dFull, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
 
-def WriteOrthologuesStats(ogSet, nOrthologues_SpPair, resultsDir):
+def WriteOrthologuesMatrix(fn, matrix, speciesToUse, speciesDict):
+    with open(fn, 'wb') as outfile:
+        writer = csv.writer(outfile, delimiter="\t")
+        writer.writerow([""] + [speciesDict[str(index)] for index in speciesToUse])
+        for iSp in speciesToUse:
+            overlap = [matrix[iSp, jSp] for jSp in speciesToUse]
+            writer.writerow([speciesDict[str(iSp)]] + overlap)   
+    
+
+def WriteOrthologuesStats(ogSet, nOrtho_sp, resultsDir):
+    """
+    nOrtho_sp is a util.nOrtho_sp object
+    """
+    speciesToUse = ogSet.speciesToUse
     speciesDict = ogSet.SpeciesDict()
-    with open(resultsDir + "../Orthologues_SpeciesOverlaps.csv", 'wb') as outfile:
-        writer = csv.writer(outfile) # , delimiter="\t")
-        writer.writerow([""] + [speciesDict[str(index)] for index in ogSet.speciesToUse])
-        for iSp in ogSet.speciesToUse:
-            overlap = [nOrthologues_SpPair[iSp, jSp] for jSp in ogSet.speciesToUse]
-            writer.writerow([speciesDict[str(iSp)]] + overlap)
+    WriteOrthologuesMatrix(resultsDir + "../OrthologuesStats_Totals.csv", nOrtho_sp.n, speciesToUse, speciesDict)
+    WriteOrthologuesMatrix(resultsDir + "../OrthologuesStats_one-to-one.csv", nOrtho_sp.n_121, speciesToUse, speciesDict)
+    WriteOrthologuesMatrix(resultsDir + "../OrthologuesStats_one-to-many.csv", nOrtho_sp.n_12m, speciesToUse, speciesDict)
+    WriteOrthologuesMatrix(resultsDir + "../OrthologuesStats_many-to-one.csv", nOrtho_sp.n_m21, speciesToUse, speciesDict)
+    WriteOrthologuesMatrix(resultsDir + "../OrthologuesStats_many-to-many.csv", nOrtho_sp.n_m2m, speciesToUse, speciesDict)
 
 def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
     speciesDict = ogSet.SpeciesDict()
     sequenceDict = ogSet.SequenceDict()
     ogs = ogSet.OGs(qInclAll=True)
-    nOrthologues_SpPair = np.zeros((len(ogSet.speciesToUse), len(ogSet.speciesToUse)))
+    nOrthologues_SpPair = util.nOrtho_sp(len(ogSet.speciesToUse))
     for iog, og in enumerate(ogs):
         n = len(og) 
         if n == 1: break

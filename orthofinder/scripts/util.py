@@ -31,6 +31,7 @@ import os
 import sys
 import glob
 import time
+import numpy as np
 import subprocess
 import datetime
 import Queue
@@ -518,3 +519,24 @@ def PrintUnderline(text, qHeavy=False):
     if text.startswith("\n"): n -= 1
     print(("=" if qHeavy else "-") * n)
 
+"""
+-------------------------------------------------------------------------------
+"""
+
+class nOrtho_sp(object):
+    """ matrix of number of genes in species i that have orthologues/an orthologue in species j"""
+    def __init__(self, nSp):
+        self.n = np.zeros((nSp, nSp))
+        self.n_121 = np.zeros((nSp, nSp))  # genes in i that have one orthologue in j
+        self.n_12m = np.zeros((nSp, nSp))  # genes in i that have many orthologues in j
+        self.n_m21 = np.zeros((nSp, nSp))  # genes in i that are in a many-to-one orthology relationship with genes in j
+        self.n_m2m = np.zeros((nSp, nSp))  # genes in i that are in a many-to-many orthology relationship with genes in j
+        
+    def __iadd__(self, other):
+        self.n += other.n
+        self.n_121 += other.n_121
+        self.n_12m += other.n_12m
+        self.n_m21 += other.n_m21
+        self.n_m2m += other.n_m2m
+        return self
+        
