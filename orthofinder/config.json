@@ -26,13 +26,13 @@
     
     "diamond":{ 
     "program_type": "search",
-    "db_cmd": "diamond-sse2 makedb --in INPUT -d OUTPUT",
-    "search_cmd": "diamond-sse2 blastp -d DATABASE -q INPUT -o OUTPUT --sensitive -p 1 --quiet -e 0.001"
+    "db_cmd": "diamond makedb --in INPUT -d OUTPUT",
+    "search_cmd": "diamond blastp -d DATABASE -q INPUT -o OUTPUT --sensitive -p 1 --quiet -e 0.001"
     },
     
     "diamond_more_sensitive":{ 
     "program_type": "search",
-    "db_cmd": "diamond-sse2 makedb --in INPUT -d OUTPUT",
-    "search_cmd": "diamond-sse2 blastp -d DATABASE -q INPUT -o OUTPUT --more-sensitive -p 1 --quiet -e 0.001"
+    "db_cmd": "diamond makedb --in INPUT -d OUTPUT",
+    "search_cmd": "diamond blastp -d DATABASE -q INPUT -o OUTPUT --more-sensitive -p 1 --quiet -e 0.001"
     }
 }
