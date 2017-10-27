@@ -277,12 +277,10 @@ def Worker_OGMatrices_EditArray(cmd_queue, ogMatrices, nGenes, speciesToUse, fil
                 mins = np.minimum(mins, m0)
                 maxes = np.maximum(maxes, m1)
             maxes_inv = 1./maxes
-        #    ogMatrices = [np.zeros((n, n)) for n in nGenes]
             for jjSp, B  in enumerate(Bs):
                 for og, m in zip(ogsPerSpecies, ogMatrices):
                     for gi, i in og[iiSp]:
                         for gj, j in og[jjSp]:
-#                                print((i,j,gi.iSeq, gj.iSeq,))
                                 m[i][j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) * maxes_inv[gi.iSeq]
         except Queue.Empty:
             return 
@@ -318,9 +316,7 @@ class DendroBLASTTrees(object):
         ogsPerSpecies = [[[(g, i) for i, g in enumerate(og) if g.iSp == iSp] for iSp in self.ogSet.seqsInfo.speciesToUse] for og in ogs]
         nGenes = [len(og) for og in ogs]
         nSeqs = self.ogSet.seqsInfo.nSeqsPerSpecies
-#        ogMatrices = [np.zeros((n, n)) for n in nGenes]
         ogMatrices = [[mp.Array('d', n, lock=False) for _ in xrange(n)] for n in nGenes]
-        # 2. Create mp.Arrays for each ogMatrix, 
         cmd_queue = mp.Queue()
         for iiSp, sp1 in enumerate(self.ogSet.seqsInfo.speciesToUse):
             cmd_queue.put((iiSp, sp1, nSeqs[sp1]))
