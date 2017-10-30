@@ -24,8 +24,10 @@
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com  
 
+import os
 import sys
 import csv
+import gzip
 from scipy import sparse
               
 #def NumberOfSequences(seqsInfo, iSpecies):
@@ -52,8 +54,9 @@ def GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies, qExcludeSelfHits = T
     nSeqs_j = seqsInfo.nSeqsPerSpecies[jSpecies]
     B = sparse.lil_matrix((nSeqs_i, nSeqs_j))
     row = ""
+    fn = fileInfo.workingDir + "Blast%d_%d.txt" % (iSpeciesOpen, jSpeciesOpen)
     try:
-        with open(fileInfo.workingDir + "Blast%d_%d.txt" % (iSpeciesOpen, jSpeciesOpen), 'rb') as blastfile:
+        with (gzip.open(fn + ".gz", 'rb') if os.path.exists(fn + ".gz") else open(fn, 'rb')) as blastfile:
             blastreader = csv.reader(blastfile, delimiter='\t')
             for row in blastreader:    
                 # Get hit and query IDs

@@ -782,7 +782,7 @@ def PrintHelp(program_caller):
     print("OPTIONS:")
     print(" -t <int>          Number of parallel sequence search threads [Default = %d]" % util.nThreadsDefault)
     print(" -a <int>          Number of parallel analysis threads [Default = %d]" % util.nAlgDefault)
-    print(" -d                Double BLAST search (BLAST in both directions)")
+    print(" -d                Double sequence search (i.e. BLAST search in both directions)")
     print(" -M <txt>          Method for gene tree inference. Options 'dendroblast' & 'msa'")
     print("                   [Default = dendroblast]")
     print(" -S <txt>          Sequence search program [Default = blast]")
@@ -1303,13 +1303,13 @@ def ProcessPreviousFiles(workingDir, qDoubleBlast):
     
     # check BLAST files
     blast_fns_triangular = ["%sBlast%d_%d.txt" % (dirs.workingDir, iSpecies, jSpecies) for iSpecies in dirs.speciesToUse for jSpecies in dirs.speciesToUse if jSpecies >= iSpecies]
-    have_triangular = [os.path.exists(fn) for fn in blast_fns_triangular]
+    have_triangular = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_triangular]
     for qHave, fn in zip(have_triangular, blast_fns_triangular):
         if not qHave: print("BLAST results file is missing: %s" % fn)
     
     if qDoubleBlast:
         blast_fns_remainder = ["%sBlast%d_%d.txt" % (dirs.workingDir, iSpecies, jSpecies) for iSpecies in dirs.speciesToUse for jSpecies in dirs.speciesToUse if jSpecies < iSpecies]
-        have_remainder = [os.path.exists(fn) for fn in blast_fns_remainder]
+        have_remainder = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_remainder]
         if not (all(have_triangular) and all(have_remainder)):
             for qHave, fn in zip(have_remainder, blast_fns_remainder):
                 if not qHave: print("BLAST results file is missing: %s" % fn)

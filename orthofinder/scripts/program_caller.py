@@ -189,7 +189,7 @@ class ProgramCaller(object):
             # it doesn't matter what file(s) it writes out the database to, only that we can use the database
             resultsfn = d + "test_search_results.txt"
             self.CallSearchMethod_Search(method_name, fasta, dbname, resultsfn)
-            success = os.path.exists(resultsfn)
+            success = os.path.exists(resultsfn) or os.path.exists(resultsfn + ".gz")
 #            with open(resultsfn, 'rb') as f:
 #                print("".join(f))
         except:
