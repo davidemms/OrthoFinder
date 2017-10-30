@@ -14,7 +14,6 @@ def DetachAndCleanup(top, n):
     top - the node that all the nodes in the current analysis will be below
     nUp - the node above n originally, from here to nTop needs the cached data updated
     """
-#    newTop = top
     nUp = n.up
     n = n.detach()
     ch = nUp.get_children()
@@ -43,7 +42,6 @@ def GraftAndUpdate(top, n, s):
         n and s could be anywhere in relation to one another, need to change all the species sets that could be affected
     """
     n, nUp, top = DetachAndCleanup(top, n)
-#    n = DetachAndCleanup(n)
     parent = s.up
     try:
         new = parent.add_child()
@@ -56,6 +54,10 @@ def GraftAndUpdate(top, n, s):
     new.add_child(n)
     s = s.detach()
     new.add_child(s)
+    
+    # sort out distances, new node will have a default distance of 1.0, correct this
+    new.dist = 0.1*s.dist
+    s.dist   = 0.9*s.dist
     
     # sort out sp_down data - can do a more efficient routine later if necessary (updating only what needs updating). Otherwise:
     # all nodes on path from nTop to s need sp_down updating
@@ -73,36 +75,6 @@ def GraftAndUpdate(top, n, s):
             r.sp_down = set.union(*[ch.sp_down for ch in r.get_children()])
             r = r.up
     return True
-   
-#def GraftNonTripartAndUpdate(nTop, s1, s2, p):
-#    """
-#    Make s1 and s2 sister clades and hang the from parent node p
-#    Args:
-#        s1, s2 - nodes to be made sisters of each other
-#        p - node to hang (s1,s2) from
-#    """
-#    s1, s1Parent , nTop = DetachAndCleanup(nTop, s1)   
-#    s2, s2Parent, nTop = DetachAndCleanup(nTop, s2)   
-#    pCh = p.get_children()
-#    new1 = p.add_child()
-#    new1.add_child(s1)
-#    new1.add_child(s2)
-#    
-#    new2 = p.add_child()
-#    for ch in pCh:
-#        new2.add_child(ch.detach())
-#    new1.add_feature("sp_down", s1.sp_down.union(s2.sp_down))
-#    new2.add_feature("sp_down", set.union(*[ch.sp_down for ch in new2.get_children()]))
-#    n = s1Parent
-#    while n != new2:
-#        n.sp_down = set.union(*[ch.sp_down for ch in n.get_children()])
-#        n = n.up
-#    n = s2Parent
-#    while n != new2:
-#        n.sp_down = set.union(*[ch.sp_down for ch in n.get_children()])
-#        n = n.up
-#    nTop.sp_down = set.union(*[ch.sp_down for ch in nTop.get_children()])
-#    return True
     
 def GraftTripartAndUpdate(nTop, s1, s2, p):
     """
@@ -111,9 +83,12 @@ def GraftTripartAndUpdate(nTop, s1, s2, p):
         s1, s2 - nodes to be made sisters of each other
         p - node to hang (s1,s2) from
     """
+    d1 = s1.up.dist
     s1, s1Parent , nTop = DetachAndCleanup(nTop, s1)   
+    d2 = s2.up.dist
     s2, s2Parent, nTop = DetachAndCleanup(nTop, s2)   
     new = p.add_child()
+    new.dist = 0.5*(d1+d2)
     new.add_child(s1)
     new.add_child(s2)
     new.add_feature("sp_down", s1.sp_down.union(s2.sp_down))
@@ -159,7 +134,7 @@ def resolve(n, M):
     """
     Rearrange node in more parsimonious configuration. 
     Cost of Moves+Dupliciations+Losses after is guaranteed to be lower than cost of Dups+Losses before.
-    M=1, D=1, L=2
+    M=1, D=1, L=1
     Args:
         n - tree_lib node with overlapping species sets on it's children
         M - function taking a gene name and returning the species name
