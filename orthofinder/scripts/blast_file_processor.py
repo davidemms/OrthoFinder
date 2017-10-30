@@ -31,19 +31,35 @@ from scipy import sparse
 #def NumberOfSequences(seqsInfo, iSpecies):
 #    return (seqsInfo.seqStartingIndices[iSpecies+1] if iSpecies != seqsInfo.nSpecies-1 else seqsInfo.nSeqs) - seqsInfo.seqStartingIndices[iSpecies] 
                          
-def GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies, qExcludeSelfHits = True, sep = "_"): 
+def GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies, qExcludeSelfHits = True, sep = "_", qDoubleBlast=True): 
+    qSameSpecies = iSpecies==jSpecies
+    qCheckForSelfHits = qExcludeSelfHits and qSameSpecies
+    if not qDoubleBlast:
+        qRev = (iSpecies > jSpecies)
+    else:
+        qRev = False      
+    if qRev:
+        iQ = 1 
+        iH = 0
+        iSpeciesOpen = jSpecies
+        jSpeciesOpen = iSpecies
+    else:        
+        iQ = 0 
+        iH = 1 
+        iSpeciesOpen = iSpecies
+        jSpeciesOpen = jSpecies
     nSeqs_i = seqsInfo.nSeqsPerSpecies[iSpecies]
     nSeqs_j = seqsInfo.nSeqsPerSpecies[jSpecies]
     B = sparse.lil_matrix((nSeqs_i, nSeqs_j))
     row = ""
     try:
-        with open(fileInfo.workingDir + "Blast%d_%d.txt" % (iSpecies, jSpecies), 'rb') as blastfile:
+        with open(fileInfo.workingDir + "Blast%d_%d.txt" % (iSpeciesOpen, jSpeciesOpen), 'rb') as blastfile:
             blastreader = csv.reader(blastfile, delimiter='\t')
             for row in blastreader:    
                 # Get hit and query IDs
                 try:
-                    species1ID, sequence1ID = map(int, row[0].split(sep, 1)) 
-                    species2ID, sequence2ID = map(int, row[1].split(sep, 1))     
+                    sequence1ID = int(row[iQ].split(sep, 1)[1])
+                    sequence2ID = int(row[iH].split(sep, 1)[1])     
                 except (IndexError, ValueError):
                     sys.stderr.write("\nERROR: Query or hit sequence ID in BLAST results file was missing or incorrectly formatted.\n")
                     raise
@@ -53,7 +69,7 @@ def GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies, qExcludeSelfHits = T
                 except (IndexError, ValueError):
                     sys.stderr.write("\nERROR: 12th field in BLAST results file line should be the bit-score for the hit\n")
                     raise
-                if (qExcludeSelfHits and species1ID == species2ID and sequence1ID == sequence2ID):
+                if (qCheckForSelfHits and sequence1ID == sequence2ID):
                     continue
                 # store bit score
                 try:

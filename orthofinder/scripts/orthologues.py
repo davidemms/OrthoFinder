@@ -209,48 +209,13 @@ def lil_minmax(M):
 # ==============================================================================================================================      
 # DendroBlast   
 
-def Worker_BlastScores(cmd_queue, seqsInfo, fileInfo, nProcesses, nToDo):
-    while True:
-        try:
-            i, args = cmd_queue.get(True, 1)
-            nDone = i - nProcesses + 1
-            if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
-                util.PrintTime("Done %d of %d" % (nDone, nToDo))
-            B = BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, *args, qExcludeSelfHits = False)
-            matrices.DumpMatrix("Bit", B, fileInfo, args[0], args[1])
-        except Queue.Empty:
-            return 
-
-def Worker_OGMatrices(iiSp, sp1, nGenes, speciesToUse, fileInfo, nSeqs_sp1, ogsPerSpecies):
-    Bs = [matrices.LoadMatrix("Bit", fileInfo, sp1, sp2) for sp2 in speciesToUse]
-    mins = np.ones((nSeqs_sp1, 1), dtype=np.float64)*9e99 
-    maxes = np.zeros((nSeqs_sp1, 1), dtype=np.float64)
-    for B in Bs:
-        m0, m1 = lil_minmax(B)
-        mins = np.minimum(mins, m0)
-        maxes = np.maximum(maxes, m1)
-    maxes_inv = 1./maxes
-    nOGs = len(nGenes)
-    Is = [[] ] * nOGs
-    Js = [[] ] * nOGs
-    Vs = [[] ] * nOGs
-    for jjSp, B  in enumerate(Bs):
-        for og, I, J, V in zip(ogsPerSpecies, Is, Js, Vs):
-            for gi, i in og[iiSp]:
-                for gj, j in og[jjSp]:
-                        Is.append(i)
-                        Js.append(j)
-                        Vs.append(0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) * maxes_inv[gi.iSeq])
-    return Is, Js, Vs
-
-
-def Worker_OGMatrices_ReadBLASTAndEditArray(cmd_queue, ogMatrices, nGenes, seqsInfo, fileInfo, ogsPerSpecies):
+def Worker_OGMatrices_ReadBLASTAndUpdateDistances(cmd_queue, ogMatrices, nGenes, seqsInfo, fileInfo, ogsPerSpecies, qDoubleBlast):
     speciesToUse = seqsInfo.speciesToUse
     with np.errstate(divide='ignore'):
         while True:
             try:
                 iiSp, sp1, nSeqs_sp1 = cmd_queue.get(True, 1)
-                Bs = [BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, sp1, sp2, qExcludeSelfHits = False) for sp2 in speciesToUse]
+                Bs = [BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, sp1, sp2, qExcludeSelfHits = False, qDoubleBlast=qDoubleBlast) for sp2 in speciesToUse]
                 mins = np.ones((nSeqs_sp1, 1), dtype=np.float64)*9e99 
                 maxes = np.zeros((nSeqs_sp1, 1), dtype=np.float64)
                 for B in Bs:
@@ -265,29 +230,9 @@ def Worker_OGMatrices_ReadBLASTAndEditArray(cmd_queue, ogMatrices, nGenes, seqsI
                                     m[i][j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) * maxes_inv[gi.iSeq]
             except Queue.Empty:
                 return 
-
-def Worker_OGMatrices_EditArray(cmd_queue, ogMatrices, nGenes, speciesToUse, fileInfo, ogsPerSpecies):
-    while True:
-        try:
-            iiSp, sp1, nSeqs_sp1 = cmd_queue.get(True, 1)
-            Bs = [matrices.LoadMatrix("Bit", fileInfo, sp1, sp2) for sp2 in speciesToUse]
-            mins = np.ones((nSeqs_sp1, 1), dtype=np.float64)*9e99 
-            maxes = np.zeros((nSeqs_sp1, 1), dtype=np.float64)
-            for B in Bs:
-                m0, m1 = lil_minmax(B)
-                mins = np.minimum(mins, m0)
-                maxes = np.maximum(maxes, m1)
-            maxes_inv = 1./maxes
-            for jjSp, B  in enumerate(Bs):
-                for og, m in zip(ogsPerSpecies, ogMatrices):
-                    for gi, i in og[iiSp]:
-                        for gj, j in og[jjSp]:
-                                m[i][j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) * maxes_inv[gi.iSeq]
-        except Queue.Empty:
-            return 
                 
 class DendroBLASTTrees(object):
-    def __init__(self, ogSet, outD, nProcesses):
+    def __init__(self, ogSet, outD, nProcesses, qDoubleBlast):
         self.outD = outD
         self.ogSet = ogSet
         self.nProcesses = nProcesses
@@ -302,6 +247,7 @@ class DendroBLASTTrees(object):
         self.treesPatIDs = treesIDsDir + "OG%07d_tree_id.txt"
         self.treesPat = treesDir + "OG%07d_tree.txt"
         self.distPat = distancesDir + "OG%07d.phy"
+        self.qDoubleBlast = qDoubleBlast
         # Check files exist
     
     def TreeFilename_IDs(self, iog):
@@ -323,7 +269,7 @@ class DendroBLASTTrees(object):
             cmd_queue = mp.Queue()
             for iiSp, sp1 in enumerate(self.ogSet.seqsInfo.speciesToUse):
                 cmd_queue.put((iiSp, sp1, nSeqs[sp1]))
-            runningProcesses = [mp.Process(target=Worker_OGMatrices_ReadBLASTAndEditArray, args=(cmd_queue, ogMatrices, nGenes, self.ogSet.seqsInfo, self.ogSet.fileInfo, ogsPerSpecies)) for i_ in xrange(self.nProcesses)]
+            runningProcesses = [mp.Process(target=Worker_OGMatrices_ReadBLASTAndUpdateDistances, args=(cmd_queue, ogMatrices, nGenes, self.ogSet.seqsInfo, self.ogSet.fileInfo, ogsPerSpecies, self.qDoubleBlast)) for i_ in xrange(self.nProcesses)]
             for proc in runningProcesses:
                 proc.start()
             for proc in runningProcesses:
@@ -331,117 +277,7 @@ class DendroBLASTTrees(object):
                     proc.join() 
             ogMatrices = [np.matrix(m) for m in ogMatrices]
             return ogs, ogMatrices      
-        
-    def ReadAndPickle(self): 
-        with warnings.catch_warnings():         
-            warnings.simplefilter("ignore")
-            cmd_queue = mp.Queue()
-            i = 0
-            for iSp in self.ogSet.seqsInfo.speciesToUse:
-                for jSp in self.ogSet.seqsInfo.speciesToUse:
-                    cmd_queue.put((i, (iSp, jSp)))           
-                    i+=1
-            runningProcesses = [mp.Process(target=Worker_BlastScores, args=(cmd_queue, self.ogSet.seqsInfo, self.ogSet.fileInfo, self.nProcesses, i)) for i_ in xrange(self.nProcesses)]
-            for proc in runningProcesses:
-                proc.start()
-            for proc in runningProcesses:
-                while proc.is_alive():
-                    proc.join() 
-           
-    def GetOGMatrices(self):
-        """
-        ogMatrices contains matrix M for each OG where:
-            Mij = 0.5*max(Bij, Bmin_i)/Bmax_i
-        """
-        tl = 0.
-        tm = 0.
-        tc = 0.
-        with warnings.catch_warnings():         
-            warnings.simplefilter("ignore")
-            ogs = self.ogSet.OGs()
-            ogsPerSpecies = [[[(g, i) for i, g in enumerate(og) if g.iSp == iSp] for iSp in self.ogSet.seqsInfo.speciesToUse] for og in ogs]
-            nGenes = [len(og) for og in ogs]
-            nSeqs = self.ogSet.seqsInfo.nSeqsPerSpecies
-            ogMatrices = [np.zeros((n, n)) for n in nGenes]
-            # parallelize here - each process creates a set of og matrices which must be summed
-            for iiSp, sp1 in enumerate(self.ogSet.seqsInfo.speciesToUse):
-                util.PrintTime("Processing species %d" % sp1)
-                ta = time.time()
-                Bs = [matrices.LoadMatrix("Bit", self.ogSet.fileInfo, sp1, sp2) for sp2 in self.ogSet.seqsInfo.speciesToUse]
-                tb = time.time()
-                tl += (tb-ta)
-#                print(tl)
-                ta = tb
-                mins = np.ones((nSeqs[sp1], 1), dtype=np.float64)*9e99 
-                maxes = np.zeros((nSeqs[sp1], 1), dtype=np.float64)
-                for B in Bs:
-                    m0, m1 = lil_minmax(B)
-                    mins = np.minimum(mins, m0)
-                    maxes = np.maximum(maxes, m1)
-                maxes_inv = 1./maxes
-                tb = time.time()
-                tm += (tb-ta)
-#                print(tm)
-                ta = tb
-                for jjSp, B  in enumerate(Bs):
-                    for og, m in zip(ogsPerSpecies, ogMatrices):
-                        for gi, i in og[iiSp]:
-                            for gj, j in og[jjSp]:
-                                    m[i, j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) * maxes_inv[gi.iSeq]   # inf if i doesn't hit anything but is hit
-                tb = time.time()
-                tc += (tb-ta)
-#                print(tc)
-#                print("")
-                ta = tb
-            print("%0.2f Load" % tl)
-            print("%0.2f Mins/Maxes" % tm)
-            print("%0.2f Construct matrices" % tc)
-            return ogs, ogMatrices
-               
-    def GetOGMatricesTowardsParallel(self):
-        """
-        ogMatrices contains matrix M for each OG where:
-            Mij = 0.5*max(Bij, Bmin_i)/Bmax_i
-        """
-        ogs = self.ogSet.OGs()
-        ogsPerSpecies = [[[(g, i) for i, g in enumerate(og) if g.iSp == iSp] for iSp in self.ogSet.seqsInfo.speciesToUse] for og in ogs]
-        nGenes = [len(og) for og in ogs]
-        nSeqs = self.ogSet.seqsInfo.nSeqsPerSpecies
-        ogMatrices = [np.zeros((n, n)) for n in nGenes]
-        # parallelize here - each process creates a set of og matrices which must be summed
-        for iiSp, sp1 in enumerate(self.ogSet.seqsInfo.speciesToUse):
-            Is, Js, Vs =  Worker_OGMatrices(iiSp, sp1, nGenes, self.ogSet.seqsInfo.speciesToUse, self.ogSet.fileInfo, nSeqs[sp1], ogsPerSpecies)
-            for m, I, J, V in zip(ogMatrices, Is, Js, Vs):
-                for i, j, v in zip(I,J,V): m[i,j] = v
-        return ogs, ogMatrices        
-        
-    def GetOGMatricesParallel(self):
-        """
-        ogMatrices contains matrix M for each OG where:
-            Mij = 0.5*max(Bij, Bmin_i)/Bmax_i
-        """
-        ogs = self.ogSet.OGs()
-        ogsPerSpecies = [[[(g, i) for i, g in enumerate(og) if g.iSp == iSp] for iSp in self.ogSet.seqsInfo.speciesToUse] for og in ogs]
-        nGenes = [len(og) for og in ogs]
-        nSeqs = self.ogSet.seqsInfo.nSeqsPerSpecies
-#        ogMatrices = [np.zeros((n, n)) for n in nGenes]
-        ogMatrices = [[mp.Array('d', n, lock=False) for _ in xrange(n)] for n in nGenes]
-        # 2. Create mp.Arrays for each ogMatrix, 
-        cmd_queue = mp.Queue()
-        for iiSp, sp1 in enumerate(self.ogSet.seqsInfo.speciesToUse):
-            cmd_queue.put((iiSp, sp1, nSeqs[sp1]))
-        runningProcesses = [mp.Process(target=Worker_OGMatrices_EditArray, args=(cmd_queue, ogMatrices, nGenes, self.ogSet.seqsInfo.speciesToUse, self.ogSet.fileInfo, ogsPerSpecies)) for i_ in xrange(self.nProcesses)]
-        for proc in runningProcesses:
-            proc.start()
-        for proc in runningProcesses:
-            while proc.is_alive():
-                proc.join() 
-        ogMatrices = [np.matrix(m) for m in ogMatrices]
-        return ogs, ogMatrices      
-    
-    def DeleteBlastMatrices(self):
-        matrices.DeleteMatrices("Bit", self.ogSet.fileInfo)
-        
+                   
     def CompleteOGMatrices(self, ogs, ogMatrices):
         newMatrices = []
         for iog, (og, m) in enumerate(zip(ogs, ogMatrices)):
@@ -1000,13 +836,15 @@ def OrthologuesWorkflow(workingDir_ogs,
                        recon_method,
                        nHighParallel,
                        nLowParrallel,
+                       qDoubleBlast,
                        userSpeciesTree = None, 
                        qStopAfterSeqs = False,
                        qStopAfterAlign = False,
                        qStopAfterTrees = False, 
                        qMSA = False,
                        qPhyldog = False,
-                       pickleDir=None):
+                       pickleDir=None,
+                       results_name = ""):
     """
     1. Setup:
         - ogSet, directories
@@ -1023,7 +861,7 @@ def OrthologuesWorkflow(workingDir_ogs,
     """
     ogSet = OrthoGroupsSet(workingDir_ogs, speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor, pickleDir=pickleDir)
         
-    resultsDir = util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_")
+    resultsDir = util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_" + ("" if results_name == "" else results_name + "_"))
     """ === 1 === ust = UserSpeciesTree
     MSA:               Sequences    Alignments                        GeneTrees    db    SpeciesTree
     Phyldog:           Sequences    Alignments                        GeneTrees    db    SpeciesTree  
@@ -1047,19 +885,17 @@ def OrthologuesWorkflow(workingDir_ogs,
             st = "\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0]
             st += "\nMultiple sequence alignments:\n   %s\n" % seqs_alignments_dirs[1]
             return st
-        db = DendroBLASTTrees(ogSet, resultsDir, nLowParrallel)
+        db = DendroBLASTTrees(ogSet, resultsDir, nLowParrallel, qDoubleBlast)
         if qDB_SpeciesTree and not userSpeciesTree:
             util.PrintUnderline("Inferring species tree (calculating gene distances)")
             print("Loading BLAST scores")
-#            db.ReadAndPickle()
             spTreeFN_ids, spTreeUnrootedFN = db.SpeciesTreeOnly()
         if qPhyldog:
             wrapper_phyldog.RunPhyldogAnalysis(resultsDir + "WorkingDirectory/phyldog/", ogSet.OGs(), speciesToUse)
             return "Running Phyldog" + "\n".join(seqs_alignments_dirs)       
     else:
         util.PrintUnderline("Calculating gene distances")
-        db = DendroBLASTTrees(ogSet, resultsDir, nLowParrallel)
-#        db.ReadAndPickle()
+        db = DendroBLASTTrees(ogSet, resultsDir, nLowParrallel, qDoubleBlast)
         nOGs, D, spTreeFN_ids, spTreeUnrootedFN = db.RunAnalysis()
     
     """ === 2 ===
@@ -1116,7 +952,6 @@ def OrthologuesWorkflow(workingDir_ogs,
             else:
                 resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted_at_outgroup_%d.txt" % i)
             util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True, label='N')
-        db.DeleteBlastMatrices()
         CleanWorkingDir(db.workingDir)
         return GetResultsFilesString(resultsSpeciesTrees, seqs_alignments_dirs if qMSA else None, False)
     
@@ -1146,7 +981,6 @@ def OrthologuesWorkflow(workingDir_ogs,
             unanalysedSpeciesTree = rooted_species_tree_dir + "SpeciesTree_rooted_at_outgroup_%d.txt" % i
             util.RenameTreeTaxa(speciesTree_fn, unanalysedSpeciesTree, db.ogSet.SpeciesDict(), qFixNegatives=True, label='N')
     
-    db.DeleteBlastMatrices()
     CleanWorkingDir(db.workingDir)
     util.PrintUnderline("Writing results files", True)
     

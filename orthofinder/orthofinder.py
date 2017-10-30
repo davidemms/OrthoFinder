@@ -356,16 +356,16 @@ def GetNumberOfSequencesInFile(filename):
 
 """ Question: Do I want to do all BLASTs or just the required ones? It's got to be all BLASTs I think. They could potentially be 
 run after the clustering has finished."""
-def GetOrderedSearchCommands(seqsInfo, dirs, search_program, program_caller):
+def GetOrderedSearchCommands(seqsInfo, dirs, qDoubleBlast, search_program, program_caller):
     """ Using the nSeq1 x nSeq2 as a rough estimate of the amount of work required for a given species-pair, returns the commands 
     ordered so that the commands predicted to take the longest come first. This allows the load to be balanced better when processing 
     the BLAST commands.
     """
     iSpeciesPrevious = range(dirs.iFirstNewSpecies)
     iSpeciesNew = range(dirs.iFirstNewSpecies, dirs.nSpAll)
-    speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew)] + \
-                   [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesPrevious)] + \
-                   [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew)] 
+    speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew) if (qDoubleBlast or i <=j)] + \
+                   [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesPrevious) if (qDoubleBlast or i <=j)] + \
+                   [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew) if (qDoubleBlast or i <=j)] 
     taskSizes = [seqsInfo.nSeqsPerSpecies[i]*seqsInfo.nSeqsPerSpecies[j] for i,j in speciesPairs]
     taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
     if search_program == "blast":
@@ -461,13 +461,13 @@ class WaterfallMethod:
             return sparse.lil_matrix(B.get_shape())
             
     @staticmethod
-    def ProcessBlastHits(seqsInfo, fileInfo, Lengths, iSpecies):
+    def ProcessBlastHits(seqsInfo, fileInfo, Lengths, iSpecies, qDoubleBlast):
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
             # process up to the best hits for each species
             Bi = []
             for jSpecies in xrange(seqsInfo.nSpecies):
-                Bij = BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies])  
+                Bij = BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)  
                 Bij = WaterfallMethod.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
                 Bi.append(Bij)
             matrices.DumpMatrixArray("B", Bi, fileInfo, iSpecies)
@@ -476,11 +476,11 @@ class WaterfallMethod:
             util.PrintTime("Initial processing of species %d complete" % iSpecies)
         
     @staticmethod 
-    def Worker_ProcessBlastHits(cmd_queue):
+    def Worker_ProcessBlastHits(cmd_queue, qDoubleBlast):
         while True:
             try:
                 args = cmd_queue.get(True, 1)
-                WaterfallMethod.ProcessBlastHits(*args)
+                WaterfallMethod.ProcessBlastHits(*args, qDoubleBlast=qDoubleBlast)
             except Queue.Empty:
                 return 
 
@@ -782,6 +782,7 @@ def PrintHelp(program_caller):
     print("OPTIONS:")
     print(" -t <int>          Number of parallel sequence search threads [Default = %d]" % util.nThreadsDefault)
     print(" -a <int>          Number of parallel analysis threads [Default = %d]" % util.nAlgDefault)
+    print(" -d                Double BLAST search (BLAST in both directions)")
     print(" -M <txt>          Method for gene tree inference. Options 'dendroblast' & 'msa'")
     print("                   [Default = dendroblast]")
     print(" -S <txt>          Sequence search program [Default = blast]")
@@ -796,6 +797,7 @@ def PrintHelp(program_caller):
     print(" -I <int>          MCL inflation parameter [Default = %0.1f]" % g_mclInflation)
     print(" -x <file>         Info for outputting results in OrthoXML format")
     print(" -p <dir>          Write the temporary pickle files to <dir>")
+    print(" -n <txt>          Name to append to the results directory")  
     print(" -h                Print this help text")
 
     print("")    
@@ -867,6 +869,8 @@ class Options(object):#
         self.msa_program = "mafft"
         self.tree_program = "fasttree"
         self.recon_method = "of_recon"
+        self.name = ""   # name to identify this set of results
+        self.qDoubleBlast = False
         self.qPhyldog = False
         self.speciesXMLInfoFN = None
         self.speciesTreeFN = None
@@ -973,6 +977,8 @@ def ProcessArgs(program_caller):
             except:
                 print("Incorrect argument for number of BLAST threads: %s\n" % arg)
                 util.Fail()   
+        elif arg == "-d":
+            options.qDoubleBlast = True 
         elif arg == "-I" or arg == "--inflation":
             if len(args) == 0:
                 print("Missing option for command line argument %s\n" % arg)
@@ -991,6 +997,17 @@ def ProcessArgs(program_caller):
                 print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
             options.speciesXMLInfoFN = args.pop(0)
+        elif arg == "-n" or arg == "--name":  
+            if options.name:
+                print("Repeated argument: -n/--name")
+                util.Fail()
+            if len(args) == 0:
+                print("Missing option for command line argument %s\n" % arg)
+                util.Fail()
+            options.name = args.pop(0)
+            if any([symbol in options.name for symbol in [" ", "/"]]): 
+                print("Invalid symbol for command line argument %s\n" % arg)
+                util.Fail()
         elif arg == "-s" or arg == "--speciestree":  
             if options.speciesXMLInfoFN:
                 print("Repeated argument: -s/--speciestree")
@@ -1188,7 +1205,7 @@ def CheckDependencies(options, program_caller, dirForTempFiles):
             print("Either install the required dependencies or use the option '-og' to stop the analysis after the inference of orthogroups.\n")
             util.Fail()
 
-def DoOrthogroups(options, dirs, seqsInfo, separatePickleDir=None):
+def DoOrthogroups(options, dirs, seqsInfo, qDoubleBlast, separatePickleDir=None):
     # Run Algorithm, cluster and output cluster files with original accessions
     util.PrintUnderline("Running OrthoFinder algorithm")
     fileIdentifierString = "OrthoFinder_v%s" % util.version
@@ -1205,7 +1222,7 @@ def DoOrthogroups(options, dirs, seqsInfo, separatePickleDir=None):
     cmd_queue = mp.Queue()
     for iSpecies in xrange(seqsInfo.nSpecies):
         cmd_queue.put((seqsInfo, fileInfo, Lengths, iSpecies))
-    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, )) for i_ in xrange(options.nProcessAlg)]
+    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, qDoubleBlast)) for i_ in xrange(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
     util.ManageQueue(runningProcesses, cmd_queue)
@@ -1242,7 +1259,7 @@ def DoOrthogroups(options, dirs, seqsInfo, separatePickleDir=None):
     return clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString
 
 # 0
-def ProcessPreviousFiles(workingDir):
+def ProcessPreviousFiles(workingDir, qDoubleBlast):
     """Checks for:
     workingDir should be the WorkingDirectory containing Blast*.txt files
     
@@ -1285,15 +1302,27 @@ def ProcessPreviousFiles(workingDir):
         util.Fail()
     
     # check BLAST files
-    qHaveBlast = True
-    for iSpecies in dirs.speciesToUse:
-        for jSpecies in dirs.speciesToUse:
-            filename = "%sBlast%d_%d.txt" % (dirs.workingDir, iSpecies, jSpecies) 
-            if not os.path.exists(filename):
-                print("BLAST results file is missing: %s" % filename)
-                qHaveBlast = False
-    if not qHaveBlast: util.Fail()
-                
+    blast_fns_triangular = ["%sBlast%d_%d.txt" % (dirs.workingDir, iSpecies, jSpecies) for iSpecies in dirs.speciesToUse for jSpecies in dirs.speciesToUse if jSpecies >= iSpecies]
+    have_triangular = [os.path.exists(fn) for fn in blast_fns_triangular]
+    for qHave, fn in zip(have_triangular, blast_fns_triangular):
+        if not qHave: print("BLAST results file is missing: %s" % fn)
+    
+    if qDoubleBlast:
+        blast_fns_remainder = ["%sBlast%d_%d.txt" % (dirs.workingDir, iSpecies, jSpecies) for iSpecies in dirs.speciesToUse for jSpecies in dirs.speciesToUse if jSpecies < iSpecies]
+        have_remainder = [os.path.exists(fn) for fn in blast_fns_remainder]
+        if not (all(have_triangular) and all(have_remainder)):
+            for qHave, fn in zip(have_remainder, blast_fns_remainder):
+                if not qHave: print("BLAST results file is missing: %s" % fn)
+            if not all(have_triangular):
+                util.Fail()
+            else:
+                # would be able to do it using just one-way blast
+                print("Required BLAST results files are present for using the one-way sequence search option (default) but not the double BLAST search ('-d' option)")
+                util.Fail()
+    else:
+        if not all(have_triangular):
+            util.Fail()
+                            
     # check SequenceIDs.txt and SpeciesIDs.txt files are present
     if not os.path.exists(dirs.IDsFilename()):
         print("%s file must be provided if using previous calculated BLAST results" % dirs.IDsFilename())
@@ -1311,7 +1340,7 @@ def CreateSearchDatabases(dirs, options, program_caller):
         else:
             command = program_caller.GetSearchMethodCommand_DB(options.search_program, dirs.workingDir + "Species%d.fa" % iSp, dirs.workingDir + "%sDBSpecies%d" % (options.search_program, iSp))
             util.PrintTime("Creating %s database %d of %d" % (options.search_program, iSp + 1, nDB))
-            util.RunCommand(command, shell=True)
+            util.RunCommand(command, shell=True, qHideOutput=True)
 
 # 7
 def RunSearch(options, dirs, seqsInfo, program_caller):
@@ -1320,7 +1349,7 @@ def RunSearch(options, dirs, seqsInfo, program_caller):
         util.PrintUnderline("%s commands that must be run" % name_to_print)
     else:        
         util.PrintUnderline("Running %s all-versus-all" % name_to_print)
-    commands = GetOrderedSearchCommands(seqsInfo, dirs, options.search_program, program_caller)
+    commands = GetOrderedSearchCommands(seqsInfo, dirs, options.qDoubleBlast, options.search_program, program_caller)
     if options.qStopAfterPrepare:
         for command in commands:
             print(command)
@@ -1356,13 +1385,15 @@ def GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthog
                                                                         options.recon_method,
                                                                         options.nBlast,
                                                                         options.nProcessAlg,
+                                                                        options.qDoubleBlast,
                                                                         options.speciesTreeFN, 
                                                                         options.qStopAfterSeqs,
                                                                         options.qStopAfterAlignments,
                                                                         options.qStopAfterTrees,
                                                                         options.qMSATrees,
                                                                         options.qPhyldog,
-                                                                        options.separatePickleDir)
+                                                                        options.separatePickleDir,
+                                                                        options.name)
     if None != orthogroupsResultsFilesString: print(orthogroupsResultsFilesString)
     print(orthologuesResultsFilesString.rstrip())    
 
@@ -1371,7 +1402,7 @@ def GetOrthologues_FromTrees(orthologuesDir, options):
     workingDir = orthologuesDir + "WorkingDirectory/"
     return orthologues.OrthologuesFromTrees(options.recon_method, groupsDir, workingDir, options.nBlast, options.speciesTreeFN, pickleDir=options.separatePickleDir)
  
-def ProcessesNewFasta(fastaDir, existingDirs=None):
+def ProcessesNewFasta(fastaDir, existingDirs=None, name = ""):
     """
     Process fasta files and return a Directory object with all paths completed.
     """
@@ -1387,7 +1418,7 @@ def ProcessesNewFasta(fastaDir, existingDirs=None):
         util.Fail()
     if None == existingDirs:
         dirs = Directories()
-        dirs.resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results_")
+        dirs.resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results_" + ("" if name == "" else name + "_"))
         dirs.workingDir = dirs.resultsDir + "WorkingDirectory" + os.sep
         os.mkdir(dirs.workingDir)
     else:
@@ -1469,10 +1500,10 @@ if __name__ == "__main__":
     # if using previous Trees etc., check these are all present - Job for orthologues
     if options.qStartFromBlast and options.qStartFromFasta:
         # 0. Check Files
-        dirs = ProcessPreviousFiles(workingDir)
+        dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
         print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, dirs.workingDir))
         # 3. 
-        dirs = ProcessesNewFasta(fastaDir, dirs)
+        dirs = ProcessesNewFasta(fastaDir, dirs, options.name)
         options = CheckOptions(options, dirs)
         # 4.
         seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
@@ -1485,7 +1516,7 @@ if __name__ == "__main__":
         # 7.  
         RunSearch(options, dirs, seqsInfo, program_caller)
         # 8.
-        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.separatePickleDir)
+        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.qDoubleBlast, options.separatePickleDir)
         # 9.
         if not options.qStopAfterGroups:
             GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
@@ -1495,7 +1526,7 @@ if __name__ == "__main__":
             
     elif options.qStartFromFasta:
         # 3. 
-        dirs = ProcessesNewFasta(fastaDir)
+        dirs = ProcessesNewFasta(fastaDir, name = options.name)
         options = CheckOptions(options, dirs)
         # 4
         seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
@@ -1508,7 +1539,7 @@ if __name__ == "__main__":
         # 7. 
         RunSearch(options, dirs, seqsInfo, program_caller)
         # 8.  
-        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.separatePickleDir)    
+        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.qDoubleBlast, options.separatePickleDir)    
         # 9. 
         if not options.qStopAfterGroups:
             GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
@@ -1518,7 +1549,7 @@ if __name__ == "__main__":
         
     elif options.qStartFromBlast:
         # 0.
-        dirs = ProcessPreviousFiles(workingDir)
+        dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
         print("Using previously calculated BLAST results in %s" % dirs.workingDir) 
         options = CheckOptions(options, dirs)
         # 4.
@@ -1527,7 +1558,7 @@ if __name__ == "__main__":
         if options.speciesXMLInfoFN:   
             speciesInfo = GetXMLSpeciesInfo(dirs, options)
         # 8        
-        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.separatePickleDir)    
+        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.qDoubleBlast, options.separatePickleDir)    
         # 9
         if not options.qStopAfterGroups:
             GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
@@ -1536,7 +1567,7 @@ if __name__ == "__main__":
         util.PrintCitation() 
     elif options.qStartFromGroups:
         # 0.  
-        dirs = ProcessPreviousFiles(workingDir)
+        dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
         dirs.resultsDir = orthofinderResultsDir       
         options = CheckOptions(options, dirs)
         # 9
@@ -1544,7 +1575,7 @@ if __name__ == "__main__":
         # 10
         util.PrintCitation() 
     elif options.qStartFromTrees:
-        dirs = ProcessPreviousFiles(workingDir)
+        dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
         options = CheckOptions(options, dirs)
         summaryText = GetOrthologues_FromTrees(orthologuesDir, options)
         print(summaryText) 
