@@ -246,24 +246,25 @@ def Worker_OGMatrices(iiSp, sp1, nGenes, speciesToUse, fileInfo, nSeqs_sp1, ogsP
 
 def Worker_OGMatrices_ReadBLASTAndEditArray(cmd_queue, ogMatrices, nGenes, seqsInfo, fileInfo, ogsPerSpecies):
     speciesToUse = seqsInfo.speciesToUse
-    while True:
-        try:
-            iiSp, sp1, nSeqs_sp1 = cmd_queue.get(True, 1)
-            Bs = [BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, sp1, sp2, qExcludeSelfHits = False) for sp2 in speciesToUse]
-            mins = np.ones((nSeqs_sp1, 1), dtype=np.float64)*9e99 
-            maxes = np.zeros((nSeqs_sp1, 1), dtype=np.float64)
-            for B in Bs:
-                m0, m1 = lil_minmax(B)
-                mins = np.minimum(mins, m0)
-                maxes = np.maximum(maxes, m1)
-            maxes_inv = 1./maxes
-            for jjSp, B  in enumerate(Bs):
-                for og, m in zip(ogsPerSpecies, ogMatrices):
-                    for gi, i in og[iiSp]:
-                        for gj, j in og[jjSp]:
-                                m[i][j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) * maxes_inv[gi.iSeq]
-        except Queue.Empty:
-            return 
+    with np.errstate(divide='ignore'):
+        while True:
+            try:
+                iiSp, sp1, nSeqs_sp1 = cmd_queue.get(True, 1)
+                Bs = [BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, sp1, sp2, qExcludeSelfHits = False) for sp2 in speciesToUse]
+                mins = np.ones((nSeqs_sp1, 1), dtype=np.float64)*9e99 
+                maxes = np.zeros((nSeqs_sp1, 1), dtype=np.float64)
+                for B in Bs:
+                    m0, m1 = lil_minmax(B)
+                    mins = np.minimum(mins, m0)
+                    maxes = np.maximum(maxes, m1)
+                maxes_inv = 1./maxes
+                for jjSp, B  in enumerate(Bs):
+                    for og, m in zip(ogsPerSpecies, ogMatrices):
+                        for gi, i in og[iiSp]:
+                            for gj, j in og[jjSp]:
+                                    m[i][j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) * maxes_inv[gi.iSeq]
+            except Queue.Empty:
+                return 
 
 def Worker_OGMatrices_EditArray(cmd_queue, ogMatrices, nGenes, speciesToUse, fileInfo, ogsPerSpecies):
     while True:
@@ -312,22 +313,24 @@ class DendroBLASTTrees(object):
         ogMatrices contains matrix M for each OG where:
             Mij = 0.5*max(Bij, Bmin_i)/Bmax_i
         """
-        ogs = self.ogSet.OGs()
-        ogsPerSpecies = [[[(g, i) for i, g in enumerate(og) if g.iSp == iSp] for iSp in self.ogSet.seqsInfo.speciesToUse] for og in ogs]
-        nGenes = [len(og) for og in ogs]
-        nSeqs = self.ogSet.seqsInfo.nSeqsPerSpecies
-        ogMatrices = [[mp.Array('d', n, lock=False) for _ in xrange(n)] for n in nGenes]
-        cmd_queue = mp.Queue()
-        for iiSp, sp1 in enumerate(self.ogSet.seqsInfo.speciesToUse):
-            cmd_queue.put((iiSp, sp1, nSeqs[sp1]))
-        runningProcesses = [mp.Process(target=Worker_OGMatrices_ReadBLASTAndEditArray, args=(cmd_queue, ogMatrices, nGenes, self.ogSet.seqsInfo, self.ogSet.fileInfo, ogsPerSpecies)) for i_ in xrange(self.nProcesses)]
-        for proc in runningProcesses:
-            proc.start()
-        for proc in runningProcesses:
-            while proc.is_alive():
-                proc.join() 
-        ogMatrices = [np.matrix(m) for m in ogMatrices]
-        return ogs, ogMatrices      
+        with warnings.catch_warnings():         
+            warnings.simplefilter("ignore")
+            ogs = self.ogSet.OGs()
+            ogsPerSpecies = [[[(g, i) for i, g in enumerate(og) if g.iSp == iSp] for iSp in self.ogSet.seqsInfo.speciesToUse] for og in ogs]
+            nGenes = [len(og) for og in ogs]
+            nSeqs = self.ogSet.seqsInfo.nSeqsPerSpecies
+            ogMatrices = [[mp.Array('d', n, lock=False) for _ in xrange(n)] for n in nGenes]
+            cmd_queue = mp.Queue()
+            for iiSp, sp1 in enumerate(self.ogSet.seqsInfo.speciesToUse):
+                cmd_queue.put((iiSp, sp1, nSeqs[sp1]))
+            runningProcesses = [mp.Process(target=Worker_OGMatrices_ReadBLASTAndEditArray, args=(cmd_queue, ogMatrices, nGenes, self.ogSet.seqsInfo, self.ogSet.fileInfo, ogsPerSpecies)) for i_ in xrange(self.nProcesses)]
+            for proc in runningProcesses:
+                proc.start()
+            for proc in runningProcesses:
+                while proc.is_alive():
+                    proc.join() 
+            ogMatrices = [np.matrix(m) for m in ogMatrices]
+            return ogs, ogMatrices      
         
     def ReadAndPickle(self): 
         with warnings.catch_warnings():         
