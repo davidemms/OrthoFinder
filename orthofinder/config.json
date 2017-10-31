@@ -27,21 +27,9 @@
     "diamond":{ 
     "program_type": "search",
     "db_cmd": "diamond makedb --in INPUT -d OUTPUT",
-    "search_cmd": "diamond blastp -d DATABASE -q INPUT -o OUTPUT --sensitive -p 1 --quiet -e 0.001"
-    },
-    
-    "diamond_more_sensitive":{ 
-    "program_type": "search",
-    "db_cmd": "diamond makedb --in INPUT -d OUTPUT",
     "search_cmd": "diamond blastp -d DATABASE -q INPUT -o OUTPUT --more-sensitive -p 1 --quiet -e 0.001"
     },
-    
-    "diamond_more_sens_gz":{ 
-    "program_type": "search",
-    "db_cmd": "diamond makedb --in INPUT -d OUTPUT",
-    "search_cmd": "diamond blastp -d DATABASE -q INPUT -o OUTPUT --more-sensitive -p 1 --quiet -e 0.001 --compress 1"
-    },
-    
+        
     "blast_gz":{ 
     "program_type": "search",
     "db_cmd": "makeblastdb -dbtype prot -in INPUT -out OUTPUT",
