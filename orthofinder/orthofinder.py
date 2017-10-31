@@ -782,7 +782,6 @@ def PrintHelp(program_caller):
     print("OPTIONS:")
     print(" -t <int>          Number of parallel sequence search threads [Default = %d]" % util.nThreadsDefault)
     print(" -a <int>          Number of parallel analysis threads [Default = %d]" % util.nAlgDefault)
-    print(" -d                Double sequence search (i.e. BLAST search in both directions)")
     print(" -M <txt>          Method for gene tree inference. Options 'dendroblast' & 'msa'")
     print("                   [Default = dendroblast]")
     print(" -S <txt>          Sequence search program [Default = blast]")
@@ -797,6 +796,7 @@ def PrintHelp(program_caller):
     print(" -I <int>          MCL inflation parameter [Default = %0.1f]" % g_mclInflation)
     print(" -x <file>         Info for outputting results in OrthoXML format")
     print(" -p <dir>          Write the temporary pickle files to <dir>")
+    print(" -1                Only perform one-way sequence search ")
     print(" -n <txt>          Name to append to the results directory")  
     print(" -h                Print this help text")
 
@@ -870,7 +870,7 @@ class Options(object):#
         self.tree_program = "fasttree"
         self.recon_method = "of_recon"
         self.name = ""   # name to identify this set of results
-        self.qDoubleBlast = False
+        self.qDoubleBlast = True
         self.qPhyldog = False
         self.speciesXMLInfoFN = None
         self.speciesTreeFN = None
@@ -977,8 +977,8 @@ def ProcessArgs(program_caller):
             except:
                 print("Incorrect argument for number of BLAST threads: %s\n" % arg)
                 util.Fail()   
-        elif arg == "-d":
-            options.qDoubleBlast = True 
+        elif arg == "-1":
+            options.qDoubleBlast = False
         elif arg == "-I" or arg == "--inflation":
             if len(args) == 0:
                 print("Missing option for command line argument %s\n" % arg)
