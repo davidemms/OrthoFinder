@@ -325,9 +325,10 @@ def RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, qL
     """
     # Setup the workers and run
     cmd_queue = mp.Queue()
+    i = -1
     for i, cmd in enumerate(commands_and_filenames):
         cmd_queue.put((i, cmd))
-    runningProcesses = [mp.Process(target=util.Worker_RunCommands_And_Move, args=(cmd_queue, nProcesses, i+1, qListOfList)) for i_ in xrange(nProcesses)]
+    runningProcesses = [mp.Process(target=util.Worker_RunCommands_And_Move, args=(cmd_queue, nProcesses, i+1, qListOfList)) for _ in xrange(nProcesses)]
     for proc in runningProcesses:
         proc.start()
     

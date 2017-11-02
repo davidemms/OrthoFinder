@@ -40,108 +40,66 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "2.1.0"
+version = "2.1.1"
 requiredBlastVersion = "2.2.28+"
 
 standard_new_files = ("Orthogroups.csv Orthogroups.GeneCount.csv SingleCopyOrthogroups.txt Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv" % (version, version, version)).split()
 
-citation = """When publishing work that uses OrthoFinder please cite:
-    D.M. Emms & S. Kelly (2015), OrthoFinder: solving fundamental biases in whole genome comparisons
-    dramatically improves orthogroup inference accuracy, Genome Biology 16:157.
-""" 
+citation = """ When publishing work that uses OrthoFinder please cite:
+ Emms D.M. & Kelly S. (2015), Genome Biology 16:157""" 
 
 expectedHelp1="""OrthoFinder version %s Copyright (C) 2014 David Emms
 
-    This program comes with ABSOLUTELY NO WARRANTY.
-    This is free software, and you are welcome to redistribute it under certain conditions.
-    For details please see the License.md that came with this software.
+SIMPLE USAGE:
+Run full OrthoFinder analysis on FASTA format proteomes in <dir>
+  orthofinder [options] -f <dir>
 
-=== Simple Usage ===
+Add new species in <dir1> to previous run in <dir2> and run new analysis
+  orthofinder [options] -f <dir1> -b <dir2>
 
-orthofinder -f fasta_directory [-t n_blast_threads]
+OPTIONS:
+ -t <int>          Number of parallel sequence search threads [Default = 16]
+ -a <int>          Number of parallel analysis threads [Default = 1]
+ -M <txt>          Method for gene tree inference. Options 'dendroblast' & 'msa'
+                   [Default = dendroblast]
+ -S <txt>          Sequence search program [Default = blast]"""  % version
 
-    Infers orthogroups for the proteomes contained in fasta_directory using
-    n_blast_threads in parallel for the BLAST searches and tree inference.
+help_not_checked="""                   Options: blast, blast_gz, diamond
+ -A <txt>          MSA program, requires '-M msa' [Default = mafft]
+                   Options: mafft, muscle, mafft
+ -T <txt>          Tree inference method, requires '-M msa' [Default = fasttree]
+                   Options: mafft, iqtree, fasttree, raxml"""
 
-=== Arguments ===
-Control where analysis starts (at least one must be specified):
+expectedHelp2=""" -R <txt>          Tree reconciliation method [Default = of_recon]
+                   Options: of_recon, dlcpar, dlcpar_deepsearch
+ -s <file>         User-specified rooted species tree
+ -I <int>          MCL inflation parameter [Default = 1.5]
+ -x <file>         Info for outputting results in OrthoXML format
+ -p <dir>          Write the temporary pickle files to <dir>
+ -1                Only perform one-way sequence search 
+ -n <txt>          Name to append to the results directory
+ -h                Print this help text
 
--f fasta_dir, --fasta fasta_dir
-    Perform full OrthoFinder analysis for the proteins in the fasta files in fasta_dir/.
+WORKFLOW STOPPING OPTIONS:
+ -op               Stop after preparing input files for BLAST
+ -og               Stop after inferring orthogroups
+ -os               Stop after writing sequence files for orthogroups
+                   (requires '-M msa')
+ -oa               Stop after inferring alignments for orthogroups
+                   (requires '-M msa')
+ -ot               Stop after inferring gene trees for orthogroups 
 
--b blast_results_dir, --blast blast_results_dir
-    Perform full OrthoF0inder analysis using the pre-calcualted BLAST results in blast_results_dir/.
+WORKFLOW RESTART COMMANDS:
+ -b  <dir>         Start OrthoFinder from pre-computed BLAST results in <dir>
+ -fg <dir>         Start OrthoFinder from pre-computed orthogroups in <dir>
+ -ft <dir>         Start OrthoFinder from pre-computed gene trees in <dir>
 
--f & -b options can be combined in order to add new species to an analysis without needing
-to redo the BLAST searches from a previous analysis.
+LICENSE:
+ Distributed under the GNU General Public License (GPLv3). See License.md
 
--fg orthogroup_results_dir, --from-groups orthogroup_results_dir
-    Infer gene trees and orthologues starting from OrthoFinder orthogroups in orthogroup_results_dir/.
-
--ft orthologues_results_dir, --from-trees orthologues_results_dir
-    Infer orthologues starting from OrthoFinder gene trees in directory in orthologues_results_dir/.
-
-Control where analysis stops (optional):
-
--op, --only-prepare
-    Only prepare the BLAST input files in the format required by OrthoFinder.
-
--og, --only-groups
-    Stop after inferring orthogroups, do not infer gene trees of orthologues.
-
--os, --only-seqs
-    Stop after inferring orthogroups and writing out sequence files for each orthogroup
-
--oa, --only-alignments
-    Stop after inferring multiple sequence alignments for each orthogroup
-
--ot, --only-trees
-    Stop after inferring gene trees, do not infer orthologues.
-
-Additional arguments:
-
--t n_blast_threads, --threads n_blast_threads
-    The number of BLAST processes to be run simultaneously. [Default is 16]
-
--a n_orthofinder_threads, --algthreads n_orthofinder_threads
-    The number of threads to use for the less readily parallelised parts of the OrthoFinder algorithm.
-    There are speed/memory trade-offs involved, see manual for details. [Default is 1]
-
--M tree_inference_method, --method tree_inference_method
-    Use tree_inference_method for gene trees. Valid options are 'dendroblast' & 'msa'. [Default is dendroblast]"""  % version
-
-help_not_checked="""-S search_program, --search search_program
-    Use search_program for alignment search. [Default in blast]
-    Options: blast, diamond, diamond_more_sensitive.
-
--A msa_program, --alignment msa_program
-    Use msa_program for multiple sequence alignments (requires '-M msa' option). [Default in mafft]
-    Options: mafft, mergealign, muscle.
-
--T tree_program, --alignment tree_program
-    Use tree_program for tree inference from multiple sequence alignments (requires '-M msa' option). [Default in fasttree]
-    Options: fasttree, iqtree, iqtreeDavid, raxmlDavid, raxml."""
-
-expectedHelp2="""-I inflation_parameter, --inflation inflation_parameter
-    Specify a non-default inflation parameter for MCL. Not recommended. [Default is 1.5]
-
--x speciesInfoFilename, --orthoxml speciesInfoFilename
-    Output the orthogroups in the orthoxml format using the information in speciesInfoFilename.
-
---pickledir directory
-    Write the temporary pickle files to the specified directory.
-
--s rootedSpeciesTree, --speciestree rootedSpeciesTree
-    Use rootedSpeciesTree for gene-tree/species-tree reconciliation (i.e. orthologue inference).
-
--h, --help
-    Print this help text
-
-
-When publishing work that uses OrthoFinder please cite:
-    D.M. Emms & S. Kelly (2015), OrthoFinder: solving fundamental biases in whole genome comparisons
-    dramatically improves orthogroup inference accuracy, Genome Biology 16:157.
-"""
+CITATION:
+ When publishing work that uses OrthoFinder please cite:
+ Emms D.M. & Kelly S. (2015), Genome Biology 16:157"""
 
 class CleanUp(object):
     """Cleans up after arbitrary code that could create any/all of the 'newFiles'
@@ -153,7 +111,7 @@ class CleanUp(object):
         - deletes any files from newFiles
         - uses the copies of modifiedFiles to revert them to their previous state
     """
-    def __init__(self, newFiles, modifiedFiles, newDirs = [], qSaveFiles=False):
+    def __init__(self, newFiles, modifiedFiles, newDirs = [], qSaveFiles=False, qCleanup=True):
         """qSaveFiles is useful for debuging purposes
         """
         self.newFiles = newFiles
@@ -162,12 +120,14 @@ class CleanUp(object):
         assert(types.ListType == type(newDirs)) # if it were a string the code could attempt to delete every file on computer
         self.newDirs = newDirs
         self.qSaveFiles = qSaveFiles
+        self.qCleanup = qCleanup
     def __enter__(self):
         for fn in self.modifiedFiles:
             copy = fn + "_bak%d" % random.randint(0, 999999)
             shutil.copy(fn, copy)
             self.copies.append(copy)
     def __exit__(self, type, value, traceback):
+        if not self.qCleanup: return
         if self.qSaveFiles and len(self.newFiles) != 0:
             saveDir = os.path.split(self.newFiles[0])[0] + "/SavedFiles/"
             os.mkdir(saveDir)
@@ -543,16 +503,16 @@ class TestCommandLine(unittest.TestCase):
                                
     def test_userSpeciesTree_fromTrees(self):
         inputDir = baseDir + "Input/FromTrees/Orthologues_Oct27/"
-        orthologuesDir = inputDir + "Orthologues_%s/" % Date()
+        orthologuesDir = inputDir + "New_Analysis_From_Trees_%s/" % Date()
         expectedChangedFiles = []
         expectedExtraFiles = []
-        expExtraDir = [orthologuesDir + "../WorkingDirectory/dlcpar/", orthologuesDir + "../WorkingDirectory/Recon_Gene_Trees/", orthologuesDir]
+        expExtraDir = [orthologuesDir]
         with CleanUp(expectedExtraFiles, expectedChangedFiles, expExtraDir):        
             self.stdout, self.stderr = self.RunOrthoFinder("-R dlcpar -ft " + inputDir + (" -s %sInput/RootedSpeciesTree2.txt"%baseDir) ) 
-            self.assertTrue(os.path.exists(orthologuesDir + "Orthologues_Mycoplasma_agalactiae"))
-            self.assertTrue(os.path.exists(orthologuesDir + "Orthologues_Mycoplasma_hyopneumoniae"))
-            self.assertTrue(os.path.exists(orthologuesDir + "Orthologues_Mycoplasma_agalactiae/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum.csv"))
-            self.assertTrue(filecmp.cmp(orthologuesDir + "Orthologues_Mycoplasma_agalactiae/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum.csv",
+            self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae"))
+            self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_hyopneumoniae"))
+            self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum.csv"))
+            self.assertTrue(filecmp.cmp(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum.csv",
                                         baseDir + "ExpectedOutput/Orthologues/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum_root2.csv"))
                                
 #    def test_userSpeciesTree_fromBlast(self):
@@ -673,7 +633,7 @@ class TestCommandLine(unittest.TestCase):
         inputDir = baseDir + "Input/DisallowedCharacters/"
         orthologuesDir = inputDir + "Orthologues_%s/" % Date()
         with CleanUp([], [], [orthologuesDir]):        
-            self.stdout, self.stderr = self.RunTrees(inputDir)
+            self.stdout, self.stderr = self.RunOrthoFinder("-t 8 -fg %s -ot -M msa -s %s" % (inputDir, inputDir+"SpeciesTree.txt"))
             fn = orthologuesDir + "Gene_Trees/OG0000000_tree.txt"
             self.assertTrue(os.path.exists(fn))
             with open(fn, 'rb') as infile:
@@ -772,9 +732,9 @@ class TestCommandLine(unittest.TestCase):
         with CleanUp(newFiles, [], [resultsDir]):    
             self.stdout, self.stderr = self.RunOrthoFinder("-b %s -ot -M msa -A muscle -t 8" % exampleBlastDir)  
             # Successful run: Sequences, Alignments, Trees
-            self.assertTrue("Inferring species tree" in self.stdout)
+            self.assertTrue("Inferring multiple sequence alignments for species tree" in self.stdout)
             self.assertEqual(1177, len(glob.glob(resultsDir + "Sequences/*fa")))
-            self.assertEqual(427, len(glob.glob(resultsDir + "Alignments/*fa")))
+            self.assertEqual(428, len(glob.glob(resultsDir + "Alignments/*fa")))
             self.assertEqual(301, len(glob.glob(resultsDir + "Gene_Trees/*txt")))
             self.assertGreater(os.stat(resultsDir + "Sequences/OG0000200.fa").st_size, 200)            
             self.assertGreater(os.stat(resultsDir + "Alignments/OG0000200.fa").st_size, 200)            
@@ -797,9 +757,9 @@ class TestCommandLine(unittest.TestCase):
         with CleanUp(newFiles, [], [resultsDir]):    
             self.stdout, self.stderr = self.RunOrthoFinder("-b %s -ot -M msa -T iqtree -t 8" % exampleBlastDir) 
             # Successful run: Sequences, Alignments, Trees
-            self.assertTrue("Inferring species tree" in self.stdout)
+            self.assertTrue("Inferring multiple sequence alignments for species tree" in self.stdout)
             self.assertEqual(1177, len(glob.glob(resultsDir + "Sequences/*fa")))
-            self.assertEqual(427, len(glob.glob(resultsDir + "Alignments/*fa")))
+            self.assertEqual(428, len(glob.glob(resultsDir + "Alignments/*fa")))
             self.assertEqual(301, len(glob.glob(resultsDir + "Gene_Trees/*txt")))
             self.assertGreater(os.stat(resultsDir + "Sequences/OG0000200.fa").st_size, 200)            
             self.assertGreater(os.stat(resultsDir + "Alignments/OG0000200.fa").st_size, 200)            
@@ -819,9 +779,9 @@ class TestCommandLine(unittest.TestCase):
         newFiles = [exampleBlastDir + f for f in standard_new_files]
         with CleanUp(newFiles, [], [resultsDir]):
             self.stdout, self.stderr = self.RunOrthoFinder("-b %s -ot -M msa -T iqtree -A muscle -t 8" % exampleBlastDir) 
-            self.assertTrue("Inferring species tree" in self.stdout)
+            self.assertTrue("Inferring multiple sequence alignments for species tree" in self.stdout)
             self.assertEqual(1177, len(glob.glob(resultsDir + "Sequences/*fa")))
-            self.assertEqual(427, len(glob.glob(resultsDir + "Alignments/*fa")))
+            self.assertEqual(428, len(glob.glob(resultsDir + "Alignments/*fa")))
             self.assertEqual(301, len(glob.glob(resultsDir + "Gene_Trees/*txt")))
             self.assertGreater(os.stat(resultsDir + "Sequences/OG0000200.fa").st_size, 200)            
             self.assertGreater(os.stat(resultsDir + "Alignments/OG0000200.fa").st_size, 200)            

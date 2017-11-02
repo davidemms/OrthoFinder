@@ -27,7 +27,7 @@
     "diamond":{ 
     "program_type": "search",
     "db_cmd": "diamond makedb --in INPUT -d OUTPUT",
-    "search_cmd": "diamond blastp -d DATABASE -q INPUT -o OUTPUT --more-sensitive -p 1 --quiet -e 0.001"
+    "search_cmd": "diamond blastp -d DATABASE -q INPUT -o OUTPUT --more-sensitive -p 1 --quiet -e 0.001 --compress 1"
     },
         
     "blast_gz":{ 

@@ -382,17 +382,16 @@ class TreesForOrthogroups(object):
         # Convert ids to accessions
         accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in xrange(len(alignmentFilesToUse))]
         # Add concatenated Alignment
-        alignmentFilesToUse.append(concatenated_algn_fn)
-        accessionAlignmentFNs.append(os.path.split(self.GetAlignmentFilename(0, True))[0] + "/SpeciesTreeAlignment.fa")
-        self.RenameAlignmentTaxa(alignmentFilesToUse, accessionAlignmentFNs, idDict)
-        for i in xrange(len(treeCommands_and_filenames)):
-            if os.path.exists(self.GetTreeFilename(i)):
-                util.RenameTreeTaxa(self.GetTreeFilename(i), self.GetTreeFilename(i, True), idDict, qFixNegatives=True)
         if qDoSpeciesTree:
+            alignmentFilesToUse.append(concatenated_algn_fn)
+            accessionAlignmentFNs.append(os.path.split(self.GetAlignmentFilename(0, True))[0] + "/SpeciesTreeAlignment.fa")
+            self.RenameAlignmentTaxa(alignmentFilesToUse, accessionAlignmentFNs, idDict)
             if os.path.exists(speciesTreeFN_ids):
                 util.RenameTreeTaxa(speciesTreeFN_ids, self.workingDir + "SpeciesTree_unrooted.txt", idDict, qFixNegatives=True)
             else:
                 print("ERROR: Species tree inference failed")
                 util.Fail()
-        
+        for i in xrange(len(treeCommands_and_filenames)):
+            if os.path.exists(self.GetTreeFilename(i)):
+                util.RenameTreeTaxa(self.GetTreeFilename(i), self.GetTreeFilename(i, True), idDict, qFixNegatives=True)       
         return resultsDirsFullPath[:2]
