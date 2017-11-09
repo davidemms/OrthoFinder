@@ -36,19 +36,18 @@ def GetSpeciesSequenceIDsDict(sequenceIDsFilename, speciesIDsFN = None):
     return idsDict
           
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser("tree_ids_to_accessions takes a tree with OrthoFinder IDs and outputs a tree with gene accessions")
-    parser.add_argument("SequenceIDsFilename")
-    parser.add_argument("Tree")
-    parser.add_argument('SpeciesIDsFilename', nargs='?', default=None)
-    parser.add_argument('-d', "--directory", action="store_true", help="Process all trees in 'Tree' directory")
+    parser = argparse.ArgumentParser(description="Takes a tree with OrthoFinder IDs and outputs a tree with gene accessions")
+    parser.add_argument("TreeInput", help="Tree filename or directory")
+    parser.add_argument("SequenceIDs", help="Found in Results_<Date>/WorkingDirectory")
+    parser.add_argument('SpeciesIDs', nargs='?', default=None, help="Found in Results_<Date>/WorkingDirectory")
 
     args = parser.parse_args()
     idsDict = GetSpeciesSequenceIDsDict(args.SequenceIDsFilename, args.SpeciesIDsFilename)
         
-    if args.directory:
-        filesToDo = [f for f in glob.glob(args.Tree + "/*")]
+    if os.path.isdir(args.TreeInput):
+        filesToDo = [f for f in glob.glob(args.TreeInput + "/*")]
     else:
-        filesToDo = [args.Tree]
+        filesToDo = [args.TreeInput]
         
     for treeFilename in filesToDo:
         try:
