@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import re
 import os
 import sys
 import glob
@@ -10,7 +9,7 @@ import argparse
 if __name__ == "__main__" and __package__ is None:   
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts import tree
+from scripts import tree, util
         
 def ReplaceFileWithNewIDs(idsMap, treeFilename, newTreeFilename):     
     t = tree.Tree(treeFilename, format=1)
@@ -20,19 +19,20 @@ def ReplaceFileWithNewIDs(idsMap, treeFilename, newTreeFilename):
     with open(newTreeFilename, 'wb') as outFile: outFile.write(outputTreeString)          
                              
 def GetSpeciesSequenceIDsDict(sequenceIDsFilename, speciesIDsFN = None):
-    idsDict = dict()
-    with open(sequenceIDsFilename, 'rb') as speciesFile:
-        for line in speciesFile:
-            id, name = line.rstrip().split(": ", 1)
-            idsDict[id] = name
+    try:
+        extract = util.FirstWordExtractor(sequenceIDsFilename)
+    except RuntimeError as error:
+        print(error.message)
+        if error.message.startswith("ERROR"): 
+            util.Fail()
+        else:
+            print("Tried to use only the first part of the accession in order to list the sequences in each orthogroup\nmore concisely but these were not unique. The full accession line will be used instead.\n")     
+            extract = util.FullAccession(sequenceIDsFilename)
+    idsDict = extract.GetIDToNameDict()    
     if speciesIDsFN != None:
-        speciesDict = dict()
-        with open(speciesIDsFN, 'rb') as speciesFile:
-            for line in speciesFile:
-                id, name = line.rstrip().split(": ", 1)
-                if id.startswith('#'): id = id[1:] 
-                speciesDict[id] = name
-        idsDict = {id: (speciesDict[id.split("_")[0]].replace(". ", "_").replace(" ", "_") + "_" + seqName.split()[0].replace(":", "_")) for id, seqName in idsDict.items()}
+        speciesDict = util.FullAccession(speciesIDsFN).GetIDToNameDict()
+        speciesDict = {k:v.rsplit(".",1)[0].replace(".", "_").replace(" ", "_") for k,v in speciesDict.items()}
+        idsDict = {seqID:speciesDict[seqID.split("_")[0]] + "_" + name for seqID, name in idsDict.items()}
     return idsDict
           
 if __name__ == "__main__":
