@@ -710,28 +710,51 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
     sequenceDict = ogSet.SequenceDict()
     ogs = ogSet.OGs(qInclAll=True)
     nOrthologues_SpPair = util.nOrtho_sp(len(ogSet.speciesToUse))
+    all_orthologues = []
     for iog, og in enumerate(ogs):
         n = len(og) 
         if n == 1: break
         elif n == 2:
             if og[0].iSp == og[1].iSp: continue
-            orthologues = [([og[0].ToString()], [og[1].ToString()]),]
+            # orthologues is a list of tuples of dictionaries
+            # each dictionary is sp->list of genes in species
+            d0 = defaultdict(list)
+            d0[str(og[0].iSp)].append(str(og[0].iSeq))
+            d1 = defaultdict(list)
+            d1[str(og[1].iSp)].append(str(og[1].iSeq))
+            orthologues = [(d0, d1)]  
         elif n == 3:
             sp = [g.iSp for g in og]
             c = Counter(sp) 
             nSp = len(c)
             if nSp == 3:
-                orthologues = [([og[0].ToString()], [og[1].ToString(), og[2].ToString()]), ] + [([og[1].ToString(), ], [og[2].ToString(), ]), ]
+                g = [(str(g.iSp), str(g.iSeq)) for g in og]
+                d0 = defaultdict(list)
+                d0[g[0][0]].append(g[0][1])
+                d1 = defaultdict(list)
+                d1[g[1][0]].append(g[1][1])
+                d1[g[2][0]].append(g[2][1])
+                orthologues = [(d0, d1)]  
+                d0 = defaultdict(list)
+                d0[g[1][0]].append(g[1][1])
+                d1 = defaultdict(list)
+                d1[g[2][0]].append(g[2][1])
+                orthologues.append((d0,d1))
             elif nSp == 2:             
-                sp1, sp2 = c.keys()
-                orthologues = [([g.ToString() for g in og if g.iSp == sp1], [g.ToString() for g in og if g.iSp == sp2])]
+                sp0, sp1 = c.keys()
+                d0 = defaultdict(list)
+                d0[str(sp0)] = [str(g.iSeq) for g in og if g.iSp == sp0]
+                d1 = defaultdict(list)
+                d1[str(sp1)] = [str(g.iSeq) for g in og if g.iSp == sp1]
+                orthologues = [(d0, d1)]
             else: 
                 continue # no orthologues
         elif n >= 4:
             continue
-        nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles(orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, iog, resultsDir)
+        all_orthologues.append((iog, orthologues))
+    nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, resultsDir)
     return nOrthologues_SpPair
-
+    
 def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree_fn, workingDir, resultsDir, reconTreesRenamedDir, nParallel, iSpeciesTree=None, pickleDir = None, all_stride_dup_genes=None):
     """
     treesPatFn - function returning name of filename
