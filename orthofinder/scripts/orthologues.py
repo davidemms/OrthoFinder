@@ -551,9 +551,9 @@ def WriteTestDistancesFile(testFN):
         outfile.write("4\n1_1 0 0 0.2 0.25\n0_2 0 0 0.21 0.28\n3_1 0.21 0.21 0 0\n4_1 0.25 0.28 0 0")
     return testFN
 
-def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfterTrees, msa_method, tree_method, recon_method, program_caller, qInferSpeciesTree, qStopAfterAlignments):  
+def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfterTrees, msa_method, tree_method, recon_method, program_caller, qStopAfterAlignments):  
     # FastME
-    if (not qMSAGeneTrees) or qInferSpeciesTree:
+    if (not qMSAGeneTrees):
         testFN = workingDir + "SimpleTest.phy"
         WriteTestDistancesFile(testFN)
         outFN = workingDir + "SimpleTest.tre"

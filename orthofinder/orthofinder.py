@@ -1199,7 +1199,6 @@ def CheckDependencies(options, program_caller, dirForTempFiles):
                                                             options.tree_program, 
                                                             options.recon_method,
                                                             program_caller, 
-                                                            options.speciesTreeFN == None, 
                                                             options.qStopAfterAlignments):
             print("Dependencies have been met for inference of orthogroups but not for the subsequent orthologue inference.")
             print("Either install the required dependencies or use the option '-og' to stop the analysis after the inference of orthogroups.\n")
