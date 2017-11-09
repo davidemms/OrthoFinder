@@ -788,7 +788,7 @@ def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, spe
             print("\nERROR: %s does not exist\n" % speciesTree_fn)
             util.Fail()
     else:
-        possibilities = ["SpeciesTree_ids_0_rooted.txt", "SpeciesTree_ids_1_rooted.txt", "SpeciesTree_user_ids.txt"] # etc (only need to determine if unique)
+        possibilities = ["SpeciesTree_ids_0_rooted.txt", "SpeciesTree_ids_1_rooted.txt", "SpeciesTree_user_ids.txt", "SpeciesTree_unrooted_0_rooted.txt"] # etc (only need to determine if unique)
         nTrees = 0
         for p in possibilities:
             fn = workingDir + "Trees_ids/" + p
