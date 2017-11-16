@@ -509,15 +509,15 @@ class WaterfallMethod:
     def WriteGraphParallel(seqsInfo, fileInfo, nProcess):
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
-            with open(fileInfo.graphFilename + "_header", 'wb') as graphFile:
+            with open(fileInfo.graphFilename, 'wb') as graphFile:
                 graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (seqsInfo.nSeqs, seqsInfo.nSeqs)) 
                 graphFile.write("\n(mclmatrix\nbegin\n\n") 
             pool = mp.Pool(nProcess)
             pool.map(WriteGraph_perSpecies, [(seqsInfo, fileInfo, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
-            subprocess.call("cat " + fileInfo.graphFilename + "_header " + " ".join([fileInfo.graphFilename + "_%d" % iSp for iSp in xrange(seqsInfo.nSpecies)]) + " > " + fileInfo.graphFilename, shell=True)
+            for iSp in xrange(seqsInfo.nSpecies):
+                subprocess.call("cat " + fileInfo.graphFilename + "_%d" % iSp + " >> " + fileInfo.graphFilename, shell=True)
+                os.remove(fileInfo.graphFilename + "_%d" % iSp)
             # Cleanup
-            os.remove(fileInfo.graphFilename + "_header")
-            for iSp in xrange(seqsInfo.nSpecies): os.remove(fileInfo.graphFilename + "_%d" % iSp)
             matrices.DeleteMatrices("B", fileInfo) 
             matrices.DeleteMatrices("connect", fileInfo) 
             
@@ -1256,6 +1256,7 @@ def DoOrthogroups(options, dirs, seqsInfo, qDoubleBlast, separatePickleDir=None)
     summaryText, statsFile = Stats(ogs, speciesNamesDict, dirs.speciesToUse, dirs.resultsDir, iResultsVersion)
     if options.speciesXMLInfoFN:
         MCL.WriteOrthoXML(speciesInfo, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml", dirs.speciesToUse)
+    util.PrintTime("Done orthogroups")
     return clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString
 
 # 0
@@ -1394,6 +1395,7 @@ def GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthog
                                                                         options.qPhyldog,
                                                                         options.separatePickleDir,
                                                                         options.name)
+    util.PrintTime("Done orthologues")
     if None != orthogroupsResultsFilesString: print(orthogroupsResultsFilesString)
     print(orthologuesResultsFilesString.rstrip())    
 

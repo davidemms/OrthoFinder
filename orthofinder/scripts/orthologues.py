@@ -846,6 +846,7 @@ def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, spe
     util.PrintUnderline("Reconciling gene and species trees") 
     ReconciliationAndOrthologues(recon_method, TreePatIDs, ogSet, speciesTree_fn, workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, pickleDir=pickleDir)
     util.PrintUnderline("Writing results files")
+    util.PrintTime("Writing results files")
     CleanWorkingDir(workingDir)
     return "Species-by-species orthologues directory:\n   %s\n" % resultsDir_new
     
