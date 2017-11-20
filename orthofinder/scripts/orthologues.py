@@ -649,7 +649,7 @@ def GetResultsFilesString(rootedSpeciesTreeFN, seqs_alignments_dirs=None, qHaveO
     """uses species tree directory to infer position of remaining files
     """
     st = ""
-    baseResultsDir = os.path.abspath(os.path.split(rootedSpeciesTreeFN[0])[0] + ("" if len(rootedSpeciesTreeFN) == 1 else "/.."))
+    baseResultsDir = os.path.abspath(os.path.split(rootedSpeciesTreeFN[0])[0])
     if seqs_alignments_dirs != None:
         st += "\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0]
         st += "\nMultiple sequence alignments:\n   %s\n" % seqs_alignments_dirs[1]
