@@ -129,7 +129,7 @@ def SingleCopy_WithProbabilityTest(fraction, ogMatrix):
     ok_ogs = [iog for iog in passFracOGs if multi[iog] <= allowed_multicopy[excluded[iog]]]
     return ok_ogs 
     
-def GetOrthogroupStats(m):
+def GetOrthogroupOccupancyInfo(m):
     """
     Args:
         m - orthogroup matrix
@@ -142,9 +142,10 @@ def GetOrthogroupStats(m):
         F = 1.-n*f
         fractions.append(F)
         nOrtho.append(len(SingleCopy_WithProbabilityTest(F-1e-5, m)))
+    nOrtho = map(float, nOrtho)
     return fractions, nOrtho
     
-def DetermineOrthogroupsForSpeciesTree(m, nOGsMin=100, p=2.):
+def DetermineOrthogroupsForSpeciesTree(m, nOGsMin=100, nSufficient=1000, increase_required=2.):
     """Orthogroups can be used if at least a fraction f of the species in the orthogroup are single copy, f is determined as described 
     below. Species that aren't single copy are allowed in the orthogroup as long as there aren't too many (criterion is quite strict). 
     The presence of species with multiple copies suggests that the single copy species might actually have arisen from duplication 
@@ -156,26 +157,21 @@ def DetermineOrthogroupsForSpeciesTree(m, nOGsMin=100, p=2.):
         p - proportionalIncreaseMin: Each decrease in the proportion of single copy species should bring about a relative increase 
         in the number of orthogroups that will be used of 'p', otherwise it is not worth lowering the bar
     """
-    fractions, nOrtho = GetOrthogroupStats(m)
-    if nOrtho[0] > 1000:
+    fractions, nOrtho = GetOrthogroupOccupancyInfo(m)
+    if nOrtho[0] > nSufficient:
         ogsToUse = SingleCopy_WithProbabilityTest(1.0-1e-5, m)
         return ogsToUse, 1.0
-    previous = [0] + nOrtho[:-1]
-    change = np.array(nOrtho)-np.array(previous)
-    proportionalGain = fractions[1:]*(change[1:])/np.array(previous[1:])/(fractions[0]-fractions[1])
-    # Start with demanding all species in the selected OGs be single copy and reduce until required trade-off is met
-    for i, (f, thisP, n) in enumerate(zip(fractions[1:], proportionalGain, nOrtho)):
-        if f < 0.5 and n > 2*nOGsMin:
-            # if fewer than half the species are in any orthogroup then set highr bar for reducing fraction further
-            if (n > nOGsMin) and thisP < 2*p:
-                break
+    nSpecies = m.shape[1]
+    for i in xrange(1, nSpecies):
+        if nOrtho[i-1] < nOGsMin: continue
+        if nOrtho[i-1] > nSufficient: break
+        p = ((nOrtho[i] - nOrtho[i-1])/nOrtho[i-1]) /  (-(fractions[i] - fractions[i-1])/fractions[i-1])
+        if fractions[i] > 0.5:
+            if p < increase_required: break
         else:
-            if (n > nOGsMin) and thisP < p:
-                break
-    f = fractions[i]
-#    print(i)        
-#    print(f)   
-#    print(nOrtho[i])  
+            # if fewer than half the species are in any orthogroup then set highr bar for reducing fraction further
+            if p < 2*increase_required: break
+    f = fractions[i-1]
     ogsToUse = SingleCopy_WithProbabilityTest(f-1e-5, m)
     return ogsToUse, f   
 
