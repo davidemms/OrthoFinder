@@ -519,6 +519,29 @@ def PrintUnderline(text, qHeavy=False):
     if text.startswith("\n"): n -= 1
     print(("=" if qHeavy else "-") * n)
 
+def FlowText(text, n=60):
+    """Split text onto lines of no more that n characters long
+    """
+    lines = ""
+    while len(text) > 0:
+        if len(lines) > 0: lines += "\n"
+        if len(text) > n:
+            # split at no more than 60
+            iEnd = n
+            while iEnd > 0 and text[iEnd] != " ": iEnd-=1
+            if iEnd == 0:
+                # there was nowhere to split it at a blank, just have to split at 60
+                lines += text[:n]
+                text = text[n:]
+            else:
+                # split at blank
+                lines += text[:iEnd]
+                text = text[iEnd+1:]  # skip blank
+        else:
+            lines += text
+            text = ""
+    return lines
+    
 """
 -------------------------------------------------------------------------------
 """

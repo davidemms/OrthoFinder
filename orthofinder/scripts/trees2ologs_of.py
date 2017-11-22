@@ -245,7 +245,7 @@ def GetOrthologues_for_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, qWr
                         isSTRIDE = "Terminal"
                     else:
                         stNode = species_tree_rooted.get_common_ancestor(sp_present)
-                        isSTRIDE = "" if all_stride_dup_genes == None else "STRIDE" if frozenset(n.get_leaf_names()) in all_stride_dup_genes else ""
+                        isSTRIDE = "Shared" if all_stride_dup_genes == None else "STRIDE" if frozenset(n.get_leaf_names()) in all_stride_dup_genes else ""
                     dupsWriter.writerow(["OG%07d" % iog, spIDs[stNode.name] if len(stNode) == 1 else stNode.name, n.name, float(o)/(len(stNode)), isSTRIDE, ", ".join([seqIDs[g] for g in ch[0].get_leaf_names()]), ", ".join([seqIDs[g] for g in ch[1].get_leaf_names()])]) 
             else:
                 d0 = defaultdict(list)
@@ -382,7 +382,7 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
     allOrthologues = []
     with open(reconTreesRenamedDir + "../Duplications.csv", 'wb') as outfile:
         dupWriter = csv.writer(outfile)
-        dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "",	"Genes 1", "Genes 2"])
+        dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
         for iog in xrange(nOgs):
             orthologues, recon_tree = GetOrthologues_for_tree(iog, treesIDsPatFn(iog), species_tree_rooted, GeneToSpecies, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes)
             allOrthologues.append((iog, orthologues))

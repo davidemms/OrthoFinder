@@ -728,9 +728,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, resultsDir, iResultsVersion):
 
     statsFiles = "Orthogroup statistics:\n"
     statsFiles += "   " + "   ".join([os.path.split(fn)[1] for fn in [filename_sp, filename_sum, filename_overlap]])
-    summaryText = """OrthoFinder assigned %d genes (%0.1f%% of total) to %d orthogroups. Fifty percent of all genes were in orthogroups 
-with %d or more genes (G50 was %d) and were contained in the largest %d orthogroups (O50 was %d). There were %d 
-orthogroups with all species present and %d of these consisted entirely of single-copy genes.""" % (nAssigned, pAssigned, nOgs, G50, G50, O50, O50, nCompleteOGs, nSingleCopy)
+    summaryText = """OrthoFinder assigned %d genes (%0.1f%% of total) to %d orthogroups. Fifty percent of all genes were in orthogroups with %d or more genes (G50 was %d) and were contained in the largest %d orthogroups (O50 was %d). There were %d orthogroups with all species present and %d of these consisted entirely of single-copy genes.""" % (nAssigned, pAssigned, nOgs, G50, G50, O50, O50, nCompleteOGs, nSingleCopy)
     return summaryText, statsFiles
           
 
@@ -1522,7 +1520,7 @@ if __name__ == "__main__":
         if not options.qStopAfterGroups:
             GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
         # 10.
-        print("\n" + statsFile + "\n\n" + summaryText) 
+        print("\n" + statsFile + "\n\n" + util.FlowText(summaryText)) 
         util.PrintCitation()
             
     elif options.qStartFromFasta:
@@ -1545,7 +1543,7 @@ if __name__ == "__main__":
         if not options.qStopAfterGroups:
             GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
         # 10.
-        print("\n" + statsFile + "\n\n" + summaryText) 
+        print("\n" + statsFile + "\n\n" + util.FlowText(summaryText)) 
         util.PrintCitation()
         
     elif options.qStartFromBlast:
@@ -1564,7 +1562,7 @@ if __name__ == "__main__":
         if not options.qStopAfterGroups:
             GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
         # 10
-        print("\n" + statsFile + "\n\n" + summaryText) 
+        print("\n" + statsFile + "\n\n" + util.FlowText(summaryText)) 
         util.PrintCitation() 
     elif options.qStartFromGroups:
         # 0.  
@@ -1579,7 +1577,7 @@ if __name__ == "__main__":
         dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
         options = CheckOptions(options, dirs)
         summaryText = GetOrthologues_FromTrees(orthologuesDir, options)
-        print(summaryText) 
+        print(util.FlowText(summaryText))
         util.PrintCitation() 
     else:
         raise NotImplementedError
