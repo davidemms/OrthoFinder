@@ -297,8 +297,8 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
             isp1 = sp_to_index[sp1]
             d1 = resultsDir + "Orthologues_" + speciesDict[sp1] + "/"
             with open(d0 + '%s__v__%s.csv' % (speciesDict[sp0], speciesDict[sp1]), 'ab') as outfile1, open(d1 + '%s__v__%s.csv' % (speciesDict[sp1], speciesDict[sp0]), 'ab') as outfile2:
-                writer1 = csv.writer(outfile1)
-                writer2 = csv.writer(outfile2)
+                writer1 = csv.writer(outfile1, delimiter="\t")
+                writer2 = csv.writer(outfile2, delimiter="\t")
                 for iog, ortholouges_onetree in orthologues_alltrees:                   
                     og = "OG%07d" % iog
                     for leavesL, leavesR in ortholouges_onetree:
@@ -366,7 +366,7 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
         for index2 in xrange(nspecies):
             if index2 == index1: continue
             with open(d + '%s__v__%s.csv' % (speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]), 'wb') as outfile:
-                writer1 = csv.writer(outfile)
+                writer1 = csv.writer(outfile, delimiter="\t")
                 writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]))
     # Infer orthologues and write them to file           
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
@@ -381,7 +381,7 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
     nOrthologues_SpPair = util.nOrtho_sp(nspecies)
     allOrthologues = []
     with open(reconTreesRenamedDir + "../Duplications.csv", 'wb') as outfile:
-        dupWriter = csv.writer(outfile)
+        dupWriter = csv.writer(outfile, delimiter="\t")
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
         for iog in xrange(nOgs):
             orthologues, recon_tree = GetOrthologues_for_tree(iog, treesIDsPatFn(iog), species_tree_rooted, GeneToSpecies, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes)

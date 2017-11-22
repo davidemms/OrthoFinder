@@ -625,7 +625,7 @@ def WriteResults(species_tree_fn_or_text, roots, S, clades, clusters_counter, ou
 #    for t in table.items():
 #        print(t)
     with open(output_dir + "Duplication_counts.csv", 'wb') as outfile:
-        writer = csv.writer(outfile)
+        writer = csv.writer(outfile, delimiter="\t")
         writer.writerow(["Branch", "MP Root", "Probability", "Duplications supporting clade", "Duplications supporting opposite clade"])
         qSingle = len(thisRoot) == 1
         root_branches = [n.name for n in new_tree.get_children()]

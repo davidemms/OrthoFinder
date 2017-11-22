@@ -120,8 +120,8 @@ def WriteOrthologues(resultsDir, spec1, spec2, orthologues, ogSet, nOrtho_sp, i,
     d1 = resultsDir + "Orthologues_" + speciesDict[str(spec1)] + "/"
     d2 = resultsDir + "Orthologues_" + speciesDict[str(spec2)] + "/"
     with open(d1 + '%s__v__%s.csv' % (speciesDict[str(spec1)], speciesDict[str(spec2)]), 'wb') as outfile1, open(d2 + '%s__v__%s.csv' % (speciesDict[str(spec2)], speciesDict[str(spec1)]), 'wb') as outfile2:
-        writer1 = csv.writer(outfile1)
-        writer2 = csv.writer(outfile2)
+        writer1 = csv.writer(outfile1, delimiter="\t")
+        writer2 = csv.writer(outfile2, delimiter="\t")
         writer1.writerow(("Orthogroup", speciesDict[str(spec1)], speciesDict[str(spec2)]))
         writer2.writerow(("Orthogroup", speciesDict[str(spec2)], speciesDict[str(spec1)]))
         for genes1, genes2 in orthologues:
