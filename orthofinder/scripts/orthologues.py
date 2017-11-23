@@ -482,7 +482,7 @@ def RunDlcpar(treesIDsPatFn, ogSet, speciesTreeFN, workingDir, nParallel, qDeepS
         nTaxa = [len(og) for og in ogs[:nOGs]]
         nIter =     [1000 if n < 25 else 25000 if n < 200 else 50000 for n in nTaxa]
         nNoImprov = [ 100 if n < 25 else  1000 if n < 200 else  2000 for n in nTaxa]
-        dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -i %d --nprescreen 100 -n %d' % (speciesTreeFN, geneMapFN, fn, i, n) for (fn, i, n) in zip(filenames, nIter, nNoImprov)]
+        dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -i %d --nprescreen 100 --nconverge %d' % (speciesTreeFN, geneMapFN, fn, i, n) for (fn, i, n) in zip(filenames, nIter, nNoImprov)]
     else:
         dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -x 1' % (speciesTreeFN, geneMapFN, fn) for fn in filenames]
     util.RunParallelOrderedCommandLists(nParallel, [[c] for c in dlcCommands], qHideStdout = True)

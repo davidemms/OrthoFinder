@@ -177,7 +177,6 @@ class MCL:
             
     @staticmethod               
     def RunMCL(graphFilename, clustersFilename, nProcesses, inflation):
-        nProcesses = 4 if nProcesses > 4 else nProcesses    # MCL appears to take *longer* as more than 4 processes are used
         command = ["mcl", graphFilename, "-I", str(inflation), "-o", clustersFilename, "-te", str(nProcesses), "-V", "all"]
         util.RunCommand(command)
         util.PrintTime("Ran MCL")  
