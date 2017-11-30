@@ -830,6 +830,9 @@ def GetDirectoryArgument(arg, args):
     directory = os.path.abspath(args.pop(0))
     if not os.path.isfile(directory) and directory[-1] != os.sep: 
         directory += os.sep
+    if not os.path.exists(directory):
+        print("Specified directory doesn't exist: %s" % directory)
+        util.Fail()
     return directory
 
 #def GetOrthogroupsDirectory(suppliedDir, options):
