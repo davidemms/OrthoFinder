@@ -21,6 +21,7 @@ import csv
 import argparse
 import numpy as np
 from itertools import izip_longest
+import multiprocessing as mp
 
 """ Local configuration """
 my_env = os.environ.copy()
@@ -29,6 +30,7 @@ my_env['PATH'] += ":/home/david/software/iqtree-1.5.3-Linux/bin/"
 
 __skipLongTests__ = False
 qVerbose = False
+qKeepFiles = False
 
 baseDir = os.path.dirname(os.path.realpath(__file__)) + os.sep
 qBinary = False
@@ -40,7 +42,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "2.1.2"
+version = "2.1.3"
 requiredBlastVersion = "2.2.28+"
 
 standard_new_files = ("Orthogroups.csv Orthogroups.GeneCount.csv SingleCopyOrthogroups.txt Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv" % (version, version, version)).split()
@@ -70,9 +72,7 @@ help_not_checked="""                   Options: blast, blast_gz, diamond
  -T <txt>          Tree inference method, requires '-M msa' [Default = fasttree]
                    Options: mafft, iqtree, fasttree, raxml"""
 
-expectedHelp2=""" -R <txt>          Tree reconciliation method [Default = of_recon]
-                   Options: of_recon, dlcpar, dlcpar_deepsearch
- -s <file>         User-specified rooted species tree
+expectedHelp2=""" -s <file>         User-specified rooted species tree
  -I <int>          MCL inflation parameter [Default = 1.5]
  -x <file>         Info for outputting results in OrthoXML format
  -p <dir>          Write the temporary pickle files to <dir>
@@ -114,6 +114,7 @@ class CleanUp(object):
     def __init__(self, newFiles, modifiedFiles, newDirs = [], qSaveFiles=False, qCleanup=True):
         """qSaveFiles is useful for debuging purposes
         """
+        if qKeepFiles: qSaveFiles = True
         self.newFiles = newFiles
         self.modifiedFiles = modifiedFiles
         self.copies = []
@@ -687,7 +688,7 @@ class TestCommandLine(unittest.TestCase):
             self.skipTest("Skipping unit test. Test can be run on sourcecode version of OrthoFinder.") 
         import orthologues
         m = np.zeros((2,2))
-        m = np.matrix([[0, 1e-9, 0.1, 1], [1e-9, 0, 1, 1], [0.1, 1, 0, 1], [1, 1, 1, 0]])
+        m = [mp.Array('d', [0, 1e-9, 0.1, 1]), mp.Array('d', [1e-9, 0, 1, 1]), mp.Array('d', [0.1, 1, 0, 1]), mp.Array('d', [1, 1, 1, 0])]
 #        m[0,1] = 
 #        m[1,0] = 0.1
         names = ["a", "b", "c", "d"]
@@ -943,8 +944,10 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--test", help="Individual test to run")
     parser.add_argument("-d", "--dir", help="Test program in specified directory")
     parser.add_argument("-v", "--verbose", action="store_true", help="Print stdout from failing orthofinder run")
+    parser.add_argument("-k", "--keep_files", action="store_true", help="don't delete results files at end of a run")
     
     args = parser.parse_args()
+    qKeepFiles = args.keep_files
     if args.dir:
         orthofinder = args.dir + "/orthofinder.py"
         orthofinder_bin = os.path.splitext(orthofinder)[0]

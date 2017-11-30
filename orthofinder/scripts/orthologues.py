@@ -275,7 +275,7 @@ class DendroBLASTTrees(object):
             for proc in runningProcesses:
                 while proc.is_alive():
                     proc.join() 
-            ogMatrices = [np.matrix(m) for m in ogMatrices]
+            #ogMatrices = [np.matrix(m) for m in ogMatrices]
             return ogs, ogMatrices      
                    
     def CompleteOGMatrices(self, ogs, ogMatrices):
@@ -294,37 +294,44 @@ class DendroBLASTTrees(object):
         return newMatrices
         
     def CompleteAndWriteOGMatrices(self, ogs, ogMatrices):
-        newMatrices = []
+        """
+        ogMatrices - each matrix is a list of mp.Array  (so that each represents an nSeq x nSeq matrix
+        """
         for iog, (og, m) in enumerate(zip(ogs, ogMatrices)):
             # dendroblast scores
-            n = m.shape[0]
-            m2 = np.zeros(m.shape)
+            n = len(m)
             max_og = -9e99
+            # Careful not to over-write a value and then attempt to try to use the old value
             for i in xrange(n):
                 for j in xrange(i):
-                    m2[i, j] = -np.log(m[i,j] + m[j,i])  
-                    m2[j, i] = m2[i, j]  
-                    max_og = max(max_og, m2[i,j])
-            self.WritePhylipMatrix(m2, [g.ToString() for g in og], self.distPat % iog, max_og)
-            newMatrices.append(m2)
-        return newMatrices
+                    m[i][j] = -np.log(m[i][j] + m[j][i])  
+                    m[j][i] = m[i][j]  
+                    max_og = max(max_og, m[i][j])
+            self.WritePhylipMatrix(m, [g.ToString() for g in og], self.distPat % iog, max_og)
+        return ogMatrices
     
     @staticmethod
     def WritePhylipMatrix(m, names, outFN, max_og):
+        """
+        m - list of mp.Array  (so that each represents an nSeq x nSeq matrix
+        """
         max_og = 1.1*max_og
         sliver = 1e-6
         with open(outFN, 'wb') as outfile:
-            n = m.shape[0]
+            n = len(m)
             outfile.write("%d\n" % n)
             for i in xrange(n):
                 outfile.write(names[i] + " ")
                 # values could be -inf, these are the most distantly related so replace with max_og
-                V = [0. + (m[i,j] if m[i,j] > -9e99 else max_og) for j in range(n)] # "0. +": hack to avoid printing out "-0"
+                V = [0. + (m[i][j] if m[i][j] > -9e99 else max_og) for j in range(n)] # "0. +": hack to avoid printing out "-0"
                 V = [sliver if 0 < v < sliver  else v for v in V]  # make sure scientific notation is not used (not accepted by fastme)
                 values = " ".join(["%.6f" % v for v in V])   
                 outfile.write(values + "\n")
     
     def SpeciesTreeDistances(self, ogs, ogMatrices, method = 0):
+        """
+        ogMatrices - each matrix is a list of mp.Array  (so that each represents an nSeq x nSeq matrix
+        """
         spPairs = list(itertools.combinations(self.ogSet.seqsInfo.speciesToUse, 2))
         D = [[] for _ in spPairs]
         if method == 0:
@@ -334,7 +341,7 @@ class DendroBLASTTrees(object):
                 for i, g in enumerate(og):
                     spDict[g.iSp].append(i)
                 for (sp1, sp2), d_list in zip(spPairs, D):
-                    distances = [m[i,j] for i in spDict[sp1] for j in spDict[sp2]]
+                    distances = [m[i][j] for i in spDict[sp1] for j in spDict[sp2]]
                     if len(distances) > 0: d_list.append(min(distances))
 #                    d_list.append(min(distances) if len(distances) > 0 else None)
         return D, spPairs
@@ -548,7 +555,7 @@ def ConvertUserSpeciesTree(workingDir, speciesTreeFN, speciesDict):
             
 def WriteTestDistancesFile(testFN):
     with open(testFN, 'wb') as outfile:
-        outfile.write("4\n1_1 0 0 0.2 0.25\n0_2 0 0 0.21 0.28\n3_1 0.21 0.21 0 0\n4_1 0.25 0.28 0 0")
+        outfile.write("4\n1_1 0 0 0.2 0.25\n0_2 0 0 0.21 0.28\n3_1 0.2 0.21 0 0\n4_1 0.25 0.28 0 0")
     return testFN
 
 def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfterTrees, msa_method, tree_method, recon_method, program_caller, qStopAfterAlignments):  
