@@ -41,6 +41,11 @@ def GraftAndUpdate(top, n, s):
     Implementation:
         n and s could be anywhere in relation to one another, need to change all the species sets that could be affected
     """
+#    c1, c2 = top.get_children()
+#    print((len(c1), len(c2)))
+#    print(top)
+#    print(n)
+#    print(s)
     n, nUp, top = DetachAndCleanup(top, n)
     parent = s.up
     try:
@@ -116,7 +121,7 @@ def ContainsMonophyletic(e, O, i, I):
         where:
             qSuccess - True if found species set O to be monophyletic
             node - node of the monophyletic clade if qSuccess else the node it made it down to
-            depth - depth of the node
+            depth - depth of the node, 0=(e is O), 1=(it's child is O), etc.
     """
     E = e.sp_down
     if E == O:
