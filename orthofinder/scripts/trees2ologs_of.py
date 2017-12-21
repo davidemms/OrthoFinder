@@ -80,7 +80,11 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
     species = set([GeneToSpecies(g) for g in tree.get_leaf_names()])
     if len(species) == 1:
         return [], 0, None
-    n1, n2 = species_tree_rooted.get_children()
+    ch = species_tree_rooted.get_children()
+    if len(ch) != 2:
+        print("ERROR: Species tree is not rooted")
+        util.Fail()
+    n1, n2 = ch
     t1 = set(n1.get_leaf_names())
     t2 = set(n2.get_leaf_names())
     have1 = len(species.intersection(t1)) != 0
@@ -223,7 +227,7 @@ def GetOrthologues_for_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, qWr
     if root != tree:
         tree.set_outgroup(root)
 
-    Resolve(tree, GeneToSpecies)
+    tree = Resolve(tree, GeneToSpecies)
     if qPrune: tree.prune(tree.get_leaf_names())
     if len(tree) == 1: return set(orthologues), tree
     """ At this point need to label the tree nodes """
@@ -340,7 +344,8 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
 def Resolve(tree, GeneToSpecies):
     StoreSpeciesSets(tree, GeneToSpecies)
     for n in tree.traverse("postorder"):
-        resolve.resolve(n, GeneToSpecies)
+        tree = resolve.resolve(n, GeneToSpecies)
+    return tree
 
 def GetOrthologuesStandalone_Parallel(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree):
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
