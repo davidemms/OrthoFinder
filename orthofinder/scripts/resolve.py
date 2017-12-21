@@ -4,6 +4,8 @@ Created on Thu Jul 27 14:15:17 2017
 
 @author: david
 """  
+from scripts import parallel_task_manager
+
 import argparse
 import tree as tree_lib
 
@@ -316,7 +318,14 @@ def resolve(n, M):
             return GraftAndUpdate(n, nY, nX)
         else:
             raise NotImplemented
-
+            
+class Finalise(object):
+    def __enter__(self):
+        pass
+    def __exit__(self, type, value, traceback):
+        ptm = parallel_task_manager.ParallelTaskManager_singleton()
+        ptm.Stop()
+        
 def Resolve_Main(trees_fn, species_tree_rooted_fn, GeneToSpecies):
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
     try:

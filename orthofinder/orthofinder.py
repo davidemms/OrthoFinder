@@ -819,6 +819,8 @@ def PrintHelp(program_caller):
     print("LICENSE:")
     print(" Distributed under the GNU General Public License (GPLv3). See License.md")
     util.PrintCitation() 
+    ptm = parallel_task_manager.ParallelTaskManager_singleton()
+    ptm.Stop()
     
 """
 Main
