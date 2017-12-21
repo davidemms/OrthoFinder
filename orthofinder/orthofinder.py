@@ -24,6 +24,8 @@
 #
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
+from scripts import parallel_task_manager
+
 import sys                                      # Y
 import subprocess                               # Y
 import os                                       # Y
@@ -178,7 +180,7 @@ class MCL:
     @staticmethod               
     def RunMCL(graphFilename, clustersFilename, nProcesses, inflation):
         command = ["mcl", graphFilename, "-I", str(inflation), "-o", clustersFilename, "-te", str(nProcesses), "-V", "all"]
-        util.RunCommand(command)
+        util.RunCommand(command, qShell=False, qHideOutput=False)
         util.PrintTime("Ran MCL")  
     
     @staticmethod
@@ -817,6 +819,8 @@ def PrintHelp(program_caller):
     print("LICENSE:")
     print(" Distributed under the GNU General Public License (GPLv3). See License.md")
     util.PrintCitation() 
+    ptm = parallel_task_manager.ParallelTaskManager_singleton()
+    ptm.Stop()
     
 """
 Main
@@ -1340,7 +1344,7 @@ def CreateSearchDatabases(dirs, options, program_caller):
         else:
             command = program_caller.GetSearchMethodCommand_DB(options.search_program, dirs.workingDir + "Species%d.fa" % iSp, dirs.workingDir + "%sDBSpecies%d" % (options.search_program, iSp))
             util.PrintTime("Creating %s database %d of %d" % (options.search_program, iSp + 1, nDB))
-            util.RunCommand(command, shell=True, qHideOutput=True)
+            util.RunCommand(command, qHideOutput=True)
 
 # 7
 def RunSearch(options, dirs, seqsInfo, program_caller):
@@ -1583,6 +1587,10 @@ if __name__ == "__main__":
         util.PrintCitation() 
     else:
         raise NotImplementedError
+        ptm = parallel_task_manager.ParallelTaskManager_singleton()
+        ptm.Stop()
+    ptm = parallel_task_manager.ParallelTaskManager_singleton()
+    ptm.Stop()
         
         
      

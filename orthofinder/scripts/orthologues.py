@@ -405,7 +405,7 @@ class DendroBLASTTrees(object):
         ogMatrices = self.CompleteOGMatrices(ogs, ogMatrices_partial)
         D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
         cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs, True)
-        util.RunOrderedCommandList([cmd_spTree], True)
+        util.RunOrderedCommandList([cmd_spTree], True, True)
         spTreeUnrootedFN = self.workingDir + "SpeciesTree_unrooted.txt"
         util.RenameTreeTaxa(spTreeFN_ids, spTreeUnrootedFN, self.ogSet.SpeciesDict(), qFixNegatives=True)  
         return spTreeFN_ids, spTreeUnrootedFN

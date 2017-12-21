@@ -4,6 +4,8 @@ Created on Thu Jul 27 14:15:17 2017
 
 @author: david
 """  
+import parallel_task_manager
+
 import argparse
 import tree as tree_lib
 
@@ -341,6 +343,13 @@ def NumberOfOrthologues(tree, GeneToSpecies):
 #    print((sum(sum(orthologues)),float(N)))
     print(sum(sum(orthologues)))
 
+class Finalise(object):
+    def __enter__(self):
+        pass
+    def __exit__(self, type, value, traceback):
+        ptm = parallel_task_manager.ParallelTaskManager_singleton()
+        ptm.Stop()
+        
 def Resolve_Main(trees_fn, species_tree_rooted_fn, GeneToSpecies, qTest):        
     try:
         tree = tree_lib.Tree(trees_fn)
@@ -382,6 +391,7 @@ def Resolve_Main(trees_fn, species_tree_rooted_fn, GeneToSpecies, qTest):
     return tree
            
 if __name__ == "__main__":
+    with Finalise():
         parser = argparse.ArgumentParser()
         parser.add_argument("gene_tree")
         parser.add_argument("-r", "--rooted_species_tree")
@@ -389,4 +399,4 @@ if __name__ == "__main__":
         parser.add_argument("-t", "--test", action="store_true", help="Perform a single operation on the largest node one step down--allows testing of the method")
         args = parser.parse_args()
         tree = Resolve_Main(args.gene_tree, args.rooted_species_tree, om1.GetGeneToSpeciesMap(args), args.test)
-        tree.write(outfile=args.gene_tree + ".rec.tre")        
+        tree.write(outfile=args.gene_tree + ".rec.tre")         
