@@ -176,7 +176,6 @@ def resolve(n, M):
         lower case letters are nodes, uppercase letters are species sets
     """
     if "recon" in n.features:
-#        sys.stdout.write("0")
         sis = n.recon
         n.del_feature('recon')
         if check_monophyly(n, sis[0]) and check_monophyly(n, sis[1]):
@@ -185,26 +184,18 @@ def resolve(n, M):
             return GraftAndUpdate(n, s0, s1)
     elif "recon_2" in n.features:
         """ (destination, target, move_out)"""
-#        print(n.recon_2)
-#        print(n.up)
-#        sys.stdout.write("00")
         moves = n.recon_2
         n.del_feature('recon_2')
         if check_monophyly(n, moves[0]) and check_monophyly(n, moves[1]) and check_monophyly(n, moves[2]):
             s0 = n.get_common_ancestor(moves[0]) if len(moves[0]) > 1 else (n&moves[0][0])
             s1 = n.get_common_ancestor(moves[1]) if len(moves[1]) > 1 else (n&moves[1][0])
             d = s1.get_sisters()[0].dist
-#            print("Move 1")
             tree = GraftAndUpdate(n, s1, s0)
-#            print(tree)
             tree.dist = d
             s3 = tree.get_common_ancestor(moves[0] + moves[1])
             sister = s3.up.up
             top = sister.up if sister.up != None else sister
-#            print("Move 2")
             s2 = n.get_common_ancestor(moves[2]) if len(moves[2]) > 1 else (n&moves[2][0])
-#            print((s2.get_leaf_names(), sister.get_leaf_names()))
-#            print(top)
             return GraftAndUpdate(top, s2, sister)
         
     ch = n.get_children()
@@ -219,15 +210,11 @@ def resolve(n, M):
     
     successA, nA, dA = ContainsMonophyletic(ch[0], O, 0, 3)   
     successB, nB, dB = ContainsMonophyletic(ch[1], O, 0, 3)    
-#    print(successA, nA, dA)
-#    print(successB, nB, dB)
     if dA+dB > 2:
         if dA == 2:
             successA, nA, dA = ContainsMonophyletic(ch[0], O, 0, 2)   
-#            print(successA, nA, dA)
         if dB == 2:
             successB, nB, dB = ContainsMonophyletic(ch[1], O, 0, 2)                  
-#            print(successB, nB, dB)
         
     if (dA==0 and dB==1) or (dA==1 and dB==0): 
         # lowest letter is the one that branches
@@ -243,10 +230,8 @@ def resolve(n, M):
             U = u.sp_down
         case = (bool(S&U), bool(S&O))  
         if case in c10_a:
-#            sys.stdout.write("1")
             return GraftAndUpdate(n, b, v)
         elif case in c10_b:
-#            sys.stdout.write("2")
             n.up.add_feature("recon", (b.get_leaf_names(),s.get_leaf_names())) 
             return n.get_tree_root()
         return n.get_tree_root()
@@ -270,28 +255,17 @@ def resolve(n, M):
         else:
             w, x = chb
         case = (bool(S&O), bool(S&U), bool(S&W))
-#        print(case)
         if case in c11_a:
-#            sys.stdout.write("3")
             return GraftAndUpdate(n, x, v)
         elif case in c11_b:
-#            sys.stdout.write("4")
             if W&S:
                 w = u
                 x = v
             n.up.add_feature("recon_2", (x.get_leaf_names(),s.get_leaf_names(),w.get_leaf_names())) 
-#            print("recon_2")
-#            print(n.up)
-#            print("(destination, target, move_out)")
-#            print(n.up.recon_2)
             return n.get_tree_root()
-#            GraftAndUpdate(n.up, s, x)
-#            return GraftAndUpdate(v.up.up, s.up, v.up)
         elif case in c11_c:
-#            sys.stdout.write("5")
             n.up.add_feature("recon", (s.get_leaf_names(), w.get_leaf_names()))     
             return n.get_tree_root()
-#            return GraftAndUpdate(n, s, w)  
         return n.get_tree_root()
     elif (dA==2 and dB==0) or (dA==0 and dB==2): 
         if dA == 2:
@@ -313,13 +287,10 @@ def resolve(n, M):
             Y = y.sp_down
         case = (bool(S&V), bool(S&Y), bool(S&O), bool(V&Y))
         if case in c20_a:
-#            sys.stdout.write("6")
             return GraftAndUpdate(n, b, z)
         elif case in c20_b:
-#            sys.stdout.write("7")
             return GraftAndUpdate(n, v, b)
         elif case in c20_c:
-#            sys.stdout.write("8")
             n.up.add_feature("recon", (b.get_leaf_names(), s.get_leaf_names()))     
             return n.get_tree_root()
         return n.get_tree_root()
@@ -405,7 +376,6 @@ def Resolve_Main(trees_fn, species_tree_rooted_fn, GeneToSpecies, qTest):
             print(tree)
     else:
         # Perform full reconciliation
-#        print(tree)    
         for n in tree.traverse("postorder"):
             tree = resolve(n, GeneToSpecies)
         NumberOfOrthologues(tree, GeneToSpecies)      
