@@ -42,7 +42,7 @@ if __name__ == "__main__":
     parser.add_argument('SpeciesIDs', nargs='?', default=None, help="Found in Results_<Date>/WorkingDirectory")
 
     args = parser.parse_args()
-    idsDict = GetSpeciesSequenceIDsDict(args.SequenceIDsFilename, args.SpeciesIDsFilename)
+    idsDict = GetSpeciesSequenceIDsDict(args.SequenceIDs, args.SpeciesIDs)
         
     if os.path.isdir(args.TreeInput):
         filesToDo = [f for f in glob.glob(args.TreeInput + "/*")]
