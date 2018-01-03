@@ -23,14 +23,14 @@
 #
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com 
-
+import os
 import time
 import multiprocessing as mp
 import Queue
 
 import util
 
-def _I_Spawn_Processes(message_queue, cmds_queue):
+def _I_Spawn_Processes(message_to_spawner, message_to_PTM, cmds_queue):
     """
     Args:
         message_queue - for passing messages that a new queue of tasks should be started (PTM -> I_Space_Processes) or that the tasks are complete
@@ -46,24 +46,21 @@ def _I_Spawn_Processes(message_queue, cmds_queue):
     while True:
         try:
             # peak in qoq - it is the only mehtod that tried to remove things from the queue
-            message = message_queue.get()
-            if message == 'Done': 
-                # for saftey's sake put this check in. This message was intended for the PTM so put it back on the queue
-                message_queue.put('Done')
-                raise Queue.Empty
-            if message == None: return
+            message = message_to_spawner.get(timeout=1)
+            if message == None: 
+                return
             # In which case, thread has been informed that there are tasks in the queue.
             nParallel, nTasks, qShell, qListOfLists, qHideStdout = message
             if qListOfLists:
-                runningProcesses = [mp.Process(target=util.Worker_RunCommand, args = (cmds_queue, nParallel, nTasks, qShell, qHideStdout)) for i_ in xrange(nParallel)]           
+                runningProcesses = [mp.Process(target=util.Worker_RunOrderedCommandList, args = (cmds_queue, nParallel, nTasks, qShell, qHideStdout)) for i_ in xrange(nParallel)]           
             else:
-                runningProcesses = [mp.Process(target=util.Worker_RunOrderedCommandList, args = (cmds_queue, nParallel, nTasks, qShell, qHideStdout)) for i_ in xrange(nParallel)] 
+                runningProcesses = [mp.Process(target=util.Worker_RunCommand, args = (cmds_queue, nParallel, nTasks, qShell, qHideStdout)) for i_ in xrange(nParallel)] 
             for proc in runningProcesses:
                 proc.start()
             for proc in runningProcesses:
                 while proc.is_alive():
                     proc.join() 
-            message_queue.put("Done")
+            message_to_PTM.put("Done")
             time.sleep(2)
         except Queue.Empty:
             time.sleep(4) # there wasn't anything this time, sleep then try again
@@ -79,14 +76,15 @@ class ParallelTaskManager_singleton:
             When provided with a list of commands it should fire up some workers and get them to run the commands and then exit.
             An alternative would be they should always stay alive - but then they could die for some reason? And I'd have to check how many there are.
             """
-            self.message_queue = mp.Queue()   
+            self.message_to_spawner = mp.Queue()   
+            self.message_to_PTM = mp.Queue()   
             # Orders/Messages:
             # None (PTM -> spawn_thread) - thread should return (i.e. exit)
             # 'Done' (spawn_thread -> PTM) - the cmds from the cmd queue have completed
             # Anything else = (nParallel, nTasks) (PTM -> spawn_thread) - cmds (nTasks of them) have been placed in the cmd queue, 
             #   they should be executed using nParallel threads
             self.cmds_queue = mp.Queue()
-            self.manager_process = mp.Process(target=_I_Spawn_Processes, args=(self.message_queue, self.cmds_queue))
+            self.manager_process = mp.Process(target=_I_Spawn_Processes, args=(self.message_to_spawner, self.message_to_PTM, self.cmds_queue))
             self.manager_process.start()
     instance = None
     
@@ -105,19 +103,19 @@ class ParallelTaskManager_singleton:
         nTasks = len(cmd_list)
         for i, x in enumerate(cmd_list):
             self.instance.cmds_queue.put((i, x))
-        self.instance.message_queue.put((nParallel, nTasks, qShell, qListOfLists, qHideStdout))
+        self.instance.message_to_spawner.put((nParallel, nTasks, qShell, qListOfLists, qHideStdout))
         while True:
             try:
-                signal = self.instance.message_queue.get()
+                signal = self.instance.message_to_PTM.get()
                 if signal == "Done": 
-                    return
+                    return                 
             except Queue.Empty:
-                time.sleep(1)
-                print("PTM waiting for work to complete")
+                pass
+            time.sleep(1)
                 
     def Stop(self):
         """Warning, cannot be restarted"""
-        self.instance.message_queue.put(None)
+        self.instance.message_to_spawner.put(None)
         self.instance.manager_process.join()
         
 

@@ -29,6 +29,8 @@ import sys
 import csv
 import gzip
 from scipy import sparse
+
+import util
               
 #def NumberOfSequences(seqsInfo, iSpecies):
 #    return (seqsInfo.seqStartingIndices[iSpecies+1] if iSpecies != seqsInfo.nSpecies-1 else seqsInfo.nSeqs) - seqsInfo.seqStartingIndices[iSpecies] 
@@ -86,9 +88,9 @@ def GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies, qExcludeSelfHits = T
                     kSpecies, nSeqs_k, sequencekID = (iSpecies,  nSeqs_i, sequence1ID) if sequence1ID >= nSeqs_i else (jSpecies,  nSeqs_j, sequence2ID)
                     sys.stderr.write("Species%d.fa contains only %d sequences " % (kSpecies,  nSeqs_k)) 
                     sys.stderr.write("but found a query/hit in the Blast%d_%d.txt for sequence %d_%d (i.e. %s sequence in species %d).\n" %  (iSpecies, jSpecies, kSpecies, sequencekID, ord(sequencekID+1), kSpecies))
-                    sys.exit()
+                    util.Fail()
     except Exception:
         sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (fileInfo.workingDir, iSpecies, jSpecies))
         sys.stderr.write("\t".join(row) + "\n")
-        sys.exit()
+        raise 
     return B  

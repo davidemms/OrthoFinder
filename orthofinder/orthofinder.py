@@ -819,8 +819,6 @@ def PrintHelp(program_caller):
     print("LICENSE:")
     print(" Distributed under the GNU General Public License (GPLv3). See License.md")
     util.PrintCitation() 
-    ptm = parallel_task_manager.ParallelTaskManager_singleton()
-    ptm.Stop()
     
 """
 Main
@@ -918,7 +916,7 @@ def ProcessArgs(program_caller):
     """
     if len(sys.argv) == 1 or sys.argv[1] == "--help" or sys.argv[1] == "help" or sys.argv[1] == "-h":
         PrintHelp(program_caller)
-        sys.exit() 
+        util.Success() 
 
     options = Options()
     fastaDir = None
@@ -1101,7 +1099,7 @@ def ProcessArgs(program_caller):
             options.qStopAfterTrees = True
         elif arg == "-h" or arg == "--help":
             PrintHelp(program_caller)
-            sys.exit()
+            util.Success()
         else:
             print("Unrecognised argument: %s\n" % arg)
             util.Fail()    
@@ -1357,7 +1355,7 @@ def RunSearch(options, dirs, seqsInfo, program_caller):
     if options.qStopAfterPrepare:
         for command in commands:
             print(command)
-        sys.exit()
+        util.Success()
     print("Using %d thread(s)" % options.nBlast)
     util.PrintTime("This may take some time....")  
     cmd_queue = mp.Queue()
@@ -1492,103 +1490,110 @@ def CheckOptions(options, dirs):
     return options
 
 if __name__ == "__main__":    
-    print("")
-    print("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version)
-    program_caller = GetProgramCaller()
-    options, fastaDir, workingDir, orthologuesDir = ProcessArgs(program_caller)  
-    # 2.
-    if options.qStartFromGroups or options.qStartFromTrees:
-        # User can specify it using clusters_id_pairs file, process this first to get the workingDirectory
-        workingDir, orthofinderResultsDir, clustersFilename_pairs = util.GetOGsFile(workingDir)
-    CheckDependencies(options, program_caller, next(d for d in [fastaDir, workingDir, orthologuesDir] if  d != None)) 
-    
-    # if using previous Trees etc., check these are all present - Job for orthologues
-    if options.qStartFromBlast and options.qStartFromFasta:
-        # 0. Check Files
-        dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
-        print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, dirs.workingDir))
-        # 3. 
-        dirs = ProcessesNewFasta(fastaDir, dirs, options.name)
-        options = CheckOptions(options, dirs)
-        # 4.
-        seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
-        # 5.
-        if options.speciesXMLInfoFN:   
-            speciesInfo = GetXMLSpeciesInfo(dirs, options)
-        # 6.    
-        util.PrintUnderline("Dividing up work for BLAST for parallel processing")
-        CreateSearchDatabases(dirs, options, program_caller)
-        # 7.  
-        RunSearch(options, dirs, seqsInfo, program_caller)
-        # 8.
-        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.qDoubleBlast, options.separatePickleDir)
-        # 9.
-        if not options.qStopAfterGroups:
-            GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
-        # 10.
-        print("\n" + statsFile + "\n\n" + util.FlowText(summaryText)) 
-        util.PrintCitation()
-            
-    elif options.qStartFromFasta:
-        # 3. 
-        dirs = ProcessesNewFasta(fastaDir, name = options.name)
-        options = CheckOptions(options, dirs)
-        # 4
-        seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
-        # 5.
-        if options.speciesXMLInfoFN:   
-            speciesInfo = GetXMLSpeciesInfo(dirs, options)
-        # 6.    
-        util.PrintUnderline("Dividing up work for BLAST for parallel processing")
-        CreateSearchDatabases(dirs, options, program_caller)
-        # 7. 
-        RunSearch(options, dirs, seqsInfo, program_caller)
-        # 8.  
-        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.qDoubleBlast, options.separatePickleDir)    
-        # 9. 
-        if not options.qStopAfterGroups:
-            GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
-        # 10.
-        print("\n" + statsFile + "\n\n" + util.FlowText(summaryText)) 
-        util.PrintCitation()
+    try:
+        print("")
+        print("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version)
+        program_caller = GetProgramCaller()
+        options, fastaDir, workingDir, orthologuesDir = ProcessArgs(program_caller)  
+        # 2.
+        if options.qStartFromGroups or options.qStartFromTrees:
+            # User can specify it using clusters_id_pairs file, process this first to get the workingDirectory
+            workingDir, orthofinderResultsDir, clustersFilename_pairs = util.GetOGsFile(workingDir)
+        CheckDependencies(options, program_caller, next(d for d in [fastaDir, workingDir, orthologuesDir] if  d != None)) 
         
-    elif options.qStartFromBlast:
-        # 0.
-        dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
-        print("Using previously calculated BLAST results in %s" % dirs.workingDir) 
-        options = CheckOptions(options, dirs)
-        # 4.
-        seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
-        # 5.
-        if options.speciesXMLInfoFN:   
-            speciesInfo = GetXMLSpeciesInfo(dirs, options)
-        # 8        
-        clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.qDoubleBlast, options.separatePickleDir)    
-        # 9
-        if not options.qStopAfterGroups:
-            GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
-        # 10
-        print("\n" + statsFile + "\n\n" + util.FlowText(summaryText)) 
-        util.PrintCitation() 
-    elif options.qStartFromGroups:
-        # 0.  
-        dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
-        dirs.resultsDir = orthofinderResultsDir       
-        options = CheckOptions(options, dirs)
-        # 9
-        GetOrthologues(dirs, options, program_caller, clustersFilename_pairs)
-        # 10
-        util.PrintCitation() 
-    elif options.qStartFromTrees:
-        dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
-        options = CheckOptions(options, dirs)
-        summaryText = GetOrthologues_FromTrees(orthologuesDir, options)
-        print(util.FlowText(summaryText))
-        util.PrintCitation() 
-    else:
-        raise NotImplementedError
+        # if using previous Trees etc., check these are all present - Job for orthologues
+        if options.qStartFromBlast and options.qStartFromFasta:
+            # 0. Check Files
+            dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, dirs.workingDir))
+            # 3. 
+            dirs = ProcessesNewFasta(fastaDir, dirs, options.name)
+            options = CheckOptions(options, dirs)
+            # 4.
+            seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
+            # 5.
+            if options.speciesXMLInfoFN:   
+                speciesInfo = GetXMLSpeciesInfo(dirs, options)
+            # 6.    
+            util.PrintUnderline("Dividing up work for BLAST for parallel processing")
+            CreateSearchDatabases(dirs, options, program_caller)
+            # 7.  
+            RunSearch(options, dirs, seqsInfo, program_caller)
+            # 8.
+            clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.qDoubleBlast, options.separatePickleDir)
+            # 9.
+            if not options.qStopAfterGroups:
+                GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
+            # 10.
+            print("\n" + statsFile + "\n\n" + util.FlowText(summaryText)) 
+            util.PrintCitation()
+                
+        elif options.qStartFromFasta:
+            # 3. 
+            dirs = ProcessesNewFasta(fastaDir, name = options.name)
+            options = CheckOptions(options, dirs)
+            # 4
+            seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
+            # 5.
+            if options.speciesXMLInfoFN:   
+                speciesInfo = GetXMLSpeciesInfo(dirs, options)
+            # 6.    
+            util.PrintUnderline("Dividing up work for BLAST for parallel processing")
+            CreateSearchDatabases(dirs, options, program_caller)
+            # 7. 
+            RunSearch(options, dirs, seqsInfo, program_caller)
+            # 8.  
+            clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.qDoubleBlast, options.separatePickleDir)    
+            # 9. 
+            if not options.qStopAfterGroups:
+                GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
+            # 10.
+            print("\n" + statsFile + "\n\n" + util.FlowText(summaryText)) 
+            util.PrintCitation()
+            
+        elif options.qStartFromBlast:
+            # 0.
+            dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            print("Using previously calculated BLAST results in %s" % dirs.workingDir) 
+            options = CheckOptions(options, dirs)
+            # 4.
+            seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
+            # 5.
+            if options.speciesXMLInfoFN:   
+                speciesInfo = GetXMLSpeciesInfo(dirs, options)
+            # 8        
+            clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.qDoubleBlast, options.separatePickleDir)    
+            # 9
+            if not options.qStopAfterGroups:
+                GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
+            # 10
+            print("\n" + statsFile + "\n\n" + util.FlowText(summaryText)) 
+            util.PrintCitation() 
+        elif options.qStartFromGroups:
+            # 0.  
+            dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            dirs.resultsDir = orthofinderResultsDir       
+            options = CheckOptions(options, dirs)
+            # 9
+            GetOrthologues(dirs, options, program_caller, clustersFilename_pairs)
+            # 10
+            util.PrintCitation() 
+        elif options.qStartFromTrees:
+            dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            options = CheckOptions(options, dirs)
+            summaryText = GetOrthologues_FromTrees(orthologuesDir, options)
+            print(util.FlowText(summaryText))
+            util.PrintCitation() 
+        else:
+            raise NotImplementedError
+            ptm = parallel_task_manager.ParallelTaskManager_singleton()
+            ptm.Stop()
+    except Exception as e:
         ptm = parallel_task_manager.ParallelTaskManager_singleton()
         ptm.Stop()
+        sys.stderr.write(str(e))
+        sys.stderr.flush()
+        print("\nERROR: An error occurred, please review error messages for more information.")
     ptm = parallel_task_manager.ParallelTaskManager_singleton()
     ptm.Stop()
         

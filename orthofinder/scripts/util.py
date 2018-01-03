@@ -48,7 +48,7 @@ SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStar
 FileInfo = namedtuple("FileInfo", "workingDir graphFilename separatePickleDir")     
 
 picProtocol = 1
-version = "2.1.3"
+version = "2.1.4"
 
 # Fix LD_LIBRARY_PATH when using pyinstaller 
 my_env = os.environ.copy()
@@ -301,11 +301,17 @@ def GetSpeciesToUse(speciesIDsFN):
             if line.startswith("#"): nSkipped += 1
             else: speciesToUse.append(int(line.split(":")[0]))
     return speciesToUse, len(speciesToUse) + nSkipped
-    
+ 
+def Success():
+    ptm = parallel_task_manager.ParallelTaskManager_singleton()
+    ptm.Stop()  
+    sys.exit()
+   
 def Fail():
-    print("ERROR: An error occurred, please review previous error messages for more information.")
+    sys.stderr.flush()
     ptm = parallel_task_manager.ParallelTaskManager_singleton()
     ptm.Stop()
+    print("ERROR: An error occurred, please review error messages for more information.")
     sys.exit()
     
 """
