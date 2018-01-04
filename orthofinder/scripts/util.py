@@ -546,3 +546,9 @@ class nOrtho_sp(object):
         self.n_m2m += other.n_m2m
         return self
         
+class Finalise(object):
+    def __enter__(self):
+        pass
+    def __exit__(self, type, value, traceback):
+        ptm = parallel_task_manager.ParallelTaskManager_singleton()
+        ptm.Stop()

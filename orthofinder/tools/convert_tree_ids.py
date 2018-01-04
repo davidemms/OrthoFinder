@@ -36,25 +36,26 @@ def GetSpeciesSequenceIDsDict(sequenceIDsFilename, speciesIDsFN = None):
     return idsDict
           
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Takes a tree with OrthoFinder IDs and outputs a tree with gene accessions")
-    parser.add_argument("TreeInput", help="Tree filename or directory")
-    parser.add_argument("SequenceIDs", help="Found in Results_<Date>/WorkingDirectory")
-    parser.add_argument('SpeciesIDs', nargs='?', default=None, help="Found in Results_<Date>/WorkingDirectory")
-
-    args = parser.parse_args()
-    idsDict = GetSpeciesSequenceIDsDict(args.SequenceIDsFilename, args.SpeciesIDsFilename)
-        
-    if os.path.isdir(args.TreeInput):
-        filesToDo = [f for f in glob.glob(args.TreeInput + "/*")]
-    else:
-        filesToDo = [args.TreeInput]
-        
-    for treeFilename in filesToDo:
-        try:
-            sys.stdout.write(treeFilename)
-            pathfilename, ext = os.path.splitext(treeFilename)
-            newFilename = pathfilename + "_accessions" + ext
-            ReplaceFileWithNewIDs(idsDict, treeFilename, newFilename)
-        except:
-            sys.stdout.write(" - skipped")
-        print("")
+    with util.Finalise():
+        parser = argparse.ArgumentParser(description="Takes a tree with OrthoFinder IDs and outputs a tree with gene accessions")
+        parser.add_argument("TreeInput", help="Tree filename or directory")
+        parser.add_argument("SequenceIDs", help="Found in Results_<Date>/WorkingDirectory")
+        parser.add_argument('SpeciesIDs', nargs='?', default=None, help="Found in Results_<Date>/WorkingDirectory")
+    
+        args = parser.parse_args()
+        idsDict = GetSpeciesSequenceIDsDict(args.SequenceIDs, args.SpeciesIDs)
+            
+        if os.path.isdir(args.TreeInput):
+            filesToDo = [f for f in glob.glob(args.TreeInput + "/*")]
+        else:
+            filesToDo = [args.TreeInput]
+            
+        for treeFilename in filesToDo:
+            try:
+                sys.stdout.write(treeFilename)
+                pathfilename, ext = os.path.splitext(treeFilename)
+                newFilename = pathfilename + "_accessions" + ext
+                ReplaceFileWithNewIDs(idsDict, treeFilename, newFilename)
+            except:
+                sys.stdout.write(" - skipped")
+            print("")

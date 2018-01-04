@@ -806,6 +806,15 @@ class TestCommandLine(unittest.TestCase):
             self.assertTrue(self.FileContainsText(resultsDir + "/WorkingDirectory/Alignments_ids/OG0000300.log", "Analysis results written to"))
         
         
+    def test_convert_tree_ids(self):
+        d = baseDir + "Input/ConvertIDs/"
+        infile = d + "SpeciesTree_ids.txt"
+        newFiles = [d + "SpeciesTree_ids_accessions.txt"]
+        exe = os.path.split(orthofinder)[0] + "/tools/convert_tree_ids.py"
+        with CleanUp(newFiles, [], []):
+            subprocess.call("%s %s %s" % (exe, infile, d + "SpeciesIDs.txt"), shell=True, env=my_env)
+            self.assertTrue(filecmp.cmp(newFiles[0], baseDir + "ExpectedOutput/SpeciesTree_ids_accessions.txt"), msg=newFiles[0])
+        
 #    def test_treesExtraSpecies(self):
 #        pass
         

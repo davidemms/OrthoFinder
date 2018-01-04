@@ -1,0 +1,1 @@
+(Mycoplasma_agalactiae.faa:0.455975,(Mycoplasma_genitalium.faa:0.43488,Mycoplasma_gallisepticum.faa:0.412452):0.362495,Mycoplasma_hyopneumoniae.faa:0.475116);
