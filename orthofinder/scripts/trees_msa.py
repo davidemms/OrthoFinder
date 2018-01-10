@@ -205,7 +205,7 @@ def ReadAlignment(fn):
             msa[accession] = seq
     return MSA(msa)
 
-def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, output_filename, fSingleCopy):
+def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, output_filename, fSingleCopy, fMaxGap=0.5):
     allSpecies = {str(gene.iSp) for og in ogs for gene in og}
     concatentaedAlignments = defaultdict(str)
     for iOg in ogsToUse_ids:
@@ -225,7 +225,7 @@ def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, 
     # Trim the completed alignment: to 50% of fraction of species present
     species_ordered = concatentaedAlignments.keys()
     trimmedAlignment = {iSp:"" for iSp in species_ordered}
-    maxGap = (1.-0.5*fSingleCopy)*len(allSpecies)
+    maxGap = (1.-fMaxGap*fSingleCopy)*len(allSpecies)
     for iCol in xrange(len(concatentaedAlignments.values()[0])):
         col = [concatentaedAlignments[iSp][iCol] for iSp in species_ordered]
         if col.count("-") <= maxGap:
