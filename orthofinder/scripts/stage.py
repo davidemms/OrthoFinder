@@ -32,6 +32,7 @@ import datetime
 import argparse
 import subprocess
 import numpy as np
+from itertools import combinations
 try:
     import tree
 except ImportError:
@@ -171,6 +172,46 @@ def CreateNewWorkingDirectory(baseDirectoryName):
     os.mkdir(newDirectoryName)
     return newDirectoryName
 
+def GetDistances_fast(t, nSp, g_to_i):
+    D = np.ones((nSp, nSp)) * 9e99
+    for n in t.traverse('postorder'):
+        if n.is_leaf():
+            n.add_feature('d', {g_to_i[n.name]:n.dist})
+#            print(n.name)
+#            print(d)
+        else:
+            children = n.get_children()
+            for ch0, ch1 in combinations(children,2):
+                for sp0,dist0 in ch0.d.items():
+                    for sp1,dist1 in ch1.d.items():
+                        if sp0==sp1: continue
+                        i = sp0 if sp0<sp1 else sp1
+                        j = sp1 if sp0<sp1 else sp0
+                        D[i,j] = min(D[i,j], dist0+dist1)
+                spp = {k for ch in children for k in ch.d.keys()}
+                d = {k:(min([ch.d[k] for ch in children if k in ch.d])+n.dist) for k in spp}
+                n.add_feature('d', d)
+#                print(d)
+    for i in xrange(nSp):
+        for j in xrange(i):
+            D[i,j] = D[j, i]
+        D[i,i]=0.
+    return D
+    
+def GetDistances(t, nSp, g_to_i):
+    D = np.ones((nSp, nSp)) * 9e99
+    for g0 in t:
+        s0 = g_to_i[g0.name]
+        for g1 in t:
+            s1 = g_to_i[g1.name]
+            if s0 == s1: continue
+            d = g0.get_distance(g1)
+            if D[s0,s1] > d: 
+                D[s0,s1] = d
+                D[s1,s0] = d
+    np.fill_diagonal(D, 0)
+    return D
+
 def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies):
     nSp = GeneToSpecies.NumberOfSpecies()
     s_to_i = GeneToSpecies.SpeciesToIndexDict()
@@ -198,17 +239,7 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies):
             nNotAllPresent += 1
             continue
         g_to_i = {g:s_to_i[s] for g,s in zip(genes, species)}
-        D = np.ones((nSp, nSp)) * 9e99
-        for g0 in t:
-            s0 = g_to_i[g0.name]
-            for g1 in t:
-                s1 = g_to_i[g1.name]
-                if s0 == s1: continue
-                d = g0.get_distance(g1)
-                if D[s0,s1] > d: 
-                    D[s0,s1] = d
-                    D[s1,s0] = d
-        np.fill_diagonal(D, 0)
+        D = GetDistances_fast(t, nSp, g_to_i)
         species_names_fastme = map(str,xrange(nSp))
         matrixFN = dir_matrices + os.path.split(fn)[1] + ".dist.phylip"
         treeOutFN = dir_trees_out + os.path.split(fn)[1] + ".tre"
@@ -251,6 +282,44 @@ def main(args):
     InferSpeciesTree(dir_trees_out, gene_to_species.species, outputFN)
     print("STAGE species tree: " + os.path.abspath(outputFN) + "\n")
 
+def TestTimings():
+    import time
+    gene_to_species = GeneToSpecies("/home/david/projects/SpeciesTreeFromAllGenes/speed_test/mapping.txt")
+    nSp = gene_to_species.NumberOfSpecies()
+    s_to_i = gene_to_species.SpeciesToIndexDict()
+    t = tree.Tree("/home/david/projects/SpeciesTreeFromAllGenes/speed_test/OG0000117_tree_id.txt")
+    genes = t.get_leaf_names()
+    species = map(gene_to_species.ToSpecies, genes)
+    nThis = len(set(species))
+    if nThis != nSp:
+        print("Not all species present: %d/%d" % (nThis, nSp))
+        return
+    g_to_i = {g:s_to_i[s] for g,s in zip(genes, species)}
+    start = time.time()
+    D2 = GetDistances_fast(t, nSp, g_to_i)
+    stop = time.time()
+    tnew = stop-start 
+    print(tnew)
+    D = GetDistances(t, nSp, g_to_i)
+    torig = time.time() - stop
+    print(D[0,:])
+    print(D2[0,:])
+    n = D.shape[0]
+    for i in xrange(n):
+        for j in xrange(n):
+            if D[i,j] == 0:
+                assert(D2[i,j] < 1e-6)
+            else:
+                assert(abs(D2[i,j] - D[i,j])/abs(D[i,j]) < 1e-6)
+    print(torig)
+    print(torig/tnew)    
+    """
+    OG              Old                 New                     Speed-up
+    OG0000500       32.0261440277       0.00913095474243        3507.42555747
+    OG0001006       7.76937317848       0.000356912612915       1484.741798797
+    OG0005002       0.388839006424      0.00172996520996        224.76695148857394
+    """
+
 if __name__ == "__main__":
     text = """
 **********************************************************
@@ -265,3 +334,4 @@ if __name__ == "__main__":
 #    parser.add_argument("-o", "--orthofinder", action="store_true", help="Create species map for OrthoFinder trees.")
     args = parser.parse_args()
     main(args)
+#    TestTimings()
