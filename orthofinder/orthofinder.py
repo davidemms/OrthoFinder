@@ -1591,9 +1591,7 @@ if __name__ == "__main__":
     except Exception as e:
         ptm = parallel_task_manager.ParallelTaskManager_singleton()
         ptm.Stop()
-        sys.stderr.write(str(e))
-        sys.stderr.flush()
-        print("\nERROR: An error occurred, please review error messages for more information.")
+        raise
     ptm = parallel_task_manager.ParallelTaskManager_singleton()
     ptm.Stop()
         
