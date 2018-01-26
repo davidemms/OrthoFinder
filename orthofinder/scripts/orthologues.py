@@ -48,6 +48,7 @@ import trees2ologs_of
 import blast_file_processor as BlastFileProcessor
 import trees_msa
 import wrapper_phyldog
+import stag
 
 nThreads = util.nThreadsDefault
 
@@ -368,8 +369,8 @@ class DendroBLASTTrees(object):
                 V = [sliver if 0 < v < sliver else v for v in V]  # make sure scientific notation is not used (not accepted by fastme)
                 values = " ".join(["%.6f" % v for v in V])   
                 outfile.write(values + "\n")       
-        treeFN = os.path.split(self.treesPatIDs)[0] + "/SpeciesTree_ids.txt"
-        cmd = " ".join(["fastme", "-i", speciesMatrixFN, "-o", treeFN, "-w", "O"] + (["-s"] if n < 1000 else []))
+        treeFN = self.workingDir + "/SpeciesTree_ids.txt"
+        cmd = " ".join(["fastme", "-i", speciesMatrixFN, "-o", treeFN, "-N", "-w", "O"] + (["-s"] if n < 1000 else []))
         return cmd, treeFN
                 
     def PrepareGeneTreeCommand(self):
@@ -377,27 +378,43 @@ class DendroBLASTTrees(object):
         ogs = self.ogSet.OGs()
         for iog in xrange(len(ogs)):
             nTaxa = len(ogs[iog])
-            cmds.append([" ".join(["fastme", "-i", self.distPat % iog, "-o", self.TreeFilename_IDs(iog), "-w", "O"] + (["-s"] if nTaxa < 1000 else []))])
+            cmds.append([" ".join(["fastme", "-i", self.distPat % iog, "-o", self.TreeFilename_IDs(iog), "-N", "-w", "O"] + (["-s"] if nTaxa < 1000 else []))])
         return cmds
-        
+
+    @staticmethod    
+    def EnoughOGsForSTAG(ogs, speciesToUse):
+        nSp = len(speciesToUse)
+        nSp_perOG = [len(set([g.iSp for g in og])) for og in ogs]
+        return (nSp_perOG.count(nSp) >= 100)
+    
     def RunAnalysis(self, qSpeciesTree=True):
+        util.PrintUnderline("Calculating gene distances")
         ogs, ogMatrices_partial = self.GetOGMatrices_FullParallel()
         ogMatrices = self.CompleteAndWriteOGMatrices(ogs, ogMatrices_partial)
-        
-        D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
-        cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs)
+        util.PrintTime("Done")
+        qSTAG = self.EnoughOGsForSTAG(ogs, self.ogSet.seqsInfo.speciesToUse)
+        if qSTAG:
+            cmd_spTree = ""
+        else:
+            print("Using fallback species tree inference method")
+            D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
+            cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs)
         cmds_geneTrees = self.PrepareGeneTreeCommand()
         util.PrintUnderline("Inferring gene and species trees")
         util.RunParallelOrderedCommandLists(self.nProcesses, [[cmd_spTree]] + cmds_geneTrees, qHideStdout = True)
+        if qSTAG:
+            # Trees must have been completed
+            print("")
+            spTreeFN_ids = stag.Run_ForOrthoFinder(os.path.split(self.treesPatIDs)[0] + "/", self.workingDir, self.ogSet.seqsInfo.speciesToUse)
         seqDict = self.ogSet.Spec_SeqDict()
         for iog in xrange(len(self.ogSet.OGs())):
-            util.RenameTreeTaxa(self.TreeFilename_IDs(iog), self.treesPat % iog, seqDict, qFixNegatives=True)
+            util.RenameTreeTaxa(self.TreeFilename_IDs(iog), self.treesPat % iog, seqDict, qSupport=False, qFixNegatives=True)
         if qSpeciesTree:
             spTreeUnrootedFN = self.workingDir + "SpeciesTree_unrooted.txt"
-            util.RenameTreeTaxa(spTreeFN_ids, spTreeUnrootedFN, self.ogSet.SpeciesDict(), qFixNegatives=True)        
-            return len(ogs), D, spTreeFN_ids, spTreeUnrootedFN
+            util.RenameTreeTaxa(spTreeFN_ids, spTreeUnrootedFN, self.ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True)        
+            return spTreeFN_ids, spTreeUnrootedFN, qSTAG
         else:      
-            return len(ogs), D, None, None
+            return None, None, qSTAG
             
         
     def SpeciesTreeOnly(self):
@@ -407,7 +424,7 @@ class DendroBLASTTrees(object):
         cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs, True)
         util.RunOrderedCommandList([cmd_spTree], True, True)
         spTreeUnrootedFN = self.workingDir + "SpeciesTree_unrooted.txt"
-        util.RenameTreeTaxa(spTreeFN_ids, spTreeUnrootedFN, self.ogSet.SpeciesDict(), qFixNegatives=True)  
+        util.RenameTreeTaxa(spTreeFN_ids, spTreeUnrootedFN, self.ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True)  
         return spTreeFN_ids, spTreeUnrootedFN
 
 
@@ -778,7 +795,7 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
         qDeepSearch = (recon_method == "dlcpar_deepsearch")
         dlcparResultsDir = RunDlcpar(treesIDsPatFn, ogSet, speciesTree_fn, workingDir, nParallel, qDeepSearch)
         for iog in xrange(len(ogSet.OGs())):
-            util.RenameTreeTaxa(dlcparResultsDir + "OG%07d_tree_id.dlcpar.locus.tree" % iog, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qFixNegatives=False, inFormat=8, label='n')
+            util.RenameTreeTaxa(dlcparResultsDir + "OG%07d_tree_id.dlcpar.locus.tree" % iog, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qSupport=False, qFixNegatives=False, inFormat=8, label='n')
     
         # Orthologue lists
         util.PrintUnderline("Inferring orthologues from gene trees" + (" (root %d)"%iSpeciesTree if iSpeciesTree != None else ""))
@@ -821,10 +838,11 @@ def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, spe
         possibilities = ["SpeciesTree_ids_0_rooted.txt", "SpeciesTree_ids_1_rooted.txt", "SpeciesTree_user_ids.txt", "SpeciesTree_unrooted_0_rooted.txt"] # etc (only need to determine if unique)
         nTrees = 0
         for p in possibilities:
-            fn = workingDir + "Trees_ids/" + p
-            if os.path.exists(fn): 
-                nTrees += 1
-                speciesTree_fn = fn
+            for d in [workingDir, workingDir + "Trees_ids/"]:
+                fn = d + p
+                if os.path.exists(fn): 
+                    nTrees += 1
+                    speciesTree_fn = fn
         if nTrees == 0:
             print("\nERROR: There is a problem with the specified directory. The rooted species tree %s or %s is not present." % (possibilities[0], possibilities[2]))
             print("Please rectify the problem or alternatively use the -s option to specify the species tree to use.\n")
@@ -925,9 +943,9 @@ def OrthologuesWorkflow(workingDir_ogs,
             wrapper_phyldog.RunPhyldogAnalysis(resultsDir + "WorkingDirectory/phyldog/", ogSet.OGs(), speciesToUse)
             return "Running Phyldog" + "\n".join(seqs_alignments_dirs)       
     else:
-        util.PrintUnderline("Calculating gene distances")
         db = DendroBLASTTrees(ogSet, resultsDir, nLowParrallel, qDoubleBlast)
-        nOGs, D, spTreeFN_ids, spTreeUnrootedFN = db.RunAnalysis()
+        spTreeFN_ids, spTreeUnrootedFN, qSTAG = db.RunAnalysis()
+    qSpeciesTreeSupports = False if (userSpeciesTree or qMSA) else qSTAG
     
     """ === 2 ===
     Check can continue with analysis 
@@ -954,7 +972,7 @@ def OrthologuesWorkflow(workingDir_ogs,
     else:
         util.PrintUnderline("Best outgroup(s) for species tree") 
         spDict = ogSet.SpeciesDict()
-        roots, clusters_counter, rootedSpeciesTreeFN, nSupport, _, _, all_stride_dup_genes = stride.GetRoot(spTreeFN_ids, os.path.split(db.TreeFilename_IDs(0))[0] + "/", stride.GeneToSpecies_dash, nHighParallel, treeFmt = 1, qWriteRootedTree=True)
+        roots, clusters_counter, rootedSpeciesTreeFN, nSupport, _, _, all_stride_dup_genes = stride.GetRoot(spTreeFN_ids, os.path.split(db.TreeFilename_IDs(0))[0] + "/", stride.GeneToSpecies_dash, nHighParallel, qWriteRootedTree=True)
         nAll = sum(clusters_counter.values())
         nFP_mp = nAll - nSupport
         n_non_trivial = sum([v for k, v in clusters_counter.items() if len(k) > 1])
@@ -966,6 +984,7 @@ def OrthologuesWorkflow(workingDir_ogs,
             print("Best outgroup for species tree:")  
         for r in roots: print("  " + (", ".join([spDict[s] for s in r]))  )
         qMultiple = len(roots) > 1
+        
         
     if qStopAfterTrees:
         if userSpeciesTree:
@@ -982,7 +1001,10 @@ def OrthologuesWorkflow(workingDir_ogs,
                 resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
             else:
                 resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted_at_outgroup_%d.txt" % i)
-            util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True, label='N')
+            labeled_tree_fn = resultsSpeciesTrees[-1][:-4] + "_node_labels.txt"
+            
+            util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qSupport=qSpeciesTreeSupports, qFixNegatives=True)
+            util.RenameTreeTaxa(speciesTree_fn, labeled_tree_fn, db.ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True, label='N')
         CleanWorkingDir(db.workingDir)
         return GetResultsFilesString(resultsSpeciesTrees, seqs_alignments_dirs if qMSA else None, False)
     
@@ -1002,7 +1024,9 @@ def OrthologuesWorkflow(workingDir_ogs,
         resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")
         print("Outgroup: " + (", ".join([spDict[s] for s in r])))
     os.mkdir(resultsDir_new)
-    util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qFixNegatives=True, label='N')
+    labeled_tree_fn = resultsSpeciesTrees[-1][:-4] + "_node_labels.txt"
+    util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qSupport=qSpeciesTreeSupports, qFixNegatives=True)
+    util.RenameTreeTaxa(speciesTree_fn, labeled_tree_fn, db.ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True, label='N')
     ReconciliationAndOrthologues(recon_method, db.TreeFilename_IDs, db.ogSet, speciesTree_fn, db.workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, i if qMultiple else None, pickleDir=pickleDir, all_stride_dup_genes=all_stride_dup_genes) 
     
     if qMultiple:
@@ -1010,7 +1034,7 @@ def OrthologuesWorkflow(workingDir_ogs,
         os.mkdir(rooted_species_tree_dir)
         for i, (r, speciesTree_fn) in enumerate(zip(roots, rootedSpeciesTreeFN)):
             unanalysedSpeciesTree = rooted_species_tree_dir + "SpeciesTree_rooted_at_outgroup_%d.txt" % i
-            util.RenameTreeTaxa(speciesTree_fn, unanalysedSpeciesTree, db.ogSet.SpeciesDict(), qFixNegatives=True, label='N')
+            util.RenameTreeTaxa(speciesTree_fn, unanalysedSpeciesTree, db.ogSet.SpeciesDict(), qSupport=qSpeciesTreeSupports, qFixNegatives=True, label='N')
     
     CleanWorkingDir(db.workingDir)
     util.PrintUnderline("Writing results files", True)

@@ -1525,7 +1525,7 @@ if __name__ == "__main__":
             if not options.qStopAfterGroups:
                 GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
             # 10.
-            print("\n" + statsFile + "\n\n" + util.FlowText(summaryText)) 
+            print("\n" + statsFile + "\n\n" + summaryText) 
             util.PrintCitation()
                 
         elif options.qStartFromFasta:
@@ -1548,7 +1548,7 @@ if __name__ == "__main__":
             if not options.qStopAfterGroups:
                 GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
             # 10.
-            print("\n" + statsFile + "\n\n" + util.FlowText(summaryText)) 
+            print("\n" + statsFile + "\n\n" + summaryText) 
             util.PrintCitation()
             
         elif options.qStartFromBlast:
@@ -1567,7 +1567,7 @@ if __name__ == "__main__":
             if not options.qStopAfterGroups:
                 GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
             # 10
-            print("\n" + statsFile + "\n\n" + util.FlowText(summaryText)) 
+            print("\n" + statsFile + "\n\n" + summaryText) 
             util.PrintCitation() 
         elif options.qStartFromGroups:
             # 0.  
@@ -1582,7 +1582,7 @@ if __name__ == "__main__":
             dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
             options = CheckOptions(options, dirs)
             summaryText = GetOrthologues_FromTrees(orthologuesDir, options)
-            print(util.FlowText(summaryText))
+            print(summaryText)
             util.PrintCitation() 
         else:
             raise NotImplementedError

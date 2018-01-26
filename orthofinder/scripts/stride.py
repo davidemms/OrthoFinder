@@ -489,11 +489,16 @@ def ParsimonyRoot(allSpecies, clades, supported_clusters_counter):
                 roots.append(clade)
     return roots, nSupport
 
-def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, treeFmt=3, qWriteDupTrees=False, qWriteRootedTree=False):
+def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, qWriteDupTrees=False, qWriteRootedTree=False):
     """ 
                     ******* The Main method ******* 
     """
-    speciesTree = tree.Tree(speciesTreeFN, format=treeFmt)
+    qHaveBranchSupport = False
+    try:
+        speciesTree = tree.Tree(speciesTreeFN, format=2)
+        qHaveBranchSupport = True
+    except:
+        speciesTree = tree.Tree(speciesTreeFN, format=1)                    
     species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
     pool = mp.Pool(nProcessors, maxtasksperchild=1)       
     list_of_dicts = pool.map(SupportedHierachies_wrapper2, [(fn, GeneToSpeciesMap, species, dict_clades, clade_names, qWriteDupTrees) for fn in glob.glob(treesDir + "/*")])
@@ -528,7 +533,7 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, treeFmt=3, q
             speciesTree = RootAtClade(speciesTree, r) 
             speciesTree_rootedFN = os.path.splitext(speciesTreeFN)[0] + "_%d_rooted.txt" % i 
     #    speciesTree = LabelNodes()
-            speciesTree.write(outfile=speciesTree_rootedFN, format=5)
+            speciesTree.write(outfile=speciesTree_rootedFN, format = 2 if qHaveBranchSupport else 1)
             speciesTrees_rootedFNs.append(speciesTree_rootedFN)
     return roots, clusters, speciesTrees_rootedFNs, nSupport, dict_clades.keys(), species, all_stride_dup_genes
 
@@ -717,7 +722,7 @@ def Main_Full(args):
             sys.exit()
         print("Analysing %d gene trees" % nTrees)
 #        roots, clusters_counter, _, nSupport, clades, species = GetRoot(args.Species_tree, args.gene_trees, GeneToSpecies, nProcs, treeFmt = 1, qWriteDupTrees=args.output)
-        roots, clusters_counter, _, nSupport, clades, species, all_stride_dup_genes = GetRoot(args.Species_tree, args.gene_trees, GeneToSpecies, nProcs, treeFmt = 1)
+        roots, clusters_counter, _, nSupport, clades, species, all_stride_dup_genes = GetRoot(args.Species_tree, args.gene_trees, GeneToSpecies, nProcs)
         PrintRootingSummary(roots, clusters_counter, nSupport)
         outputDir = CreateNewWorkingDirectory(args.gene_trees + "/../STRIDE_Results")
 #        shelveFN = outputDir + "STRIDE_data.shv"

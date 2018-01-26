@@ -380,14 +380,28 @@ class FirstWordExtractor(IDExtractor):
     def GetNameToIDDict(self):
         return self.nameToIDDict    
 
+def HaveSupportValues(speciesTreeFN_ids):
+    qHaveSupport = False
+    try:
+        tree.Tree(speciesTreeFN_ids, format=2)
+        qHaveSupport = True
+    except:
+        pass
+    return qHaveSupport
 
-def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qFixNegatives=False, inFormat=None, label=None): 
+def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qSupport, qFixNegatives=False, inFormat=None, label=None):
+    if label != None: qSupport = False
     try:
         if type(treeFN_or_tree) == tree.TreeNode:
             t = treeFN_or_tree
         else:
+            qHaveSupport = False
             if inFormat == None:
-                t = tree.Tree(treeFN_or_tree)
+                try:
+                    t = tree.Tree(treeFN_or_tree, format=2)
+                    qHaveSupport = True
+                except:
+                    t = tree.Tree(treeFN_or_tree)
             else:
                 t = tree.Tree(treeFN_or_tree, format=inFormat)
         for node in t.get_leaves():
@@ -406,7 +420,10 @@ def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qFixNegatives=False,
             with open(newTreeFilename, 'wb') as outfile:
                 outfile.write(t.write(format=3)[:-1] + label + "0;")  # internal + terminal branch lengths, leaf names, node names. (tree library won't label root node)
         else:
-            t.write(outfile = newTreeFilename, format=5)  # internal + terminal branch lengths, leaf names
+            if qSupport or qHaveSupport:
+                t.write(outfile = newTreeFilename, format=2)  
+            else:
+                t.write(outfile = newTreeFilename, format=5)  
     except:
         pass
 

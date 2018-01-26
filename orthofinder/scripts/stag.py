@@ -121,6 +121,7 @@ class GeneToSpecies(object):
             with open(gene_map_fn, 'rb') as infile:
                 for line in infile:
                     _, sp = line.rstrip().rsplit(".", 1)[0].split()
+                    sp = sp.replace(".", "_")
                     self.startswith[sp] = sp
         else:
             with open(gene_map_fn, 'rb') as infile:
@@ -139,7 +140,7 @@ class GeneToSpecies(object):
         print("%d species in mapping file:" % len(self.species))
         for s in self.species:
             print(s)
-        print("\nSTAGE will infer a species tree from each gene tree with all species present") 
+        print("\nSTAG will infer a species tree from each gene tree with all species present") 
         self.sp_to_i = {s:i for i,s in enumerate(self.species)}
                 
     def ToSpecies(self, gene):
@@ -155,6 +156,15 @@ class GeneToSpecies(object):
     
     def NumberOfSpecies(self):
         return len(self.species)
+
+class GeneToSpecies_OrthoFinder(GeneToSpecies):
+    def __init__(self, speciesToUse):
+        # no exact conversions
+        self.exact = dict()
+        self.startswith = {("%d_" % sp):str(sp) for sp in speciesToUse}
+        self.species = map(str,speciesToUse)
+        self.sp_to_i = {s:i for i,s in enumerate(self.species)}
+            
 
 def GetDirectoryName(baseDirName, i):
     if i == 0:
@@ -212,13 +222,13 @@ def GetDistances(t, nSp, g_to_i):
     np.fill_diagonal(D, 0)
     return D
 
-def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies):
+def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=True):
     nSp = GeneToSpecies.NumberOfSpecies()
     s_to_i = GeneToSpecies.SpeciesToIndexDict()
     nSuccess = 0
     nNotAllPresent = 0
     nFail = 0
-    print("\nProcessing gene trees:")
+    if qVerbose: print("\nProcessing gene trees:")
     for fn in glob.glob(dir_in + "/*"):
         try:
             t = tree.Tree(fn)
@@ -244,34 +254,33 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies):
         matrixFN = dir_matrices + os.path.split(fn)[1] + ".dist.phylip"
         treeOutFN = dir_trees_out + os.path.split(fn)[1] + ".tre"
         WritePhylipMatrix(D, species_names_fastme, matrixFN, max_og=1e6)
-        subprocess.call("fastme -i %s -o %s -w O -s" % (matrixFN, treeOutFN), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.call("fastme -i %s -o %s -w O -s -N" % (matrixFN, treeOutFN), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         nSuccess += 1
-        print(os.path.split(fn)[1] + " - Processed")
-    print("\nExamined %d trees" % (nSuccess + nNotAllPresent + nFail))
-    print("%d trees had all species present and will be used by STAGE to infer the species tree\n" % nSuccess)
+        if qVerbose: print(os.path.split(fn)[1] + " - Processed")
+    if qVerbose: print("\nExamined %d trees" % (nSuccess + nNotAllPresent + nFail))
+    print("%d trees had all species present and will be used by STAG to infer the species tree\n" % nSuccess)
       
 def InferSpeciesTree(tree_dir, species, outputFN):
     t = cons.ConsensusTree(tree_dir)
     for n in t:
         n.name = species[int(n.name)]
     t.write(outfile=outputFN)
+
+def Run_ForOrthoFinder(dir_in, d_out, speciesToUse):
+    dir_matrices = d_out + "Distances_SpeciesTree/"
+    os.mkdir(dir_matrices)
+    dir_trees_out = d_out + "SpeciesTrees_ids/"
+    os.mkdir(dir_trees_out)
+    gene_to_species = GeneToSpecies_OrthoFinder(speciesToUse)
+    ProcessTrees(dir_in, dir_matrices, dir_trees_out, gene_to_species, qVerbose=False)
+    outputFN = d_out + "STAG_SpeciesTree_ids.tre"
+    InferSpeciesTree(dir_trees_out, gene_to_species.species, outputFN)
+    return outputFN
     
 def main(args):
     dir_in = args.gene_trees
-#    if args.separator and args.separator == "dot":
-#        GeneToSpecies = GeneToSpecies_dot  
-#    if args.separator and args.separator == "underscore":
-#        GeneToSpecies = GeneToSpecies_dash  
-#    elif args.separator and args.separator == "2nd_underscore":
-#        GeneToSpecies = GeneToSpecies_secondDash  
-#    elif args.separator and args.separator == "3rd_underscore":
-#        GeneToSpecies = GeneToSpecies_3rdDash  
-#    elif args.separator and args.separator == "dash":
-#        GeneToSpecies = GeneToSpecies_hyphen 
-#    else: 
-#        raise NotImplementedError()
     gene_to_species = GeneToSpecies(args.species_map)
-    dir_out = CreateNewWorkingDirectory(dir_in + "/../STAGE_Results")
+    dir_out = CreateNewWorkingDirectory(dir_in + "/../STAG_Results")
     CheckFastME(dir_out)
     dir_matrices = dir_out + "DistanceMatrices/"
     os.mkdir(dir_matrices)
@@ -280,7 +289,7 @@ def main(args):
     ProcessTrees(dir_in, dir_matrices, dir_trees_out, gene_to_species)
     outputFN = dir_out + "SpeciesTree.tre"
     InferSpeciesTree(dir_trees_out, gene_to_species.species, outputFN)
-    print("STAGE species tree: " + os.path.abspath(outputFN) + "\n")
+    print("STAG species tree: " + os.path.abspath(outputFN) + "\n")
 
 def TestTimings():
     import time
@@ -313,25 +322,18 @@ def TestTimings():
                 assert(abs(D2[i,j] - D[i,j])/abs(D[i,j]) < 1e-6)
     print(torig)
     print(torig/tnew)    
-    """
-    OG              Old                 New                     Speed-up
-    OG0000500       32.0261440277       0.00913095474243        3507.42555747
-    OG0001006       7.76937317848       0.000356912612915       1484.741798797
-    OG0005002       0.388839006424      0.00172996520996        224.76695148857394
-    """
 
 if __name__ == "__main__":
     text = """
-**********************************************************
-*                                                        *
-*      STAGE: Species Tree inference from All GEnes      *
-*                                                        *
-**********************************************************"""
+*********************************************************
+*                                                       *
+*      STAG: Species Tree inference from All Genes      *
+*                                                       *
+*********************************************************"""
     print(text[1:] + "\n")
     parser = argparse.ArgumentParser()
     parser.add_argument("species_map", help = "Map file from gene names to species names, or SpeciesIDs.txt file from OrthoFinder")
     parser.add_argument("gene_trees", help = "Directory conaining gene trees")
-#    parser.add_argument("-o", "--orthofinder", action="store_true", help="Create species map for OrthoFinder trees.")
     args = parser.parse_args()
     main(args)
 #    TestTimings()
