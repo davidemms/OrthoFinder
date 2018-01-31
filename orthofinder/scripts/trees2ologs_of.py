@@ -54,32 +54,203 @@ class RootMap(object):
             print(sp)
             raise Exception
         
-def StoreSpeciesSets(t, GeneMap):
+def StoreSpeciesSets(t, GeneMap, tag="sp_"):
+    tag_up = tag + "up"
+    tag_down = tag + "down"  
     for node in t.traverse('postorder'):
         if node.is_leaf():
-            node.add_feature('sp_down', {GeneMap(node.name)})
+            node.add_feature(tag_down, {GeneMap(node.name)})
         elif node.is_root():
             continue
         else:
-            node.add_feature('sp_down', set.union(*[ch.sp_down for ch in node.get_children()]))
+            node.add_feature(tag_down, set.union(*[ch.__getattribute__(tag_down) for ch in node.get_children()]))
     for node in t.traverse('preorder'):
         if node.is_root():
-            node.add_feature('sp_up', set())
+            node.add_feature(tag_up, set())
         else:
             parent = node.up
             if parent.is_root():
                 others = [ch for ch in parent.get_children() if ch != node]
-                node.add_feature('sp_up', set.union(*[other.sp_down for other in others]))
+                node.add_feature(tag_up, set.union(*[other.__getattribute__(tag_down) for other in others]))
             else:
                 others = [ch for ch in parent.get_children() if ch != node]
-                sp_downs = set.union(*[other.sp_down for other in others])
-                node.add_feature('sp_up', parent.sp_up.union(sp_downs))
-    t.add_feature('sp_down', set.union(*[ch.sp_down for ch in t.get_children()]))
+                sp_downs = set.union(*[other.__getattribute__(tag_down) for other in others])
+                node.add_feature(tag_up, parent.__getattribute__(tag_up).union(sp_downs))
+    t.add_feature(tag_down, set.union(*[ch.__getattribute__(tag_down) for ch in t.get_children()]))
 
+def OutgroupIngroupSeparationScore(sp_up, sp_down, sett1, sett2, N_recip, n1, n2):
+    f_dup = len(sp_up.intersection(sett1)) * len(sp_up.intersection(sett2)) * len(sp_down.intersection(sett1)) * len(sp_down.intersection(sett2)) * N_recip
+    f_a = len(sp_up.intersection(sett1)) * (n2-len(sp_up.intersection(sett2))) * (n1-len(sp_down.intersection(sett1))) * len(sp_down.intersection(sett2)) * N_recip
+    f_b = (n1-len(sp_up.intersection(sett1))) * len(sp_up.intersection(sett2)) * len(sp_down.intersection(sett1)) * (n2-len(sp_down.intersection(sett2))) * N_recip
+    choice = (f_dup, f_a, f_b)
+#    print(choice)
+    return max(choice)
+    
+def GetRoots3(tree, species_tree_rooted, GeneToSpecies):
+    """
+    Allow non-binary gene or species trees.
+    (A,B,C) => consider splits A|BC, B|AC, C|AB - this applies to gene and species tree
+    If a clean ingroup/outgroup split cannot be found then score root by geometric mean of fraction of expected species actually 
+    observed for the two splits
+    """
+    speciesObserved = set([GeneToSpecies(g) for g in tree.get_leaf_names()])
+    if len(speciesObserved) == 1:
+        return []
+    
+    # use species tree to find correct outgroup according to what species are present in the gene tree
+    n = species_tree_rooted
+    children = n.get_children()
+    leaves = [set(ch.get_leaf_names()) for ch in children]
+    have = [len(l.intersection(speciesObserved)) != 0 for l in leaves]
+    while sum(have) < 2:
+        n = children[have.index(True)]
+        children = n.get_children()
+        leaves = [set(ch.get_leaf_names()) for ch in children]
+        have = [len(l.intersection(speciesObserved)) != 0 for l in leaves]
+
+    # Get splits to look for
+    roots_list = []
+    scores_list = []   # the fraction completeness of the two clades
+#    roots_set = set()
+    for i in xrange(len(leaves)):
+        t1 = leaves[i]
+        t2 = set.union(*[l for j,l in enumerate(leaves) if j!=i])
+        # G - set of species in gene tree
+        # First relevant split in species tree is (A,B), such that A \cap G \neq \emptyset and A \cap G \neq \emptyset
+        # label all nodes in gene tree according the whether subsets of A, B or both lie below node
+        StoreSpeciesSets(tree, GeneToSpecies)   # sets of species
+        root_mapper = RootMap(t1, t2, GeneToSpecies)    
+        sett1 = set(t1)
+        sett2 = set(t2)
+        nt1 = float(len(t1))
+        nt2 = float(len(t2))
+        N_recip = 1./(nt1*nt1*nt2*nt2)
+        GeneMap = root_mapper.GeneMap
+        StoreSpeciesSets(tree, GeneMap, "inout_") # ingroup/outgroup identification
+        # find all possible locations in the gene tree at which the root should be
+
+        T = {True,}
+        F = {False,}
+        TF = set([True, False])
+        for m in tree.traverse('postorder'):
+            if m.is_leaf(): 
+                if len(m.inout_up) == 1 and m.inout_up != m.inout_down:
+                    # this is the unique root
+                    return [m]
+            else:
+                if len(m.inout_up) == 1 and len(m.inout_down) == 1 and m.inout_up != m.inout_down:
+                    # this is the unique root
+                    return [m]
+                nodes = m.get_children() if m.is_root() else [m] + m.get_children()
+                clades = [ch.inout_down for ch in nodes] if n.is_root() else [m.inout_up] + [ch.inout_down for ch in m.get_children()]               
+                # do we have the situation A | B or (A,B),S?
+                if len(nodes) == 3:
+                    if all([len(c) == 1 for c in clades]) and T in clades and F in clades:
+                        # unique root
+                        if clades.count(T) == 1:
+                            return [nodes[clades.index(T)]]
+                        else:
+                            return [nodes[clades.index(F)]]
+                    elif T in clades and F in clades:
+                        #AB-(A,B) or B-(AB,A)
+                        ab = [c == TF for c in clades]
+                        i = ab.index(True)
+                        roots_list.append(nodes[i])
+                        sp_down = nodes[i].sp_down
+                        sp_up = nodes[i].sp_up
+#                        f = len(sp_up.intersection(sett1)) * len(sp_up.intersection(sett2)) * len(sp_down.intersection(sett1)) * len(sp_down.intersection(sett2)) / N
+#                        print(m)
+                        scores_list.append(np.sqrt(OutgroupIngroupSeparationScore(sp_up, sp_down, sett1, sett2, N_recip, nt1, nt2)))
+                    elif clades.count(TF) >= 2:  
+                        # (A,A,A)-excluded, (A,A,AB)-ignore as want A to be bigest without including B, (A,AB,AB), (AB,AB,AB) 
+                        i = 0
+                        roots_list.append(nodes[i])
+                        sp_down = nodes[i].sp_down
+                        sp_up = nodes[i].sp_up
+#                        f = len(sp_up.intersection(sett1)) * len(sp_up.intersection(sett2)) * len(sp_down.intersection(sett1)) * len(sp_down.intersection(sett2)) / N
+#                        print(m)
+                        scores_list.append(np.sqrt(OutgroupIngroupSeparationScore(sp_up, sp_down, sett1, sett2, N_recip, nt1, nt2)))
+                elif T in clades and F in clades:
+                    roots_list.append(m)
+                    scores_list.append(0)  # last choice
+    # If we haven't found a unique root then use the scores for completeness of ingroup/outgroup to root
+#    print (scores_list)
+    if len(roots_list) == 0: 
+        return [] # This shouldn't occur
+    return [sorted(zip(scores_list, roots_list), reverse=True)[0][1]]
+    
+def GetRoots2(tree, species_tree_rooted, GeneToSpecies):
+    """
+    Allow non-binary gene or species trees.
+    (A,B,C) => consider splits A|BC, B|AC, C|AB - this applies to gene and species tree
+    """
+    speciesObserved = set([GeneToSpecies(g) for g in tree.get_leaf_names()])
+    if len(speciesObserved) == 1:
+        print("single")
+        return []
+    
+    # use species tree to find correct outgroup according to what species are present in the gene tree
+    n = species_tree_rooted
+    children = n.get_children()
+    leaves = [set(ch.get_leaf_names()) for ch in children]
+    have = [len(l.intersection(speciesObserved)) != 0 for l in leaves]
+    while sum(have) < 2:
+        n = children[have.index(True)]
+        children = n.get_children()
+        leaves = [set(ch.get_leaf_names()) for ch in children]
+        have = [len(l.intersection(speciesObserved)) != 0 for l in leaves]
+
+    # Get splits to look for
+    roots_list = []
+    for i in xrange(len(leaves)):
+        t1 = leaves[i]
+        t2 = set.union(*[l for j,l in enumerate(leaves) if j!=i])
+        # G - set of species in gene tree
+        # First relevant split in species tree is (A,B), such that A \cap G \neq \emptyset and A \cap G \neq \emptyset
+        # label all nodes in gene tree according the whether subsets of A, B or both lie below node
+        root_mapper = RootMap(t1, t2, GeneToSpecies)    
+        GeneMap = root_mapper.GeneMap
+        StoreSpeciesSets(tree, GeneMap, "inout_")
+        # find all possible locations in the gene tree at which the root should be
+#        scores_list = []   # the fraction completeness of the two clades
+#        roots_set = set()
+        T = {True,}
+        F = {False,}
+        TF = set([True, False])
+        for m in tree.traverse('postorder'):
+            if m.is_leaf(): 
+                if len(m.inout_up) == 1 and m.inout_up != m.inout_down:
+                    # this is the unique root
+                    return [m]
+            else:
+                if len(m.inout_up) == 1 and len(m.inout_down) == 1 and m.inout_up != m.inout_down:
+                    # this is the unique root
+                    return [m]
+                nodes = m.get_children() if m.is_root() else [m] + m.get_children()
+                clades = [ch.inout_down for ch in nodes] if n.is_root() else [m.inout_up] + [ch.inout_down for ch in m.get_children()]               
+                # do we have the situation A | B or (A,B),S?
+                if len(nodes) == 3:
+                    if all([len(c) == 1 for c in clades]) and T in clades and F in clades:
+                        # unique root
+                        if clades.count(T) == 1:
+                            return [nodes[clades.index(T)]]
+                        else:
+                            return [nodes[clades.index(F)]]
+                    elif T in clades and F in clades:
+                        #AB-(A,B) or B-(AB,A) or B-(A,B)
+                        ab = [c == TF for c in clades]
+                        roots_list.append(nodes[ab.index(True)])
+                    #else:  # (A,A,A), (A,A,AB), (A,AB,AB), (AB,AB,AB) - noe suitable for root
+                elif T in clades and F in clades:
+                    roots_list.append(m)
+    return roots_list
+    
 def GetRoots(tree, species_tree_rooted, GeneToSpecies):
     species = set([GeneToSpecies(g) for g in tree.get_leaf_names()])
     if len(species) == 1:
         return [], 0, None
+    
+    # use species tree to find correct outgroup according to what species are present in the gene tree
     ch = species_tree_rooted.get_children()
     if len(ch) != 2:
         print("ERROR: Species tree is not rooted")
@@ -102,10 +273,14 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
         have1 = len(species.intersection(t1)) != 0
         have2 = len(species.intersection(t2)) != 0
         
-    n1, n2 = species_tree_rooted.get_children()
+#    n1, n2 = species_tree_rooted.get_children()
+    # G - set of species in gene tree
+    # First relevant split in species tree is (A,B), such that A \cap G \neq \emptyset and A \cap G \neq \emptyset
+    # label all nodes in gene tree according the whether subsets of A, B or both lie below node
     root_mapper = RootMap(t1, t2, GeneToSpecies)    
     GeneMap = root_mapper.GeneMap
-    StoreSpeciesSets(tree, GeneMap)
+    StoreSpeciesSets(tree, GeneMap, "inout_")
+    # find all possible locations in the gene tree at which the root should be
     found = set()
     TF = set([True, False])
     TFfr = frozenset([True, False])
@@ -114,20 +289,21 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
     fail = 0
     for m in tree:
         n = m.up
-        while not n.is_root() and n.sp_down != TF:
+        # walk up from leaf until both T and F are below node
+        while (not n.is_root()) and n.inout_down != TF:
             m = n
             n = m.up
-        if n.sp_down == TF:
+        if n.inout_down == TF:
             children = n.get_children()
             if n.is_root():
-                colour = m.sp_down
-                if any([x.sp_down != colour and len(x.sp_down) == 1 for x in children]):
-                    comb = Counter([frozenset(x.sp_down) for x in children])
+                colour = m.inout_down
+                if any([x.inout_down != colour and len(x.inout_down) == 1 for x in children]):
+                    comb = Counter([frozenset(x.inout_down) for x in children])
                     # case 0
                     if comb[TFfr] == 0:
                         # case 0A - one of the branches is the root
                         for c in children:
-                            if sum([c.sp_down == x.sp_down for x in children]) == 1:
+                            if sum([c.inout_down == x.inout_down for x in children]) == 1:
                                 found.add(c) # only holds for one of them
                                 break
                     elif comb[TFfr] == 1 and (comb[Tfr] == 2 or comb[Ffr] == 2):
@@ -137,7 +313,7 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
                         pass
                     elif comb[TFfr] == 1 and comb[Tfr] == 1:
                         # case 0C - one mixed branch, one True & one False
-                        found.add([c for c in children if c.sp_down == TF][0])
+                        found.add([c for c in children if c.inout_down == TF][0])
                     else:
                         # case 0D - two mixed branches
                         # while find the transition while walking up the tree
@@ -147,29 +323,29 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
             elif len(children) == 2:
 #                found.add(n)
                 c1, c2 = children
-                single_state = c1.sp_down if len(c1.sp_down) == 1 else c2.sp_down
-                if len(c1.sp_down) == 1 and len(c2.sp_down) == 1:
+                single_state = c1.inout_down if len(c1.inout_down) == 1 else c2.inout_down
+                if len(c1.inout_down) == 1 and len(c2.inout_down) == 1:
                     # Case 1 - Both single state
-                    if len(n.sp_up) == 1:
+                    if len(n.inout_up) == 1:
                         # Case 1A - 3rd clade also single state
                         # Root is the bipartition separating True from False
-                        found.add(c1 if n.sp_up == c2.sp_down else c2)
+                        found.add(c1 if n.inout_up == c2.inout_down else c2)
                     else:
                         # Case 1B - 3rd clade is mixed
                         found.add(n)
                 else:
                     # Case 2 - only one is single state and it's not the same as the 3rd clade
-                    if single_state != n.sp_up:
+                    if single_state != n.inout_up:
                         # Case 2A - only one is single state and it's not the same as the 3rd clade
 #                        print("*** Root3 ***")
-                        found.add(c1 if len(c1.sp_down) == 1 else c2)
+                        found.add(c1 if len(c1.inout_down) == 1 else c2)
 #                    else:
 #                        # Case 2A - only one is single state and it's the same as the 3rd clade
 #                        # root is in the mixed clade and will be found while walking up that
 #                        pass
             else:
                 fail += 1
-    return list(found), fail, GeneMap  
+    return list(found)  
             
 def WriteQfO2(orthologues_list_pairs_list, outfilename, qAppend = True):
     """ takes a list where each entry is a pair, (genes1, genes2), which are orthologues of one another
@@ -199,7 +375,7 @@ def OverlapSize(node, GeneToSpecies):
     return len(descendents[0].intersection(descendents[1])), descendents[0], descendents[1]
           
 def GetRoot(tree, species_tree_rooted, GeneToSpecies):
-        roots, j, GeneMap = GetRoots(tree, species_tree_rooted, GeneToSpecies)
+        roots = GetRoots3(tree, species_tree_rooted, GeneToSpecies)
 #        print("%d roots" % len(roots))
         # 1. Store distance of each root from each leaf
 #        for root in roots:
@@ -209,6 +385,8 @@ def GetRoot(tree, species_tree_rooted, GeneToSpecies):
             root_dists = [r.get_closest_leaf()[1] for r in roots]
             i, _ = max(enumerate(root_dists), key=operator.itemgetter(1))
             return roots[i]
+        else:
+            return None # single species tree
     
 def GetOrthologues_for_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None):
     """ if dupsWriter != None then seqIDs and spIDs must also be provided"""
@@ -397,33 +575,54 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
             nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, output_dir)
     return nOrthologues_SpPair
 
+def RootAllTrees():
+    import tree
+    speciesIDs = util.FirstWordExtractor("SpeciesIDs.txt").GetIDToNameDict()
+    species_tree_rooted = tree.Tree("SpeciesTree_ids_0_rooted_unresolved.txt")
+    GeneToSpecies = GeneToSpecies_dash
+    for fn in glob.glob("Trees_ids/OG*txt"):
+        print("*** " + fn + " ***")
+        t = tree.Tree(fn)
+        root = GetRoot(t, species_tree_rooted, GeneToSpecies)
+        if root == None: 
+            print("Fail: " + fn)
+        else:
+            if root != t:
+                t.set_outgroup(root)
+            for n in t:
+                n.name = speciesIDs[n.name.split("_")[0]]
+            t.write(outfile="Trees_ids_rooted/" + os.path.split(fn)[1])
+    util.Success()
+        
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("trees_dir")
-    parser.add_argument("rooted_species_tree")
-#    parser.add_argument("-p", "--prune", action='store_true')
-    parser.add_argument("-s", "--separator", choices=("dot", "dash", "second_dash", "3rd_dash", "hyphen"), help="Separator been species name and gene name in gene tree taxa")
-    args = parser.parse_args()
-    output_dir = os.path.split(args.trees_dir)[0]
-    qSingleTree = False
-    try:
-        tree_lib.Tree(args.trees_dir)
-        qSingleTree = True
-        print("Analysing single tree")
-    except:
-        try:
-            tree = tree_lib.Tree(args.trees_dir)
-            qSingleTree = True
-        except:
-            pass
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-    
-    GeneToSpecies = GetGeneToSpeciesMap(args)
-    output_dir = output_dir + "/../Orthologues_M3/"
-    print(output_dir)
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-#    GetOrthologuesStandalone_Parallel(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
-    GetOrthologuesStandalone_Serial(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
+    RootAllTrees()
+#    parser = argparse.ArgumentParser()
+#    parser.add_argument("trees_dir")
+#    parser.add_argument("rooted_species_tree")
+##    parser.add_argument("-p", "--prune", action='store_true')
+#    parser.add_argument("-s", "--separator", choices=("dot", "dash", "second_dash", "3rd_dash", "hyphen"), help="Separator been species name and gene name in gene tree taxa")
+#    args = parser.parse_args()
+#    output_dir = os.path.split(args.trees_dir)[0]
+#    qSingleTree = False
+#    try:
+#        tree_lib.Tree(args.trees_dir)
+#        qSingleTree = True
+#        print("Analysing single tree")
+#    except:
+#        try:
+#            tree = tree_lib.Tree(args.trees_dir)
+#            qSingleTree = True
+#        except:
+#            pass
+#    if not os.path.exists(output_dir):
+#        os.mkdir(output_dir)
+#    
+#    GeneToSpecies = GetGeneToSpeciesMap(args)
+#    output_dir = output_dir + "/../Orthologues_M3/"
+#    print(output_dir)
+#    if not os.path.exists(output_dir):
+#        os.mkdir(output_dir)
+##    GetOrthologuesStandalone_Parallel(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
+#    GetOrthologuesStandalone_Serial(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
 

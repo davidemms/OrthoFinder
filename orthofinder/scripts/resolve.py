@@ -360,7 +360,7 @@ def Resolve_Main(trees_fn, species_tree_rooted_fn, GeneToSpecies, qTest):
         species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
         tree.prune(tree.get_leaf_names())
         if len(tree) == 1: return tree
-        roots, j, GeneMap = om1.GetRoots(tree, species_tree_rooted, GeneToSpecies)
+        roots = om1.GetRoots(tree, species_tree_rooted, GeneToSpecies)
         if len(roots) == 0: return tree
         # Pick the first root for now
         root = roots[0]
