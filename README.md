@@ -198,18 +198,18 @@ This option should always be used. It makes the BLAST searches, the tree inferen
 - **'-a number_of_orthofinder_threads'**
 The remainder of the algorithm, beyond these highly-parallelisable tasks, is relatively fast and efficient and so this option has less overall effect. It is most useful when running OrthoFinder using pre-calculated BLAST results since the time savings will be more noticeable in this case. Using this option will also increase the RAM requirements (see manual for more details).
 
-### Running BLAST Searches Separately (-p option)
-The '-p' option will prepare the files in the format required by OrthoFinder and print the set of BLAST commands that need to be run. 
-- `orthofinder -f fasta_files_directory -p`
+### Running BLAST Searches Separately (-op option)
+The '-op' option will prepare the files in the format required by OrthoFinder and print the set of BLAST commands that need to be run. 
+- `orthofinder -f fasta_files_directory -op`
 
 This is useful if you want to manage the BLAST searches yourself. For example, you may want to distribute them across multiple machines. Once the BLAST searches have been completed the orthogroups can be calculated using the '-b' command as described in Section "Using Pre-Computed BLAST Results".
 
 ### Using Pre-Computed BLAST Results
-It is possible to run OrthoFinder with pre-computed BLAST results provided they are in the correct format. They can be prepared in the correct format using the '-p' command and, equally, the files from a previous OrthoFinder run are also in the correct format to rerun using the '-b' option. The command is simply:
+It is possible to run OrthoFinder with pre-computed BLAST results provided they are in the correct format. They can be prepared in the correct format using the '-op' command and, equally, the files from a previous OrthoFinder run are also in the correct format to rerun using the '-b' option. The command is simply:
 
 - `orthofinder -b directory_with_processed_fasta_and_blast_results`
 
-If you are running the BLAST searches yourself it is strongly recommended that you use the '-p' option to prepare the files first (see Section "Running BLAST Searches Separately"). Should you need to prepare them manually, the required files and their formats are described in the appendix of the PDF Manual (for example, if you already have BLAST search results from another source and it will take too much computing time to redo them).
+If you are running the BLAST searches yourself it is strongly recommended that you use the '-op' option to prepare the files first (see Section "Running BLAST Searches Separately"). Should you need to prepare them manually, the required files and their formats are described in the appendix of the PDF Manual (for example, if you already have BLAST search results from another source and it will take too much computing time to redo them).
 
 ### Regression Tests
 A set of regression tests are included in the directory 'Tests' available from the github repository. They can be run by calling the script 'test_orthofinder.py'. They currently require version 2.2.28 of NCBI BLAST and the script will exit with an error message if this is not the case.
