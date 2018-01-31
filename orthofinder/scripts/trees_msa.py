@@ -388,7 +388,10 @@ class TreesForOrthogroups(object):
             else:
                 print("ERROR: Species tree inference failed")
                 util.Fail()
+        qHaveSupport = None
         for i in xrange(len(treeCommands_and_filenames)):
-            if os.path.exists(self.GetTreeFilename(i)):
-                util.RenameTreeTaxa(self.GetTreeFilename(i), self.GetTreeFilename(i, True), idDict, qSupport=qHaveSupport, qFixNegatives=True)       
+            infn = self.GetTreeFilename(i)
+            if os.path.exists(infn):
+                if qHaveSupport == None: qHaveSupport = util.HaveSupportValues(infn)
+                util.RenameTreeTaxa(infn, self.GetTreeFilename(i, True), idDict, qSupport=qHaveSupport, qFixNegatives=True)       
         return resultsDirsFullPath[:2]
