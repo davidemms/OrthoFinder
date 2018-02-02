@@ -17,10 +17,6 @@
 #
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#  
-#  When publishing work that uses OrthoFinder please cite:
-#      Emms, D.M. and Kelly, S. (2015) OrthoFinder: solving fundamental biases in whole genome comparisons dramatically 
-#      improves orthogroup inference accuracy, Genome Biology 16:157
 #
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
