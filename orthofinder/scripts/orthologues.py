@@ -777,7 +777,7 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
         elif n >= 4:
             continue
         all_orthologues.append((iog, orthologues))
-    nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, resultsDir)
+    nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, resultsDir, False)
     return nOrthologues_SpPair
     
 def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree_fn, workingDir, resultsDir, reconTreesRenamedDir, nParallel, iSpeciesTree=None, pickleDir = None, all_stride_dup_genes=None):
