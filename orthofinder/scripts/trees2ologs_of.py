@@ -480,7 +480,8 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
                                 text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]+leavesL_sus[sp1]])
                             writer1_sus.writerow((og, text0, text1))
                             writer2_sus.writerow((og, text1, text0))
-                        outfile2_sus.close()
+                if qContainsSuspectOlogs:
+                    outfile2_sus.close()
         if qContainsSuspectOlogs:
             outfile1_sus.close()
     return nOrtho   
