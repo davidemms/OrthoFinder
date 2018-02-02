@@ -735,6 +735,7 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
     ogs = ogSet.OGs(qInclAll=True)
     nOrthologues_SpPair = util.nOrtho_sp(len(ogSet.speciesToUse))
     all_orthologues = []
+    d_empty = defaultdict(list)
     for iog, og in enumerate(ogs):
         n = len(og) 
         if n == 1: break
@@ -746,7 +747,7 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
             d0[str(og[0].iSp)].append(str(og[0].iSeq))
             d1 = defaultdict(list)
             d1[str(og[1].iSp)].append(str(og[1].iSeq))
-            orthologues = [(d0, d1)]  
+            orthologues = [(d0, d1, d_empty, d_empty)]  
         elif n == 3:
             sp = [g.iSp for g in og]
             c = Counter(sp) 
@@ -758,19 +759,19 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
                 d1 = defaultdict(list)
                 d1[g[1][0]].append(g[1][1])
                 d1[g[2][0]].append(g[2][1])
-                orthologues = [(d0, d1)]  
+                orthologues = [(d0, d1, d_empty, d_empty)]  
                 d0 = defaultdict(list)
                 d0[g[1][0]].append(g[1][1])
                 d1 = defaultdict(list)
                 d1[g[2][0]].append(g[2][1])
-                orthologues.append((d0,d1))
+                orthologues.append((d0,d1, d_empty, d_empty))
             elif nSp == 2:             
                 sp0, sp1 = c.keys()
                 d0 = defaultdict(list)
                 d0[str(sp0)] = [str(g.iSeq) for g in og if g.iSp == sp0]
                 d1 = defaultdict(list)
                 d1[str(sp1)] = [str(g.iSeq) for g in og if g.iSp == sp1]
-                orthologues = [(d0, d1)]
+                orthologues = [(d0, d1, d_empty, d_empty)]
             else: 
                 continue # no orthologues
         elif n >= 4:

@@ -159,7 +159,7 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
                         sp_down = nodes[i].sp_down
                         sp_up = nodes[i].sp_up
 #                        print(m)
-                        scores_list.append(np.sqrt(OutgroupIngroupSeparationScore(sp_up, sp_down, sett1, sett2, N_recip, nt1, nt2)))
+                        scores_list.append(OutgroupIngroupSeparationScore(sp_up, sp_down, sett1, sett2, N_recip, nt1, nt2))
                     elif clades.count(TF) >= 2:  
                         # (A,A,A)-excluded, (A,A,AB)-ignore as want A to be bigest without including B, (A,AB,AB), (AB,AB,AB) 
                         i = 0
@@ -167,7 +167,7 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
                         sp_down = nodes[i].sp_down
                         sp_up = nodes[i].sp_up
 #                        print(m)
-                        scores_list.append(np.sqrt(OutgroupIngroupSeparationScore(sp_up, sp_down, sett1, sett2, N_recip, nt1, nt2)))
+                        scores_list.append(OutgroupIngroupSeparationScore(sp_up, sp_down, sett1, sett2, N_recip, nt1, nt2))
                 elif T in clades and F in clades:
                     roots_list.append(m)
                     scores_list.append(0)  # last choice
@@ -201,7 +201,92 @@ def GetGeneToSpeciesMap(args):
   
 def OverlapSize(node, GeneToSpecies):  
     descendents = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in node.get_children()]
-    return len(descendents[0].intersection(descendents[1])), descendents[0], descendents[1]
+    intersection = descendents[0].intersection(descendents[1])
+    return len(intersection), intersection, descendents[0], descendents[1]
+
+nSuccess = 0
+nFail = 0
+nOrthoNew = 0
+
+def ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours):
+    """
+    Is an overlap suspicious and if so can ift be resolved by identifying genes that are out of place?
+    Args:
+        overlap - the species with genes in both clades
+        sp0 - the species below ch[0]
+        sp1 - the species below ch[1]
+        ch - the two child nodes
+        tree - the gene tree
+        neighbours - dictionary species->neighbours, where neighbours is a list of the sets of species observed at successive topological distances from the species
+    Returns:
+        qSuccess - has the overlap been resolved
+        genes_removed - the out-of-place genes that have been removed so as to resolve the overlap
+    
+    Implementation:
+        - The number of species in the overlap must be a 5th or less of the number of species in each clade
+        - for each species with genes in both clades: the genes in one clade must all be more out of place (according to the 
+          species tree) than all the gene from that species in the other tree
+    """
+    global nSuccess
+    global nFail
+    global nOrthoNew
+    oSize = len(overlap)
+    if not( 4*oSize < len(sp0) and 4*oSize < len(sp1)): return False, []
+    # The overlpa looks suspect, misplaced genes?
+    # for each species, we'd need to be able to determine that all genes from A or all genes from B are misplaced
+    genes_removed = []
+    nA_removed = 0
+    nB_removed = 0
+    qResolved = True
+    for sp in overlap:
+        A = [g for g in ch[0].get_leaf_names() if g.split("_")[0] in overlap]
+        B = [g for g in ch[1].get_leaf_names() if g.split("_")[0] in overlap]
+#        print("Overlap: " + str((A,B)))
+        sp_set = {sp}
+        A_levels = []
+        B_levels = []
+        for X, level in zip([A,B],[A_levels, B_levels]):
+            for g in X:
+                r = (tree & g).up
+                nextSpecies = set([gg.split("_")[0] for gg in r.get_leaf_names()])
+                while len(nextSpecies) == 1:
+                    r = r.up
+                    nextSpecies = set([gg.split("_")[0] for gg in r.get_leaf_names()])
+                nextSpecies = nextSpecies.difference(sp_set)
+                # get the level
+                observed = [bool(neigh & nextSpecies) for neigh in neighbours[sp]]
+                N = len(observed)
+#                                level.append((observed.index(True), next(i for i, oo in zip(xrange(N-1,-1,-1), reversed(observed)) if oo)))
+                # the sum of the closest and furthest expected distance toplological distance for the closest genes in the gene tree (based on species tree topology)
+                level.append(observed.index(True) + next(i for i, oo in zip(xrange(N-1,-1,-1), reversed(observed)) if oo))  
+#        print(sp)
+#        print(A)
+#        print(A_levels)
+#        print(B)
+#        print(B_levels)
+#        print("")
+        qRemoveA = max(B_levels) < min(A_levels)                           
+        qRemoveB = max(A_levels) < min(B_levels)                            
+        if qRemoveA or qRemoveB:
+#            print("Success")
+            if qRemoveA:
+                nA_removed += len(A_levels)
+                genes_removed.extend(A)
+            else:
+                nB_removed += len(B_levels)
+                genes_removed.extend(B)
+        else:
+#            print("Fail")
+            qResolved = False
+            break
+    if qResolved:
+        nSuccess +=1
+        nOrthoNew += (len(ch[0]) - nA_removed)  * (len(ch[1])-nB_removed)
+#        print((nSuccess, nFail, nOrthoNew))
+        return True, set(genes_removed)
+    else:
+        nFail += 1
+        return False, set()
           
 def GetRoot(tree, species_tree_rooted, GeneToSpecies):
         roots = GetRoots(tree, species_tree_rooted, GeneToSpecies)
@@ -216,8 +301,8 @@ def GetRoot(tree, species_tree_rooted, GeneToSpecies):
             return roots[i]
         else:
             return None # single species tree
-    
-def GetOrthologues_for_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None):
+
+def GetOrthologues_for_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, neighbours, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None):
     """ if dupsWriter != None then seqIDs and spIDs must also be provided"""
     qPrune=True
     orthologues = []
@@ -229,26 +314,34 @@ def GetOrthologues_for_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, qWr
 #    if qPrune: tree.prune(tree.get_leaf_names())
     if len(tree) == 1: return set(orthologues), tree
     root = GetRoot(tree, species_tree_rooted, GeneToSpecies)
-    if root == None: return set(orthologues), tree
+    if root == None: return set(orthologues), tree, set()
     # Pick the first root for now
     if root != tree:
         tree.set_outgroup(root)
 
     tree = Resolve(tree, GeneToSpecies)
     if qPrune: tree.prune(tree.get_leaf_names())
-    if len(tree) == 1: return set(orthologues), tree
+#    tree.write(outfile="/home/david/projects/OrthoFinder/Development/Orthologues/ReplacingDLCpar/Overlaps/Orthologues_M3/" + os.path.split(treeFN)[1] + ".rec.txt")
+    if len(tree) == 1: return set(orthologues), tree, set()
     """ At this point need to label the tree nodes """
     iNode = 1
     tree.name = "n0"
-    for n in tree.traverse():
+    suspect_genes = set()
+    empty_set = set()
+    # preorder traverse so that suspect genes can be identified first, before their closer ortholgoues are proposed
+    for n in tree.traverse('preorder'):
         if n.is_leaf(): continue
         if not n.is_root():
             n.name = "n%d" % iNode
             iNode += 1
         ch = n.get_children()
         if len(ch) == 2: 
-            o, sp0, sp1 = OverlapSize(n, GeneToSpecies)
-            if o != 0:
+            oSize, overlap, sp0, sp1 = OverlapSize(n, GeneToSpecies)
+            if oSize != 0:
+                qResolved, misplaced_genes = ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours)
+            else:
+                misplaced_genes = empty_set
+            if oSize != 0 and not qResolved:
                 if dupsWriter != None:
                     sp_present = sp0.union(sp1)
                     if len(sp_present) == 1:
@@ -257,35 +350,55 @@ def GetOrthologues_for_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, qWr
                     else:
                         stNode = species_tree_rooted.get_common_ancestor(sp_present)
                         isSTRIDE = "Shared" if all_stride_dup_genes == None else "STRIDE" if frozenset(n.get_leaf_names()) in all_stride_dup_genes else ""
-                    dupsWriter.writerow(["OG%07d" % iog, spIDs[stNode.name] if len(stNode) == 1 else stNode.name, n.name, float(o)/(len(stNode)), isSTRIDE, ", ".join([seqIDs[g] for g in ch[0].get_leaf_names()]), ", ".join([seqIDs[g] for g in ch[1].get_leaf_names()])]) 
+                    dupsWriter.writerow(["OG%07d" % iog, spIDs[stNode.name] if len(stNode) == 1 else stNode.name, n.name, float(oSize)/(len(stNode)), isSTRIDE, ", ".join([seqIDs[g] for g in ch[0].get_leaf_names()]), ", ".join([seqIDs[g] for g in ch[1].get_leaf_names()])]) 
             else:
+                # sort out bad genes - no orthology for all the misplaced genes at this level (misplaced_genes). 
+                # For previous levels, (suspect_genes) have their orthologues written to suspect orthologues file
                 d0 = defaultdict(list)
-                for g in ch[0].get_leaf_names():
+                d0_sus = defaultdict(list)
+                for g in [g for g in ch[0].get_leaf_names() if g not in misplaced_genes]:
                     sp, seq = g.split("_")
-                    d0[sp].append(seq)
+                    if g in suspect_genes:
+                        d0_sus[sp].append(seq)
+                    else:
+                        d0[sp].append(seq)
+#                if len(d0_sus) > 0: print(d0_sus)
                 d1 = defaultdict(list)
-                for g in ch[1].get_leaf_names():
+                d1_sus = defaultdict(list)
+                for g in [g for g in ch[1].get_leaf_names() if g not in misplaced_genes]:
                     sp, seq = g.split("_")
-                    d1[sp].append(seq)
-                orthologues.append((d0, d1))
+                    if g in suspect_genes:
+                        d1_sus[sp].append(seq)
+                    else:
+                        d1[sp].append(seq)
+                orthologues.append((d0, d1, d0_sus, d1_sus))
+                suspect_genes.update(misplaced_genes)
         elif len(ch) > 2:
             species = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in ch]
             for (n0, s0), (n1, s1) in itertools.combinations(zip(ch, species), 2):
                 if len(s0.intersection(s1)) == 0:
                     d0 = defaultdict(list)
+                    d0_sus = defaultdict(list)
                     for g in n0.get_leaf_names():
                         sp, seq = g.split("_")
-                        d0[sp].append(seq)
+                        if g in suspect_genes:
+                            d0_sus[sp].append(seq)
+                        else:
+                            d0[sp].append(seq)
                     d1 = defaultdict(list)
+                    d1_sus = defaultdict(list)
                     for g in n1.get_leaf_names():
                         sp, seq = g.split("_")
-                        d1[sp].append(seq)
-                    orthologues.append((d0, d1))
+                        if g in suspect_genes:
+                            d1_sus[sp].append(seq)
+                        else:
+                            d1[sp].append(seq)
+                    orthologues.append((d0, d1, d0_sus, d1_sus))
 #    raise Exception("WriteQfO2")
     if qWrite:
         directory = os.path.split(treeFN)[0]
         WriteQfO2(orthologues, directory + "/../Orthologues_M3/" + os.path.split(treeFN)[1], qAppend=False)
-    return orthologues, tree
+    return orthologues, tree, suspect_genes
 
 def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir):
     # Sort the orthologues according to speices pairs
@@ -298,54 +411,75 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
     nSpecies = len(species)
     for i in xrange(nSpecies):
         sp0 = species[i]
-        strsp0 = sp0 + "_"
-        isp0 = sp_to_index[sp0]
-        d0 = resultsDir + "Orthologues_" + speciesDict[sp0] + "/"
-        for j in xrange(i, nSpecies):
-            sp1 = species[j]
-            if sp1 == sp0: continue
-            strsp1 = sp1 + "_"
-            isp1 = sp_to_index[sp1]
-            d1 = resultsDir + "Orthologues_" + speciesDict[sp1] + "/"
-            with open(d0 + '%s__v__%s.csv' % (speciesDict[sp0], speciesDict[sp1]), 'ab') as outfile1, open(d1 + '%s__v__%s.csv' % (speciesDict[sp1], speciesDict[sp0]), 'ab') as outfile2:
-                writer1 = csv.writer(outfile1, delimiter="\t")
-                writer2 = csv.writer(outfile2, delimiter="\t")
-                for iog, ortholouges_onetree in orthologues_alltrees:                   
-                    og = "OG%07d" % iog
-                    for leavesL, leavesR in ortholouges_onetree:
-                        nL0 = len(leavesL[sp0])
-                        nR0 = len(leavesR[sp0])
-                        nL1 = len(leavesL[sp1])
-                        nR1 = len(leavesR[sp1])
-                        if nL0*nR1 + nL1*nR0 == 0: continue # no orthologues
-                        # each species can be in only one of L and R at most: they might both be in the same half
-                        if nL0 > 0:
-                            # then nR0 == 0 so nR1 > 0 since checked (nL0*nR1 + nL1*nR0 != 0)
-                            n0 = nL0
-                            n1 = nR1
-                            text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesL[sp0]])
-                            text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesR[sp1]])
-                        else:
-                            n0 = nR0
-                            n1 = nL1
-                            text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesR[sp0]])
-                            text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]])
-                        writer1.writerow((og, text0, text1))
-                        writer2.writerow((og, text1, text0))
-                        nOrtho.n[isp0, isp1] += n0
-                        nOrtho.n[isp1, isp0] += n1
-                        if n0 == 1 and n1 == 1:
-                            nOrtho.n_121[isp0, isp1] += 1
-                            nOrtho.n_121[isp1, isp0] += 1
-                        elif n0 == 1:
-                            nOrtho.n_12m[isp0, isp1] += 1
-                            nOrtho.n_m21[isp1, isp0] += n1
-                        elif n1 == 1:
-                            nOrtho.n_m21[isp0, isp1] += n0
-                            nOrtho.n_12m[isp1, isp0] += 1
-                        else:
-                            nOrtho.n_m2m[isp0, isp1] += n0
-                            nOrtho.n_m2m[isp1, isp0] += n1
+        with open(resultsDir + "Suspect_Orthologues/%s.csv" % speciesDict[sp0], 'ab') as outfile1_sus:
+            writer1_sus = csv.writer(outfile1_sus, delimiter="\t")
+            strsp0 = sp0 + "_"
+            isp0 = sp_to_index[sp0]
+            d0 = resultsDir + "Orthologues_" + speciesDict[sp0] + "/"
+            for j in xrange(i, nSpecies):
+                sp1 = species[j]
+                if sp1 == sp0: continue
+                strsp1 = sp1 + "_"
+                isp1 = sp_to_index[sp1]
+                d1 = resultsDir + "Orthologues_" + speciesDict[sp1] + "/"
+                with open(d0 + '%s__v__%s.csv' % (speciesDict[sp0], speciesDict[sp1]), 'ab') as outfile1, open(d1 + '%s__v__%s.csv' % (speciesDict[sp1], speciesDict[sp0]), 'ab') as outfile2, open(resultsDir + "Suspect_Orthologues/%s.csv" % speciesDict[sp1], 'ab') as outfile2_sus:
+                    writer1 = csv.writer(outfile1, delimiter="\t")
+                    writer2 = csv.writer(outfile2, delimiter="\t")
+                    writer2_sus = csv.writer(outfile2_sus, delimiter="\t")
+                    for iog, ortholouges_onetree in orthologues_alltrees:                   
+                        og = "OG%07d" % iog
+                        for leavesL, leavesR, leavesL_sus, leavesR_sus  in ortholouges_onetree:
+                            # suspect_genes are the genes which, for this level, the orthologues should be considered suspect as the gene appears misplaced (at this level)
+                            nL0 = len(leavesL[sp0])
+                            nR0 = len(leavesR[sp0])
+                            nL1 = len(leavesL[sp1])
+                            nR1 = len(leavesR[sp1])
+                            if nL0*nR1 + nL1*nR0 != 0: 
+                                # each species can be in only one of L and R at most: they might both be in the same half
+                                if nL0 > 0:
+                                    # then nR0 == 0 so nR1 > 0 since checked (nL0*nR1 + nL1*nR0 != 0)
+                                    n0 = nL0
+                                    n1 = nR1
+                                    text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesL[sp0]])
+                                    text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesR[sp1]])
+                                else:
+                                    n0 = nR0
+                                    n1 = nL1
+                                    text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesR[sp0]])
+                                    text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]])
+                                writer1.writerow((og, text0, text1))
+                                writer2.writerow((og, text1, text0))
+                                nOrtho.n[isp0, isp1] += n0
+                                nOrtho.n[isp1, isp0] += n1
+                                if n0 == 1 and n1 == 1:
+                                    nOrtho.n_121[isp0, isp1] += 1
+                                    nOrtho.n_121[isp1, isp0] += 1
+                                elif n0 == 1:
+                                    nOrtho.n_12m[isp0, isp1] += 1
+                                    nOrtho.n_m21[isp1, isp0] += n1
+                                elif n1 == 1:
+                                    nOrtho.n_m21[isp0, isp1] += n0
+                                    nOrtho.n_12m[isp1, isp0] += 1
+                                else:
+                                    nOrtho.n_m2m[isp0, isp1] += n0
+                                    nOrtho.n_m2m[isp1, isp0] += n1
+                            # Write suspect orthologues
+                            nL0s = len(leavesL_sus[sp0])
+                            nR0s = len(leavesR_sus[sp0])
+                            nL1s = len(leavesL_sus[sp1])
+                            nR1s = len(leavesR_sus[sp1])
+                            if nL0s*(nR1+nR1s) + (nL1+nL1s)*nR0s != 0: 
+                                print((nL0s, nR0s, nL1s, nR1s))
+                                # each species can be in only one of L and R at most: they might both be in the same half
+                                if nL0s > 0:
+                                    # then nR0 == 0 so nR1 > 0 since checked (nL0*nR1 + nL1*nR0 != 0)
+                                    text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesL_sus[sp0]])
+                                    text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesR[sp1]+leavesR_sus[sp1]])
+                                else:
+                                    text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesR_sus[sp0]])
+                                    text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]+leavesL_sus[sp1]])
+                                writer1_sus.writerow((og, text0, text1))
+                                writer2_sus.writerow((og, text1, text0))
     return nOrtho   
                                       
 def Resolve(tree, GeneToSpecies):
@@ -354,25 +488,66 @@ def Resolve(tree, GeneToSpecies):
         tree = resolve.resolve(n, GeneToSpecies)
     return tree
 
+def GetSpeciesNeighbours(t):
+    """
+    Args: t = rooted species tree
+    """
+    species = t.get_leaf_names()
+    levels = {s:[] for s in species}
+    for n in t.traverse('postorder'):
+        if n.is_leaf(): continue
+        children = n.get_children()
+        leaf_sets = [set(ch.get_leaf_names()) for ch in children]
+        not_i = [set.union(*[l for j, l in enumerate(leaf_sets) if j != i]) for i in xrange(len(children))]
+        for l,n in zip(leaf_sets, not_i):
+            for ll in l:
+                levels[ll].append(n)
+    return levels
+
 def GetOrthologuesStandalone_Parallel(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree):
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
+    neighbours = GetSpeciesNeighbours(species_tree_rooted)
     args_queue = mp.Queue()
-    for treeFn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")): args_queue.put((0, treeFn, species_tree_rooted, GeneToSpecies, True))
+    for treeFn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")): args_queue.put((0, treeFn, species_tree_rooted, GeneToSpecies, neighbours, True))
     util.RunMethodParallel(GetOrthologues_for_tree, args_queue, 8)
+
+def RootTreeStandalone_Serial(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree):
+    species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
+#    args_queue = mp.Queue()
+    for treeFN in glob.glob(trees_dir + ("*" if qSingleTree else "/*")): 
+        if (not os.path.exists(treeFN)) or os.stat(treeFN).st_size == 0: return 
+        try:
+            tree = tree_lib.Tree(treeFN)
+        except:
+            tree = tree_lib.Tree(treeFN, format=3)
+        if len(tree) == 1: return 
+        root = GetRoot(tree, species_tree_rooted, GeneToSpecies)
+        if root == None: return 
+        # Pick the first root for now
+        if root != tree:
+            tree.set_outgroup(root)
+        tree.write(outfile=treeFN + ".rooted.txt")
     
 def GetOrthologuesStandalone_Serial(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree):
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
+    neighbours = GetSpeciesNeighbours(species_tree_rooted)
 #    args_queue = mp.Queue()
     for treeFn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")): 
-        GetOrthologues_for_tree(0, treeFn, species_tree_rooted, GeneToSpecies, True)        
+        print(treeFn)
+        GetOrthologues_for_tree(0, treeFn, species_tree_rooted, GeneToSpecies, neighbours, True)        
         
 def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, GeneToSpecies, workingDir, output_dir, reconTreesRenamedDir, all_stride_dup_genes):    # Create directory structure
     speciesDict = ogSet.SpeciesDict()
     SequenceDict = ogSet.SequenceDict()
     # Write directory and file structure
     speciesIDs = ogSet.speciesToUse
-    nspecies = len(speciesIDs)           
+    nspecies = len(speciesIDs)      
+    dSuspect = output_dir + "Suspect_Orthologues/"
+    if not os.path.exists(dSuspect): os.mkdir(dSuspect)     
     for index1 in xrange(nspecies):
+        with open(dSuspect + '%s.csv' % speciesDict[str(speciesIDs[index1])], 'wb') as outfile:
+            writer1 = csv.writer(outfile, delimiter="\t")
+            writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], "Other"))
         d = output_dir + "Orthologues_" + speciesDict[str(speciesIDs[index1])] + "/"
         if not os.path.exists(d): os.mkdir(d)     
         for index2 in xrange(nspecies):
@@ -382,6 +557,7 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
                 writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]))
     # Infer orthologues and write them to file           
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
+    neighbours = GetSpeciesNeighbours(species_tree_rooted)
     # Label nodes of species tree
     species_tree_rooted.name = "N0"    
     iNode = 1
@@ -390,14 +566,22 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
             n.name = "N%d" % iNode
             iNode += 1
     nOgs = len(ogSet.OGs())
-    nOrthologues_SpPair = util.nOrtho_sp(nspecies)
+    nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
+    species = speciesDict.keys()
     with open(reconTreesRenamedDir + "../Duplications.csv", 'wb') as outfile:
         dupWriter = csv.writer(outfile, delimiter="\t")
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
         for iog in xrange(nOgs):
-            allOrthologues = []
-            orthologues, recon_tree = GetOrthologues_for_tree(iog, treesIDsPatFn(iog), species_tree_rooted, GeneToSpecies, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes)
-            allOrthologues.append((iog, orthologues))
+            orthologues, recon_tree, suspect_genes = GetOrthologues_for_tree(iog, treesIDsPatFn(iog), species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes)
+            for index0 in xrange(nspecies):
+                strsp0 = species[index0]
+                strsp0_ = strsp0+"_"
+                these_genes = [g for g in suspect_genes if g.startswith(strsp0_)]
+                if len(these_genes) > 0:
+                    print(these_genes)
+                    with open(output_dir + "Orthologues_" + speciesDict[strsp0] + "/MisplacedGenes.txt", 'ab') as outfile:
+                        outfile.write("\n".join([SequenceDict[g]]))
+            allOrthologues = [(iog, orthologues)]
             util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qSupport=False, qFixNegatives=True, label='n') 
             if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
                 util.PrintTime("Done %d of %d" % (iog, nOgs))
@@ -453,4 +637,6 @@ if __name__ == "__main__":
         os.mkdir(output_dir)
 #    GetOrthologuesStandalone_Parallel(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
     GetOrthologuesStandalone_Serial(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
+#    RootTreeStandalone_Serial(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
+    util.Success()
 
