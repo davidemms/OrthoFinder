@@ -204,10 +204,6 @@ def OverlapSize(node, GeneToSpecies):
     intersection = descendents[0].intersection(descendents[1])
     return len(intersection), intersection, descendents[0], descendents[1]
 
-nSuccess = 0
-nFail = 0
-nOrthoNew = 0
-
 def ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, relOverlapCutoff=4):
     """
     Is an overlap suspicious and if so can ift be resolved by identifying genes that are out of place?
@@ -227,44 +223,34 @@ def ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, relOverlapCutoff=4):
         - for each species with genes in both clades: the genes in one clade must all be more out of place (according to the 
           species tree) than all the gene from that species in the other tree
     """
-    global nSuccess
-    global nFail
-    global nOrthoNew
     oSize = len(overlap)
     if relOverlapCutoff*oSize >= len(sp0) and relOverlapCutoff*oSize >= len(sp1): return False, []
-    # The overlpa looks suspect, misplaced genes?
+    # The overlap looks suspect, misplaced genes?
     # for each species, we'd need to be able to determine that all genes from A or all genes from B are misplaced
     genes_removed = []
     nA_removed = 0
     nB_removed = 0
     qResolved = True
     for sp in overlap:
-        A = [g for g in ch[0].get_leaf_names() if g.split("_")[0] in overlap]
-        B = [g for g in ch[1].get_leaf_names() if g.split("_")[0] in overlap]
-#        print("Overlap: " + str((A,B)))
-        sp_set = {sp}
+        A = [g for g in ch[0].get_leaf_names() if g.split("_")[0] == sp]
+        B = [g for g in ch[1].get_leaf_names() if g.split("_")[0] == sp]
         A_levels = []
         B_levels = []
         for X, level in zip((A,B),(A_levels, B_levels)):
             for g in X:
-                r = (tree & g).up
+                gene_node = tree & g
+                r = gene_node.up
                 nextSpecies = set([gg.split("_")[0] for gg in r.get_leaf_names()])
                 while len(nextSpecies) == 1:
                     r = r.up
                     nextSpecies = set([gg.split("_")[0] for gg in r.get_leaf_names()])
-                nextSpecies = nextSpecies.difference(sp_set)
+#                print((g, sp,nextSpecies))
+                nextSpecies.remove(sp)
                 # get the level
-                observed = [bool(neigh & nextSpecies) for neigh in neighbours[sp]]
-                N = len(observed)
-#                                level.append((observed.index(True), next(i for i, oo in zip(xrange(N-1,-1,-1), reversed(observed)) if oo)))
                 # the sum of the closest and furthest expected distance toplological distance for the closest genes in the gene tree (based on species tree topology)
-                level.append(observed.index(True) + next(i for i, oo in zip(xrange(N-1,-1,-1), reversed(observed)) if oo))  
-#        print(sp)
-#        print(A)
-#        print(A_levels)
-#        print(B)
-#        print(B_levels)
-#        print("")
+                neigh = neighbours[sp]
+                observed = [neigh[nSp] for nSp in nextSpecies]
+                level.append(min(observed) + max(observed))
         qRemoveA = max(B_levels) < min(A_levels)                           
         qRemoveB = max(A_levels) < min(B_levels)                            
         if qRemoveA and relOverlapCutoff*oSize < len(sp0):
@@ -277,21 +263,12 @@ def ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, relOverlapCutoff=4):
             qResolved = False
             break
     if qResolved:
-        nSuccess +=1
-        nOrthoNew += (len(ch[0]) - nA_removed)  * (len(ch[1])-nB_removed)
-#        print((nSuccess, nFail, nOrthoNew))
         return True, set(genes_removed)
     else:
-        nFail += 1
         return False, set()
           
 def GetRoot(tree, species_tree_rooted, GeneToSpecies):
         roots = GetRoots(tree, species_tree_rooted, GeneToSpecies)
-#        print("%d roots" % len(roots))
-        # 1. Store distance of each root from each leaf
-#        for root in roots:
-#            print(root)
-#        return roots[0]
         if len(roots) > 0:
             root_dists = [r.get_closest_leaf()[1] for r in roots]
             i, _ = max(enumerate(root_dists), key=operator.itemgetter(1))
@@ -495,6 +472,9 @@ def Resolve(tree, GeneToSpecies):
 def GetSpeciesNeighbours(t):
     """
     Args: t = rooted species tree
+    
+    Returns:
+    dict: species -> species_dict, such that species_dict: other_species -> toplogical_dist 
     """
     species = t.get_leaf_names()
     levels = {s:[] for s in species}
@@ -506,7 +486,8 @@ def GetSpeciesNeighbours(t):
         for l,n in zip(leaf_sets, not_i):
             for ll in l:
                 levels[ll].append(n)
-    return levels
+    neighbours = {sp:{other:n for n,others in enumerate(lev) for other in others} for sp, lev in levels.items()}
+    return neighbours
 
 def GetOrthologuesStandalone_Parallel(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree):
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
