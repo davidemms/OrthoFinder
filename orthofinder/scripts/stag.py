@@ -208,7 +208,7 @@ def GetDistances(t, nSp, g_to_i):
     np.fill_diagonal(D, 0)
     return D
 
-def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=True):
+def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=True, qRedoSingleCopy=True):
     nSp = GeneToSpecies.NumberOfSpecies()
     s_to_i = GeneToSpecies.SpeciesToIndexDict()
     nSuccess = 0
@@ -234,8 +234,8 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=Tr
 #            print(os.path.split(fn)[1] + " - Only %d species, skipping" % nThis)
             nNotAllPresent += 1
             continue
-        if nThis == len(genes):
-            # Single copy - don't need to calculate the tree
+        if (not qRedoSingleCopy) and nThis == len(genes):
+            # Single copy - don't recalculate the tree
             treeOutFN = dir_trees_out + os.path.split(fn)[1] + ".tre"
             for n in t:
                 n.name = s_to_i[GeneToSpecies.ToSpecies(n.name)]
