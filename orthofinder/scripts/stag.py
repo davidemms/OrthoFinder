@@ -74,24 +74,9 @@ def WritePhylipMatrix(m, names, outFN, max_og=1e6):
             outfile.write(names[i] + " ")
             # values could be -inf, these are the most distantly related so replace with max_og
             V = [0. + (m[i][j] if m[i][j] > -9e99 else max_og) for j in range(n)] # "0. +": hack to avoid printing out "-0"
-            V = [sliver if 0 < v < sliver  else v for v in V]  # make sure scientific notation is not used (not accepted by fastme)
+            V = [sliver if v < sliver  else v for v in V]  # make sure scientific notation is not used (not accepted by fastme)
             values = " ".join(["%.6f" % v for v in V])   
             outfile.write(values + "\n")
-
-#def GeneToSpecies_dash(g):
-#  return g.split("_", 1)[0]
-#  
-#def GeneToSpecies_secondDash(g):
-#  return "_".join(g.split("_", 2)[:2])
-#  
-#def GeneToSpecies_3rdDash(g):
-#  return "_".join(g.split("_", 3)[:3])
-#  
-#def GeneToSpecies_dot(g):
-#  return g.split(".", 1)[0]
-#  
-#def GeneToSpecies_hyphen(g):
-#  return g.split("-", 1)[0]
 
 class UnrecognisedGene(Exception):
     pass
@@ -173,8 +158,6 @@ def GetDistances_fast(t, nSp, g_to_i):
     for n in t.traverse('postorder'):
         if n.is_leaf():
             n.add_feature('d', {g_to_i[n.name]:n.dist})
-#            print(n.name)
-#            print(d)
         else:
             children = n.get_children()
             for ch0, ch1 in combinations(children,2):
@@ -187,28 +170,13 @@ def GetDistances_fast(t, nSp, g_to_i):
                 spp = {k for ch in children for k in ch.d.keys()}
                 d = {k:(min([ch.d[k] for ch in children if k in ch.d])+n.dist) for k in spp}
                 n.add_feature('d', d)
-#                print(d)
     for i in xrange(nSp):
         for j in xrange(i):
             D[i,j] = D[j, i]
         D[i,i]=0.
     return D
-    
-def GetDistances(t, nSp, g_to_i):
-    D = np.ones((nSp, nSp)) * 9e99
-    for g0 in t:
-        s0 = g_to_i[g0.name]
-        for g1 in t:
-            s1 = g_to_i[g1.name]
-            if s0 == s1: continue
-            d = g0.get_distance(g1)
-            if D[s0,s1] > d: 
-                D[s0,s1] = d
-                D[s1,s0] = d
-    np.fill_diagonal(D, 0)
-    return D
 
-def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=True, qRedoSingleCopy=True):
+def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=True, qSkipSingleCopy=False):
     nSp = GeneToSpecies.NumberOfSpecies()
     s_to_i = GeneToSpecies.SpeciesToIndexDict()
     nSuccess = 0
@@ -234,7 +202,7 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=Tr
 #            print(os.path.split(fn)[1] + " - Only %d species, skipping" % nThis)
             nNotAllPresent += 1
             continue
-        if (not qRedoSingleCopy) and nThis == len(genes):
+        if qSkipSingleCopy and nThis == len(genes):
             # Single copy - don't recalculate the tree
             treeOutFN = dir_trees_out + os.path.split(fn)[1] + ".tre"
             for n in t:
@@ -285,38 +253,6 @@ def main(args):
     InferSpeciesTree(dir_trees_out, gene_to_species.species, outputFN)
     print("STAG species tree: " + os.path.abspath(outputFN) + "\n")
 
-def TestTimings():
-    import time
-    gene_to_species = GeneToSpecies("/home/david/projects/SpeciesTreeFromAllGenes/speed_test/mapping.txt")
-    nSp = gene_to_species.NumberOfSpecies()
-    s_to_i = gene_to_species.SpeciesToIndexDict()
-    t = tree.Tree("/home/david/projects/SpeciesTreeFromAllGenes/speed_test/OG0000117_tree_id.txt")
-    genes = t.get_leaf_names()
-    species = map(gene_to_species.ToSpecies, genes)
-    nThis = len(set(species))
-    if nThis != nSp:
-        print("Not all species present: %d/%d" % (nThis, nSp))
-        return
-    g_to_i = {g:s_to_i[s] for g,s in zip(genes, species)}
-    start = time.time()
-    D2 = GetDistances_fast(t, nSp, g_to_i)
-    stop = time.time()
-    tnew = stop-start 
-    print(tnew)
-    D = GetDistances(t, nSp, g_to_i)
-    torig = time.time() - stop
-    print(D[0,:])
-    print(D2[0,:])
-    n = D.shape[0]
-    for i in xrange(n):
-        for j in xrange(n):
-            if D[i,j] == 0:
-                assert(D2[i,j] < 1e-6)
-            else:
-                assert(abs(D2[i,j] - D[i,j])/abs(D[i,j]) < 1e-6)
-    print(torig)
-    print(torig/tnew)    
-
 if __name__ == "__main__":
     text = """
 *********************************************************
@@ -331,4 +267,3 @@ if __name__ == "__main__":
     parser.add_argument("-q", "--quiet", help = "Only print sparse output", action="store_true")
     args = parser.parse_args()
     main(args)
-#    TestTimings()
