@@ -157,7 +157,7 @@ def GetDistances_fast(t, nSp, g_to_i):
     D = np.ones((nSp, nSp)) * 9e99
     for n in t.traverse('postorder'):
         if n.is_leaf():
-            n.add_feature('d', {g_to_i[n.name]:n.dist})
+            n.add_feature('d', {g_to_i[n.name]:max(0.0, n.dist)})
         else:
             children = n.get_children()
             for ch0, ch1 in combinations(children,2):
@@ -168,7 +168,7 @@ def GetDistances_fast(t, nSp, g_to_i):
                         j = sp1 if sp0<sp1 else sp0
                         D[i,j] = min(D[i,j], dist0+dist1)
                 spp = {k for ch in children for k in ch.d.keys()}
-                d = {k:(min([ch.d[k] for ch in children if k in ch.d])+n.dist) for k in spp}
+                d = {k:(min([ch.d[k] for ch in children if k in ch.d])+max(0.0, n.dist)) for k in spp}
                 n.add_feature('d', d)
     for i in xrange(nSp):
         for j in xrange(i):
@@ -222,8 +222,21 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=Tr
     if qVerbose: print("\nExamined %d trees" % (nSuccess + nNotAllPresent + nFail))
     print("%d trees had all species present and will be used by STAG to infer the species tree\n" % nSuccess)
       
-def InferSpeciesTree(tree_dir, species, outputFN):
-    t = cons.ConsensusTree(tree_dir)
+def Astral(tree_dir, astral_jar_file):
+    treesFN = tree_dir + "../TreesFile.txt"
+    with open(treesFN, 'wb') as outfile:
+        for fn in glob.glob(tree_dir + "/*"):
+            t = tree.Tree(fn)    
+            outfile.write(t.write(format=9) + "\n")
+    speciesTreeFN = tree_dir + "../SpeciesTree_ids.txt"
+    subprocess.call(" ".join(["java", "-Xmx6000M", "-jar", astral_jar_file, "-i", treesFN, "-o", speciesTreeFN]), shell=True)
+    return tree.Tree(speciesTreeFN)     
+      
+def InferSpeciesTree(tree_dir, species, outputFN, astral_jar=None):
+    if astral_jar == None:
+        t = cons.ConsensusTree(tree_dir)
+    else:
+        t = Astral(tree_dir, astral_jar)
     for n in t:
         n.name = species[int(n.name)]
     t.write(outfile=outputFN)
@@ -250,7 +263,10 @@ def main(args):
     os.mkdir(dir_trees_out)
     ProcessTrees(dir_in, dir_matrices, dir_trees_out, gene_to_species, qVerbose=(not args.quiet))
     outputFN = dir_out + "SpeciesTree.tre"
-    InferSpeciesTree(dir_trees_out, gene_to_species.species, outputFN)
+    if args.astral_jar == None:
+        InferSpeciesTree(dir_trees_out, gene_to_species.species, outputFN)
+    else:
+        InferSpeciesTree(dir_trees_out, gene_to_species.species, outputFN, astral_jar=args.astral_jar)
     print("STAG species tree: " + os.path.abspath(outputFN) + "\n")
 
 if __name__ == "__main__":
@@ -265,5 +281,6 @@ if __name__ == "__main__":
     parser.add_argument("species_map", help = "Map file from gene names to species names, or SpeciesIDs.txt file from OrthoFinder")
     parser.add_argument("gene_trees", help = "Directory conaining gene trees")
     parser.add_argument("-q", "--quiet", help = "Only print sparse output", action="store_true")
+    parser.add_argument("-a", "--astral_jar", help = "ASTRAL jar file. Use ASTRAL to combine STAG species tree estimates instead of greedy consensus tree.")
     args = parser.parse_args()
     main(args)
