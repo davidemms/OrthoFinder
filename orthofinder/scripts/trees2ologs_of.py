@@ -564,7 +564,7 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
                 these_genes = [g for g in suspect_genes if g.startswith(strsp0_)]
                 if len(these_genes) > 0:
                     with open(output_dir + "Orthologues_" + speciesDict[strsp0] + "/Putative_Horizontal_Gene_Transfer.txt", 'ab') as outfile:
-                        outfile.write("\n".join([SequenceDict[g]]))
+                        outfile.write("\n".join([SequenceDict[g]]) + "\n")
             allOrthologues = [(iog, orthologues)]
             util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qSupport=False, qFixNegatives=True, label='n') 
             if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
