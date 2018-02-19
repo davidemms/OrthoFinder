@@ -25,6 +25,7 @@ import time
 import glob
 import argparse
 from collections import Counter, defaultdict
+
 import tree
 
 class BitVector(object):

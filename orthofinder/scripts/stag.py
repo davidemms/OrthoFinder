@@ -107,7 +107,7 @@ class GeneToSpecies(object):
                         self.startswith[g[:-1]] = sp
                     else:
                         self.exact[g] = sp
-        self.species = list(set(self.exact.values() + self.startswith.values()))
+        self.species = sorted(list(set(self.exact.values() + self.startswith.values())))
         print("%d species in mapping file:" % len(self.species))
         for s in self.species:
             print(s)
@@ -216,7 +216,7 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=Tr
         matrixFN = dir_matrices + os.path.split(fn)[1] + ".dist.phylip"
         treeOutFN = dir_trees_out + os.path.split(fn)[1] + ".tre"
         WritePhylipMatrix(D, species_names_fastme, matrixFN, max_og=1e6)
-        subprocess.call("fastme -i %s -o %s -w O -s -N" % (matrixFN, treeOutFN), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.call("fastme -i %s -o %s -w O -s -n" % (matrixFN, treeOutFN), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         nSuccess += 1
         if qVerbose: print(os.path.split(fn)[1] + " - Processed")
     if qVerbose: print("\nExamined %d trees" % (nSuccess + nNotAllPresent + nFail))
