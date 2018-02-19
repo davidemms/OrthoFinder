@@ -21,22 +21,11 @@
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
 
-import sys
 import time
 import glob
 import argparse
 from collections import Counter, defaultdict
-try:
-    import tree
-except ImportError:
-    try:
-        import ete3 as tree
-    except ImportError:
-        try:
-            import ete2 as tree
-        except ImportError:
-            print("ERROR: Could not import tree library ete3 or ete2. Please install one of these.")
-            sys.exit()
+import tree
 
 class BitVector(object):
     """
