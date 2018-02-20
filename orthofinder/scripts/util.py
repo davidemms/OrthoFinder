@@ -511,7 +511,11 @@ def GetOGsFile(userArg):
 def PrintCitation():  
     print ("\nCITATION:")  
     print (" When publishing work that uses OrthoFinder please cite:")
-    print (" Emms D.M. & Kelly S. (2015), Genome Biology 16:157\n")         
+    print (" Emms D.M. & Kelly S. (2015), Genome Biology 16:157\n")   
+
+    print (" If you use the species tree in your work then please also cite:")
+    print (" Emms D.M. & Kelly S. (2017), MBE 34(12): 3267-3278")
+    print (" Emms D.M. & Kelly S. (2018), bioRxiv https://doi.org/10.1101/267914")
 
 def PrintUnderline(text, qHeavy=False):
     print("\n" + text)
