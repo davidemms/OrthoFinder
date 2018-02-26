@@ -142,7 +142,7 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
                     # this is the unique root
                     return [m]
                 nodes = m.get_children() if m.is_root() else [m] + m.get_children()
-                clades = [ch.inout_down for ch in nodes] if n.is_root() else [m.inout_up] + [ch.inout_down for ch in m.get_children()]               
+                clades = [ch.inout_down for ch in nodes] if m.is_root() else ([m.inout_up] + [ch.inout_down for ch in m.get_children()])
                 # do we have the situation A | B or (A,B),S?
                 if len(nodes) == 3:
                     if all([len(c) == 1 for c in clades]) and T in clades and F in clades:

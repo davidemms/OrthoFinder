@@ -42,7 +42,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "2.2.0"
+version = "2.2.1"
 requiredBlastVersion = "2.2.28+"
 
 standard_new_files = ("Orthogroups.csv Orthogroups.GeneCount.csv SingleCopyOrthogroups.txt Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv" % (version, version, version)).split()
@@ -52,8 +52,7 @@ citation = """ When publishing work that uses OrthoFinder please cite:
  
  If you use the species tree in your work then please also cite:
  Emms D.M. & Kelly S. (2017), MBE 34(12): 3267-3278
- Emms D.M. & Kelly S. (2018), bioRxiv https://doi.org/10.1101/267914
- """ 
+ Emms D.M. & Kelly S. (2018), bioRxiv https://doi.org/10.1101/267914""" 
 
 expectedHelp1="""OrthoFinder version %s Copyright (C) 2014 David Emms
 
