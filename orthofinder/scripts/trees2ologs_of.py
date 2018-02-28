@@ -377,14 +377,16 @@ def GetOrthologues_for_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, nei
 def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, qContainsSuspectOlogs):
     # Sort the orthologues according to speices pairs
     sp_to_index = {str(sp):i for i, sp in enumerate(iSpeciesToUse)}
-    nOrtho = util.nOrtho_sp(len(iSpeciesToUse))    
-    species = speciesDict.keys()
+    nOrtho = util.nOrtho_sp(len(iSpeciesToUse))   
+#    print(speciesDict)
+#    print(iSpeciesToUse)
+#    species = speciesDict.keys()
 #    left = [[] for sp in species]  
 #    right = [[] for sp in species]
     # reorder orthologues on a per-species basis
-    nSpecies = len(species)
+    nSpecies = len(iSpeciesToUse)
     for i in xrange(nSpecies):
-        sp0 = species[i]
+        sp0 = str(iSpeciesToUse[i])
         if qContainsSuspectOlogs: 
             outfile1_sus = open(resultsDir + "Putative_Xenologues/%s.csv" % speciesDict[sp0], 'ab')
             writer1_sus = csv.writer(outfile1_sus, delimiter="\t")
@@ -392,7 +394,7 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
         isp0 = sp_to_index[sp0]
         d0 = resultsDir + "Orthologues_" + speciesDict[sp0] + "/"
         for j in xrange(i, nSpecies):
-            sp1 = species[j]
+            sp1 = str(iSpeciesToUse[j])
             if sp1 == sp0: continue
             strsp1 = sp1 + "_"
             isp1 = sp_to_index[sp1]

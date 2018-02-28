@@ -381,13 +381,13 @@ class TreesForOrthogroups(object):
         if qDoSpeciesTree:
             alignmentFilesToUse.append(concatenated_algn_fn)
             accessionAlignmentFNs.append(os.path.split(self.GetAlignmentFilename(0, True))[0] + "/SpeciesTreeAlignment.fa")
-            self.RenameAlignmentTaxa(alignmentFilesToUse, accessionAlignmentFNs, idDict)
             qHaveSupport = util.HaveSupportValues(speciesTreeFN_ids)
             if os.path.exists(speciesTreeFN_ids):
                 util.RenameTreeTaxa(speciesTreeFN_ids, self.workingDir + "SpeciesTree_unrooted.txt", idDict, qSupport=qHaveSupport, qFixNegatives=True)
             else:
                 print("ERROR: Species tree inference failed")
                 util.Fail()
+        self.RenameAlignmentTaxa(alignmentFilesToUse, accessionAlignmentFNs, idDict)
         qHaveSupport = None
         for i in xrange(len(treeCommands_and_filenames)):
             infn = self.GetTreeFilename(i)

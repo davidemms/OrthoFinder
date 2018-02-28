@@ -515,18 +515,20 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, qWriteDupTre
     # Get distance of each from a supported clade
     topDist = []
     branchDist = []
-    for r in roots:
-        speciesTree = RootAtClade(speciesTree, r)
-        topDist.append(min([speciesTree.get_distance(n, topology_only=True) for n in speciesTree.traverse('preorder') if frozenset(n.get_leaf_names()) in clusters]))
-        branchDist.append(min([speciesTree.get_distance(n) for n in speciesTree.traverse('preorder') if (frozenset(n.get_leaf_names()) in clusters and speciesTree.get_distance(n, topology_only=True) == topDist[-1])]))        
-    maxTopDist = max(topDist)
-    bestDist = -1
-    for i, (t, d) in enumerate(zip(topDist, branchDist)):
-        if t == maxTopDist and d > bestDist:
-            bestDist = d
-            iRootToUse = i
-    rootToUse = roots.pop(iRootToUse)
-    roots = [rootToUse] + roots
+    if len(clusters) > 0 and len(roots) > 1:
+        # Evaluate which is the best one
+        for r in roots:
+            speciesTree = RootAtClade(speciesTree, r)
+            topDist.append(min([speciesTree.get_distance(n, topology_only=True) for n in speciesTree.traverse('preorder') if frozenset(n.get_leaf_names()) in clusters]))
+            branchDist.append(min([speciesTree.get_distance(n) for n in speciesTree.traverse('preorder') if (frozenset(n.get_leaf_names()) in clusters and speciesTree.get_distance(n, topology_only=True) == topDist[-1])]))        
+        maxTopDist = max(topDist)
+        bestDist = -1
+        for i, (t, d) in enumerate(zip(topDist, branchDist)):
+            if t == maxTopDist and d > bestDist:
+                bestDist = d
+                iRootToUse = i
+        rootToUse = roots.pop(iRootToUse)
+        roots = [rootToUse] + roots
         
     if qWriteRootedTree:
         for i, r in enumerate(roots):
