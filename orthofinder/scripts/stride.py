@@ -421,8 +421,8 @@ def SupportedHierachies_wrapper(treeName, GeneToSpecies, species, dict_clades, c
         print("Some genes cannot be mapped to species in the species tree")
         print(S.difference(species))
         return None
-    if len(S) < 4:
-        return [], []
+    if len(S) < 3:
+        return defaultdict(int), []
     result = SupportedHierachies(t, G, S, GeneToSpecies, species, dict_clades, clade_names, treeName, qWriteDupTrees)
     return result
     
