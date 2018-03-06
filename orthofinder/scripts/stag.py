@@ -254,6 +254,7 @@ def Run_ForOrthoFinder(dir_in, d_out, speciesToUse):
     
 def main(args):
     dir_in = args.gene_trees
+    astral_jar = None
     gene_to_species = GeneToSpecies(args.species_map)
     dir_out = CreateNewWorkingDirectory(dir_in + "/../STAG_Results")
     CheckFastME(dir_out)
@@ -263,10 +264,11 @@ def main(args):
     os.mkdir(dir_trees_out)
     ProcessTrees(dir_in, dir_matrices, dir_trees_out, gene_to_species, qVerbose=(not args.quiet))
     outputFN = dir_out + "SpeciesTree.tre"
-    if args.astral_jar == None:
+#    if args.astral_jar == None:
+    if astral_jar == None:
         InferSpeciesTree(dir_trees_out, gene_to_species.species, outputFN)
     else:
-        InferSpeciesTree(dir_trees_out, gene_to_species.species, outputFN, astral_jar=args.astral_jar)
+        InferSpeciesTree(dir_trees_out, gene_to_species.species, outputFN, astral_jar=astral_jar)
     print("STAG species tree: " + os.path.abspath(outputFN) + "\n")
 
 if __name__ == "__main__":
@@ -281,6 +283,6 @@ if __name__ == "__main__":
     parser.add_argument("species_map", help = "Map file from gene names to species names, or SpeciesIDs.txt file from OrthoFinder")
     parser.add_argument("gene_trees", help = "Directory conaining gene trees")
     parser.add_argument("-q", "--quiet", help = "Only print sparse output", action="store_true")
-    parser.add_argument("-a", "--astral_jar", help = "ASTRAL jar file. Use ASTRAL to combine STAG species tree estimates instead of greedy consensus tree.")
+#    parser.add_argument("-a", "--astral_jar", help = "ASTRAL jar file. Use ASTRAL to combine STAG species tree estimates instead of greedy consensus tree.")
     args = parser.parse_args()
     main(args)

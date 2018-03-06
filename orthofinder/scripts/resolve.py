@@ -152,12 +152,12 @@ t = True
 f = False
 
 # dA = 1, dB = 0
-# Subcases (S&U, S&O)
-c10_a = {(f,f), (f,t), (t,t)}      
-c10_b = {(t,f),}
+# Subcases (S&O, S&U)
+c10_a = {(f,f), (t,f), (t,t)}      
+c10_b = {(f,t),}
 
 # dA = 1, dB = 1
-# Subcases (S&O, S&U, S&W)
+# Subcases (S&O, S&W, S&U)
 c11_a = {(f,f,f), (t,t,t), (t,t,f), (t,f,t)}
 c11_b = {(f,t,f), (f,f,t)}
 c11_c = {(f,t,t),}
@@ -230,7 +230,7 @@ def resolve(n, M):
         if O & U: 
             v,u = ch
             U = u.sp_down
-        case = (bool(S&U), bool(S&O))  
+        case = (bool(S&O), bool(S&U))  
         if case in c10_a:
             return GraftAndUpdate(n, b, v)
         elif case in c10_b:
@@ -256,7 +256,7 @@ def resolve(n, M):
             W = TEMP
         else:
             w, x = chb
-        case = (bool(S&O), bool(S&U), bool(S&W))
+        case = (bool(S&O), bool(S&W), bool(S&U))
         if case in c11_a:
             return GraftAndUpdate(n, x, v)
         elif case in c11_b:

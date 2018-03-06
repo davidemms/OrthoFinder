@@ -290,7 +290,8 @@ def LocalCheck_clades(clade1, clade2, expClades, GeneToSpecies):
     Y = set.union(*expClades[1])
     x0, x1 = expClades[0] if len(expClades[0]) == 2 else (None, None) if len(expClades[0]) == 1 else (Exception, Exception)
     y0, y1 = expClades[1] if len(expClades[1]) == 2 else (None, None) if len(expClades[1]) == 1 else (Exception, Exception)
-    if x0 == Exception or y0 == Exception: raise Exception
+    if x0 == Exception or y0 == Exception: 
+        raise False   # Can't get a well-supported duplication meeting topology criteria if tree is not fully resolved
     for actClades in [clade1, clade2]:
             iUsed = None
             for clade in actClades:
@@ -509,7 +510,7 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, qWriteDupTre
             sys.exit()
         clusters.update(l)
         all_stride_dup_genes.update(stride_dup_genes)
-    roots, nSupport = ParsimonyRoot(species, dict_clades.keys(), clusters)
+    roots, nSupport = ParsimonyRoot(species, list(dict_clades.keys()), clusters)
     roots = list(set(roots))
     speciesTrees_rootedFNs =[]
     # Get distance of each from a supported clade
@@ -537,7 +538,7 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, qWriteDupTre
     #    speciesTree = LabelNodes()
             speciesTree.write(outfile=speciesTree_rootedFN, format = 2 if qHaveBranchSupport else 1)
             speciesTrees_rootedFNs.append(speciesTree_rootedFN)
-    return roots, clusters, speciesTrees_rootedFNs, nSupport, dict_clades.keys(), species, all_stride_dup_genes
+    return roots, clusters, speciesTrees_rootedFNs, nSupport, list(dict_clades.keys()), species, all_stride_dup_genes
 
 def PrintRootingSummary(roots, clusters_counter, nSupport):
     nAll = sum(clusters_counter.values())
@@ -600,89 +601,52 @@ def WriteResults(species_tree_fn_or_text, roots, S, clades, clusters_counter, ou
 #    print(species_tree)
 #    species_tree = tree.Tree(output_dir + "Species_tree_labelled.tre", format=1)
     # Calculate probabilities
-    p_final = probroot.GetProbabilities(species_tree, S, clades, clusters_counter)
+    qBinary = True
+    for n in species_tree.traverse():
+        if len(n.get_children()) > 2:
+            qBinary = False
+    if qBinary:
+        p_final = probroot.GetProbabilities(species_tree, S, clades, clusters_counter)
+    else:
+        print("Probability distribution for root location is not supported for non-binary trees")
+        print("To get a probability distribution for the root, please supply a fully resolved input species tree")
     # Write numbers of duplications
     table = dict()
     new_tree = tree.Tree(output_dir + "Species_tree_labelled.tre", format=1)
     for clade in clades + [frozenset([s]) for s in S]:
-#        print(clade)
         qAnti = False
         anticlade = S.difference(clade)
         if len(clade) == 1:
             node = new_tree & list(clade)[0]
-#            if len(anticlade) == 1: qAnti = True:
-#        elif len(anticlade) == 1:
         else:
             node = new_tree.get_common_ancestor(clade)
         if node == new_tree:
             node = new_tree.get_common_ancestor(anticlade)
             qAnti = True
-#        print("")
-#        print(clade)
-#        print(anticlade)
-#        print(node.name)
-#        print(node)
-        p = p_final[clade] if clade in p_final else p_final[anticlade]
-#        qThisRooting = (clade == thisRoot) or (anticlade == thisRoot)
         x = anticlade if qAnti else clade
         y = clade if qAnti else anticlade
         X = ("(%d)" % clusters_counter[x]) if len(clade) == 1 else clusters_counter[x] 
+        if qBinary:
+            p = p_final[clade] if clade in p_final else p_final[anticlade]
+        else:
+            p = 0.
         table[node.name] = [node.name, "X" if (clade in roots or anticlade in roots) else "", "%0.1f%%" % (100.*p) , X, clusters_counter[y]]
-#    print(len(table))
-#    for t in table.items():
-#        print(t)
     with open(output_dir + "Duplication_counts.csv", 'wb') as outfile:
         writer = csv.writer(outfile, delimiter="\t")
         writer.writerow(["Branch", "MP Root", "Probability", "Duplications supporting clade", "Duplications supporting opposite clade"])
         qSingle = len(thisRoot) == 1
         root_branches = [n.name for n in new_tree.get_children()]
         writer.writerow([root_branches[0] + " (& " + root_branches[1] + ")"] + table[root_branches[0]][1:])
-#        if qSingle:
-#        else:
-#            root_data = table['N1']
-#            writer.writerow(['N1 (& N2)'] + root_data[1:])
         for i in range(2 if qSingle else 3, iNode):  
             name = "N%d" % i
             if name in table:
                 writer.writerow(table[name])
             else:
                 print("Skipping %s" % name)
-#                writer.writerow([name, "X" if (clade in roots or anticlade in roots) else "", "%0.1f%%" % (100.*p) , clusters_counter[clade], clusters_counter[anticlade]])
         for sp in S:
             if sp in table:
                 if qSingle and sp in thisRoot: continue
                 writer.writerow(table[sp])
-            
-        
-#        # skip node at top of tree
-#        for i in range(1, iNode):
-#            name = "N%d" % i
-#            if name in skip: continue
-#            node = species_tree & name
-#            clade = frozenset(node.get_leaf_names())
-#            anticlade = S.difference(clade)
-#            if not species_tree.check_monophyly(clade, target_attr="name"):
-#                swap = clade
-#                clade = anticlade
-#                anticlade = swap
-#            print("")
-#            print(name)
-##            print(node)
-#            print((clusters_counter[clade],clade))
-#            print((clusters_counter[anticlade], anticlade))
-#            qThisRooting = (clade == thisRoot) or (anticlade == thisRoot)
-#            if qThisRooting:
-#                antinode = species_tree.get_common_ancestor(anticlade)
-#                skip.append(antinode.name)
-#                name = name + (" (%s)" % antinode.name) 
-#            p = p_final[clade] if clade in p_final else p_final[anticlade]
-#            writer.writerow([name, "X" if (clade in roots or anticlade in roots) else "", "%0.1f%%" % (100.*p) , clusters_counter[clade], clusters_counter[anticlade]])
-
-#        writer.writerow(["Node", "Number of Supporting Duplications"])
-#        for cluster, count in clusters_counter.items():
-#            if len(cluster) == 1: continue
-#            name = GetCluseterName(species_tree, S, cluster)
-#            writer.writerow([name, count])
    
 def Main_Full(args):
     text = """
