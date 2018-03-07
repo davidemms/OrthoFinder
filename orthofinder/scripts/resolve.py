@@ -6,6 +6,7 @@ Created on Thu Jul 27 14:15:17 2017
 """  
 import parallel_task_manager
 
+import glob
 import argparse
 import tree as tree_lib
 
@@ -338,10 +339,10 @@ def NumberOfOrthologues(tree, GeneToSpecies):
                     for s in s0:
                         orthologues[gDict[g1], sDict[s]] = 1
                 
-    print(nOrtho)
+#    print(nOrtho)
 #    N = (len(species)-1)*len(genes)
 #    print((sum(sum(orthologues)),float(N)))
-    print(sum(sum(orthologues)))
+#    print(sum(sum(orthologues)))
 
 class Finalise(object):
     def __enter__(self):
@@ -350,45 +351,63 @@ class Finalise(object):
         ptm = parallel_task_manager.ParallelTaskManager_singleton()
         ptm.Stop()
         
-def Resolve_Main(trees_fn, species_tree_rooted_fn, GeneToSpecies, qTest):        
-    try:
-        tree = tree_lib.Tree(trees_fn)
-    except:
-        tree = tree_lib.Tree(trees_fn, format=3)
-    # Root using species tree if provided, otherwise tree should have been rooted already
+def Resolve_Main(trees_fn_or_dir, species_tree_rooted_fn, GeneToSpecies, qTest):   
+    """
+    Resolves the single tree or trees in the directory trees_fn. If no species tree is provided then the gene tree is assumed to 
+    be rooted
+    Args:
+        trees_fn - tree filename or directory containing trees
+        species_tree_rooted_fn - species tree used to root the tree. If None then the gene tree is assumed to be rooted already
+    """
     if species_tree_rooted_fn != None:
         species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
-        tree.prune(tree.get_leaf_names())
-        if len(tree) == 1: return tree
-        roots = om1.GetRoots(tree, species_tree_rooted, GeneToSpecies)
-        if len(roots) == 0: return tree
-        # Pick the first root for now
-        root = roots[0]
-        if root != tree:
-            tree.set_outgroup(root)
-        tree.write(outfile=trees_fn+"_rooted.tre")
-    om1.StoreSpeciesSets(tree, GeneToSpecies)  
-    if qTest:
-        # Just perform a single reconciliation (including making move that is flagged but not initially applied in the reconciliation_
-        for iNode, n in enumerate(tree.traverse()):
-            n.dist = float(iNode * 0.01)
-        ch = tree.get_children()
-        if len(ch) != 2:
-            print("ERROR: Not binary")
-            return tree
-        print(tree)
-        n = ch[0] if len(ch[0]) > len(ch[1]) else ch[1]
-        tree = resolve(n, GeneToSpecies)
-        print(tree)
-        if "recon" in tree.features or "recon_2" in tree.features:
-            tree = resolve(tree, GeneToSpecies)
+        
+    qDir = True
+    try:
+        tree = tree_lib.Tree(trees_fn_or_dir)
+        qDir = False
+    except:
+        try:
+            tree = tree_lib.Tree(trees_fn_or_dir, format=3)
+            qDir = False
+        except:
+            pass
+    trees = glob.glob(trees_fn_or_dir + "/*") if qDir else [trees_fn_or_dir] 
+    for trees_fn in trees:
+        # Root using species tree if provided, otherwise tree should have been rooted already
+        tree = tree_lib.Tree(trees_fn)
+        if len(tree) == 1: continue
+        if species_tree_rooted_fn != None:
+            tree.prune(tree.get_leaf_names())
+            roots = om1.GetRoots(tree, species_tree_rooted, GeneToSpecies)
+            if len(roots) == 0: continue
+            # Pick the first root for now
+            root = roots[0]
+            if root != tree:
+                tree.set_outgroup(root)
+            tree.write(outfile=trees_fn+"_rooted.tre")
+        om1.StoreSpeciesSets(tree, GeneToSpecies)  
+        if qTest:
+            # Just perform a single reconciliation (including making move that is flagged but not initially applied in the reconciliation_
+            for iNode, n in enumerate(tree.traverse()):
+                n.dist = float(iNode * 0.01)
+            ch = tree.get_children()
+            if len(ch) != 2:
+                print("ERROR: Not binary")
+                return tree
             print(tree)
-    else:
-        # Perform full reconciliation
-        for n in tree.traverse("postorder"):
+            n = ch[0] if len(ch[0]) > len(ch[1]) else ch[1]
             tree = resolve(n, GeneToSpecies)
-        NumberOfOrthologues(tree, GeneToSpecies)      
-    return tree
+            print(tree)
+            if "recon" in tree.features or "recon_2" in tree.features:
+                tree = resolve(tree, GeneToSpecies)
+                print(tree)
+        else:
+            # Perform full reconciliation
+            for n in tree.traverse("postorder"):
+                tree = resolve(n, GeneToSpecies)
+            NumberOfOrthologues(tree, GeneToSpecies)    
+        tree.write(outfile=(trees_fn + ".rec.tre"))           
            
 if __name__ == "__main__":
     with Finalise():
@@ -398,5 +417,4 @@ if __name__ == "__main__":
         parser.add_argument("-s", "--separator", choices=("dot", "dash", "second_dash", "3rd_dash", "hyphen"), help="Separator been species name and gene name in gene tree taxa")
         parser.add_argument("-t", "--test", action="store_true", help="Perform a single operation on the largest node one step down--allows testing of the method")
         args = parser.parse_args()
-        tree = Resolve_Main(args.gene_tree, args.rooted_species_tree, om1.GetGeneToSpeciesMap(args), args.test)
-        tree.write(outfile=args.gene_tree + ".rec.tre")         
+        Resolve_Main(args.gene_tree, args.rooted_species_tree, om1.GetGeneToSpeciesMap(args), args.test)
