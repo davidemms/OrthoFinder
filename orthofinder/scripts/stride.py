@@ -291,7 +291,7 @@ def LocalCheck_clades(clade1, clade2, expClades, GeneToSpecies):
     x0, x1 = expClades[0] if len(expClades[0]) == 2 else (None, None) if len(expClades[0]) == 1 else (Exception, Exception)
     y0, y1 = expClades[1] if len(expClades[1]) == 2 else (None, None) if len(expClades[1]) == 1 else (Exception, Exception)
     if x0 == Exception or y0 == Exception: 
-        raise False   # Can't get a well-supported duplication meeting topology criteria if tree is not fully resolved
+        return False   # Can't get a well-supported duplication meeting topology criteria if tree is not fully resolved
     for actClades in [clade1, clade2]:
             iUsed = None
             for clade in actClades:
