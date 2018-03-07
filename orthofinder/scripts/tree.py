@@ -66,17 +66,9 @@ import random
 import copy
 from collections import deque 
 import itertools
-from ete2.parser.newick import read_newick, write_newick
+from newick import read_newick, write_newick
 
-# the following imports are necessary to set fixed styles and faces
-try:
-    from ete2.treeview.main import NodeStyle, _FaceAreas, FaceContainer, FACE_POSITIONS
-    from ete2.treeview.faces import Face
-except ImportError:
-    TREEVIEW = False
-else:
-    TREEVIEW = True
-
+TREEVIEW = False
 __all__ = ["Tree", "TreeNode"]
 
 DEFAULT_COMPACT = False
