@@ -12,11 +12,26 @@ if __name__ == "__main__" and __package__ is None:
 from scripts import tree, util
         
 def ReplaceFileWithNewIDs(idsMap, treeFilename, newTreeFilename):     
-    t = tree.Tree(treeFilename, format=1)
+    qHaveSupport = False
+    qHaveInternalNames = False
+    try:
+        t = tree.Tree(treeFilename, format=2)
+        qHaveSupport = True
+    except:
+        try:
+            t = tree.Tree(treeFilename, format=3)
+            qHaveInternalNames = True
+        except:
+            t = tree.Tree(treeFilename)
     for node in t.get_leaves():
         node.name = idsMap[node.name]
-    outputTreeString = t.write(format=1)
-    with open(newTreeFilename, 'wb') as outFile: outFile.write(outputTreeString)          
+    if qHaveSupport:
+        t.write(outfile=newTreeFilename)
+    elif qHaveInternalNames:
+        t.write(outfile=newTreeFilename, format=3)
+    else:
+        t.write(outfile=newTreeFilename, format=5)
+        
                              
 def GetSpeciesSequenceIDsDict(sequenceIDsFilename, speciesIDsFN = None):
     try:

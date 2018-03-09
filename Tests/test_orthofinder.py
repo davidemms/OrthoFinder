@@ -812,13 +812,16 @@ class TestCommandLine(unittest.TestCase):
         
     def test_convert_tree_ids(self):
         d = baseDir + "Input/ConvertIDs/"
-        infile = d + "SpeciesTree_ids.txt"
-        newFiles = [d + "SpeciesTree_ids_accessions.txt"]
+        newFiles = [d + "SpeciesTree_ids_accessions.txt", d + "SpeciesTree_ids_nodelabels_accessions.txt", d + "SpeciesTree_ids_support_accessions.txt"]
         exe = os.path.split(orthofinder)[0] + "/tools/convert_tree_ids.py"
         with CleanUp(newFiles, [], []):
-            p = subprocess.Popen("%s %s %s" % (exe, infile, d + "SpeciesIDs.txt"), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)    
+            p = subprocess.Popen("%s %s %s" % (exe, d + "SpeciesTree_ids.txt", d + "SpeciesIDs.txt"), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)    
+            p = subprocess.Popen("%s %s %s" % (exe, d + "SpeciesTree_ids_support.txt", d + "SpeciesIDs.txt"), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)    
+            p = subprocess.Popen("%s %s %s" % (exe, d + "SpeciesTree_ids_nodelabels.txt", d + "SpeciesIDs.txt"), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)    
             p.wait()
-            self.assertTrue(filecmp.cmp(newFiles[0], baseDir + "ExpectedOutput/SpeciesTree_ids_accessions.txt"), msg=newFiles[0])
+            self.assertTrue(filecmp.cmp(d + "SpeciesTree_ids_accessions.txt", baseDir + "ExpectedOutput/SpeciesTree_ids_accessions.txt"))
+            self.assertTrue(filecmp.cmp(d + "SpeciesTree_ids_support_accessions.txt", baseDir + "ExpectedOutput/SpeciesTree_ids_accessions_support.txt"))
+            self.assertTrue(filecmp.cmp(d + "SpeciesTree_ids_nodelabels_accessions.txt", baseDir + "ExpectedOutput/SpeciesTree_ids_accessions_nodelabels.txt"))
         
 #    def test_treesExtraSpecies(self):
 #        pass
