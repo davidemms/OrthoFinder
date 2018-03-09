@@ -95,7 +95,7 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
     """
     speciesObserved = set([GeneToSpecies(g) for g in tree.get_leaf_names()])
     if len(speciesObserved) == 1:
-        return []
+        return [next(n for n in tree)] # arbitrary root if all genes are from the same species
     
     # use species tree to find correct outgroup according to what species are present in the gene tree
     n = species_tree_rooted
