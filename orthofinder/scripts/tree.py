@@ -1302,53 +1302,6 @@ class TreeNode(object):
             else:
                 raise TreeError, "Cannot unroot a tree with only two leaves"
 
-    def show(self, layout=None, tree_style=None, name="ETE"):
-        """ 
-        Starts an interative session to visualize current node
-        structure using provided layout and TreeStyle.
-
-        """
-        try:
-            from ete2.treeview import drawer
-        except ImportError, e:
-            print "'treeview' module could not be loaded.\n",e
-            print "\n\n"
-            print e
-        else:
-            drawer.show_tree(self, layout=layout,
-                             tree_style=tree_style, win_name=name)
-
-    def render(self, file_name, layout=None, w=None, h=None, \
-                       tree_style=None, units="px", dpi=90):
-        """ 
-        Renders the node structure as an image. 
-
-        :var file_name: path to the output image file. valid
-          extensions are .SVG, .PDF, .PNG
- 
-        :var layout: a layout function or a valid layout function name
-
-        :var tree_style: a `TreeStyle` instance containing the image
-          properties
-
-        :var px units: "px": pixels, "mm": millimeters, "in": inches 
-        :var None h: height of the image in :attr:`units`        
-        :var None w: weight of the image in :attr:`units`        
-        :var 300 dpi: dots per inches. 
-
-        """
-
-        try:
-            from ete2.treeview import drawer
-        except ImportError, e:
-            print "'treeview' module could not be loaded.\n",e
-            print "\n\n"
-            print e
-        else:
-            return drawer.render_tree(self, file_name, w=w, h=h, 
-                                      layout=layout, tree_style=tree_style, 
-                                      units=units, dpi=dpi)
-
     def copy(self, method="cpickle"):
         """.. versionadded: 2.1
 

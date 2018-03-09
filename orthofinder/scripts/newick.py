@@ -43,7 +43,7 @@ import re
 import os
 import base64 
 
-__all__ = ["read_newick", "write_newick", "print_supported_formats"]
+__all__ = ["read_newick", "write_newick"]
 
 # Regular expressions used for reading newick format
 _ILEGAL_NEWICK_CHARS = ":;(),\[\]\t\n\r="
@@ -177,14 +177,6 @@ def node2internalformat(node, format):
     elif format == 6 or format == 7:
         return ""
 
-def print_supported_formats():
-    from ete2.coretype.tree import TreeNode
-    t = TreeNode()
-    t.populate(4, "ABCDEFGHI")
-    print t
-    for f in NW_FORMAT:
-        print "Format", f,"=", write_newick(t, features=None, format=f)
-
 class NewickError(Exception):
     """Exception class designed for NewickIO errors."""
     pass
@@ -203,7 +195,7 @@ def read_newick(newick, root_node=None, format=0):
     """
 
     if root_node is None:
-        from ete2.coretype.tree import TreeNode
+        from tree import TreeNode
         root_node = TreeNode()
 
     if isinstance(newick, basestring):
