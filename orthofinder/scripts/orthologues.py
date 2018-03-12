@@ -989,8 +989,8 @@ def OrthologuesWorkflow(workingDir_ogs,
             print("Loading BLAST scores")
             spTreeFN_ids, spTreeUnrootedFN = db.SpeciesTreeOnly()
         if qPhyldog:
-            wrapper_phyldog.RunPhyldogAnalysis(resultsDir + "WorkingDirectory/phyldog/", ogSet.OGs(), speciesToUse)
-            return "Running Phyldog" + "\n".join(seqs_alignments_dirs)       
+            wrapper_phyldog.RunPhyldogAnalysis(resultsDir + "WorkingDirectory/phyldog/", ogSet.OGs(), speciesToUse, nHighParallel)
+            return "Running Phyldog\n" + "\n".join(seqs_alignments_dirs)       
     else:
         db = DendroBLASTTrees(ogSet, resultsDir, nLowParrallel, qDoubleBlast)
         spTreeFN_ids, spTreeUnrootedFN, qSTAG = db.RunAnalysis()
