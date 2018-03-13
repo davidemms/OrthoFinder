@@ -855,6 +855,8 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
                     os.rmdir(pickleDir)
                 except OSError:
                     pass
+    elif "phyldog" == recon_method:
+        nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDir, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir)
     else:
         nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir, all_stride_dup_genes)
     nOrthologues_SpPair += TwoAndThreeGeneOrthogroups(ogSet, resultsDir)
@@ -989,12 +991,11 @@ def OrthologuesWorkflow(workingDir_ogs,
             print("Loading BLAST scores")
             spTreeFN_ids, spTreeUnrootedFN = db.SpeciesTreeOnly()
         if qPhyldog:
-            wrapper_phyldog.RunPhyldogAnalysis(resultsDir + "WorkingDirectory/phyldog/", ogSet.OGs(), speciesToUse, nHighParallel)
-            return "Running Phyldog\n" + "\n".join(seqs_alignments_dirs)       
+            species_tree_ids_labelled_phyldog = wrapper_phyldog.RunPhyldogAnalysis(resultsDir + "WorkingDirectory/phyldog/", ogSet.OGs(), speciesToUse, nHighParallel)
     else:
         db = DendroBLASTTrees(ogSet, resultsDir, nLowParrallel, qDoubleBlast)
         spTreeFN_ids, spTreeUnrootedFN, qSTAG = db.RunAnalysis()
-    qSpeciesTreeSupports = False if (userSpeciesTree or qMSA) else qSTAG
+    qSpeciesTreeSupports = False if (userSpeciesTree or qMSA or qPhyldog) else qSTAG
     
     """ === 2 ===
     Check can continue with analysis 
@@ -1021,6 +1022,11 @@ def OrthologuesWorkflow(workingDir_ogs,
     elif len(ogSet.seqsInfo.speciesToUse) == 2:
         hardcodeSpeciesTree = GetSpeciesTreeRoot_TwoTaxa(ogSet.seqsInfo.speciesToUse, db.workingDir)
         rootedSpeciesTreeFN = [hardcodeSpeciesTree]
+        roots = [None]
+        qMultiple = False
+        all_stride_dup_genes = None
+    elif qPhyldog:
+        rootedSpeciesTreeFN = [species_tree_ids_labelled_phyldog]
         roots = [None]
         qMultiple = False
         all_stride_dup_genes = None
@@ -1069,7 +1075,7 @@ def OrthologuesWorkflow(workingDir_ogs,
     r = roots[0]
     speciesTree_fn = rootedSpeciesTreeFN[0]
     util.PrintUnderline("Reconciling gene trees and species tree") 
-    if userSpeciesTree or len(ogSet.seqsInfo.speciesToUse) == 2:
+    if userSpeciesTree or qPhyldog or len(ogSet.seqsInfo.speciesToUse) == 2:
         resultsDir_new = resultsDir + "Orthologues/"
         reconTreesRenamedDir = resultsDir + "/Recon_Gene_Trees/"
         resultsSpeciesTrees.append(resultsDir + "SpeciesTree_rooted.txt")

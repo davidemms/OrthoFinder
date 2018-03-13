@@ -1038,8 +1038,9 @@ def ProcessArgs(program_caller):
                 util.Fail()
             arg = args.pop(0)
             if arg == "msa": options.qMSATrees = True
-            elif arg == "joint-tree-recon": 
+            elif arg == "phyldog": 
                 options.qPhyldog = True
+                options.recon_method = "phyldog"
                 options.qMSATrees = False
             elif arg == "dendroblast": options.qMSATrees = False    
             else:

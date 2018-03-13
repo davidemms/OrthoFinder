@@ -12,6 +12,8 @@ import subprocess
 import fileinput
 from collections import defaultdict, Counter
 
+import tree as tree_lib
+
 def WriteGeneralOptions(filename, baseDir):
     x="""######## First, data files ########
 BASEDIR=%s
@@ -146,8 +148,26 @@ def CleanAlignmentsForPhyldog(phyldogDir, ogs):
         c = Counter(seqs)
         if len(c) < 4: exclude.append(i)
     print("%d excluded alignments" % len(exclude))
+    print("Running PHYLDOG")
     return set(exclude)
-    
+ 
+def ProcessSpeciesTree(phyldogDir):
+    species_tree_rooted_fn = phyldogDir + "OutputSpeciesTree_ConsensusNumbered.tree.txt"
+    # Label nodes of species tree
+    species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
+    species_tree_rooted.name = "N0"    
+    leaf_node_labels = dict()
+    for n in species_tree_rooted.traverse():
+        if n.is_root(): continue
+        elif n.is_leaf():
+            sp, node_name = n.name.split("_") 
+            leaf_node_labels[sp] = node_name
+            n.name = sp
+        else:
+            n.name = "N%s" % n.name
+    ret_species_tree_fn = phyldogDir + "Species_tree_labelled.tre"
+    species_tree_rooted.write(outfile=ret_species_tree_fn)
+    return ret_species_tree_fn
     
 def WriteStandardFiles(phyldogDir, speciesToUse):
     WriteGeneralOptions(phyldogDir + "GeneralOptions.opt", phyldogDir + "../")
@@ -173,6 +193,7 @@ def Setup(phyldogDir, ogs, speciesToUse):
 def RunPhyldogAnalysis(phyldogDir, ogs, speciesToUse, nParallel):
     Setup(phyldogDir, ogs, speciesToUse)
     start = time.time()
-    subprocess.call("mpirun -np %d phyldog param=GeneralOptions.opt" % nParallel, shell=True, cwd=phyldogDir)
+    subprocess.call("mpirun -np %d phyldog param=GeneralOptions.opt" % nParallel, shell=True, cwd=phyldogDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stop = time.time()
     print("%f seconds" % (stop-start))
+    return ProcessSpeciesTree(phyldogDir)
