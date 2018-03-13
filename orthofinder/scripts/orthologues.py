@@ -689,6 +689,13 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
         except OSError:
             time.sleep(1)
             shutil.rmtree(temp_dir, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
+            
+    if qPhyldog:
+        if not util.CanRunCommand("mpirun -np 1 phyldog", qAllowStderr=False):
+            print("ERROR: Cannot run mpirun -np 1 phyldog")
+            print("Please check phyldog is installed and that the executable is in the system path\n")
+            return False
+        
     return True    
         
 def PrintHelp():
