@@ -7,6 +7,7 @@ Created on Fri Dec 16 15:20:28 2016
 
 import os
 import sys
+import time
 import subprocess
 import fileinput
 from collections import defaultdict, Counter
@@ -171,4 +172,7 @@ def Setup(phyldogDir, ogs, speciesToUse):
     
 def RunPhyldogAnalysis(phyldogDir, ogs, speciesToUse, nParallel):
     Setup(phyldogDir, ogs, speciesToUse)
-    subprocess.call("mpirun -np %d phyldog GeneralOptions.opt" % nParallel, shell=True, cwd=phyldogDir)
+    start = time.time()
+    subprocess.call("mpirun -np %d phyldog param=GeneralOptions.opt" % nParallel, shell=True, cwd=phyldogDir)
+    stop = time.time()
+    print("%f seconds" % (stop-start))
