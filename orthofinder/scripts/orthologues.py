@@ -843,7 +843,9 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
     if not os.path.exists(reconTreesRenamedDir): os.mkdir(reconTreesRenamedDir)
     if "dlcpar" in recon_method:
         qDeepSearch = (recon_method == "dlcpar_deepsearch")
+        util.PrintTime("Starting DLCpar")
         dlcparResultsDir = RunDlcpar(treesIDsPatFn, ogSet, speciesTree_fn, workingDir, nParallel, qDeepSearch)
+        util.PrintTime("Done DLCpar")
         for iog in xrange(len(ogSet.OGs())):
             util.RenameTreeTaxa(dlcparResultsDir + "OG%07d_tree_id.dlcpar.locus.tree" % iog, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qSupport=False, qFixNegatives=False, inFormat=8, label='n')
     
@@ -863,9 +865,13 @@ def ReconciliationAndOrthologues(recon_method, treesIDsPatFn, ogSet, speciesTree
                 except OSError:
                     pass
     elif "phyldog" == recon_method:
+        util.PrintTime("Starting Orthologues from Phyldog")
         nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDir, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir)
+        util.PrintTime("Done Orthologues from Phyldog")
     else:
+        util.PrintTime("Starting OF Orthologues")
         nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, speciesTree_fn, trees2ologs_of.GeneToSpecies_dash, workingDir, resultsDir, reconTreesRenamedDir, all_stride_dup_genes)
+        util.PrintTime("Done OF Orthologues")
     nOrthologues_SpPair += TwoAndThreeGeneOrthogroups(ogSet, resultsDir)
     WriteOrthologuesStats(ogSet, nOrthologues_SpPair, resultsDir)
 #    print("Identified %d orthologues" % nOrthologues)
@@ -980,7 +986,9 @@ def OrthologuesWorkflow(workingDir_ogs,
             spTreeUnrootedFN = resultsDir + "WorkingDirectory/" + "SpeciesTree_unrooted.txt"
             util.RenameTreeTaxa(spTreeFN_ids, spTreeUnrootedFN, ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True)
         qDoMSASpeciesTree = (not qLessThanFourSpecies) and (not userSpeciesTree)
+        util.PrintTime("Starting MSA/Trees")
         seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.OrthogroupMatrix(), ogSet.Spec_SeqDict(), ogSet.SpeciesDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlign or qPhyldog, qDoSpeciesTree=qDoMSASpeciesTree) 
+        util.PrintTime("Done MSA/Trees")
         if qDoMSASpeciesTree:
             spTreeFN_ids = resultsDir + "WorkingDirectory/Trees_ids/SpeciesTree_unrooted.txt"
             spTreeUnrootedFN = resultsDir + "WorkingDirectory/" + "SpeciesTree_unrooted.txt"
@@ -998,6 +1006,7 @@ def OrthologuesWorkflow(workingDir_ogs,
             print("Loading BLAST scores")
             spTreeFN_ids, spTreeUnrootedFN = db.SpeciesTreeOnly()
         if qPhyldog:
+            util.PrintTime("Starting phyldog")
             species_tree_ids_labelled_phyldog = wrapper_phyldog.RunPhyldogAnalysis(resultsDir + "WorkingDirectory/phyldog/", ogSet.OGs(), speciesToUse, nHighParallel)
     else:
         db = DendroBLASTTrees(ogSet, resultsDir, nLowParrallel, qDoubleBlast)
@@ -1039,7 +1048,9 @@ def OrthologuesWorkflow(workingDir_ogs,
         all_stride_dup_genes = None
     else:
         util.PrintUnderline("Best outgroup(s) for species tree") 
+        util.PrintTime("Starting STRIDE")
         roots, clusters_counter, rootedSpeciesTreeFN, nSupport, _, _, all_stride_dup_genes = stride.GetRoot(spTreeFN_ids, os.path.split(db.TreeFilename_IDs(0))[0] + "/", stride.GeneToSpecies_dash, nHighParallel, qWriteRootedTree=True)
+        util.PrintTime("Done STRIDE")
         nAll = sum(clusters_counter.values())
         nFP_mp = nAll - nSupport
         n_non_trivial = sum([v for k, v in clusters_counter.items() if len(k) > 1])
@@ -1095,7 +1106,9 @@ def OrthologuesWorkflow(workingDir_ogs,
     labeled_tree_fn = resultsSpeciesTrees[-1][:-4] + "_node_labels.txt"
     util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qSupport=qSpeciesTreeSupports, qFixNegatives=True)
     util.RenameTreeTaxa(speciesTree_fn, labeled_tree_fn, db.ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True, label='N')
+    util.PrintTime("Starting Recon and orthologues")
     ReconciliationAndOrthologues(recon_method, db.TreeFilename_IDs, db.ogSet, speciesTree_fn, db.workingDir, resultsDir_new, reconTreesRenamedDir, nHighParallel, i if qMultiple else None, pickleDir=pickleDir, all_stride_dup_genes=all_stride_dup_genes) 
+    util.PrintTime("Done Recon")
     
     if qMultiple:
         rooted_species_tree_dir = resultsDir + "Potential_Rooted_Species_Trees/"
