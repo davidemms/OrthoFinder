@@ -605,6 +605,7 @@ def CheckUserSpeciesTree(speciesTreeFN, expSpecies):
 
 def ConvertUserSpeciesTree(workingDir, speciesTreeFN, speciesDict):
     t = tree.Tree(speciesTreeFN, format=1)  
+    t.prune(t.get_leaf_names())
     revDict = {v:k for k,v in speciesDict.items()}
     for sp in t:
         sp.name = revDict[sp.name]       

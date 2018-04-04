@@ -823,6 +823,39 @@ class TestCommandLine(unittest.TestCase):
             self.assertTrue(filecmp.cmp(d + "SpeciesTree_ids_support_accessions.txt", baseDir + "ExpectedOutput/SpeciesTree_ids_accessions_support.txt"))
             self.assertTrue(filecmp.cmp(d + "SpeciesTree_ids_nodelabels_accessions.txt", baseDir + "ExpectedOutput/SpeciesTree_ids_accessions_nodelabels.txt"))
         
+    def test_extra_brackets_user_species_tree(self):
+        # from start
+        inputDir = baseDir + "Input/ExampleDataset_renamed/"
+        resultsDir = inputDir + "Results_%s/" % Date()
+        orthologuesDir = resultsDir + "Orthologues_%s/" % Date()
+        expectedChangedFiles = []
+        expectedExtraFiles = [orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum.csv"]
+        expExtraDir = [resultsDir]
+        with CleanUp(expectedExtraFiles, expectedChangedFiles, expExtraDir):        
+            self.stdout, self.stderr = self.RunOrthoFinder("-R dlcpar -f " + inputDir + (" -s %sInput/RootedSpeciesTree2_extra_brackets.txt"%baseDir) ) 
+            self.assertEquals(312, len(glob.glob(orthologuesDir + "Gene_Trees/*tree.txt")))
+            self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae"))
+            self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_hyopneumoniae"))
+            self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum.csv"))
+            self.assertTrue(filecmp.cmp(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum.csv",
+                                        baseDir + "ExpectedOutput/Orthologues/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum_root2.csv"))
+                               
+        # from groups
+        inputDir = baseDir + "Input/FromOrthogroups/"
+        orthologuesDir = inputDir + "Orthologues_%s/" % Date()
+        expectedChangedFiles = []
+        expectedExtraFiles = []
+        expExtraDir = [orthologuesDir + d for d in ["Gene_Trees/", "Orthologues/", "WorkingDirectory/", ""]]
+        with CleanUp(expectedExtraFiles, expectedChangedFiles, expExtraDir):        
+            self.stdout, self.stderr = self.RunOrthoFinder("-R dlcpar -fg " + inputDir + (" -s %sInput/RootedSpeciesTree2_extra_brackets.txt"%baseDir) ) 
+            self.assertEquals(312, len(glob.glob(orthologuesDir + "Gene_Trees/*tree.txt")))
+            self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae"))
+            self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_hyopneumoniae"))
+            self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum.csv"))
+            self.assertTrue(filecmp.cmp(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum.csv",
+                                        baseDir + "ExpectedOutput/Orthologues/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum_root2.csv"))        
+        
+        
 #    def test_treesExtraSpecies(self):
 #        pass
         
