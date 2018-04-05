@@ -673,7 +673,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
         else:
             if not program_caller.TestMSAMethod(temp_dir, msa_method):
                 print("ERROR: Cannot run user-configured MSA method '%s'" % msa_method)
-                print("Please check program is installed and that it is correctly configured in the ~/.orthofinder.config file\n")
+                print("Please check program is installed and that it is correctly configured in the orthofinder/config.json file\n")
                 return False
         if tree_method == "fasttree":
             if qMSAGeneTrees and (not qStopAfterAlignments) and not util.CanRunCommand("FastTree %s" % testFN, qAllowStderr=True):
@@ -683,7 +683,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
         else:
             if not program_caller.TestTreeMethod(temp_dir, tree_method):
                 print("ERROR: Cannot run user-configured tree method '%s'" % tree_method)
-                print("Please check program is installed and that it is correctly configured in the ~/.orthofinder.config file\n")
+                print("Please check program is installed and that it is correctly configured in the orthofinder/config.json file\n")
                 return False
         try:
             shutil.rmtree(temp_dir)
