@@ -113,7 +113,7 @@ def GraftTripartAndUpdate(nTop, s1, s2, p):
         
 def ContainsMonophyletic(e, O, i, I):
     """
-    Check if O is a monophyletic clade in e. Returns (isMono, n) where n is the node if O is monophletic otherwise n is None
+    Check if set of species O is found only in a clade below e. If so, returns (True, n) where n is the clade otherwise (False, None)
     Args:
         e - the node to check
         O - the species set to look for
@@ -186,20 +186,37 @@ def resolve(n, M):
             s1 = n.get_common_ancestor(sis[1]) if len(sis[1]) > 1 else (n&sis[1][0])
             return GraftAndUpdate(n, s0, s1)
     elif "recon_2" in n.features:
-        """ (destination, target, move_out)"""
+        """ (dest, target, move_out)
+        move target to be sister to destination, move move_out to where target was
+        Note, move_out is a list of lists, corresponding to potentially multiple nodes"""
         moves = n.recon_2
         n.del_feature('recon_2')
-        if check_monophyly(n, moves[0]) and check_monophyly(n, moves[1]) and check_monophyly(n, moves[2]):
-            s0 = n.get_common_ancestor(moves[0]) if len(moves[0]) > 1 else (n&moves[0][0])
-            s1 = n.get_common_ancestor(moves[1]) if len(moves[1]) > 1 else (n&moves[1][0])
+        dest, target, move_out = moves
+        if check_monophyly(n, dest) and check_monophyly(n, target) and all([check_monophyly(n, m) for m in move_out]):
+            # make all the move_out hang from a single node
+            if len(move_out) == 1:
+                sm_new = n.get_common_ancestor(move_out[0]) if len(move_out[0]) > 1 else (n&move_out[0][0])
+            else:
+                sm = n.get_common_ancestor(move_out[0]) if len(move_out[0]) > 1 else (n&move_out[0][0])
+                sm_new = sm.up.add_child()
+                dist = sm.up.dist
+                sm_new.dist = dist
+                sm_new_sp_down = set()
+                for m in move_out:
+                    sm = n.get_common_ancestor(m) if len(m) > 1 else (n&m[0])
+                    sm_new_sp_down.update(sm.sp_down)
+                    sm = sm.detach()
+                    sm_new.add_child(sm)
+                sm_new.add_feature("sp_down", sm_new_sp_down)
+            s0 = n.get_common_ancestor(dest) if len(dest) > 1 else (n&dest[0])
+            s1 = n.get_common_ancestor(target) if len(target) > 1 else (n&target[0])
             d = s1.get_sisters()[0].dist
             tree = GraftAndUpdate(n, s1, s0)
             tree.dist = d
-            s3 = tree.get_common_ancestor(moves[0] + moves[1])
+            s3 = tree.get_common_ancestor(dest + target)
             sister = s3.up.up
             top = sister.up if sister.up != None else sister
-            s2 = n.get_common_ancestor(moves[2]) if len(moves[2]) > 1 else (n&moves[2][0])
-            return GraftAndUpdate(top, s2, sister)
+            return GraftAndUpdate(top, sm_new, sister)
         
     ch = n.get_children()
     if len(ch) != 2: return n.get_tree_root()    #bipart
@@ -212,7 +229,7 @@ def resolve(n, M):
     S = set() if (n.is_root() or len(n.get_sisters()) > 1) else set.union(*[nother.sp_down for nother in n.up.get_children() if nother != n]) # works for non-binary too
     
     successA, nA, dA = ContainsMonophyletic(ch[0], O, 0, 3)   
-    successB, nB, dB = ContainsMonophyletic(ch[1], O, 0, 3)    
+    successB, nB, dB = ContainsMonophyletic(ch[1], O, 0, 3)   
     if dA+dB > 2:
         if dA == 2:
             successA, nA, dA = ContainsMonophyletic(ch[0], O, 0, 2)   
@@ -220,17 +237,16 @@ def resolve(n, M):
             successB, nB, dB = ContainsMonophyletic(ch[1], O, 0, 2)                  
         
     if (dA==0 and dB==1) or (dA==1 and dB==0): 
-        # lowest letter is the one that branches
+        # Case A
+        # a is the one that branches
+        # v is the child of A that overlaps with O
         if dA == 1:
             a, b = ch
+            v = nA
         else:
             b, a = ch
-        ch = a.get_children()
-        u, v = ch
-        U,V = [c.sp_down for c in ch]
-        if O & U: 
-            v,u = ch
-            U = u.sp_down
+            v = nB
+        U = set.union(*[c.sp_down for c in a.get_children() if c != v]) # allows for non-binary
         case = (bool(S&O), bool(S&U))  
         if case in c10_a:
             return GraftAndUpdate(n, b, v)
@@ -239,60 +255,69 @@ def resolve(n, M):
             return n.get_tree_root()
         return n.get_tree_root()
     elif (dA==1 and dB==1): 
+        # Case B
+        # v is the child of A that overlaps with O (ws are the others)
+        # x is the child of B that overlaps with O
+        v = nA
+        x = nB
         cha = ch[0].get_children()
-        U,V = [c.sp_down for c in cha]
-        if O & U: 
-            v, u = cha
-            TEMP = U
-            U = V
-            V = TEMP
-        else:
-            u, v = cha
         chb = ch[1].get_children()
-        W,X = [c.sp_down for c in chb]
-        if O & W: 
-            x, w = chb
-            TEMP = X
-            X = W
-            W = TEMP
-        else:
-            w, x = chb
+        U = set.union(*[c.sp_down for c in cha if c != v]) # allows for non-binary
+        W = set.union(*[c.sp_down for c in chb if c != x]) # allows for non-binary
         case = (bool(S&O), bool(S&W), bool(S&U))
         if case in c11_a:
             return GraftAndUpdate(n, x, v)
         elif case in c11_b:
             if W&S:
-                w = u
-                x = v
-            n.up.add_feature("recon_2", (x.get_leaf_names(),s.get_leaf_names(),w.get_leaf_names())) 
+                # switch, so that ws, x are below a
+                ws = [c for c in cha if c != v]
+                w_leaves = [c.get_leaf_names() for c in ws]   # need to get the list of leaves that aren't in the node where the overlap is (for w.get_leaf_names(), below) AND need to update recon2 so that it will deal with multiple nodes in the ones it has to move
+                x = v   
+            else:
+                ws = [c for c in chb if c != x]
+                w_leaves = [c.get_leaf_names() for c in ws]
+            n.up.add_feature("recon_2", (x.get_leaf_names(),s.get_leaf_names(),w_leaves)) 
             return n.get_tree_root()
         elif case in c11_c:
-            n.up.add_feature("recon", (s.get_leaf_names(), w.get_leaf_names()))     
+            ws = [c for c in chb if c != x]
+            w_leaves = [c.get_leaf_names() for c in ws] 
+            n.up.add_feature("recon", (s.get_leaf_names(), w_leaves))     
             return n.get_tree_root()
         return n.get_tree_root()
     elif (dA==2 and dB==0) or (dA==0 and dB==2): 
+        # Case C
         if dA == 2:
             a,b = ch
         else:
             b,a = ch
         cha = a.get_children()
-        u, v = cha
-        U,V = [c.sp_down for c in cha]
-        if O & V: 
-            v, u = cha
-            U =  u.sp_down
-            V =  v.sp_down
-        chu = u.get_children()[:2]  # fix
-        y,z = chu
-        Y,Z = [c.sp_down for c in chu]
-        if O & Y:
-            z,y = chu
-            Y = y.sp_down
+        i = next(ii for ii,c in enumerate(cha) if (c.sp_down & O))  # there will be only one node with an overlap
+        u = cha[i]
+        vs = [c for ii, c in enumerate(cha) if ii != i]
+        V = set.union(*[c.sp_down for c in vs])
+        chu = u.get_children()  
+        i = next(ii for ii,c in enumerate(chu) if (c.sp_down & O))
+        z = chu[i]
+        ys = [c for ii, c in enumerate(chu) if ii != i]
+        Y = set.union(*[c.sp_down for c in ys])
         case = (bool(S&V), bool(S&Y), bool(S&O), bool(V&Y))
         if case in c20_a:
             return GraftAndUpdate(n, b, z)
         elif case in c20_b:
-            return GraftAndUpdate(n, v, b)
+            # need to make v a single node
+            if len(vs) == 1:
+                vs_new = vs[0]
+            else:
+                vs_up = vs[0].up
+                vs_new = vs_up.add_child()
+                vs_new.dist = vs_up.dist
+                vs_new_sp_down = set()
+                for v in vs:
+                    vs_new_sp_down.update(v.sp_down)
+                    v = v.detach()
+                    vs_new.add_child(v)
+                vs_new.add_feature("sp_down", vs_new_sp_down)        
+            return GraftAndUpdate(n, vs_new, b)
         elif case in c20_c:
             n.up.add_feature("recon", (b.get_leaf_names(), s.get_leaf_names()))     
             return n.get_tree_root()

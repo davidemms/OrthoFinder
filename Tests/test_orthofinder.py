@@ -42,7 +42,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "2.2.2"
+version = "2.2.3"
 requiredBlastVersion = "2.2.28+"
 
 standard_new_files = ("Orthogroups.csv Orthogroups.GeneCount.csv SingleCopyOrthogroups.txt Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_v%s_I1.5.txt_id_pairs.txt clusters_OrthoFinder_v%s_I1.5.txt OrthoFinder_v%s_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv" % (version, version, version)).split()
@@ -135,7 +135,7 @@ class CleanUp(object):
         if not self.qCleanup: return
         if self.qSaveFiles and len(self.newFiles) != 0:
             saveDir = os.path.split(self.newFiles[0])[0] + "/SavedFiles/"
-            os.mkdir(saveDir)
+            if not os.path.exists(saveDir): os.mkdir(saveDir)
             for fn in self.modifiedFiles + self.newFiles:
                 if os.path.exists(fn):
                     shutil.copy(fn, saveDir + os.path.split(fn)[1])
@@ -854,8 +854,30 @@ class TestCommandLine(unittest.TestCase):
             self.assertTrue(os.path.exists(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum.csv"))
             self.assertTrue(filecmp.cmp(orthologuesDir + "Orthologues/Orthologues_Mycoplasma_agalactiae/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum.csv",
                                         baseDir + "ExpectedOutput/Orthologues/Mycoplasma_agalactiae__v__Mycoplasma_gallisepticum_root2.csv"))        
-        
-        
+
+    def TestResolve(self, case):    
+        resolve_script = "python " + os.path.split(orthofinder)[0] + "/scripts/resolve.py"
+        inDir = baseDir + "Input/Resolve/"
+        expDir = baseDir + "ExpectedOutput/Resolve/"
+        infn = inDir + case
+        expectedResultfn = infn + ".rec.tre"
+        goldfn = expDir + case + ".rec.tre"
+        with CleanUp([expectedResultfn], [], []):        
+            subprocess.call("%s -s dash %s" % (resolve_script, infn), shell=True, env=my_env)   #, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            self.assertTrue(filecmp.cmp(goldfn, expectedResultfn))  
+    
+    def test_resolve_nonbinary_issue147(self):
+        """
+        Error was cause when one of the nested clades in which an overalp occurs was assumed to be binary
+        """
+        self.TestResolve("non_binary_tree.txt")
+        self.TestResolve("non_binary_tree_caseB_t1.txt")
+        self.TestResolve("non_binary_tree_caseB_t2.txt")
+        self.TestResolve("non_binary_tree_caseB_b_t1.txt")
+        self.TestResolve("non_binary_tree_caseB_b_t2.txt")
+        self.TestResolve("non_binary_tree_caseC_t1.txt")
+    
+    
 #    def test_treesExtraSpecies(self):
 #        pass
         
