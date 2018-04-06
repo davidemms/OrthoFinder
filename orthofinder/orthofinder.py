@@ -868,8 +868,8 @@ class Options(object):#
         self.qStopAfterTrees = False
         self.qMSATrees = False
         self.search_program = "blast"
-        self.msa_program = "mafft"
-        self.tree_program = "fasttree"
+        self.msa_program = None
+        self.tree_program = None
         self.recon_method = "of_recon"
         self.name = ""   # name to identify this set of results
         self.qDoubleBlast = True
@@ -1037,11 +1037,15 @@ def ProcessArgs(program_caller):
                 print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
             arg = args.pop(0)
-            if arg == "msa": options.qMSATrees = True
+            if arg == "msa": 
+                options.qMSATrees = True
+                options.msa_program = "mafft"
+                options.tree_program = "fasttree"
             elif arg == "phyldog": 
                 options.qPhyldog = True
                 options.recon_method = "phyldog"
                 options.qMSATrees = False
+                options.msa_program = "mafft"
             elif arg == "dendroblast": options.qMSATrees = False    
             else:
                 print("Invalid argument for option %s: %s" % (arg_M_or_msa, arg))
@@ -1128,7 +1132,15 @@ def ProcessArgs(program_caller):
 
     if options.qStopAfterAlignments and (not options.qMSATrees):
         print("ERROR: Argument '-oa' (stop after alignments) also requires option '-M msa'")
-        util.Fail()         
+        util.Fail()    
+
+    if options.tree_program != None and (not options.qMSATrees):
+        print("ERROR: Argument '-T' (tree inference program) also requires option '-M msa'")
+        util.Fail()  
+
+    if options.msa_program != None and (not options.qMSATrees):
+        print("ERROR: Argument '-A' (multiple sequence alignment inference program) also requires option '-M msa'")
+        util.Fail()        
         
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
     print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)

@@ -670,7 +670,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
                 print("ERROR: Cannot run mafft")
                 print("Please check MAFFT is installed and that the executables are in the system path\n")
                 return False
-        else:
+        elif msa_method != None:
             if not program_caller.TestMSAMethod(temp_dir, msa_method):
                 print("ERROR: Cannot run user-configured MSA method '%s'" % msa_method)
                 print("Please check program is installed and that it is correctly configured in the orthofinder/config.json file\n")
@@ -680,7 +680,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
                 print("ERROR: Cannot run FastTree")
                 print("Please check FastTree is installed and that the executables are in the system path\n")
                 return False      
-        else:
+        elif tree_method != None:
             if not program_caller.TestTreeMethod(temp_dir, tree_method):
                 print("ERROR: Cannot run user-configured tree method '%s'" % tree_method)
                 print("Please check program is installed and that it is correctly configured in the orthofinder/config.json file\n")
