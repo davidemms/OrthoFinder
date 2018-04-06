@@ -293,14 +293,18 @@ def GetSeqsInfo(inputDirectory, speciesToUse, nSpAll):
 def GetSpeciesToUse(speciesIDsFN):
     """Returns species indices to use and total number of species available """
     speciesToUse = []
+    speciesToUse_names = []
     nSkipped = 0
     with open(speciesIDsFN, 'rb') as speciesF:
         for line in speciesF:
             line = line.rstrip()
             if not line: continue
             if line.startswith("#"): nSkipped += 1
-            else: speciesToUse.append(int(line.split(":")[0]))
-    return speciesToUse, len(speciesToUse) + nSkipped
+            else: 
+                iSp, spName = line.split(": ")
+                speciesToUse.append(int(iSp))
+                speciesToUse_names.append(spName)
+    return speciesToUse, len(speciesToUse) + nSkipped, speciesToUse_names
  
 def Success():
     ptm = parallel_task_manager.ParallelTaskManager_singleton()

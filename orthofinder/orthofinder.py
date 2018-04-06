@@ -1290,7 +1290,7 @@ def ProcessPreviousFiles(workingDir, qDoubleBlast):
     if not os.path.exists(dirs.SpeciesIdsFilename()):
         print("%s file must be provided if using previously calculated BLAST results" % dirs.SpeciesIdsFilename())
         util.Fail()
-    dirs.speciesToUse, dirs.nSpAll = util.GetSpeciesToUse(dirs.SpeciesIdsFilename())
+    dirs.speciesToUse, dirs.nSpAll, speciesToUse_names = util.GetSpeciesToUse(dirs.SpeciesIdsFilename())
     dirs.resultsDir = dirs.workingDir
     
     # check BLAST results directory exists
@@ -1342,7 +1342,7 @@ def ProcessPreviousFiles(workingDir, qDoubleBlast):
     if not os.path.exists(dirs.IDsFilename()):
         print("%s file must be provided if using previous calculated BLAST results" % dirs.IDsFilename())
         util.Fail()
-    return dirs
+    return dirs, speciesToUse_names
 
 # 6
 def CreateSearchDatabases(dirs, options, program_caller):
@@ -1418,7 +1418,7 @@ def GetOrthologues_FromTrees(orthologuesDir, options):
     workingDir = orthologuesDir + "WorkingDirectory/"
     return orthologues.OrthologuesFromTrees(options.recon_method, groupsDir, workingDir, options.nBlast, options.speciesTreeFN, pickleDir=options.separatePickleDir)
  
-def ProcessesNewFasta(fastaDir, existingDirs=None, name = ""):
+def ProcessesNewFasta(fastaDir, existingDirs=None, speciesToUse_prev_names=[], name = ""):
     """
     Process fasta files and return a Directory object with all paths completed.
     """
@@ -1429,6 +1429,13 @@ def ProcessesNewFasta(fastaDir, existingDirs=None, name = ""):
         util.Fail()
     originalFastaFilenames = sorted([f for f in os.listdir(fastaDir) if os.path.isfile(os.path.join(fastaDir,f))])
     originalFastaFilenames = [f for f in originalFastaFilenames if len(f.rsplit(".", 1)) == 2 and f.rsplit(".", 1)[1].lower() in fastaExtensions]
+    speciesToUse_prev_names = set(speciesToUse_prev_names)
+    if any([fn in speciesToUse_prev_names for fn in originalFastaFilenames]):
+        print("ERROR: Attempted to add a second copy of a previously included species:")
+        for fn in originalFastaFilenames:
+            if fn in speciesToUse_prev_names: print(fn)
+        print("")
+        util.Fail()
     if len(originalFastaFilenames) == 0:
         print("\nNo fasta files found in supplied directory: %s" % fastaDir)
         util.Fail()
@@ -1517,10 +1524,10 @@ if __name__ == "__main__":
         # if using previous Trees etc., check these are all present - Job for orthologues
         if options.qStartFromBlast and options.qStartFromFasta:
             # 0. Check Files
-            dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            dirs, speciesToUse_names = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
             print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, dirs.workingDir))
             # 3. 
-            dirs = ProcessesNewFasta(fastaDir, dirs, options.name)
+            dirs = ProcessesNewFasta(fastaDir, dirs, speciesToUse_names, options.name)
             options = CheckOptions(options, dirs)
             # 4.
             seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
@@ -1543,7 +1550,8 @@ if __name__ == "__main__":
                 
         elif options.qStartFromFasta:
             # 3. 
-            dirs = ProcessesNewFasta(fastaDir, name = options.name)
+            previousSpeciesNames = []
+            dirs = ProcessesNewFasta(fastaDir, speciesToUse_prev_names=previousSpeciesNames, name = options.name)
             options = CheckOptions(options, dirs)
             # 4
             seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
@@ -1566,7 +1574,7 @@ if __name__ == "__main__":
             
         elif options.qStartFromBlast:
             # 0.
-            dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            dirs, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
             print("Using previously calculated BLAST results in %s" % dirs.workingDir) 
             options = CheckOptions(options, dirs)
             # 4.
@@ -1584,7 +1592,7 @@ if __name__ == "__main__":
             util.PrintCitation() 
         elif options.qStartFromGroups:
             # 0.  
-            dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            dirs, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
             dirs.resultsDir = orthofinderResultsDir       
             options = CheckOptions(options, dirs)
             # 9
@@ -1592,7 +1600,7 @@ if __name__ == "__main__":
             # 10
             util.PrintCitation() 
         elif options.qStartFromTrees:
-            dirs = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            dirs, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
             options = CheckOptions(options, dirs)
             summaryText = GetOrthologues_FromTrees(orthologuesDir, options)
             print(summaryText)

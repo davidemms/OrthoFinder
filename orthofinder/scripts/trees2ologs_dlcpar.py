@@ -64,7 +64,7 @@ def make_dicts(dlcparResultsDir):
     return Orthologs
     
 def GetSpeciesGenesInfo(ogSet):
-    speciesLabels, nSpAll = util.GetSpeciesToUse(ogSet.speciesIDsFN) 
+    speciesLabels, nSpAll, _ = util.GetSpeciesToUse(ogSet.speciesIDsFN) 
     seqsInfo = util.GetSeqsInfo(ogSet.workingDirOF, speciesLabels, nSpAll)
     genenumbers = list(np.diff(seqsInfo.seqStartingIndices))
     genenumbers.append(seqsInfo.nSeqs - seqsInfo.seqStartingIndices[-1])

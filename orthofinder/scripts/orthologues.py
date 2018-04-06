@@ -920,7 +920,7 @@ def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, spe
     reconTreesRenamedDir = resultsDir_new + "../Recon_Gene_Trees/"
 
     orthofinderWorkingDir, orthofinderResultsDir, clustersFilename_pairs = util.GetOGsFile(groupsDir)
-    speciesToUse, nSpAll = util.GetSpeciesToUse(orthofinderWorkingDir + "SpeciesIDs.txt")    
+    speciesToUse, nSpAll, _ = util.GetSpeciesToUse(orthofinderWorkingDir + "SpeciesIDs.txt")    
     ogSet = OrthoGroupsSet(orthofinderWorkingDir, speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor)
     if qUserSpTree:
         speciesToUseNames = ogSet.SpeciesDict().values()
