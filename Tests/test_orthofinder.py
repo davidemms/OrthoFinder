@@ -82,6 +82,7 @@ expectedHelp2=""" -s <file>         User-specified rooted species tree
  -p <dir>          Write the temporary pickle files to <dir>
  -1                Only perform one-way sequence search 
  -n <txt>          Name to append to the results directory
+ -o <txt>          Non-default results directory
  -h                Print this help text
 
 WORKFLOW STOPPING OPTIONS:
@@ -194,6 +195,36 @@ class TestCommandLine(unittest.TestCase):
             self.stdout, self.stderr = self.RunOrthoFinder("--fasta %s -og" % exampleFastaDir)
             self.CheckStandardRun(self.stdout, self.stderr, goldResultsDir_smallExample, expectedCSVFile)  
         self.test_passed = True         
+           
+    @unittest.skipIf(__skipLongTests__, "Only performing quick tests")     
+    def test_fromfasta_full_user_output_dir(self):
+        currentResultsDir = baseDir + "Input/UserSpecifiedDir/" 
+        expectedCSVFile = currentResultsDir + "Orthogroups.csv"     
+        with CleanUp([], [], [currentResultsDir, ]):
+            self.stdout, self.stderr = self.RunOrthoFinder("--fasta %s -og -o %s" % (exampleFastaDir, currentResultsDir))
+            self.CheckStandardRun(self.stdout, self.stderr, goldResultsDir_smallExample, expectedCSVFile)  
+        # this time without a final slash
+        currentResultsDir = baseDir + "Input/UserSpecifiedDir2" 
+        with CleanUp([], [], [currentResultsDir, ]):
+            self.stdout, self.stderr = self.RunOrthoFinder("--fasta %s -op -o %s" % (exampleFastaDir, currentResultsDir))
+            self.assertTrue(os.path.exists(currentResultsDir + "/WorkingDirectory/SpeciesIDs.txt"))
+        # Test erroneous directory
+        currentResultsDir = baseDir + "Input/DoesNotExist/UserSpecifiedDir" 
+        self.stdout, self.stderr = self.RunOrthoFinder("--fasta %s -op -o %s" % (exampleFastaDir, currentResultsDir))
+        self.assertTrue(("ERROR: location '%sInput/DoesNotExist' for results directory 'UserSpecifiedDir' does not exist" % baseDir) in self.stdout)
+        self.assertTrue("ERROR: An error occurred, please review error messages for more information" in self.stdout)
+        # Test incompatible arguments
+        currentResultsDir = baseDir + "Input/UserSpecifiedDir2" 
+        self.stdout, self.stderr = self.RunOrthoFinder("--fasta %s -op -o %s -n name2" % (exampleFastaDir, currentResultsDir))
+        self.assertTrue("ERROR: Incompatible arguments, -o (non-default output directory) and -n (name for OrthoFinder run)" in self.stdout)
+        self.assertTrue("ERROR: An error occurred, please review error messages for more information" in self.stdout)
+        # Test incompatible arguments -o with -b
+        currentResultsDir = baseDir + "Input/UserSpecifiedDir2" 
+        self.stdout, self.stderr = self.RunOrthoFinder("-b %s -og -o %s" % (exampleBlastDir, currentResultsDir))
+        self.assertTrue("ERROR: Incompatible arguments, -o (non-default output directory) can only be used with a new OrthoFinder run using option '-f'" in self.stdout)
+        self.assertTrue("ERROR: An error occurred, please review error messages for more information" in self.stdout)
+        self.test_passed = True  
+            
         
     def test_justPrepare(self):    
         self.currentResultsDir = exampleFastaDir + "Results_%s/" % Date() 

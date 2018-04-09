@@ -797,6 +797,7 @@ def PrintHelp(program_caller):
     print(" -p <dir>          Write the temporary pickle files to <dir>")
     print(" -1                Only perform one-way sequence search ")
     print(" -n <txt>          Name to append to the results directory")  
+    print(" -o <txt>          Non-default results directory")  
     print(" -h                Print this help text")
 
     print("")    
@@ -922,6 +923,7 @@ def ProcessArgs(program_caller):
     fastaDir = None
     workingDir = None
     orthologuesDir = None
+    resultsDir_nonDefault = None
     
     """
     -f: store fastaDir
@@ -1009,6 +1011,27 @@ def ProcessArgs(program_caller):
             options.name = args.pop(0)
             if any([symbol in options.name for symbol in [" ", "/"]]): 
                 print("Invalid symbol for command line argument %s\n" % arg)
+                util.Fail()
+        elif arg == "-o" or arg == "--output":  
+            if resultsDir_nonDefault != None:
+                print("Repeated argument: -o/--output")
+                util.Fail()
+            if len(args) == 0:
+                print("Missing option for command line argument %s\n" % arg)
+                util.Fail()
+            resultsDir_nonDefault = args.pop(0)
+            if os.path.exists(resultsDir_nonDefault):
+                print("ERROR: non-default output directory already exists: %s\n" % resultsDir_nonDefault)
+                util.Fail()
+            if " " in resultsDir_nonDefault:
+                print("ERROR: non-default output directory cannot include spaces: %s\n" % resultsDir_nonDefault)
+                util.Fail()
+            checkDirName = resultsDir_nonDefault
+            while checkDirName.endswith("/"):
+                checkDirName = checkDirName[:-1]
+            path, newDir = os.path.split(checkDirName)
+            if not os.path.exists(path):
+                print("ERROR: location '%s' for results directory '%s' does not exist.\n" % (path, newDir))
                 util.Fail()
         elif arg == "-s" or arg == "--speciestree":  
             if options.speciesXMLInfoFN:
@@ -1140,11 +1163,19 @@ def ProcessArgs(program_caller):
 
     if options.msa_program != None and (not options.qMSATrees):
         print("ERROR: Argument '-A' (multiple sequence alignment inference program) also requires option '-M msa'")
-        util.Fail()        
+        util.Fail()    
+
+    if resultsDir_nonDefault != None and options.name != "":
+        print("ERROR: Incompatible arguments, -o (non-default output directory) and -n (name for OrthoFinder run)")
+        util.Fail()      
+
+    if resultsDir_nonDefault != None and ((not options.qStartFromFasta) or options.qStartFromBlast):
+        print("ERROR: Incompatible arguments, -o (non-default output directory) can only be used with a new OrthoFinder run using option '-f'")
+        util.Fail()       
         
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
     print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
-    return options, fastaDir, workingDir, orthologuesDir            
+    return options, fastaDir, workingDir, orthologuesDir, resultsDir_nonDefault            
 
 def GetXMLSpeciesInfo(dirs, options):
     # speciesInfo:  name, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile
@@ -1514,7 +1545,7 @@ if __name__ == "__main__":
         print("")
         print("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version)
         program_caller = GetProgramCaller()
-        options, fastaDir, workingDir, orthologuesDir = ProcessArgs(program_caller)  
+        options, fastaDir, workingDir, orthologuesDir, resultsDir_nonDefault = ProcessArgs(program_caller)  
         # 2.
         if options.qStartFromGroups or options.qStartFromTrees:
             # User can specify it using clusters_id_pairs file, process this first to get the workingDirectory
@@ -1551,7 +1582,19 @@ if __name__ == "__main__":
         elif options.qStartFromFasta:
             # 3. 
             previousSpeciesNames = []
-            dirs = ProcessesNewFasta(fastaDir, speciesToUse_prev_names=previousSpeciesNames, name = options.name)
+            dirs = None
+            if resultsDir_nonDefault != None:
+#                raise Exception("# Do whatever processing of user input is required")
+                # read/write access
+                # ...
+                if resultsDir_nonDefault[-1] != "/":
+                    resultsDir_nonDefault += "/"
+                dirs = Directories()
+                dirs.resultsDir = resultsDir_nonDefault 
+                dirs.workingDir = dirs.resultsDir + "WorkingDirectory/"
+                os.mkdir(dirs.resultsDir)
+                os.mkdir(dirs.workingDir)
+            dirs = ProcessesNewFasta(fastaDir, dirs, speciesToUse_prev_names=previousSpeciesNames, name = options.name)
             options = CheckOptions(options, dirs)
             # 4
             seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
