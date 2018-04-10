@@ -48,7 +48,7 @@ SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStar
 FileInfo = namedtuple("FileInfo", "workingDir graphFilename separatePickleDir")     
 
 picProtocol = 1
-version = "2.2.3"
+version = "2.3.0"
 
 # Fix LD_LIBRARY_PATH when using pyinstaller 
 my_env = os.environ.copy()
@@ -260,15 +260,7 @@ def SortArrayPairByFirst(useForSortAr, keepAlignedAr, qLargestFirst=False):
     sortedTuples = sorted(zip(useForSortAr, keepAlignedAr), reverse=qLargestFirst)
     useForSortAr = [i for i, j in sortedTuples]
     keepAlignedAr = [j for i, j in sortedTuples]
-    return useForSortAr, keepAlignedAr
-
-def SortFastaFilenames(fastaFilenames):
-    speciesIndices = []
-    for f in fastaFilenames:
-        start = f.rfind("Species")
-        speciesIndices.append(int(f[start+7:-3]))
-    indices, sortedFasta = SortArrayPairByFirst(speciesIndices, fastaFilenames)
-    return sortedFasta        
+    return useForSortAr, keepAlignedAr      
 
 # Get Info from seqs IDs file?
 def GetSeqsInfo(inputDirectory, speciesToUse, nSpAll):

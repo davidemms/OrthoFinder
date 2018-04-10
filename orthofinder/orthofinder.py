@@ -51,6 +51,7 @@ import scripts.mcl as MCLread
 import scripts.blast_file_processor as BlastFileProcessor
 from scripts import util, matrices, orthologues
 from scripts import program_caller as pcs
+import scripts.files
 
 # Get directory containing script/bundle
 if getattr(sys, 'frozen', False):
@@ -357,22 +358,22 @@ def GetNumberOfSequencesInFile(filename):
 
 """ Question: Do I want to do all BLASTs or just the required ones? It's got to be all BLASTs I think. They could potentially be 
 run after the clustering has finished."""
-def GetOrderedSearchCommands(seqsInfo, dirs, qDoubleBlast, search_program, program_caller):
+def GetOrderedSearchCommands(seqsInfo, speciesInfoObj, qDoubleBlast, search_program, program_caller):
     """ Using the nSeq1 x nSeq2 as a rough estimate of the amount of work required for a given species-pair, returns the commands 
     ordered so that the commands predicted to take the longest come first. This allows the load to be balanced better when processing 
     the BLAST commands.
     """
-    iSpeciesPrevious = range(dirs.iFirstNewSpecies)
-    iSpeciesNew = range(dirs.iFirstNewSpecies, dirs.nSpAll)
+    iSpeciesPrevious = range(speciesInfoObj.iFirstNewSpecies)
+    iSpeciesNew = range(speciesInfoObj.iFirstNewSpecies, speciesInfoObj.nSpAll)
     speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew) if (qDoubleBlast or i <=j)] + \
                    [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesPrevious) if (qDoubleBlast or i <=j)] + \
                    [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew) if (qDoubleBlast or i <=j)] 
     taskSizes = [seqsInfo.nSeqsPerSpecies[i]*seqsInfo.nSeqsPerSpecies[j] for i,j in speciesPairs]
     taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
     if search_program == "blast":
-        commands = [" ".join(["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", dirs.workingDir + "Species%d.fa" % iFasta, "-db", dirs.workingDir + "BlastDBSpecies%d" % iDB, "-out", "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)]) for iFasta, iDB in speciesPairs]
+        commands = [" ".join(["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", scripts.files.FileHandler.GetSpeciesFastaFN(iFasta), "-db", scripts.files.FileHandler.GetSpeciesDatabaseN(iDB), "-out", scripts.files.FileHandler.GetBlastResultsFN(iFasta, iDB)]) for iFasta, iDB in speciesPairs]
     else:
-        commands = [program_caller.GetSearchMethodCommand_Search(search_program, dirs.workingDir + "Species%d.fa" % iFasta, dirs.workingDir + "%sDBSpecies%d" % (search_program, iDB), "%sBlast%d_%d.txt" % (dirs.workingDir, iFasta, iDB)) for iFasta, iDB in speciesPairs]
+        commands = [program_caller.GetSearchMethodCommand_Search(search_program, scripts.files.FileHandler.GetSpeciesFastaFN(iFasta), scripts.files.FileHandler.GetSpeciesDatabaseN(iDB, search_program), scripts.files.FileHandler.GetBlastResultsFN(iFasta, iDB)) for iFasta, iDB in speciesPairs]
     return commands     
 
 """
@@ -884,21 +885,6 @@ class Options(object):#
         for k, v in self.__dict__.items():
             if v == True:
                 print(k)
-
-class Directories(object):
-    def __init__(self):
-        self.resultsDir = None           # directory for orthogroup results files
-        self.workingDir = None           # Orthogroup inference workingDir
-        self.separatePickleDir = None
-                                         # Will need to store 3 bits of information in total    
-        self.speciesToUse = []           #       seqsInfo.iSpeciesToUse   - which to include for this analysis 
-        self.nSpAll = None               #       seqsInfo.nSpAll => 0, 1, ..., nSpAll - 1 are valid species indices
-        self.iFirstNewSpecies = None     #       iFirstNew   => (0, 1, ..., iFirstNew-1) are from previous and (iFirstNew, iFirstNew+1, ..., nSpecies-1) are the new species indices
-    
-    def IDsFilename(self):
-        return self.workingDir + "SequenceIDs.txt"
-    def SpeciesIdsFilename(self):
-        return self.workingDir + "SpeciesIDs.txt"
                                  
 def ProcessArgs(program_caller):
     """ 
@@ -1177,14 +1163,14 @@ def ProcessArgs(program_caller):
     print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
     return options, fastaDir, workingDir, orthologuesDir, resultsDir_nonDefault            
 
-def GetXMLSpeciesInfo(dirs, options):
+def GetXMLSpeciesInfo(seqsInfoObj, options):
     # speciesInfo:  name, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile
     util.PrintUnderline("Reading species information file")
     # do this now so that we can alert user to any errors prior to running the algorithm
-    speciesInfo = [[] for i_ in dirs.speciesToUse]
-    speciesNamesDict = SpeciesNameDict(dirs.SpeciesIdsFilename())
+    speciesXML = [[] for i_ in seqsInfoObj.speciesToUse]
+    speciesNamesDict = SpeciesNameDict(scripts.files.FileHandler.GetSpeciesIDsFN())
     speciesRevDict = {v:k for k,v in speciesNamesDict.items()}
-    userFastaFilenames = [os.path.split(speciesNamesDict[i])[1] for i in dirs.speciesToUse]
+    userFastaFilenames = [os.path.split(speciesNamesDict[i])[1] for i in seqsInfoObj.speciesToUse]
     with open(options.speciesXMLInfoFN, 'rb') as speciesInfoFile:
         reader = csv.reader(speciesInfoFile, delimiter = "\t")
         for iLine, line in enumerate(reader):
@@ -1205,11 +1191,11 @@ def GetXMLSpeciesInfo(dirs, options):
             except KeyError:
                 print("Skipping %s from line %d as it is not being used in this analysis" % (fastaFilename, iLine+1))
                 continue
-            speciesInfo[dirs.speciesToUse.index(iSpecies)] = line   
+            speciesXML[seqsInfoObj.speciesToUse.index(iSpecies)] = line   
     # check information has been provided for all species
     speciesMissing = False        
-    for iPos, iSpecies in enumerate(dirs.speciesToUse):
-        if speciesInfo[iPos] == []:
+    for iPos, iSpecies in enumerate(seqsInfoObj.speciesToUse):
+        if speciesXML[iPos] == []:
             if not speciesMissing:
                 print("ERROR")
                 print("Species information file %s does not contain information for all species." % options.speciesXMLInfoFN) 
@@ -1218,7 +1204,7 @@ def GetXMLSpeciesInfo(dirs, options):
             print(speciesNamesDict[iSpecies])
     if speciesMissing:
         util.Fail()
-    return speciesInfo
+    return speciesXML
 
 def CheckDependencies(options, program_caller, dirForTempFiles):
     util.PrintUnderline("Checking required programs are installed")
@@ -1250,16 +1236,15 @@ def CheckDependencies(options, program_caller, dirForTempFiles):
             print("Either install the required dependencies or use the option '-og' to stop the analysis after the inference of orthogroups.\n")
             util.Fail()
 
-def DoOrthogroups(options, dirs, seqsInfo, qDoubleBlast, separatePickleDir=None):
+def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast, separatePickleDir=None):
     # Run Algorithm, cluster and output cluster files with original accessions
     util.PrintUnderline("Running OrthoFinder algorithm")
-    fileIdentifierString = "OrthoFinder_v%s" % util.version
-    graphFilename = dirs.workingDir + "%s_graph.txt" % fileIdentifierString
+    graphFilename = scripts.files.FileHandler.GetGraphFilename() 
     # it's important to free up the memory from python used for processing the genomes
     # before launching MCL becuase both use sizeable ammounts of memory. The only
     # way I can find to do this is to launch the memory intensive python code 
     # as separate process that exits before MCL is launched.
-    fileInfo = util.FileInfo(workingDir = dirs.workingDir, graphFilename=graphFilename, separatePickleDir=separatePickleDir) 
+    fileInfo = util.FileInfo(workingDir = scripts.files.FileHandler.GetWorkingDirectory1(), graphFilename=graphFilename, separatePickleDir=separatePickleDir) 
     Lengths = GetSequenceLengths(seqsInfo, fileInfo)
     
     # Process BLAST hits
@@ -1284,23 +1269,22 @@ def DoOrthogroups(options, dirs, seqsInfo, qDoubleBlast, separatePickleDir=None)
     WaterfallMethod.WriteGraphParallel(seqsInfo, fileInfo, options.nProcessAlg)
     
     # 5b. MCL     
-    clustersFilename, iResultsVersion = util.GetUnusedFilename(dirs.workingDir  + "clusters_%s_I%0.1f" % (fileIdentifierString, options.mclInflation), ".txt")
+    clustersFilename, clustersFilename_pairs = scripts.files.FileHandler.CreateUnusedClustersFN(options.mclInflation) 
     MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
-    clustersFilename_pairs = clustersFilename + "_id_pairs.txt"
     MCLread.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
     
     util.PrintUnderline("Writing orthogroups to file")
     if options.qStopAfterGroups: util.PrintCitation()
     ogs = MCLread.GetPredictedOGs(clustersFilename_pairs)
-    resultsBaseFilename = util.GetUnusedFilename(dirs.resultsDir + "Orthogroups", ".csv")[:-4]         # remove .csv from base filename
-    resultsBaseFilename = dirs.resultsDir + "Orthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion)
-    idsDict = MCL.WriteOrthogroupFiles(ogs, [dirs.IDsFilename()], resultsBaseFilename, clustersFilename_pairs)
-    speciesNamesDict = SpeciesNameDict(dirs.SpeciesIdsFilename())
-    orthogroupsResultsFilesString = MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, dirs.speciesToUse, resultsBaseFilename)
+    
+    resultsBaseFilename = scripts.files.FileHandler.GetResultsFNBase()
+    idsDict = MCL.WriteOrthogroupFiles(ogs, [scripts.files.FileHandler.GetSequenceIDsFN()], resultsBaseFilename, clustersFilename_pairs)
+    speciesNamesDict = SpeciesNameDict(scripts.files.FileHandler.GetSpeciesIDsFN())
+    orthogroupsResultsFilesString = MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesInfoObj.speciesToUse, resultsBaseFilename)
     print(orthogroupsResultsFilesString)
-    summaryText, statsFile = Stats(ogs, speciesNamesDict, dirs.speciesToUse, dirs.resultsDir, iResultsVersion)
+    summaryText, statsFile = Stats(ogs, speciesNamesDict, speciesInfoObj.speciesToUse, scripts.files.FileHandler.GetResultsDirectory1(), scripts.files.FileHandler.iResultsVersion)
     if options.speciesXMLInfoFN:
-        MCL.WriteOrthoXML(speciesInfo, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml", dirs.speciesToUse)
+        MCL.WriteOrthoXML(speciesXML, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml", speciesInfoObj.speciesToUse)
     util.PrintTime("Done orthogroups")
     return clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString
 
@@ -1315,24 +1299,23 @@ def ProcessPreviousFiles(workingDir, qDoubleBlast):
     SequenceIDs.txt
     
     Checks which species should be included
-    """
-    dirs = Directories()
-    dirs.workingDir = workingDir
-    if not os.path.exists(dirs.SpeciesIdsFilename()):
-        print("%s file must be provided if using previously calculated BLAST results" % dirs.SpeciesIdsFilename())
-        util.Fail()
-    dirs.speciesToUse, dirs.nSpAll, speciesToUse_names = util.GetSpeciesToUse(dirs.SpeciesIdsFilename())
-    dirs.resultsDir = dirs.workingDir
     
+    """
     # check BLAST results directory exists
-    if not os.path.exists(dirs.workingDir):
-        print("Previous/Pre-calculated BLAST results directory does not exist: %s\n" % dirs.workingDir)
+    if not os.path.exists(workingDir):
+        print("Previous/Pre-calculated BLAST results directory does not exist: %s\n" % workingDir)
         util.Fail()
+        
+    speciesInfo = scripts.files.SpeciesInfo()
+    if not os.path.exists(scripts.files.FileHandler.GetSpeciesIDsFN()):
+        print("%s file must be provided if using previously calculated BLAST results" % scripts.files.FileHandler.GetSpeciesIDsFN())
+        util.Fail()
+    speciesInfo.speciesToUse, speciesInfo.nSpAll, speciesToUse_names = util.GetSpeciesToUse(scripts.files.FileHandler.GetSpeciesIDsFN())
  
     # check fasta files are present 
-    previousFastaFiles = util.SortFastaFilenames(glob.glob(dirs.workingDir + "Species*.fa"))
+    previousFastaFiles = scripts.files.FileHandler.GetSortedSpeciesFastaFiles()
     if len(previousFastaFiles) == 0:
-        print("No processed fasta files in the supplied previous working directory: %s\n" % dirs.workingDir)
+        print("No processed fasta files in the supplied previous working directory: %s\n" % workingDir)
         util.Fail()
     tokens = previousFastaFiles[-1][:-3].split("Species")
     lastFastaNumberString = tokens[-1]
@@ -1348,13 +1331,13 @@ def ProcessPreviousFiles(workingDir, qDoubleBlast):
         util.Fail()
     
     # check BLAST files
-    blast_fns_triangular = ["%sBlast%d_%d.txt" % (dirs.workingDir, iSpecies, jSpecies) for iSpecies in dirs.speciesToUse for jSpecies in dirs.speciesToUse if jSpecies >= iSpecies]
+    blast_fns_triangular = [scripts.files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies >= iSpecies]
     have_triangular = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_triangular]
     for qHave, fn in zip(have_triangular, blast_fns_triangular):
         if not qHave: print("BLAST results file is missing: %s" % fn)
     
     if qDoubleBlast:
-        blast_fns_remainder = ["%sBlast%d_%d.txt" % (dirs.workingDir, iSpecies, jSpecies) for iSpecies in dirs.speciesToUse for jSpecies in dirs.speciesToUse if jSpecies < iSpecies]
+        blast_fns_remainder = [scripts.files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies < iSpecies]
         have_remainder = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_remainder]
         if not (all(have_triangular) and all(have_remainder)):
             for qHave, fn in zip(have_remainder, blast_fns_remainder):
@@ -1370,32 +1353,32 @@ def ProcessPreviousFiles(workingDir, qDoubleBlast):
             util.Fail()
                             
     # check SequenceIDs.txt and SpeciesIDs.txt files are present
-    if not os.path.exists(dirs.IDsFilename()):
-        print("%s file must be provided if using previous calculated BLAST results" % dirs.IDsFilename())
+    if not os.path.exists(scripts.files.FileHandler.GetSequenceIDsFN()):
+        print("%s file must be provided if using previous calculated BLAST results" % scripts.files.FileHandler.GetSequenceIDsFN())
         util.Fail()
-    return dirs, speciesToUse_names
+    return speciesInfo, speciesToUse_names
 
 # 6
-def CreateSearchDatabases(dirs, options, program_caller):
-    nDB = max(dirs.speciesToUse) + 1
+def CreateSearchDatabases(seqsInfoObj, options, program_caller):
+    nDB = max(seqsInfoObj.speciesToUse) + 1
     for iSp in xrange(nDB):
         if options.search_program == "blast":
-            command = ["makeblastdb", "-dbtype", "prot", "-in", dirs.workingDir + "Species%d.fa" % iSp, "-out", dirs.workingDir + "BlastDBSpecies%d" % iSp]
+            command = ["makeblastdb", "-dbtype", "prot", "-in", scripts.files.FileHandler.GetSpeciesFastaFN(iSp), "-out", scripts.files.FileHandler.GetSpeciesDatabaseN(iSp)]
             util.PrintTime("Creating Blast database %d of %d" % (iSp + 1, nDB))
             RunBlastDBCommand(command) 
         else:
-            command = program_caller.GetSearchMethodCommand_DB(options.search_program, dirs.workingDir + "Species%d.fa" % iSp, dirs.workingDir + "%sDBSpecies%d" % (options.search_program, iSp))
+            command = program_caller.GetSearchMethodCommand_DB(options.search_program, scripts.files.FileHandler.GetSpeciesFastaFN(iSp), scripts.files.FileHandler.GetSpeciesDatabaseN(iSp, options.search_program))
             util.PrintTime("Creating %s database %d of %d" % (options.search_program, iSp + 1, nDB))
             util.RunCommand(command, qHideOutput=True)
 
 # 7
-def RunSearch(options, dirs, seqsInfo, program_caller):
+def RunSearch(options, speciessInfoObj, seqsInfo, program_caller):
     name_to_print = "BLAST" if options.search_program == "blast" else options.search_program
     if options.qStopAfterPrepare:
         util.PrintUnderline("%s commands that must be run" % name_to_print)
     else:        
         util.PrintUnderline("Running %s all-versus-all" % name_to_print)
-    commands = GetOrderedSearchCommands(seqsInfo, dirs, options.qDoubleBlast, options.search_program, program_caller)
+    commands = GetOrderedSearchCommands(seqsInfo, speciessInfoObj, options.qDoubleBlast, options.search_program, program_caller)
     if options.qStopAfterPrepare:
         for command in commands:
             print(command)
@@ -1413,33 +1396,31 @@ def RunSearch(options, dirs, seqsInfo, program_caller):
             proc.join()
     # remove BLAST databases
     if options.search_program == "blast":
-        for f in glob.glob(dirs.workingDir + "BlastDBSpecies*"):
+        for f in glob.glob(scripts.files.FileHandler.GetWorkingDirectory1() + "BlastDBSpecies*"):
             os.remove(f)
 
 # 9
 def GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString=None):
     util.PrintUnderline("Analysing Orthogroups", True)
 
-    orthologuesResultsFilesString = orthologues.OrthologuesWorkflow(dirs.workingDir, 
-                                                                        dirs.resultsDir, 
-                                                                        dirs.speciesToUse, 
-                                                                        dirs.nSpAll, 
-                                                                        clustersFilename_pairs, 
-                                                                        program_caller,
-                                                                        options.msa_program,
-                                                                        options.tree_program,
-                                                                        options.recon_method,
-                                                                        options.nBlast,
-                                                                        options.nProcessAlg,
-                                                                        options.qDoubleBlast,
-                                                                        options.speciesTreeFN, 
-                                                                        options.qStopAfterSeqs,
-                                                                        options.qStopAfterAlignments,
-                                                                        options.qStopAfterTrees,
-                                                                        options.qMSATrees,
-                                                                        options.qPhyldog,
-                                                                        options.separatePickleDir,
-                                                                        options.name)
+    orthologuesResultsFilesString = orthologues.OrthologuesWorkflow(speciesInfoObj.speciesToUse, 
+                                                                    speciesInfoObj.nSpAll, 
+                                                                    clustersFilename_pairs, 
+                                                                    program_caller,
+                                                                    options.msa_program,
+                                                                    options.tree_program,
+                                                                    options.recon_method,
+                                                                    options.nBlast,
+                                                                    options.nProcessAlg,
+                                                                    options.qDoubleBlast,
+                                                                    options.speciesTreeFN, 
+                                                                    options.qStopAfterSeqs,
+                                                                    options.qStopAfterAlignments,
+                                                                    options.qStopAfterTrees,
+                                                                    options.qMSATrees,
+                                                                    options.qPhyldog,
+                                                                    options.separatePickleDir,
+                                                                    options.name)
     util.PrintTime("Done orthologues")
     if None != orthogroupsResultsFilesString: print(orthogroupsResultsFilesString)
     print(orthologuesResultsFilesString.rstrip())    
@@ -1449,7 +1430,7 @@ def GetOrthologues_FromTrees(orthologuesDir, options):
     workingDir = orthologuesDir + "WorkingDirectory/"
     return orthologues.OrthologuesFromTrees(options.recon_method, groupsDir, workingDir, options.nBlast, options.speciesTreeFN, pickleDir=options.separatePickleDir)
  
-def ProcessesNewFasta(fastaDir, existingDirs=None, speciesToUse_prev_names=[], name = ""):
+def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_names=[], name = ""):
     """
     Process fasta files and return a Directory object with all paths completed.
     """
@@ -1470,28 +1451,25 @@ def ProcessesNewFasta(fastaDir, existingDirs=None, speciesToUse_prev_names=[], n
     if len(originalFastaFilenames) == 0:
         print("\nNo fasta files found in supplied directory: %s" % fastaDir)
         util.Fail()
-    if None == existingDirs:
-        dirs = Directories()
-        dirs.resultsDir = util.CreateNewWorkingDirectory(fastaDir + "Results_" + ("" if name == "" else name + "_"))
-        dirs.workingDir = dirs.resultsDir + "WorkingDirectory" + os.sep
-        os.mkdir(dirs.workingDir)
+    if speciesInfoObj_prev == None:
+        # Then this is a new, clean analysis 
+        speciesInfoObj = scripts.files.SpeciesInfo()
     else:
-        dirs = existingDirs
+        speciesInfoObj = speciesInfoObj_prev
     iSeq = 0
     iSpecies = 0
     # check if SpeciesIDs.txt already exists
-    if os.path.exists(dirs.SpeciesIdsFilename()):
-        with open(dirs.SpeciesIdsFilename(), 'rb') as infile:
+    if os.path.exists(scripts.files.FileHandler.GetSpeciesIDsFN()):
+        with open(scripts.files.FileHandler.GetSpeciesIDsFN(), 'rb') as infile:
             for line in infile: pass
         if line.startswith("#"): line = line[1:]
         iSpecies = int(line.split(":")[0]) + 1
-    dirs.iFirstNewSpecies = iSpecies
+    speciesInfoObj.iFirstNewSpecies = iSpecies
     newSpeciesIDs = []
-    with open(dirs.IDsFilename(), 'ab') as idsFile, open(dirs.SpeciesIdsFilename(), 'ab') as speciesFile:
+    with open(scripts.files.FileHandler.GetSequenceIDsFN(), 'ab') as idsFile, open(scripts.files.FileHandler.GetSpeciesIDsFN(), 'ab') as speciesFile:
         for fastaFilename in originalFastaFilenames:
             newSpeciesIDs.append(iSpecies)
-            outputFastaFilename = dirs.workingDir + "Species%d.fa" % iSpecies
-            outputFasta = open(outputFastaFilename, 'wb')
+            outputFasta = open(scripts.files.FileHandler.GetSpeciesFastaFN(iSpecies), 'wb')
             fastaFilename = fastaFilename.rstrip()
             speciesFile.write("%d: %s\n" % (iSpecies, fastaFilename))
             baseFilename, extension = os.path.splitext(fastaFilename)
@@ -1519,16 +1497,16 @@ def ProcessesNewFasta(fastaDir, existingDirs=None, speciesToUse_prev_names=[], n
         if not qOk:
             util.Fail()
     if len(originalFastaFilenames) > 0: outputFasta.close()
-    dirs.speciesToUse = dirs.speciesToUse + newSpeciesIDs
-    dirs.nSpAll = max(dirs.speciesToUse) + 1      # will be one of the new species
-    return dirs
+    speciesInfoObj.speciesToUse = speciesInfoObj.speciesToUse + newSpeciesIDs
+    speciesInfoObj.nSpAll = max(speciesInfoObj.speciesToUse) + 1      # will be one of the new species
+    return speciesInfoObj
             
-def CheckOptions(options, dirs):
+def CheckOptions(options):
     """Check any optional arguments are valid once we know what species are in the analysis
     - user supplied species tree
     """
     if options.speciesTreeFN:
-        expSpecies = SpeciesNameDict(dirs.SpeciesIdsFilename()).values()
+        expSpecies = SpeciesNameDict(scripts.files.FileHandler.GetSpeciesIDsFN()).values()
         orthologues.CheckUserSpeciesTree(options.speciesTreeFN, expSpecies)
         
     if options.qStopAfterSeqs and (not options.qMSATrees):
@@ -1555,96 +1533,91 @@ if __name__ == "__main__":
         # if using previous Trees etc., check these are all present - Job for orthologues
         if options.qStartFromBlast and options.qStartFromFasta:
             # 0. Check Files
-            dirs, speciesToUse_names = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
-            print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, dirs.workingDir))
+            scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir)
+            speciesInfoObj, speciesToUse_names = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, workingDir))
             # 3. 
-            dirs = ProcessesNewFasta(fastaDir, dirs, speciesToUse_names, options.name)
-            options = CheckOptions(options, dirs)
+            speciesInfoObj = ProcessesNewFasta(fastaDir, speciesInfoObj, speciesToUse_names, options.name)
+            options = CheckOptions(options)
             # 4.
-            seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
+            seqsInfo = util.GetSeqsInfo(scripts.files.FileHandler.GetWorkingDirectory1(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # 5.
             if options.speciesXMLInfoFN:   
-                speciesInfo = GetXMLSpeciesInfo(dirs, options)
+                speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
             # 6.    
             util.PrintUnderline("Dividing up work for BLAST for parallel processing")
-            CreateSearchDatabases(dirs, options, program_caller)
+            CreateSearchDatabases(speciesInfoObj, options, program_caller)
             # 7.  
-            RunSearch(options, dirs, seqsInfo, program_caller)
+            RunSearch(options, speciesInfoObj, seqsInfo, program_caller)
             # 8.
-            clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.qDoubleBlast, options.separatePickleDir)
+            clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo, options.qDoubleBlast, options.separatePickleDir)
             # 9.
             if not options.qStopAfterGroups:
-                GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
+                GetOrthologues(speciesInfoObj, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
             # 10.
             print("\n" + statsFile + "\n\n" + summaryText) 
             util.PrintCitation()
                 
         elif options.qStartFromFasta:
             # 3. 
-            previousSpeciesNames = []
-            dirs = None
-            if resultsDir_nonDefault != None:
-#                raise Exception("# Do whatever processing of user input is required")
-                # read/write access
-                # ...
-                if resultsDir_nonDefault[-1] != "/":
-                    resultsDir_nonDefault += "/"
-                dirs = Directories()
-                dirs.resultsDir = resultsDir_nonDefault 
-                dirs.workingDir = dirs.resultsDir + "WorkingDirectory/"
-                os.mkdir(dirs.resultsDir)
-                os.mkdir(dirs.workingDir)
-            dirs = ProcessesNewFasta(fastaDir, dirs, speciesToUse_prev_names=previousSpeciesNames, name = options.name)
-            options = CheckOptions(options, dirs)
+            speciesInfoObj = None
+            if resultsDir_nonDefault == None:
+                scripts.files.FileHandler.CreateOutputDirFromInputFastaDir(fastaDir)
+            else:
+                scripts.files.FileHandler.CreateNonDefaultResultsDirectory1(resultsDir_nonDefault)
+            speciesInfoObj = ProcessesNewFasta(fastaDir, name = options.name)
+            options = CheckOptions(options)
             # 4
-            seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
+            seqsInfo = util.GetSeqsInfo(scripts.files.FileHandler.GetWorkingDirectory1(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # 5.
             if options.speciesXMLInfoFN:   
-                speciesInfo = GetXMLSpeciesInfo(dirs, options)
+                speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
             # 6.    
             util.PrintUnderline("Dividing up work for BLAST for parallel processing")
-            CreateSearchDatabases(dirs, options, program_caller)
+            CreateSearchDatabases(speciesInfoObj, options, program_caller)
             # 7. 
-            RunSearch(options, dirs, seqsInfo, program_caller)
+            RunSearch(options, speciesInfoObj, seqsInfo, program_caller)
             # 8.  
-            clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.qDoubleBlast, options.separatePickleDir)    
+            clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo, options.qDoubleBlast, options.separatePickleDir)    
             # 9. 
             if not options.qStopAfterGroups:
-                GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
+                GetOrthologues(speciesInfoObj, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
             # 10.
             print("\n" + statsFile + "\n\n" + summaryText) 
             util.PrintCitation()
             
         elif options.qStartFromBlast:
             # 0.
-            dirs, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
-            print("Using previously calculated BLAST results in %s" % dirs.workingDir) 
-            options = CheckOptions(options, dirs)
+            scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir)
+            speciesInfoObj, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            print("Using previously calculated BLAST results in %s" % workingDir) 
+            options = CheckOptions(options)
             # 4.
-            seqsInfo = util.GetSeqsInfo(dirs.workingDir, dirs.speciesToUse, dirs.nSpAll)
+            seqsInfo = util.GetSeqsInfo(workingDir, speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # 5.
             if options.speciesXMLInfoFN:   
-                speciesInfo = GetXMLSpeciesInfo(dirs, options)
+                speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
             # 8        
-            clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, dirs, seqsInfo, options.qDoubleBlast, options.separatePickleDir)    
+            clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo, options.qDoubleBlast, options.separatePickleDir)    
             # 9
             if not options.qStopAfterGroups:
-                GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
+                GetOrthologues(speciesInfoObj, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
             # 10
             print("\n" + statsFile + "\n\n" + summaryText) 
             util.PrintCitation() 
         elif options.qStartFromGroups:
             # 0.  
-            dirs, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
-            dirs.resultsDir = orthofinderResultsDir       
-            options = CheckOptions(options, dirs)
+            scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir, orthofinderResultsDir)
+            speciesInfoObj, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            options = CheckOptions(options)
             # 9
-            GetOrthologues(dirs, options, program_caller, clustersFilename_pairs)
+            GetOrthologues(speciesInfoObj, options, program_caller, clustersFilename_pairs)
             # 10
             util.PrintCitation() 
         elif options.qStartFromTrees:
-            dirs, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
-            options = CheckOptions(options, dirs)
+            scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir)
+            speciesInfoObj, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            options = CheckOptions(options)
             summaryText = GetOrthologues_FromTrees(orthologuesDir, options)
             print(summaryText)
             util.PrintCitation() 

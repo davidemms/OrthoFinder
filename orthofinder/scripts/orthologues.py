@@ -49,6 +49,7 @@ import blast_file_processor as BlastFileProcessor
 import trees_msa
 import wrapper_phyldog
 import stag
+import files
 
 nThreads = util.nThreadsDefault
 
@@ -934,9 +935,7 @@ def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, spe
     CleanWorkingDir(workingDir)
     return "Species-by-species orthologues directory:\n   %s\n" % resultsDir_new
     
-def OrthologuesWorkflow(workingDir_ogs, 
-                       orthofinderResultsDir, 
-                       speciesToUse, nSpAll, 
+def OrthologuesWorkflow(speciesToUse, nSpAll, 
                        clustersFilename_pairs, 
                        tree_options,
                        msa_method,
@@ -967,9 +966,9 @@ def OrthologuesWorkflow(workingDir_ogs,
     Variables:
     - ogSet - all the relevant information about the orthogroups, species etc.
     """
-    ogSet = OrthoGroupsSet(workingDir_ogs, speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor, pickleDir=pickleDir)
+    ogSet = OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1(), speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor, pickleDir=pickleDir)
         
-    resultsDir = util.CreateNewWorkingDirectory(orthofinderResultsDir + "Orthologues_" + ("" if results_name == "" else results_name + "_"))
+    resultsDir = util.CreateNewWorkingDirectory(files.FileHandler.GetResultsDirectory1() + "Orthologues_" + ("" if results_name == "" else results_name + "_"))
     """ === 1 === ust = UserSpeciesTree
     MSA:               Sequences    Alignments                        GeneTrees    db    SpeciesTree
     Phyldog:           Sequences    Alignments                        GeneTrees    db    SpeciesTree  
@@ -981,7 +980,7 @@ def OrthologuesWorkflow(workingDir_ogs,
     qDB_SpeciesTree = False
     if qMSA or qPhyldog:
         qLessThanFourSpecies = len(ogSet.seqsInfo.speciesToUse) < 4
-        treeGen = trees_msa.TreesForOrthogroups(tree_options, msa_method, tree_method, resultsDir, workingDir_ogs)       
+        treeGen = trees_msa.TreesForOrthogroups(tree_options, msa_method, tree_method, resultsDir, files.FileHandler.GetWorkingDirectory1())       
         if (not userSpeciesTree) and qLessThanFourSpecies:
             spTreeFN_ids = GetSpeciesTree_TwoThree(ogSet.seqsInfo.speciesToUse, resultsDir + "WorkingDirectory/")
             spTreeUnrootedFN = resultsDir + "WorkingDirectory/" + "SpeciesTree_unrooted.txt"
