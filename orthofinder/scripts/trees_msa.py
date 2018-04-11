@@ -36,6 +36,7 @@ import numpy as np
 from collections import Counter, defaultdict
 
 import util, program_caller as pc
+import files
 
 class FastaWriter(object):
     def __init__(self, fastaFileDir):
@@ -249,33 +250,19 @@ def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, 
 """    
      
 class TreesForOrthogroups(object):
-    def __init__(self, program_caller, msa_program, tree_program, resultsDir, ogsWorkingDir):
+    def __init__(self, program_caller, msa_program, tree_program):
         self.program_caller = program_caller
         self.msa_program = msa_program
         self.tree_program = tree_program
-        self.baseOgFormat = "OG%07d"
-        self.resultsDir = resultsDir
-        self.workingDir = resultsDir + "WorkingDirectory/"
-        if not os.path.exists(self.workingDir): os.mkdir(self.workingDir)
-        self.ogsWorkingDir = ogsWorkingDir
     
     def GetFastaFilename(self, iOG, qResults=False):
-        if qResults:
-            return self.resultsDir + "Sequences/" + (self.baseOgFormat % iOG) + ".fa"
-        else:
-            return self.workingDir + "Sequences_ids/" + (self.baseOgFormat % iOG) + ".fa"
+        return files.FileHandler.GetOGsSeqFN(iOG, qResults)
             
     def GetAlignmentFilename(self, iOG, qResults=False):
-        if qResults:
-            return self.resultsDir + "Alignments/" + (self.baseOgFormat % iOG) + ".fa"
-        else:
-            return self.workingDir + "Alignments_ids/" + (self.baseOgFormat % iOG) + ".fa"
+        return files.FileHandler.GetOGsAlignFN(iOG, qResults)
             
     def GetTreeFilename(self, iOG, qResults=False):
-        if qResults:
-            return self.resultsDir + "Gene_Trees/" + (self.baseOgFormat % iOG) + "_tree.txt"
-        else:
-            return self.workingDir + "Trees_ids/" + (self.baseOgFormat % iOG) + "_tree_id.txt"
+        return files.FileHandler.GetOGsTreeFN(iOG, qResults)
         
     def WriteFastaFiles(self, fastaWriter, ogs, idDict):
         for iOg, og in enumerate(ogs):
@@ -308,17 +295,10 @@ class TreesForOrthogroups(object):
     def DoTrees(self, ogs, ogMatrix, idDict, speciesIdDict, nProcesses, qStopAfterSeqs, qStopAfterAlignments, qDoSpeciesTree):
         idDict.update(speciesIdDict) # smae code will then also convert concatenated alignment for species tree
         # 0       
-        resultsDirsFullPath = []
-        for fn in [self.GetFastaFilename, self.GetAlignmentFilename, self.GetTreeFilename]:
-            for qIDs in [True, False]:
-                d = os.path.split(fn(0, not qIDs))[0]
-                if not os.path.exists(d): os.mkdir(d)
-                if not qIDs: resultsDirsFullPath.append(d)
-            if qStopAfterSeqs: break
-            if qStopAfterAlignments and fn == self.GetAlignmentFilename: break
+        resultsDirsFullPath = [files.FileHandler.GetResultsSeqsDir(), files.FileHandler.GetResultsAlignDir(), files.FileHandler.GetResultsTreesDir()]
         
         # 1.
-        fastaWriter = FastaWriter(self.ogsWorkingDir)
+        fastaWriter = FastaWriter(files.FileHandler.GetSpeciesSeqsDir())
         self.WriteFastaFiles(fastaWriter, ogs, idDict)
         if qStopAfterSeqs: return resultsDirsFullPath
 
@@ -326,7 +306,7 @@ class TreesForOrthogroups(object):
         # Get OGs to use for species tree
         if qDoSpeciesTree:
             iOgsForSpeciesTree, fSingleCopy = DetermineOrthogroupsForSpeciesTree(ogMatrix)            
-            concatenated_algn_fn = os.path.split(self.GetAlignmentFilename(0))[0] + "/SpeciesTreeAlignment.fa"
+            concatenated_algn_fn = files.FileHandler.GetSpeciesTreeConcatAlignFN()
         else:
             iOgsForSpeciesTree = []
         alignCommands_and_filenames = self.GetAlignmentCommandsAndNewFilenames(ogs)
@@ -338,7 +318,7 @@ class TreesForOrthogroups(object):
             alignmentFilesToUse = [self.GetAlignmentFilename(i) for i, _ in enumerate(alignCommands_and_filenames)]        
             accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in xrange(len(alignmentFilesToUse))]
             alignmentFilesToUse.append(concatenated_algn_fn)
-            accessionAlignmentFNs.append(os.path.split(self.GetAlignmentFilename(0, True))[0] + "/SpeciesTreeAlignment.fa")
+            accessionAlignmentFNs.append(files.FileHandler.GetSpeciesTreeConcatAlignFN(True))
             self.RenameAlignmentTaxa(alignmentFilesToUse, accessionAlignmentFNs, idDict)
             return resultsDirsFullPath[:2]
         
@@ -354,7 +334,7 @@ class TreesForOrthogroups(object):
             print("Species tree: Using %d orthogroups with minimum of %0.1f%% of species having single-copy genes in any orthogroup" % (len(iOgsForSpeciesTree), 100.*fSingleCopy))
             util.PrintUnderline("Inferring multiple sequence alignments for species tree") 
             # Do required alignments and trees
-            speciesTreeFN_ids = os.path.split(self.GetTreeFilename(i))[0] + "/SpeciesTree_unrooted.txt"
+            speciesTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
             for i in iOgsForSpeciesTree:
                 commands_and_filenames.append([alignCommands_and_filenames[i], treeCommands_and_filenames[i]])
             pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
@@ -380,10 +360,10 @@ class TreesForOrthogroups(object):
         # Add concatenated Alignment
         if qDoSpeciesTree:
             alignmentFilesToUse.append(concatenated_algn_fn)
-            accessionAlignmentFNs.append(os.path.split(self.GetAlignmentFilename(0, True))[0] + "/SpeciesTreeAlignment.fa")
+            accessionAlignmentFNs.append(files.FileHandler.GetSpeciesTreeConcatAlignFN(True))
             qHaveSupport = util.HaveSupportValues(speciesTreeFN_ids)
             if os.path.exists(speciesTreeFN_ids):
-                util.RenameTreeTaxa(speciesTreeFN_ids, self.workingDir + "SpeciesTree_unrooted.txt", idDict, qSupport=qHaveSupport, qFixNegatives=True)
+                util.RenameTreeTaxa(speciesTreeFN_ids, files.FileHandler.GetSpeciesTreeUnrootedFN(True), idDict, qSupport=qHaveSupport, qFixNegatives=True)
             else:
                 print("ERROR: Species tree inference failed")
                 util.Fail()

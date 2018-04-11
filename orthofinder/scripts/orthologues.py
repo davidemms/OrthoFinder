@@ -212,7 +212,7 @@ def lil_minmax(M):
 # ==============================================================================================================================    
 # Species trees for two- & three-species analyses
 
-def GetSpeciesTree_TwoThree(taxa, workingDir):
+def GetSpeciesTree_TwoThree(taxa):
     """
     Get the unrooted species tree for two or three species
     Args:
@@ -220,7 +220,7 @@ def GetSpeciesTree_TwoThree(taxa, workingDir):
     Returns:
     
     """
-    speciesTreeFN_ids = workingDir + "/SpeciesTree_ids.txt"
+    speciesTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
     t = tree.Tree()
     for s in taxa:
         t.add_child(tree.TreeNode(name=s))
@@ -432,7 +432,7 @@ class DendroBLASTTrees(object):
         qLessThanFourSpecies = len(self.ogSet.seqsInfo.speciesToUse) < 4
         if qLessThanFourSpecies:
             qSTAG = False
-            spTreeFN_ids = GetSpeciesTree_TwoThree(self.ogSet.seqsInfo.speciesToUse, self.workingDir)
+            spTreeFN_ids = GetSpeciesTree_TwoThree(self.ogSet.seqsInfo.speciesToUse)
         else:
             qSTAG = self.EnoughOGsForSTAG(ogs, self.ogSet.seqsInfo.speciesToUse)
             if not qSTAG:
@@ -459,7 +459,7 @@ class DendroBLASTTrees(object):
     def SpeciesTreeOnly(self):
         qLessThanFourSpecies = len(self.ogSet.seqsInfo.speciesToUse) < 4
         if qLessThanFourSpecies:
-            spTreeFN_ids = GetSpeciesTree_TwoThree(self.ogSet.seqsInfo.speciesToUse, self.workingDir)
+            spTreeFN_ids = GetSpeciesTree_TwoThree(self.ogSet.seqsInfo.speciesToUse)
         else:
             ogs, ogMatrices_partial = self.GetOGMatrices_FullParallel()
             ogMatrices = self.CompleteOGMatrices(ogs, ogMatrices_partial)
@@ -967,8 +967,11 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
     - ogSet - all the relevant information about the orthogroups, species etc.
     """
     ogSet = OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1(), speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor, pickleDir=pickleDir)
-        
-    resultsDir = util.CreateNewWorkingDirectory(files.FileHandler.GetResultsDirectory1() + "Orthologues_" + ("" if results_name == "" else results_name + "_"))
+    
+    tree_generation_method = "msa" if qMSA else ""
+    stop_after = "seqs" if qStopAfterSeqs else "align" if qStopAfterAlign else ""
+    files.FileHandler.MakeResultsDirectory2(tree_generation_method, stop_after, results_name)    
+#    resultsDir = util.CreateNewWorkingDirectory(files.FileHandler.GetResultsDirectory1() + "Orthologues_" + ("" if results_name == "" else results_name + "_"))
     """ === 1 === ust = UserSpeciesTree
     MSA:               Sequences    Alignments                        GeneTrees    db    SpeciesTree
     Phyldog:           Sequences    Alignments                        GeneTrees    db    SpeciesTree  
@@ -977,21 +980,20 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
     Phyldog (ust):     Sequences    Alignments                        GeneTrees    db      
     Dendroblast (ust):                            DistanceMatrices    GeneTrees    db        
     """
+    resultsDir = files.FileHandler.GetResultsDirectory2()
     qDB_SpeciesTree = False
     if qMSA or qPhyldog:
         qLessThanFourSpecies = len(ogSet.seqsInfo.speciesToUse) < 4
-        treeGen = trees_msa.TreesForOrthogroups(tree_options, msa_method, tree_method, resultsDir, files.FileHandler.GetWorkingDirectory1())       
+        treeGen = trees_msa.TreesForOrthogroups(tree_options, msa_method, tree_method)       
         if (not userSpeciesTree) and qLessThanFourSpecies:
-            spTreeFN_ids = GetSpeciesTree_TwoThree(ogSet.seqsInfo.speciesToUse, resultsDir + "WorkingDirectory/")
-            spTreeUnrootedFN = resultsDir + "WorkingDirectory/" + "SpeciesTree_unrooted.txt"
-            util.RenameTreeTaxa(spTreeFN_ids, spTreeUnrootedFN, ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True)
+            spTreeFN_ids = GetSpeciesTree_TwoThree(ogSet.seqsInfo.speciesToUse)
+            util.RenameTreeTaxa(spTreeFN_ids, files.FileHandler.GetSpeciesTreeUnrootedFN(True), ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True)
         qDoMSASpeciesTree = (not qLessThanFourSpecies) and (not userSpeciesTree)
         util.PrintTime("Starting MSA/Trees")
         seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.OrthogroupMatrix(), ogSet.Spec_SeqDict(), ogSet.SpeciesDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlign or qPhyldog, qDoSpeciesTree=qDoMSASpeciesTree) 
         util.PrintTime("Done MSA/Trees")
         if qDoMSASpeciesTree:
-            spTreeFN_ids = resultsDir + "WorkingDirectory/Trees_ids/SpeciesTree_unrooted.txt"
-            spTreeUnrootedFN = resultsDir + "WorkingDirectory/" + "SpeciesTree_unrooted.txt"
+            spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
         if qStopAfterSeqs:
             print("")
             return ("\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0])

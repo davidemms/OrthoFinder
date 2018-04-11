@@ -67,6 +67,7 @@ class SpeciesInfo(object):
             
 class Files_singleton(object):    
     def __init__(self):
+        self.baseOgFormat = "OG%07d"
         self.wd1 = None
         self.rd1 = None
         self.fastaDir = None
@@ -75,7 +76,8 @@ class Files_singleton(object):
         self.iResultsVersion = None
         self.resultsBaseFilename = None
     
-    """ Two options (currently) for creating:
+    """ ========================================================================================== """
+    """ Three options (currently) for initialisation:
     1. CreateOutputDirFromWorkingDirectory1   - for working from a directory of BLAST results
     2. CreateOutputDirFromInputFastaDir       - for working from a new analysis of a directory of fasta files
     3. CreateNonDefaultResultsDirectory1      - for a user specified results directory
@@ -88,10 +90,10 @@ class Files_singleton(object):
         else:
             self.rd1 = rd1
 
-    def CreateOutputDirFromInputFastaDir(self, d, name = ""):
+    def CreateOutputDirFromInputFastaDir(self, d, append_name = ""):
         if self.wd1 != None: raise Exception("Changing WorkingDirectory1")
         if not d.endswith("/"): d+="/"        
-        self.rd1 = util.CreateNewWorkingDirectory(d + "Results_" + ("" if name == "" else name + "_"))    
+        self.rd1 = util.CreateNewWorkingDirectory(d + "Results_" + ("" if append_name == "" else append_name + "_"))    
         self.wd1 = self.rd1 + "WorkingDirectory/" 
         os.mkdir(self.wd1)
     
@@ -106,14 +108,40 @@ class Files_singleton(object):
 
     
     """ ========================================================================================== """
+   
+    def MakeResultsDirectory2(self, tree_generation_method, stop_after="", append_name=""):
+        """
+        Args
+        tree_method: msa, dendroblast, phyldog (determines the directory structure that will be created)
+        stop_after: seqs, align
+        """
+        if self.rd1 == None: raise Exception("No rd1") 
+        self.rd2 = util.CreateNewWorkingDirectory(self.GetResultsDirectory1() + "Orthologues_" + ("" if append_name == "" else append_name + "_"))   
+        self.wd2 = self.rd2 + "WorkingDirectory/"
+        if not os.path.exists(self.wd2): os.mkdir(self.wd2)
+        if tree_generation_method == "msa":
+            for i, d in enumerate([self.rd2 + "Sequences/", self.wd2 + "Sequences_ids/", self.rd2 + "Alignments/", self.wd2 + "Alignments_ids/", self.rd2 + "Gene_Trees/", self.wd2 + "Trees_ids/"]):
+                if stop_after == "seqs" and i == 2: break 
+                if stop_after == "align" and i == 4: break 
+                if not os.path.exists(d): os.mkdir(d)
         
+    """ ========================================================================================== """
+    
     def GetWorkingDirectory1(self):
+        if self.wd1 == None: raise Exception("No wd1")
+        return self.wd1 
+        
+    def GetSpeciesSeqsDir(self):
         if self.wd1 == None: raise Exception("No wd1")
         return self.wd1 
         
     def GetResultsDirectory1(self):
         if self.rd1 == None: raise Exception("No rd1")
         return self.rd1 
+        
+    def GetResultsDirectory2(self):
+        if self.rd2 == None: raise Exception("No rd2")
+        return self.rd2 
         
     def GetSpeciesIDsFN(self):
         if self.wd1 == None: raise Exception("No wd1")
@@ -160,6 +188,46 @@ class Files_singleton(object):
         if self.iResultsVersion == None:
             raise Exception("Base results identifier has not been created")
         return self.rd1 + "Orthogroups" + ("" if self.iResultsVersion == 0 else "_%d" % self.iResultsVersion)
+        
+    def GetResultsSeqsDir(self):
+        return self.rd2 + "Sequences/"
+    def GetResultsAlignDir(self):
+        return self.rd2 + "Alignments/"
+    def GetResultsTreesDir(self):
+        return self.rd2 + "Gene_Trees/"
+        
+    """ ========================================================================================== """
+    
+    def GetOGsSeqFN(self, iOG, qResults=False):
+        if qResults:
+            return self.rd2 + "Sequences/" + (self.baseOgFormat % iOG) + ".fa"
+        else:
+            return self.wd2 + "Sequences_ids/" + (self.baseOgFormat % iOG) + ".fa"
+            
+    def GetOGsAlignFN(self, iOG, qResults=False):
+        if qResults:
+            return self.rd2 + "Alignments/" + (self.baseOgFormat % iOG) + ".fa"
+        else:
+            return self.wd2 + "Alignments_ids/" + (self.baseOgFormat % iOG) + ".fa"
+            
+    def GetOGsTreeFN(self, iOG, qResults=False):
+        if qResults:
+            return self.rd2 + "Gene_Trees/" + (self.baseOgFormat % iOG) + "_tree.txt"
+        else:
+            return self.wd2 + "Trees_ids/" + (self.baseOgFormat % iOG) + "_tree_id.txt"   
+        
+    def GetSpeciesTreeConcatAlignFN(self, qResults=False):
+        if qResults:
+            return self.rd2 + "Alignments/SpeciesTreeAlignment.fa"
+        else:
+            return self.wd2 + "Alignments_ids/SpeciesTreeAlignment.fa"
+            
+    def GetSpeciesTreeUnrootedFN(self, qAccessions=False):
+        if qAccessions:
+            return self.wd2 + "SpeciesTree_unrooted.txt"
+        else: 
+            return self.wd2 + "Trees_ids/SpeciesTree_unrooted.txt"  # change to  SpeciesTree_unrooted_id.txt
+             
              
 FileHandler = Files_singleton()
         
