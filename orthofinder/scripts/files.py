@@ -31,6 +31,8 @@ Handles location of all input and output files
 """
 import os
 import glob
+import time
+import shutil
 
 import util
 
@@ -39,7 +41,6 @@ class Directories(object):
     def __init__(self):
         self.resultsDir = None           # directory for orthogroup results files
         self.workingDir = None           # Orthogroup inference workingDir
-        self.separatePickleDir = None
                                          # Will need to store 3 bits of information in total
     
     def IDsFilename(self):
@@ -70,11 +71,14 @@ class Files_singleton(object):
         self.baseOgFormat = "OG%07d"
         self.wd1 = None
         self.rd1 = None
+        self.ologdir = None
         self.fastaDir = None
         self.fileIdentifierString = "OrthoFinder"
         self.clustersFilename = None
         self.iResultsVersion = None
         self.resultsBaseFilename = None
+        self.nondefaultPickleDir = None
+        self.speciesTreeRootedIDsFN = None
     
     """ ========================================================================================== """
     """ Three options (currently) for initialisation:
@@ -106,8 +110,55 @@ class Files_singleton(object):
         os.mkdir(self.rd1)
         os.mkdir(self.wd1)
 
-    
+    def CreateOutputDirForAnalysisFromTrees(self, orthologuesDir, userSpeciesTree):
+        """
+        if userSpeciesTree == None: Use existing tree
+        """
+        self.rd1 = orthologuesDir + "../"
+        self.wd2 = orthologuesDir + "WorkingDirectory/"
+        # Find species tree
+        if userSpeciesTree == None:
+            possibilities = ["SpeciesTree_ids_0_rooted.txt", "SpeciesTree_ids_1_rooted.txt", "SpeciesTree_user_ids.txt", "SpeciesTree_unrooted_0_rooted.txt", "STAG_SpeciesTree_ids_0_rooted.txt"] # etc (only need to determine if unique)
+            nTrees = 0
+            for p in possibilities:
+                for d in [self.wd2, self.wd2 + "Trees_ids/"]:
+                    fn = d + p
+                    if os.path.exists(fn): 
+                        nTrees += 1
+                        speciesTree_fn = fn
+            if nTrees == 0:
+                print("\nERROR: There is a problem with the specified directory. The rooted species tree %s or %s is not present." % (possibilities[0], possibilities[2]))
+                print("Please rectify the problem or alternatively use the -s option to specify the species tree to use.\n")
+                util.Fail()
+            if nTrees > 1:
+                print("\nERROR: There is more than one rooted species tree in the specified directory structure. Please use the -s option to specify which species tree should be used\n")
+                util.Fail()
+            self.speciesTreeRootedIDsFN = speciesTree_fn
+        else:
+            if not os.path.exists(userSpeciesTree):
+                print("\nERROR: %s does not exist\n" % userSpeciesTree)
+                util.Fail()
+            self.speciesTreeRootedIDsFN = userSpeciesTree
+        resultsDir_new = orthologuesDir + "New_Analysis_From_Trees"      # for the Orthologues_Species/ directories
+        self.rd2 = util.CreateNewWorkingDirectory(resultsDir_new + "_")
+        self.ologdir = self.rd2  + "Orthologues/"
+        os.mkdir(self.ologdir)
+        self.wd1, self.rd1, self.clustersFilename = util.GetOGsFile(self.rd1)
+        if self.clustersFilename.endswith("_id_pairs.txt"):
+            self.clustersFilename = self.clustersFilename[:-len("_id_pairs.txt")]
+        
     """ ========================================================================================== """
+   
+    def SetNondefaultPickleDir(self, d):
+        self.pickleDir = d
+   
+    def GetPickleDir(self):
+        if self.nondefaultPickleDir != None: 
+            d = self.pickleDir
+        else:
+            d = self.wd1 + "pickle/"
+        if not os.path.exists(d): os.mkdir(d)
+        return d
    
     def MakeResultsDirectory2(self, tree_generation_method, stop_after="", append_name=""):
         """
@@ -118,22 +169,27 @@ class Files_singleton(object):
         if self.rd1 == None: raise Exception("No rd1") 
         self.rd2 = util.CreateNewWorkingDirectory(self.GetResultsDirectory1() + "Orthologues_" + ("" if append_name == "" else append_name + "_"))   
         self.wd2 = self.rd2 + "WorkingDirectory/"
-        if not os.path.exists(self.wd2): os.mkdir(self.wd2)
+        os.mkdir(self.wd2)
+        os.mkdir(self.rd2 + "Orthologues/")
         if tree_generation_method == "msa":
             for i, d in enumerate([self.rd2 + "Sequences/", self.wd2 + "Sequences_ids/", self.rd2 + "Alignments/", self.wd2 + "Alignments_ids/", self.rd2 + "Gene_Trees/", self.wd2 + "Trees_ids/"]):
                 if stop_after == "seqs" and i == 2: break 
                 if stop_after == "align" and i == 4: break 
                 if not os.path.exists(d): os.mkdir(d)
+        elif tree_generation_method == "dendroblast":
+            for i, d in enumerate([self.wd2 + "Distances/", self.rd2 + "Gene_Trees/", self.wd2 + "Trees_ids/"]):
+                if not os.path.exists(d): os.mkdir(d)
         
-    """ ========================================================================================== """
+    """ Standard Dirctories
+        ========================================================================================== """
     
     def GetWorkingDirectory1(self):
         if self.wd1 == None: raise Exception("No wd1")
         return self.wd1 
         
-    def GetSpeciesSeqsDir(self):
-        if self.wd1 == None: raise Exception("No wd1")
-        return self.wd1 
+    def GetWorkingDirectory2(self):
+        if self.wd2 == None: raise Exception("No wd2")
+        return self.wd2 
         
     def GetResultsDirectory1(self):
         if self.rd1 == None: raise Exception("No rd1")
@@ -143,6 +199,13 @@ class Files_singleton(object):
         if self.rd2 == None: raise Exception("No rd2")
         return self.rd2 
         
+    def GetOrthologuesDirectory(self):
+        if self.rd2 == None: raise Exception("No rd2")
+        return self.rd2 + "Orthologues/"
+        
+    """ Orthogroups files 
+        ========================================================================================== """
+        
     def GetSpeciesIDsFN(self):
         if self.wd1 == None: raise Exception("No wd1")
         return self.wd1 + "SpeciesIDs.txt"
@@ -150,6 +213,14 @@ class Files_singleton(object):
     def GetSequenceIDsFN(self):
         if self.wd1 == None: raise Exception("No wd1")
         return self.wd1 + "SequenceIDs.txt"
+        
+    def GetSpeciesSeqsDir(self):
+        if self.wd1 == None: raise Exception("No wd1")
+        return self.wd1 
+        
+    def GetSpeciesFastaFN(self, iSpecies):
+        if self.wd1 == None: raise Exception("No wd1")
+        return "%sSpecies%d.fa" % (self.wd1, iSpecies)
         
     def GetSortedSpeciesFastaFiles(self):
         if self.wd1 == None: raise Exception("No wd1")
@@ -160,10 +231,6 @@ class Files_singleton(object):
             speciesIndices.append(int(f[start+7:-3]))
         indices, sortedFasta = util.SortArrayPairByFirst(speciesIndices, fastaFilenames)
         return sortedFasta  
-        
-    def GetSpeciesFastaFN(self, iSpecies):
-        if self.wd1 == None: raise Exception("No wd1")
-        return "%sSpecies%d.fa" % (self.wd1, iSpecies)
         
     def GetSpeciesDatabaseN(self, iSpecies, program="Blast"):
         if self.wd1 == None: raise Exception("No wd1")
@@ -182,6 +249,9 @@ class Files_singleton(object):
         self.clustersFilename, self.iResultsVersion = util.GetUnusedFilename(self.wd1  + "clusters_%s_I%0.1f" % (self.fileIdentifierString, mclInflation), ".txt")
         return self.clustersFilename, self.clustersFilename + "_id_pairs.txt"
         
+    def GetClustersFN(self):
+        return self.clustersFilename + "_id_pairs.txt"
+        
     def GetResultsFNBase(self):
         if self.wd1 == None: 
             raise Exception("No wd1")
@@ -189,14 +259,17 @@ class Files_singleton(object):
             raise Exception("Base results identifier has not been created")
         return self.rd1 + "Orthogroups" + ("" if self.iResultsVersion == 0 else "_%d" % self.iResultsVersion)
         
+    """ Orthologues files
+        ========================================================================================== """
+        
     def GetResultsSeqsDir(self):
         return self.rd2 + "Sequences/"
+        
     def GetResultsAlignDir(self):
         return self.rd2 + "Alignments/"
+        
     def GetResultsTreesDir(self):
         return self.rd2 + "Gene_Trees/"
-        
-    """ ========================================================================================== """
     
     def GetOGsSeqFN(self, iOG, qResults=False):
         if qResults:
@@ -220,15 +293,64 @@ class Files_singleton(object):
         if qResults:
             return self.rd2 + "Alignments/SpeciesTreeAlignment.fa"
         else:
-            return self.wd2 + "Alignments_ids/SpeciesTreeAlignment.fa"
+            return self.wd2 + "Alignments_ids/SpeciesTreeAlignment.fa"  
+        
+    def GetSpeciesTreeMatrixFN(self, qPutInWorkingDir = False):
+        if qPutInWorkingDir:
+            return self.wd2 + "SpeciesMatrix.phy"
+        else:
+            return self.wd2 + "Distances/SpeciesMatrix.phy"
             
     def GetSpeciesTreeUnrootedFN(self, qAccessions=False):
         if qAccessions:
             return self.wd2 + "SpeciesTree_unrooted.txt"
         else: 
-            return self.wd2 + "Trees_ids/SpeciesTree_unrooted.txt"  # change to  SpeciesTree_unrooted_id.txt
-             
-             
+            return self.wd2 + "Trees_ids/SpeciesTree_unrooted_id.txt"  
+            
+    def SetSpeciesTreeRootedFN(self, fn):
+        self.speciesTreeRootedIDsFN = fn
+            
+    def GetSpeciesTreeRootedFN(self):
+        return self.speciesTreeRootedIDsFN
+        
+    def GetSpeciesTreeUserSupplied_idsFN(self):
+        return self.wd2 + "SpeciesTree_UserSupplied_Rooted_IDs.txt"
+        
+    def GetOGsDistMatFN(self, iOG):
+        return self.wd2 + "Distances/OG%07d.phy" % iOG
+        
+    def GetSpeciesDict(self):
+        d = util.FullAccession(self.GetSpeciesIDsFN()).GetIDToNameDict()
+        return {k:v.rsplit(".",1)[0] for k,v in d.items()}
+        
+    """ ========================================================================================== """
+            
+    def GetOGsTreeDir(self, qResults=False):
+        if qResults:
+            return self.rd2 + "Gene_Trees/" 
+        else:
+            return self.wd2 + "Trees_ids/" 
+            
+    def GetOGsReconTreeDir(self, qResults=False):
+        if qResults:
+            return self.rd2 + "Recon_Gene_Trees/" 
+        else:
+            raise NotImplemented() 
+        
+    
+    """ ========================================================================================== """
+         
+    def CleanWorkingDir2(self):
+        dirs = ['Distances/']
+        for d in dirs:
+            dFull = self.wd2 + d
+            if os.path.exists(dFull): 
+                try:
+                    shutil.rmtree(dFull)
+                except OSError:
+                    time.sleep(1)
+                    shutil.rmtree(dFull, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
+                    
 FileHandler = Files_singleton()
         
     

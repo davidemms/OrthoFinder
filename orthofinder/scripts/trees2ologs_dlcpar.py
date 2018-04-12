@@ -36,6 +36,7 @@ from collections import defaultdict
 
 import tree
 import util
+import files
 
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(_nsre, s)]
@@ -63,9 +64,9 @@ def make_dicts(dlcparResultsDir):
                   Orthologs[leaf2].append(leaf1)     
     return Orthologs
     
-def GetSpeciesGenesInfo(ogSet):
-    speciesLabels, nSpAll, _ = util.GetSpeciesToUse(ogSet.speciesIDsFN) 
-    seqsInfo = util.GetSeqsInfo(ogSet.workingDirOF, speciesLabels, nSpAll)
+def GetSpeciesGenesInfo():
+    speciesLabels, nSpAll, _ = util.GetSpeciesToUse(files.FileHandler.GetSpeciesIDsFN()) 
+    seqsInfo = util.GetSeqsInfo(files.FileHandler.GetSpeciesSeqsDir(), speciesLabels, nSpAll)
     genenumbers = list(np.diff(seqsInfo.seqStartingIndices))
     genenumbers.append(seqsInfo.nSeqs - seqsInfo.seqStartingIndices[-1])
     return speciesLabels, genenumbers
@@ -186,7 +187,7 @@ def create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir):
     orthodict = make_dicts(dlcparResultsDir)
     
     # -> dictionary
-    speciesLabels, genenumbers = GetSpeciesGenesInfo(ogSet)
+    speciesLabels, genenumbers = GetSpeciesGenesInfo()
     for iSpecies in xrange(len(speciesLabels)):
         one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, pickleDir)
         

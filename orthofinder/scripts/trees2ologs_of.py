@@ -20,7 +20,7 @@ import multiprocessing as mp
 from collections import Counter, defaultdict
 
 import tree as tree_lib
-import resolve, util
+import resolve, util, files
 
 def GeneToSpecies_dash(g):
   return g.split("_", 1)[0]
@@ -523,7 +523,7 @@ def GetOrthologuesStandalone_Serial(trees_dir, species_tree_rooted_fn, GeneToSpe
         print(treeFn)
         GetOrthologues_from_tree(0, treeFn, species_tree_rooted, GeneToSpecies, neighbours, True)        
         
-def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, GeneToSpecies, workingDir, output_dir, reconTreesRenamedDir, all_stride_dup_genes):    # Create directory structure
+def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, workingDir, output_dir, reconTreesRenamedDir, all_stride_dup_genes):    # Create directory structure
     speciesDict = ogSet.SpeciesDict()
     SequenceDict = ogSet.SequenceDict()
     # Write directory and file structure
@@ -559,7 +559,7 @@ def DoOrthologuesForOrthoFinder(ogSet, treesIDsPatFn, species_tree_rooted_fn, Ge
         dupWriter = csv.writer(outfile, delimiter="\t")
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
         for iog in xrange(nOgs):
-            orthologues, recon_tree, suspect_genes = GetOrthologues_from_tree(iog, treesIDsPatFn(iog), species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes)
+            orthologues, recon_tree, suspect_genes = GetOrthologues_from_tree(iog, files.FileHandler.GetOGsTreeFN(iog), species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes)
             for index0 in xrange(nspecies):
                 strsp0 = species[index0]
                 strsp0_ = strsp0+"_"
