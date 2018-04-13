@@ -632,15 +632,16 @@ def Stats_SizeTable(writer_sum, writer_sp, properOGs, allGenesCounter, iSpecies,
     for i in xrange(1, nSp+1):
         writer_sum.writerow([i, n.count(i)])
 
-def Stats(ogs, speciesNamesDict, iSpecies, resultsDir, iResultsVersion):
+def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
     """ Top-level method for calcualtion of stats for the orthogroups"""
     allOgs = [[map(int, g.split("_")) for g in og] for og in ogs]
     properOGs = [og for og in allOgs if len(og) > 1]
     allGenes = [g for og in allOgs for g in og]
-    filename_sp = resultsDir +  "Statistics_PerSpecies" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
-    filename_sum = resultsDir +  "Statistics_Overall" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
-    filename_overlap = resultsDir +  "Orthogroups_SpeciesOverlaps" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
-    filename_single_copy = resultsDir +  "SingleCopyOrthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".txt"
+    ogStatsResultsDir = scripts.files.FileHandler.GetOGsStatsResultsDirectory()
+    filename_sp = ogStatsResultsDir +  "Statistics_PerSpecies" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
+    filename_sum = ogStatsResultsDir +  "Statistics_Overall" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
+    filename_overlap = ogStatsResultsDir +  "Orthogroups_SpeciesOverlaps" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
+    filename_single_copy = ogStatsResultsDir +  "SingleCopyOrthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".txt"
     percentFormat = "%0.1f"
     with open(filename_sp, 'wb') as outfile_species, open(filename_sum, 'wb') as outfile_sum:
         writer_sp = csv.writer(outfile_species, delimiter="\t")
@@ -1282,7 +1283,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast):
     speciesNamesDict = SpeciesNameDict(scripts.files.FileHandler.GetSpeciesIDsFN())
     orthogroupsResultsFilesString = MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesInfoObj.speciesToUse, resultsBaseFilename)
     print(orthogroupsResultsFilesString)
-    summaryText, statsFile = Stats(ogs, speciesNamesDict, speciesInfoObj.speciesToUse, scripts.files.FileHandler.GetResultsDirectory1(), scripts.files.FileHandler.iResultsVersion)
+    summaryText, statsFile = Stats(ogs, speciesNamesDict, speciesInfoObj.speciesToUse, scripts.files.FileHandler.iResultsVersion)
     if options.speciesXMLInfoFN:
         MCL.WriteOrthoXML(speciesXML, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml", speciesInfoObj.speciesToUse)
     util.PrintTime("Done orthogroups")

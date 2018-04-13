@@ -41,6 +41,95 @@ import files
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(_nsre, s)]
 
+
+# ==============================================================================================================================      
+# Run DLCPar
+
+def GetTotalLength(t):
+    return sum([node.dist for node in t])
+  
+def AllEqualBranchLengths(t):
+    lengths = [node.dist for node in t]
+    return (len(lengths) > 1 and len(set(lengths)) == 1)
+
+def RootGeneTreesArbitrarily(nOGs, outputDir):
+    filenames = [files.FileHandler.GetOGsTreeFN(i) for i in xrange(nOGs)]
+    outFilenames = [outputDir + os.path.split(files.FileHandler.GetOGsTreeFN(i))[1] for i in xrange(nOGs)]
+    treeFilenames = [fn for fn in filenames if fn.endswith(".txt")]
+    nErrors = 0
+    with open(outputDir + 'root_errors.txt', 'wb') as errorfile:
+        for treeFN, outFN in zip(treeFilenames, outFilenames):
+            try:    
+                t = tree.Tree(treeFN)
+                if len(t.get_children()) != 2:
+                    R = t.get_midpoint_outgroup()
+                    # if it's a tree with 3 genes all with zero length branches then root arbitrarily (it's possible this could happen with more than 3 nodes)
+                    if GetTotalLength(t) == 0.0:
+                      for leaf in t:
+                        R = leaf
+                        break
+                    elif AllEqualBranchLengths(t):
+                      # more generally, for any branch length all branches could have that same length
+                      for leaf in t:
+                        R = leaf
+                        break
+                    t.set_outgroup(R)
+                t.resolve_polytomy()
+                t.write(outfile = outFN)
+            except Exception as err:
+                try:
+                    t = tree.Tree(treeFN)
+                    for leaf in t:
+                       R = leaf
+                       break
+                    t.set_outgroup(R)
+                    t.resolve_polytomy()
+                    t.write(outfile = outFN)
+                except:
+                    errorfile.write(treeFN + ": " + str(err) + '\n')
+                    nErrors += 1    
+    if nErrors != 0:
+      print("WARNING: Some trees could not be rooted")
+      print("Usually this is because the tree contains genes from a single species.")    
+
+def WriteGeneSpeciesMap(d, speciesDict):
+    fn = d + "GeneMap.smap"
+    iSpecies = speciesDict.keys()
+    with open(fn, 'wb') as outfile:
+        for iSp in iSpecies:
+            outfile.write("%s_*\t%s\n" % (iSp, iSp))
+    return fn
+
+def RunDlcpar(ogSet, speciesTreeFN, workingDir, nParallel, qDeepSearch):
+    """
+    
+    Implementation:
+    - (skip: label species tree)
+    - sort out trees (midpoint root, resolve plytomies etc)
+    - run
+    
+    """
+    ogs = ogSet.OGs()
+    nOGs = len(ogs)
+    dlcparResultsDir = workingDir + 'dlcpar/'
+    if not os.path.exists(dlcparResultsDir): os.mkdir(dlcparResultsDir)
+    RootGeneTreesArbitrarily(nOGs, dlcparResultsDir)
+    geneMapFN = WriteGeneSpeciesMap(dlcparResultsDir, ogSet.SpeciesDict())
+    filenames = [dlcparResultsDir + os.path.split(files.FileHandler.GetOGsTreeFN(i))[1] for i in xrange(nOGs)]
+    if qDeepSearch:
+        nTaxa = [len(og) for og in ogs[:nOGs]]
+        nIter =     [1000 if n < 25 else 25000 if n < 200 else 50000 for n in nTaxa]
+        nNoImprov = [ 100 if n < 25 else  1000 if n < 200 else  2000 for n in nTaxa]
+        dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -i %d --nprescreen 100 --nconverge %d' % (speciesTreeFN, geneMapFN, fn, i, n) for (fn, i, n) in zip(filenames, nIter, nNoImprov)]
+    else:
+        dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -x 1' % (speciesTreeFN, geneMapFN, fn) for fn in filenames]
+    util.RunParallelOrderedCommandLists(nParallel, [[c] for c in dlcCommands], qHideStdout = True)
+    return dlcparResultsDir, "OG%07d_tree_id.dlcpar.locus.tree"
+
+
+# ==============================================================================================================================      
+# Analyse DLCPar results
+
 #make_dicts checks every leaf against every other leaf to find the ancestor node and checks this node against speclist and duplist to see which dictionary the gene-pair should be placed in.
 def make_dicts(dlcparResultsDir):
     treeFNs = glob.glob(dlcparResultsDir + '/*.locus.tree')

@@ -37,17 +37,6 @@ import shutil
 import util
 
 
-class Directories(object):
-    def __init__(self):
-        self.resultsDir = None           # directory for orthogroup results files
-        self.workingDir = None           # Orthogroup inference workingDir
-                                         # Will need to store 3 bits of information in total
-    
-    def IDsFilename(self):
-        return self.workingDir + "SequenceIDs.txt"
-    def SpeciesIdsFilename(self):
-        return self.workingDir + "SpeciesIDs.txt"
-
 class SpeciesInfo(object):
     def __init__(self):
         self.speciesToUse = []           #       seqsInfo.iSpeciesToUse   - which to include for this analysis 
@@ -55,18 +44,8 @@ class SpeciesInfo(object):
         self.iFirstNewSpecies = None     #       iFirstNew   => (0, 1, ..., iFirstNew-1) are from previous and (iFirstNew, iFirstNew+1, ..., nSpecies-1) are the new species indices
     def __str__(self):
         return str((self.speciesToUse, self.nSpAll, self.iFirstNewSpecies))
-        
-
-#class Files_singleton(object):
-#    class __Singleton(object):
-#        pass
-#    instance = None
-#    
-#    def __init__(self):
-#        if not Files_singleton.instance:
-#            Files_singleton.instance = Files_singleton.__Singleton()
-            
-class Files_singleton(object):    
+                    
+class __Files_dont_recreate__(object):    
     def __init__(self):
         self.baseOgFormat = "OG%07d"
         self.wd1 = None
@@ -267,6 +246,9 @@ class Files_singleton(object):
             raise Exception("Base results identifier has not been created")
         return self.rd1 + "Orthogroups" + ("" if self.iResultsVersion == 0 else "_%d" % self.iResultsVersion)
         
+    def GetOGsStatsResultsDirectory(self):
+        return self.GetResultsDirectory1() 
+        
     """ Orthologues files
         ========================================================================================== """
         
@@ -370,6 +352,9 @@ class Files_singleton(object):
         else:
             raise NotImplemented() 
             
+    def GetOGsReconTreeFN(self, iOG):
+        return self.rd2 + "Recon_Gene_Trees/OG%07d_tree.txt" % iOG
+            
     def GetPhyldogWorkingDirectory(self):
         d = self.wd2 + "phyldog/"
         if not os.path.exists(d): os.mkdir(d)
@@ -395,7 +380,7 @@ class Files_singleton(object):
                     time.sleep(1)
                     shutil.rmtree(dFull, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
                     
-FileHandler = Files_singleton()
+FileHandler = __Files_dont_recreate__()
         
     
 
