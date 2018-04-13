@@ -94,14 +94,12 @@ def one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, pickle
             jSp = speciesLabelsReverse[jSpLabel]
             if iSpecies > jSp:
                 matrixlist[jSp][iGene, jGene] = 1
-#    matrices.DumpMatrixArray("ortholog", matrixlist, fileInfo, iSpecies)
     for j, m in enumerate(matrixlist):    
         with open(pickleDir + 'ortholog_%d_%d_matrix.pic' % (iSpecies, j), 'wb') as file:
             pic.dump(m, file)
     return matrixlist   
     
 def multiply(specmin, specmax, pickleDir):
-#    M = matrices.LoadMatrix("ortholog", fileInfo, specmax, specmin)
     with open(pickleDir + 'ortholog_%d_%d_matrix.pic' % (specmax, specmin), 'rb') as F:
         M = pic.load(F)    
     M = M.tocsr()

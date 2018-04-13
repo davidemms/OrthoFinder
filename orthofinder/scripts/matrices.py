@@ -30,26 +30,26 @@ import cPickle as pic
 
 import util, files
 
-def DumpMatrix(name, m, fileInfo, iSpecies, jSpecies):
+def DumpMatrix(name, m, iSpecies, jSpecies):
     with open(files.FileHandler.GetPickleDir() + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'wb') as picFile:
         pic.dump(m, picFile, protocol=util.picProtocol)
     
-def DumpMatrixArray(name, matrixArray, fileInfo, iSpecies):
+def DumpMatrixArray(name, matrixArray, iSpecies):
     for jSpecies, m in enumerate(matrixArray):
-        DumpMatrix(name, m, fileInfo, iSpecies, jSpecies)
+        DumpMatrix(name, m, iSpecies, jSpecies)
 
-def LoadMatrix(name, fileInfo, iSpecies, jSpecies): 
+def LoadMatrix(name, iSpecies, jSpecies): 
     with open(files.FileHandler.GetPickleDir() + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'rb') as picFile:  
         M = pic.load(picFile)
     return M
         
-def LoadMatrixArray(name, fileInfo, seqsInfo, iSpecies, row=True):
+def LoadMatrixArray(name, seqsInfo, iSpecies, row=True):
     matrixArray = []
     for jSpecies in xrange(seqsInfo.nSpecies):
         if row == True:
-            matrixArray.append(LoadMatrix(name, fileInfo, iSpecies, jSpecies))
+            matrixArray.append(LoadMatrix(name, iSpecies, jSpecies))
         else:
-            matrixArray.append(LoadMatrix(name, fileInfo, jSpecies, iSpecies))
+            matrixArray.append(LoadMatrix(name, jSpecies, iSpecies))
     return matrixArray
               
 def MatricesAnd_s(Xarr, Yarr):
@@ -64,6 +64,6 @@ def MatricesAndTr_s(Xarr, Yarr):
         Zarr.append(x.multiply(y.transpose()))
     return Zarr   
     
-def DeleteMatrices(baseName, fileInfo):
+def DeleteMatrices(baseName):
     for f in glob.glob(files.FileHandler.GetPickleDir() + baseName + "*_*.pic"):
         if os.path.exists(f): os.remove(f)

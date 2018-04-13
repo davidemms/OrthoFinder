@@ -45,7 +45,6 @@ Utilities
 -------------------------------------------------------------------------------
 """
 SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")
-FileInfo = namedtuple("FileInfo", "workingDir graphFilename")     
 
 picProtocol = 1
 version = "2.3.0"

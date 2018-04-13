@@ -35,7 +35,7 @@ import util
 #def NumberOfSequences(seqsInfo, iSpecies):
 #    return (seqsInfo.seqStartingIndices[iSpecies+1] if iSpecies != seqsInfo.nSpecies-1 else seqsInfo.nSeqs) - seqsInfo.seqStartingIndices[iSpecies] 
                          
-def GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies, qExcludeSelfHits = True, sep = "_", qDoubleBlast=True): 
+def GetBLAST6Scores(seqsInfo, blastDir, iSpecies, jSpecies, qExcludeSelfHits = True, sep = "_", qDoubleBlast=True): 
     qSameSpecies = iSpecies==jSpecies
     qCheckForSelfHits = qExcludeSelfHits and qSameSpecies
     if not qDoubleBlast:
@@ -56,7 +56,7 @@ def GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies, qExcludeSelfHits = T
     nSeqs_j = seqsInfo.nSeqsPerSpecies[jSpecies]
     B = sparse.lil_matrix((nSeqs_i, nSeqs_j))
     row = ""
-    fn = fileInfo.workingDir + "Blast%d_%d.txt" % (iSpeciesOpen, jSpeciesOpen)
+    fn = blastDir + "Blast%d_%d.txt" % (iSpeciesOpen, jSpeciesOpen)
     try:
         with (gzip.open(fn + ".gz", 'rb') if os.path.exists(fn + ".gz") else open(fn, 'rb')) as blastfile:
             blastreader = csv.reader(blastfile, delimiter='\t')
@@ -90,7 +90,7 @@ def GetBLAST6Scores(seqsInfo, fileInfo, iSpecies, jSpecies, qExcludeSelfHits = T
                     sys.stderr.write("but found a query/hit in the Blast%d_%d.txt for sequence %d_%d (i.e. %s sequence in species %d).\n" %  (iSpecies, jSpecies, kSpecies, sequencekID, ord(sequencekID+1), kSpecies))
                     util.Fail()
     except Exception:
-        sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (fileInfo.workingDir, iSpecies, jSpecies))
+        sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (blastDir, iSpecies, jSpecies))
         sys.stderr.write("\t".join(row) + "\n")
         raise 
     return B  

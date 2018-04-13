@@ -79,6 +79,7 @@ class Files_singleton(object):
         self.resultsBaseFilename = None
         self.nondefaultPickleDir = None
         self.speciesTreeRootedIDsFN = None
+        self.multipleRootedSpeciesTreesDir = None
     
     """ ========================================================================================== """
     """ Three options (currently) for initialisation:
@@ -200,6 +201,7 @@ class Files_singleton(object):
         return self.rd2 
         
     def GetOrthologuesDirectory(self):
+        """"Where the directories of species orthologues are"""
         if self.rd2 == None: raise Exception("No rd2")
         return self.rd2 + "Orthologues/"
         
@@ -236,6 +238,9 @@ class Files_singleton(object):
         if self.wd1 == None: raise Exception("No wd1")
         return "%s%sDBSpecies%d" % (self.wd1, program, iSpecies)
         
+    def GetBlastResultsDir(self):
+        return self.wd1
+        
     def GetBlastResultsFN(self, iSpeciesSearch, jSpeciesDB):
         if self.wd1 == None: raise Exception("No wd1")
         return "%sBlast%d_%d.txt" % (self.wd1, iSpeciesSearch, jSpeciesDB)
@@ -248,6 +253,9 @@ class Files_singleton(object):
         if self.wd1 == None: raise Exception("No wd1")
         self.clustersFilename, self.iResultsVersion = util.GetUnusedFilename(self.wd1  + "clusters_%s_I%0.1f" % (self.fileIdentifierString, mclInflation), ".txt")
         return self.clustersFilename, self.clustersFilename + "_id_pairs.txt"
+        
+    def SetClustersFN(self, pairsFN):
+        self.clustersFilename = pairsFN[:-len("_id_pairs.txt")]
         
     def GetClustersFN(self):
         return self.clustersFilename + "_id_pairs.txt"
@@ -270,6 +278,14 @@ class Files_singleton(object):
         
     def GetResultsTreesDir(self):
         return self.rd2 + "Gene_Trees/"
+        
+    def GetOlogStatsDir(self):
+        return self.rd2
+        
+    def GetPutativeXenelogsDir(self):
+        d = self.GetOrthologuesDirectory() + "Putative_Xenologues/"
+        if not os.path.exists(d): os.mkdir(d)
+        return d
     
     def GetOGsSeqFN(self, iOG, qResults=False):
         if qResults:
@@ -313,6 +329,21 @@ class Files_singleton(object):
     def GetSpeciesTreeRootedFN(self):
         return self.speciesTreeRootedIDsFN
         
+    def GetSpeciesTreeResultsFN(self, i, qUnique):
+        """
+        The results species tree (rooted, accessions, support values)
+        i: index for species tree, starting at 0
+        qUnique: bool, has a unique root been identified (as it may not be known exatly which branch the root belongs on)
+        E.g. if there were just one species tree, the correct call would be GetSpeciesTreeResultsFN(0,True)
+        """
+        if qUnique:
+            return self.rd2 + "SpeciesTree_rooted.txt"
+        else:
+            if not self.multipleRootedSpeciesTreesDir:
+                self.multipleRootedSpeciesTreesDir = self.rd2 + "Potential_Rooted_Species_Trees/"
+                if not os.path.exists(self.multipleRootedSpeciesTreesDir): os.mkdir(self.multipleRootedSpeciesTreesDir)
+            return self.multipleRootedSpeciesTreesDir + "SpeciesTree_rooted_at_outgroup_%d.txt" % i
+        
     def GetSpeciesTreeUserSupplied_idsFN(self):
         return self.wd2 + "SpeciesTree_UserSupplied_Rooted_IDs.txt"
         
@@ -333,9 +364,22 @@ class Files_singleton(object):
             
     def GetOGsReconTreeDir(self, qResults=False):
         if qResults:
-            return self.rd2 + "Recon_Gene_Trees/" 
+            d = self.rd2 + "Recon_Gene_Trees/" 
+            if not os.path.exists(d): os.mkdir(d)
+            return d
         else:
             raise NotImplemented() 
+            
+    def GetPhyldogWorkingDirectory(self):
+        d = self.wd2 + "phyldog/"
+        if not os.path.exists(d): os.mkdir(d)
+        return d
+            
+    def GetPhyldogOGResultsTreeFN(self, i):
+        return self.wd2 + "phyldog/OG%07d.ReconciledTree.txt" % i
+            
+    def GetDuplicationsFN(self):
+        return self.rd2 + "Duplications.csv"
         
     
     """ ========================================================================================== """

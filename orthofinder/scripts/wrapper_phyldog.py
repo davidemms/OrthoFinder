@@ -13,6 +13,7 @@ import fileinput
 from collections import defaultdict, Counter
 
 import tree as tree_lib
+import files
 
 def WriteGeneralOptions(filename, baseDir):
     x="""######## First, data files ########
@@ -181,7 +182,6 @@ def WriteListGenes(phyldogDir, nOGs, exclude):
             outfile.write(phyldogDir + "OG%07d.opt:%s\n" % (i, str(os.stat( phyldogDir + "../Alignments_ids/OG%07d.fa" % i )[6])))   # phyldog prepareData.py method
     
 def Setup(phyldogDir, ogs, speciesToUse):
-    if not os.path.exists(phyldogDir): os.mkdir(phyldogDir)
     if not os.path.exists(phyldogDir + "Results/"): os.mkdir(phyldogDir + "Results/")
     WriteStandardFiles(phyldogDir, speciesToUse)
     exclude = CleanAlignmentsForPhyldog(phyldogDir, ogs)

@@ -15,9 +15,8 @@ import glob
 import argparse
 import operator
 import itertools
-import numpy as np
 import multiprocessing as mp
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 import tree as tree_lib
 import resolve, util, files
@@ -523,19 +522,22 @@ def GetOrthologuesStandalone_Serial(trees_dir, species_tree_rooted_fn, GeneToSpe
         print(treeFn)
         GetOrthologues_from_tree(0, treeFn, species_tree_rooted, GeneToSpecies, neighbours, True)        
         
-def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, workingDir, output_dir, reconTreesRenamedDir, all_stride_dup_genes):    # Create directory structure
+def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, all_stride_dup_genes):   
+    """
+    """
+     # Create directory structure
     speciesDict = ogSet.SpeciesDict()
     SequenceDict = ogSet.SequenceDict()
     # Write directory and file structure
     speciesIDs = ogSet.speciesToUse
     nspecies = len(speciesIDs)      
-    dSuspect = output_dir + "Putative_Xenologues/"
-    if not os.path.exists(dSuspect): os.mkdir(dSuspect)     
+    dSuspect = files.FileHandler.GetPutativeXenelogsDir()
+    dResultsOrthologues = files.FileHandler.GetOrthologuesDirectory()
     for index1 in xrange(nspecies):
         with open(dSuspect + '%s.csv' % speciesDict[str(speciesIDs[index1])], 'wb') as outfile:
             writer1 = csv.writer(outfile, delimiter="\t")
             writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], "Other"))
-        d = output_dir + "Orthologues_" + speciesDict[str(speciesIDs[index1])] + "/"
+        d = dResultsOrthologues + "Orthologues_" + speciesDict[str(speciesIDs[index1])] + "/"
         if not os.path.exists(d): os.mkdir(d)     
         for index2 in xrange(nspecies):
             if index2 == index1: continue
@@ -555,7 +557,8 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, wo
     nOgs = len(ogSet.OGs())
     nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
     species = speciesDict.keys()
-    with open(reconTreesRenamedDir + "../Duplications.csv", 'wb') as outfile:
+    reconTreesRenamedDir = files.FileHandler.GetOGsReconTreeDir(True)
+    with open(files.FileHandler.GetDuplicationsFN(), 'wb') as outfile:
         dupWriter = csv.writer(outfile, delimiter="\t")
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
         for iog in xrange(nOgs):
@@ -565,13 +568,13 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, wo
                 strsp0_ = strsp0+"_"
                 these_genes = [g for g in suspect_genes if g.startswith(strsp0_)]
                 if len(these_genes) > 0:
-                    with open(output_dir + "Orthologues_" + speciesDict[strsp0] + "/Putative_Horizontal_Gene_Transfer.txt", 'ab') as outfile:
+                    with open(dResultsOrthologues + "Orthologues_" + speciesDict[strsp0] + "/Putative_Horizontal_Gene_Transfer.txt", 'ab') as outfile:
                         outfile.write("\n".join([SequenceDict[g]]) + "\n")
             allOrthologues = [(iog, orthologues)]
             util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qSupport=False, qFixNegatives=True, label='n') 
             if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
                 util.PrintTime("Done %d of %d" % (iog, nOgs))
-            nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, output_dir, True)
+            nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, dResultsOrthologues, True)
     return nOrthologues_SpPair
 
 
@@ -620,8 +623,7 @@ def GetOrthologues_from_phyldog_tree(iog, treeFN, GeneToSpecies, qWrite=False, d
         WriteQfO2(orthologues, directory + "/../Orthologues_M3/" + os.path.split(treeFN)[1], qAppend=False)
     return orthologues
     
-def DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDirectory, GeneToSpecies, workingDir, output_dir, reconTreesRenamedDir):    # Create directory structure
-    resultsDir = workingDirectory + "phyldog/Results/"
+def DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDirectory, GeneToSpecies, output_dir, reconTreesRenamedDir):    # Create directory structure
     speciesDict = ogSet.SpeciesDict()
     SequenceDict = ogSet.SequenceDict()
     # Write directory and file structure
@@ -637,11 +639,11 @@ def DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDirectory, GeneToSpecies, 
                 writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]))
     nOgs = len(ogSet.OGs())
     nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
-    with open(reconTreesRenamedDir + "../Duplications.csv", 'wb') as outfile:
+    with open(files.FileHandler.GetDuplicationsFN(), 'wb') as outfile:
         dupWriter = csv.writer(outfile, delimiter="\t")
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
         for iog in xrange(nOgs):
-            recon_tree = resultsDir + "OG%07d.ReconciledTree.txt" % iog
+            recon_tree = files.FileHandler.GetPhyldogOGResultsTreeFN(iog)
             orthologues = GetOrthologues_from_phyldog_tree(iog, recon_tree, GeneToSpecies, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict())
             allOrthologues = [(iog, orthologues)]
             util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qSupport=False, qFixNegatives=True, label='n') 

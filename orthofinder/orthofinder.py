@@ -326,11 +326,11 @@ RunInfo
 -------------------------------------------------------------------------------
 """     
 
-def GetSequenceLengths(seqsInfo, fileInfo):                
+def GetSequenceLengths(seqsInfo):                
     sequenceLengths = []
     for iSpecies, iFasta in enumerate(seqsInfo.speciesToUse):
         sequenceLengths.append(np.zeros(seqsInfo.nSeqsPerSpecies[iFasta]))
-        fastaFilename = fileInfo.workingDir + "Species%d.fa" % iFasta
+        fastaFilename = scripts.files.FileHandler.GetSpeciesFastaFN(iFasta)
         currentSequenceLength = 0
         iCurrentSequence = -1
         qFirstLine = True
@@ -424,15 +424,15 @@ WaterfallMethod
 """ 
 
 def WriteGraph_perSpecies(args):
-    seqsInfo, fileInfo, iSpec = args            
+    seqsInfo, graphFN, iSpec = args            
     # calculate the 2-way connections for one query species
-    with open(fileInfo.graphFilename + "_%d" % iSpec, 'wb') as graphFile:
+    with open(graphFN + "_%d" % iSpec, 'wb') as graphFile:
         connect2 = []
         for jSpec in xrange(seqsInfo.nSpecies):
-            m1 = matrices.LoadMatrix("connect", fileInfo, iSpec, jSpec)
-            m2tr = numeric.transpose(matrices.LoadMatrix("connect", fileInfo, jSpec, iSpec))
+            m1 = matrices.LoadMatrix("connect", iSpec, jSpec)
+            m2tr = numeric.transpose(matrices.LoadMatrix("connect", jSpec, iSpec))
             connect2.append(m1 + m2tr)
-        B = matrices.LoadMatrixArray("B", fileInfo, seqsInfo, iSpec)
+        B = matrices.LoadMatrixArray("B", seqsInfo, iSpec)
         B_connect = matrices.MatricesAnd_s(connect2, B)
         
         W = [b.sorted_indices().tolil() for b in B_connect]
@@ -463,18 +463,18 @@ class WaterfallMethod:
             return sparse.lil_matrix(B.get_shape())
             
     @staticmethod
-    def ProcessBlastHits(seqsInfo, fileInfo, Lengths, iSpecies, qDoubleBlast):
+    def ProcessBlastHits(seqsInfo, blastDir, Lengths, iSpecies, qDoubleBlast):
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
             # process up to the best hits for each species
             Bi = []
             for jSpecies in xrange(seqsInfo.nSpecies):
-                Bij = BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)  
+                Bij = BlastFileProcessor.GetBLAST6Scores(seqsInfo, blastDir, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)  
                 Bij = WaterfallMethod.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
                 Bi.append(Bij)
-            matrices.DumpMatrixArray("B", Bi, fileInfo, iSpecies)
+            matrices.DumpMatrixArray("B", Bi, iSpecies)
             BH = GetBH_s(Bi, seqsInfo, iSpecies)
-            matrices.DumpMatrixArray("BH", BH, fileInfo, iSpecies)
+            matrices.DumpMatrixArray("BH", BH, iSpecies)
             util.PrintTime("Initial processing of species %d complete" % iSpecies)
         
     @staticmethod 
@@ -487,14 +487,14 @@ class WaterfallMethod:
                 return 
 
     @staticmethod
-    def ConnectCognates(seqsInfo, fileInfo, iSpecies): 
+    def ConnectCognates(seqsInfo, iSpecies): 
         # calculate RBH for species i
-        BHix = matrices.LoadMatrixArray("BH", fileInfo, seqsInfo, iSpecies)
-        BHxi = matrices.LoadMatrixArray("BH", fileInfo, seqsInfo, iSpecies, row=False)
+        BHix = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies)
+        BHxi = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies, row=False)
         RBHi = matrices.MatricesAndTr_s(BHix, BHxi)   # twice as much work as before (only did upper triangular before)
-        B = matrices.LoadMatrixArray("B", fileInfo, seqsInfo, iSpecies)
+        B = matrices.LoadMatrixArray("B", seqsInfo, iSpecies)
         connect = WaterfallMethod.ConnectAllBetterThanAnOrtholog_s(RBHi, B, seqsInfo, iSpecies) 
-        matrices.DumpMatrixArray("connect", connect, fileInfo, iSpecies)
+        matrices.DumpMatrixArray("connect", connect, iSpecies)
             
     @staticmethod 
     def Worker_ConnectCognates(cmd_queue):
@@ -508,20 +508,21 @@ class WaterfallMethod:
                     return  
                                    
     @staticmethod
-    def WriteGraphParallel(seqsInfo, fileInfo, nProcess):
+    def WriteGraphParallel(seqsInfo, nProcess):
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
-            with open(fileInfo.graphFilename, 'wb') as graphFile:
+            with open(scripts.files.FileHandler.GetGraphFilename(), 'wb') as graphFile:
                 graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (seqsInfo.nSeqs, seqsInfo.nSeqs)) 
                 graphFile.write("\n(mclmatrix\nbegin\n\n") 
             pool = mp.Pool(nProcess)
-            pool.map(WriteGraph_perSpecies, [(seqsInfo, fileInfo, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
+            graphFN = scripts.files.FileHandler.GetGraphFilename()
+            pool.map(WriteGraph_perSpecies, [(seqsInfo, graphFN, iSpec) for iSpec in xrange(seqsInfo.nSpecies)])
             for iSp in xrange(seqsInfo.nSpecies):
-                subprocess.call("cat " + fileInfo.graphFilename + "_%d" % iSp + " >> " + fileInfo.graphFilename, shell=True)
-                os.remove(fileInfo.graphFilename + "_%d" % iSp)
+                subprocess.call("cat " + graphFN + "_%d" % iSp + " >> " + graphFN, shell=True)
+                os.remove(graphFN + "_%d" % iSp)
             # Cleanup
-            matrices.DeleteMatrices("B", fileInfo) 
-            matrices.DeleteMatrices("connect", fileInfo) 
+            matrices.DeleteMatrices("B") 
+            matrices.DeleteMatrices("connect") 
             
     @staticmethod
     def GetMostDistant_s(RBH, B, seqsInfo, iSpec):
@@ -1238,19 +1239,18 @@ def CheckDependencies(options, program_caller, dirForTempFiles):
 def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast):
     # Run Algorithm, cluster and output cluster files with original accessions
     util.PrintUnderline("Running OrthoFinder algorithm")
-    graphFilename = scripts.files.FileHandler.GetGraphFilename() 
     # it's important to free up the memory from python used for processing the genomes
     # before launching MCL becuase both use sizeable ammounts of memory. The only
     # way I can find to do this is to launch the memory intensive python code 
     # as separate process that exits before MCL is launched.
-    fileInfo = util.FileInfo(workingDir = scripts.files.FileHandler.GetWorkingDirectory1(), graphFilename=graphFilename) 
-    Lengths = GetSequenceLengths(seqsInfo, fileInfo)
+    Lengths = GetSequenceLengths(seqsInfo)
     
     # Process BLAST hits
     util.PrintTime("Initial processing of each species")
     cmd_queue = mp.Queue()
+    blastDir = scripts.files.FileHandler.GetBlastResultsDir()
     for iSpecies in xrange(seqsInfo.nSpecies):
-        cmd_queue.put((seqsInfo, fileInfo, Lengths, iSpecies))
+        cmd_queue.put((seqsInfo, blastDir, Lengths, iSpecies))
     runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, qDoubleBlast)) for i_ in xrange(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
@@ -1258,17 +1258,18 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast):
     
     cmd_queue = mp.Queue()
     for iSpecies in xrange(seqsInfo.nSpecies):
-        cmd_queue.put((seqsInfo, fileInfo, iSpecies))
+        cmd_queue.put((seqsInfo, iSpecies))
     runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, )) for i_ in xrange(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
     util.ManageQueue(runningProcesses, cmd_queue)
     
     util.PrintTime("Connected putatitive homologs") 
-    WaterfallMethod.WriteGraphParallel(seqsInfo, fileInfo, options.nProcessAlg)
+    WaterfallMethod.WriteGraphParallel(seqsInfo, options.nProcessAlg)
     
     # 5b. MCL     
     clustersFilename, clustersFilename_pairs = scripts.files.FileHandler.CreateUnusedClustersFN(options.mclInflation) 
+    graphFilename = scripts.files.FileHandler.GetGraphFilename() 
     MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
     MCLread.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
     
@@ -1285,7 +1286,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast):
     if options.speciesXMLInfoFN:
         MCL.WriteOrthoXML(speciesXML, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml", speciesInfoObj.speciesToUse)
     util.PrintTime("Done orthogroups")
-    return clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString
+    return statsFile, summaryText, orthogroupsResultsFilesString
 
 # 0
 def ProcessPreviousFiles(workingDir, qDoubleBlast):
@@ -1399,12 +1400,11 @@ def RunSearch(options, speciessInfoObj, seqsInfo, program_caller):
             os.remove(f)
 
 # 9
-def GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString=None):
+def GetOrthologues(dirs, options, program_caller, orthogroupsResultsFilesString=None):
     util.PrintUnderline("Analysing Orthogroups", True)
 
     orthologuesResultsFilesString = orthologues.OrthologuesWorkflow(speciesInfoObj.speciesToUse, 
                                                                     speciesInfoObj.nSpAll, 
-                                                                    clustersFilename_pairs, 
                                                                     program_caller,
                                                                     options.msa_program,
                                                                     options.tree_program,
@@ -1525,6 +1525,7 @@ if __name__ == "__main__":
         if options.qStartFromGroups or options.qStartFromTrees:
             # User can specify it using clusters_id_pairs file, process this first to get the workingDirectory
             workingDir, orthofinderResultsDir, clustersFilename_pairs = util.GetOGsFile(workingDir)
+            scripts.files.FileHandler.SetClustersFN(clustersFilename_pairs)
         CheckDependencies(options, program_caller, next(d for d in [fastaDir, workingDir, orthologuesDir] if  d != None)) 
         
         # if using previous Trees etc., check these are all present - Job for orthologues
@@ -1547,10 +1548,10 @@ if __name__ == "__main__":
             # 7.  
             RunSearch(options, speciesInfoObj, seqsInfo, program_caller)
             # 8.
-            clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo, options.qDoubleBlast)
+            statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo, options.qDoubleBlast)
             # 9.
             if not options.qStopAfterGroups:
-                GetOrthologues(speciesInfoObj, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
+                GetOrthologues(speciesInfoObj, options, program_caller, orthogroupsResultsFilesString)
             # 10.
             print("\n" + statsFile + "\n\n" + summaryText) 
             util.PrintCitation()
@@ -1575,10 +1576,10 @@ if __name__ == "__main__":
             # 7. 
             RunSearch(options, speciesInfoObj, seqsInfo, program_caller)
             # 8.  
-            clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo, options.qDoubleBlast)    
+            statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo, options.qDoubleBlast)    
             # 9. 
             if not options.qStopAfterGroups:
-                GetOrthologues(speciesInfoObj, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
+                GetOrthologues(speciesInfoObj, options, program_caller, orthogroupsResultsFilesString)
             # 10.
             print("\n" + statsFile + "\n\n" + summaryText) 
             util.PrintCitation()
@@ -1595,10 +1596,10 @@ if __name__ == "__main__":
             if options.speciesXMLInfoFN:   
                 speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
             # 8        
-            clustersFilename_pairs, statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo, options.qDoubleBlast)    
+            statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo, options.qDoubleBlast)    
             # 9
             if not options.qStopAfterGroups:
-                GetOrthologues(speciesInfoObj, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString)
+                GetOrthologues(speciesInfoObj, options, program_caller, orthogroupsResultsFilesString)
             # 10
             print("\n" + statsFile + "\n\n" + summaryText) 
             util.PrintCitation() 
@@ -1608,7 +1609,7 @@ if __name__ == "__main__":
             speciesInfoObj, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
             options = CheckOptions(options)
             # 9
-            GetOrthologues(speciesInfoObj, options, program_caller, clustersFilename_pairs)
+            GetOrthologues(speciesInfoObj, options, program_caller)
             # 10
             util.PrintCitation() 
         elif options.qStartFromTrees:
