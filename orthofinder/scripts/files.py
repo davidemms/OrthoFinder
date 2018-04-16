@@ -380,6 +380,14 @@ class __Files_dont_recreate__(object):
                     time.sleep(1)
                     shutil.rmtree(dFull, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
                     
+
+    
+""" ************************************************************************************************************************* """
+                    
+class __Files_new_structure_dont_recreate__(__Files_dont_recreate__):    
+    def __init__(self):
+        __Files_dont_recreate__.__init__(self)
+                    
 FileHandler = __Files_dont_recreate__()
         
     
