@@ -749,10 +749,10 @@ def OrthologuesFromTrees(recon_method, nHighParallel, userSpeciesTree_fn):
         CheckUserSpeciesTree(userSpeciesTree_fn, speciesToUseNames)
         speciesTreeFN_ids = files.FileHandler.GetWorkingDirectory2() + "SpeciesTree_user_ids_rooted.txt"
         ConvertUserSpeciesTree(userSpeciesTree_fn, speciesDict, speciesTreeFN_ids)
-        files.FileHandler.SetSpeciesTreeRootedFN(speciesTreeFN_ids)
+        files.FileHandler.SetSpeciesTreeIDsRootedFN(speciesTreeFN_ids)
     util.PrintUnderline("Running Orthologue Prediction", True)
     util.PrintUnderline("Reconciling gene and species trees") 
-    ReconciliationAndOrthologues(recon_method, ogSet, files.FileHandler.GetSpeciesTreeRootedFN(), nHighParallel)
+    ReconciliationAndOrthologues(recon_method, ogSet, files.FileHandler.GetSpeciesTreeIDsRootedFN(), nHighParallel)
     util.PrintUnderline("Writing results files")
     util.PrintTime("Writing results files")
     files.FileHandler.CleanWorkingDir2()

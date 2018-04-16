@@ -383,11 +383,12 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
 #    left = [[] for sp in species]  
 #    right = [[] for sp in species]
     # reorder orthologues on a per-species basis
+    dSuspect = files.FileHandler.GetPutativeXenelogsDir()
     nSpecies = len(iSpeciesToUse)
     for i in xrange(nSpecies):
         sp0 = str(iSpeciesToUse[i])
         if qContainsSuspectOlogs: 
-            outfile1_sus = open(resultsDir + "Putative_Xenologues/%s.csv" % speciesDict[sp0], 'ab')
+            outfile1_sus = open(dSuspect + "%s.csv" % speciesDict[sp0], 'ab')
             writer1_sus = csv.writer(outfile1_sus, delimiter="\t")
         strsp0 = sp0 + "_"
         isp0 = sp_to_index[sp0]
@@ -400,7 +401,7 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
             d1 = resultsDir + "Orthologues_" + speciesDict[sp1] + "/"
             with open(d0 + '%s__v__%s.csv' % (speciesDict[sp0], speciesDict[sp1]), 'ab') as outfile1, open(d1 + '%s__v__%s.csv' % (speciesDict[sp1], speciesDict[sp0]), 'ab') as outfile2:
                 if qContainsSuspectOlogs:
-                    outfile2_sus = open(resultsDir + "Putative_Xenologues/%s.csv" % speciesDict[sp1], 'ab')
+                    outfile2_sus = open(dSuspect + "%s.csv" % speciesDict[sp1], 'ab')
                     writer2_sus = csv.writer(outfile2_sus, delimiter="\t")
                 writer1 = csv.writer(outfile1, delimiter="\t")
                 writer2 = csv.writer(outfile2, delimiter="\t")

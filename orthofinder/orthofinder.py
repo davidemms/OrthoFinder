@@ -1425,8 +1425,7 @@ def GetOrthologues(dirs, options, program_caller, orthogroupsResultsFilesString=
     if None != orthogroupsResultsFilesString: print(orthogroupsResultsFilesString)
     print(orthologuesResultsFilesString.rstrip())    
 
-def GetOrthologues_FromTrees(orthologuesDir, options):
-    scripts.files.FileHandler.CreateOutputDirForAnalysisFromTrees(orthologuesDir, options.speciesTreeFN)
+def GetOrthologues_FromTrees(options):
     return orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.speciesTreeFN)
  
 def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_names=[], name = ""):
@@ -1526,22 +1525,26 @@ if __name__ == "__main__":
         # 2.
         if options.qStartFromGroups or options.qStartFromTrees:
             # User can specify it using clusters_id_pairs file, process this first to get the workingDirectory
-            workingDir, orthofinderResultsDir, clustersFilename_pairs = util.GetOGsFile(workingDir)
+            workingDir, orthofinderResultsDir, clustersFilename_pairs, qNewStructure = scripts.files.GetOGsFile(workingDir)
         CheckDependencies(options, program_caller, next(d for d in [fastaDir, workingDir, orthologuesDir] if  d != None)) 
         
         # Create FileHandler
         if options.qStartFromBlast: 
-            scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir)
+            if qNewStructure:
+                scripts.files.FileHandler = scripts.files.__Files_new_structure_dont_recreate__()
+                scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir, orthofinderResultsDir, options.name)
+            else:
+                scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir)
         elif options.qStartFromTrees:
+            if qNewStructure:
+                scripts.files.FileHandler = scripts.files.__Files_new_structure_dont_recreate__()
             scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir)
             scripts.files.FileHandler.SetClustersFN(clustersFilename_pairs)
+            scripts.files.FileHandler.CreateOutputDirFromTrees(orthologuesDir, options.speciesTreeFN)
         elif options.qStartFromFasta:
             # But, by previous condition, not qStartFromBlast
             scripts.files.FileHandler = scripts.files.__Files_new_structure_dont_recreate__()
-            if resultsDir_nonDefault == None:
-                scripts.files.FileHandler.CreateOutputDirFromInputFastaDir(fastaDir)
-            else:
-                scripts.files.FileHandler.CreateNonDefaultResultsDirectory1(resultsDir_nonDefault)
+            scripts.files.FileHandler.CreateOutputDirFromStart_new(fastaDir, resultsDir_nonDefault, append_name=options.name)
         elif options.qStartFromGroups:
             scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir, orthofinderResultsDir)
             scripts.files.FileHandler.SetClustersFN(clustersFilename_pairs)

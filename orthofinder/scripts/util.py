@@ -246,6 +246,19 @@ def CreateNewWorkingDirectory(baseDirectoryName):
         newDirectoryName = GetDirectoryName(baseDirectoryName + dateStr, iAppend)
     os.mkdir(newDirectoryName)
     return newDirectoryName
+    
+def CreateNewPairedDirectories(baseDirectoryName1, baseDirectoryName2):
+    dateStr = datetime.date.today().strftime("%b%d") 
+    iAppend = 0
+    newDirectoryName1 = GetDirectoryName(baseDirectoryName1 + dateStr, iAppend)
+    newDirectoryName2 = GetDirectoryName(baseDirectoryName2 + dateStr, iAppend)
+    while os.path.exists(newDirectoryName1) or os.path.exists(newDirectoryName2):
+        iAppend += 1
+        newDirectoryName1 = GetDirectoryName(baseDirectoryName1 + dateStr, iAppend)
+        newDirectoryName2 = GetDirectoryName(baseDirectoryName2 + dateStr, iAppend)
+    os.mkdir(newDirectoryName1)
+    os.mkdir(newDirectoryName2)
+    return newDirectoryName1, newDirectoryName2
 
 def GetUnusedFilename(baseFilename, ext):
     iAppend = 0
@@ -421,12 +434,6 @@ def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qSupport, qFixNegati
                 t.write(outfile = newTreeFilename, format=5)  
     except:
         pass
-
-def IsWorkingDirectory(orthofinderWorkingDir):
-    ok = True
-    ok = ok and len(glob.glob(orthofinderWorkingDir + "clusters_OrthoFinder_*.txt_id_pairs.txt")) > 0
-    ok = ok and len(glob.glob(orthofinderWorkingDir + "Species*.fa")) > 0
-    return ok
     
 """
 Find results of previous run    
@@ -436,72 +443,6 @@ Find results of previous run
 def GetSpeciesDirectory():
     # Confirms all required Sequence files and BLAST etc are present
     pass
-
-def GetOGsFile(userArg):
-    """returns the WorkingDirectory, ResultsDirectory and clusters_id_pairs filename"""
-    qSpecifiedResultsFile = False
-    if userArg == None:
-        print("ERROR: orthofinder_results_directory has not been specified")
-        Fail()
-    if os.path.isfile(userArg):
-        fn = os.path.split(userArg)[1]
-        if ("clusters_OrthoFinder_" not in fn) or ("txt_id_pairs.txt" not in fn):
-            print("ERROR:\n    %s\nis neither a directory or a clusters_OrthoFinder_*.txt_id_pairs.txt file." % userArg)
-            Fail()
-        qSpecifiedResultsFile = True
-        # user has specified specific results file
-    elif userArg[-1] != os.path.sep: 
-        userArg += os.path.sep
-    
-    # find required files
-    if qSpecifiedResultsFile:
-        orthofinderWorkingDir = os.path.split(userArg)[0] + os.sep
-        if not IsWorkingDirectory(orthofinderWorkingDir):
-            print("ERROR: cannot find files from OrthoFinder run in directory:\n   %s" % orthofinderWorkingDir)
-            Fail()
-    else:
-        orthofinderWorkingDir = os.path.split(userArg)[0] if qSpecifiedResultsFile else userArg
-        if not IsWorkingDirectory(orthofinderWorkingDir):
-            orthofinderWorkingDir = userArg + "WorkingDirectory" + os.sep   
-            if not IsWorkingDirectory(orthofinderWorkingDir):
-                print("ERROR: cannot find files from OrthoFinder run in directory:\n   %s\nor\n   %s\n" % (userArg, orthofinderWorkingDir))
-                Fail()
-            
-    if qSpecifiedResultsFile:
-        print("\nUsing orthogroups in file:\n    %s" % userArg)
-        return orthofinderWorkingDir, orthofinderWorkingDir, userArg
-    else:     
-        # identify orthogroups file
-        clustersFiles = glob.glob(orthofinderWorkingDir + "clusters_OrthoFinder_*.txt_id_pairs.txt")
-        orthogroupFiles = glob.glob(orthofinderWorkingDir + "OrthologousGroups*.txt") + glob.glob(orthofinderWorkingDir + "Orthogroups*.txt")
-        if orthofinderWorkingDir != userArg:
-            orthogroupFiles += glob.glob(userArg + "OrthologousGroups*.txt")
-            orthogroupFiles += glob.glob(userArg + "Orthogroups*.txt")
-        # User may have specified a WorkingDirectory and results could be in directory above
-        if len(orthogroupFiles) < len(clustersFiles):
-            orthogroupFiles += glob.glob(userArg + ".." + os.sep + "OrthologousGroups*.txt")
-            orthogroupFiles += glob.glob(userArg + ".." + os.sep + "Orthogroups*.txt")
-        clustersFiles = sorted(clustersFiles)
-        orthogroupFiles = sorted(orthogroupFiles)
-        if len(clustersFiles) > 1 or len(orthogroupFiles) > 1:
-            print("ERROR: Results from multiple OrthoFinder runs found\n")
-            print("Tab-delimiter Orthogroups*.txt/OrthologousGroups*.txt files:")
-            for fn in orthogroupFiles:
-                print("    " + fn)
-            print("With corresponding cluster files:")
-            for fn in clustersFiles:
-                print("    " + fn)
-            print("\nPlease run with only one set of results in directories or specifiy the specific clusters_OrthoFinder_*.txt_id_pairs.txt file on the command line")
-            Fail()        
-            
-        if len(clustersFiles) != 1 or len(orthogroupFiles) != 1:
-            print("ERROR: Results not found in <orthofinder_results_directory> or <orthofinder_results_directory>/WorkingDirectory")
-            print("\nCould not find:\n    Orthogroups*.txt/OrthologousGroups*.txt\nor\n    clusters_OrthoFinder_*.txt_id_pairs.txt")
-            Fail()
-            
-        print("\nUsing orthogroups in file:\n    %s" % orthogroupFiles[0])
-        print("and corresponding clusters file:\n    %s" % clustersFiles[0])
-        return orthofinderWorkingDir, userArg, clustersFiles[0]
 
 def PrintCitation():  
     print ("\nCITATION:")  
