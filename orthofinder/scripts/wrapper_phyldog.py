@@ -59,7 +59,7 @@ use.quality.filters=false""" % baseDir
             og = "OG%07d" % i
             outFN = base + "_" + og + ext
             with open(outFN, 'wb') as outfile:
-                outfile.write(x.replace("ListGenes", "ListGenes_" + og))
+                outfile.write(x.replace("ListGenes", "ListGenes_" + og).replace("mrp", "user"))
     else:
         with open(filename, 'wb') as outfile: outfile.write(x)
 
