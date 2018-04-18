@@ -12,9 +12,10 @@ import subprocess
 import fileinput
 from collections import defaultdict, Counter
 
+import util
 import tree as tree_lib
 
-def WriteGeneralOptions(filename, baseDir):
+def WriteGeneralOptions(filename, baseDir, qRunSingley, nOGs):
     x="""######## First, data files ########
 BASEDIR=%s
 
@@ -23,8 +24,7 @@ PATH=$(RESULT)
 
 genelist.file=$(RESULT)ListGenes.opt
 init.species.tree=mrp
-#species.tree.file=$(BASEDIR)Trees_ids/SpeciesTree_ids_0_rooted.txt
-#species.tree.file=/home/david/projects/OrthoFinder/Development/phyldog/SpeciesTree_ids_0_rooted_from_elsewhere.txt
+species.tree.file=../Trees_ids/SpeciesTree_user_ids_rooted.txt
 species.names.file=$(RESULT)ListSpecies.txt
 starting.tree.file=$(RESULT)StartingTree.tree
 output.tree.file=$(RESULT)OutputSpeciesTree.tree
@@ -53,7 +53,15 @@ output.losses.tree.file=$(RESULT)$(DATA).LossTree
 #output.numbered.tree.file=$(RESULT)OutputSpeciesTree_ConsensusNumbered.tree
 
 use.quality.filters=false""" % baseDir
-    with open(filename, 'wb') as outfile: outfile.write(x)
+    if qRunSingley:
+        for i in xrange(nOGs):
+            base, ext = os.path.splitext(filename)
+            og = "OG%07d" % i
+            outFN = base + "_" + og + ext
+            with open(outFN, 'wb') as outfile:
+                outfile.write(x.replace("ListGenes", "ListGenes_" + og))
+    else:
+        with open(filename, 'wb') as outfile: outfile.write(x)
 
 def WriteOGOptions(phyldogDir, nOGs, exclude):
     basedir = phyldogDir + "../"
@@ -169,31 +177,44 @@ def ProcessSpeciesTree(phyldogDir):
     species_tree_rooted.write(outfile=ret_species_tree_fn)
     return ret_species_tree_fn
     
-def WriteStandardFiles(phyldogDir, speciesToUse):
-    WriteGeneralOptions(phyldogDir + "GeneralOptions.opt", phyldogDir + "../")
+def WriteStandardFiles(phyldogDir, speciesToUse, qRunSingley, nOGs):
+    WriteGeneralOptions(phyldogDir + "GeneralOptions.opt", phyldogDir + "../", qRunSingley, nOGs)
 #    with open(phyldogDir + "listGenes_generic.txt", 'wb') as outfile: outfile.write(phyldogDir + "OG_generic.opt:1")
     WriteListSpecies(phyldogDir + "ListSpecies.txt", speciesToUse)
 
-def WriteListGenes(phyldogDir, nOGs, exclude):
-    with open(phyldogDir + "ListGenes.opt", 'wb') as outfile:
+def WriteListGenes(phyldogDir, nOGs, exclude, qRunSingley):
+    if qRunSingley:
         for i in xrange(nOGs):
             if i in exclude: continue
-            outfile.write(phyldogDir + "OG%07d.opt:%s\n" % (i, str(os.stat( phyldogDir + "../Alignments_ids/OG%07d.fa" % i )[6])))   # phyldog prepareData.py method
+            with open(phyldogDir + "ListGenes_OG%07d.opt" % i, 'wb') as outfile:
+                    outfile.write(phyldogDir + "OG%07d.opt:%s\n" % (i, str(os.stat( phyldogDir + "../Alignments_ids/OG%07d.fa" % i )[6])))   # phyldog prepareData.py method
     
-def Setup(phyldogDir, ogs, speciesToUse):
+    else:
+        with open(phyldogDir + "ListGenes.opt", 'wb') as outfile:
+            for i in xrange(nOGs):
+                if i in exclude: continue
+                outfile.write(phyldogDir + "OG%07d.opt:%s\n" % (i, str(os.stat( phyldogDir + "../Alignments_ids/OG%07d.fa" % i )[6])))   # phyldog prepareData.py method
+    
+def Setup(phyldogDir, ogs, speciesToUse, qRunSingley):
     if not os.path.exists(phyldogDir): os.mkdir(phyldogDir)
     if not os.path.exists(phyldogDir + "Results/"): os.mkdir(phyldogDir + "Results/")
-    WriteStandardFiles(phyldogDir, speciesToUse)
-    exclude = CleanAlignmentsForPhyldog(phyldogDir, ogs)
     nOGs = len(ogs)
+    WriteStandardFiles(phyldogDir, speciesToUse, qRunSingley, nOGs)
+    exclude = CleanAlignmentsForPhyldog(phyldogDir, ogs)
     WriteOGOptions(phyldogDir, nOGs, exclude)
     WriteGeneMaps(phyldogDir, ogs, exclude)
-    WriteListGenes(phyldogDir, nOGs, exclude)
+    WriteListGenes(phyldogDir, nOGs, exclude, qRunSingley)
     
 def RunPhyldogAnalysis(phyldogDir, ogs, speciesToUse, nParallel):
-    Setup(phyldogDir, ogs, speciesToUse)
+    qRunSingley = True
+    Setup(phyldogDir, ogs, speciesToUse, qRunSingley)
     start = time.time()
-    subprocess.call("mpirun -np %d phyldog param=GeneralOptions.opt" % nParallel, shell=True, cwd=phyldogDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if qRunSingley:
+        nOGs = len(ogs)
+        cmds = [["mpirun -np 2 phyldog param=%s%s"  % (phyldogDir, "GeneralOptions_OG%07d.opt" % i)] for i in xrange(nOGs)]
+        util.RunParallelOrderedCommandLists(nParallel, cmds, True)
+    else:
+        subprocess.call("mpirun -np %d phyldog param=GeneralOptions.opt" % nParallel, shell=True, cwd=phyldogDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stop = time.time()
     print("%f seconds" % (stop-start))
     return ProcessSpeciesTree(phyldogDir)

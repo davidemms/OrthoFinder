@@ -1007,6 +1007,8 @@ def OrthologuesWorkflow(workingDir_ogs,
             print("Loading BLAST scores")
             spTreeFN_ids, spTreeUnrootedFN = db.SpeciesTreeOnly()
         if qPhyldog:
+#            util.PrintTime("Do species tree for phyldog")
+#            spTreeFN_ids, spTreeUnrootedFN = db.SpeciesTreeOnly()
             util.PrintTime("Starting phyldog")
             species_tree_ids_labelled_phyldog = wrapper_phyldog.RunPhyldogAnalysis(resultsDir + "WorkingDirectory/phyldog/", ogSet.OGs(), speciesToUse, nHighParallel)
     else:

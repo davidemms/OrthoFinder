@@ -1138,9 +1138,13 @@ def ProcessArgs(program_caller):
         print("ERROR: Argument '-T' (tree inference program) also requires option '-M msa'")
         util.Fail()  
 
-    if options.msa_program != None and (not options.qMSATrees):
+    if options.msa_program != None and (not options.qMSATrees and not options.qPhyldog):
         print("ERROR: Argument '-A' (multiple sequence alignment inference program) also requires option '-M msa'")
-        util.Fail()        
+        util.Fail()      
+        
+    if options.qPhyldog and (not options.speciesTreeFN):
+        print("ERROR: Phyldog currently needs a species tree to be provided")
+        util.Fail()      
         
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
     print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
