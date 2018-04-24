@@ -1434,6 +1434,9 @@ def ProcessesNewFasta(fastaDir, existingDirs=None, speciesToUse_prev_names=[], n
     originalFastaFilenames = sorted([f for f in os.listdir(fastaDir) if os.path.isfile(os.path.join(fastaDir,f))])
     originalFastaFilenames = [f for f in originalFastaFilenames if len(f.rsplit(".", 1)) == 2 and f.rsplit(".", 1)[1].lower() in fastaExtensions]
     speciesToUse_prev_names = set(speciesToUse_prev_names)
+    if len(originalFastaFilenames) + len(speciesToUse_prev_names) < 2:
+        print("ERROR: At least two species are required")
+        util.Fail()
     if any([fn in speciesToUse_prev_names for fn in originalFastaFilenames]):
         print("ERROR: Attempted to add a second copy of a previously included species:")
         for fn in originalFastaFilenames:
