@@ -24,7 +24,7 @@ PATH=$(RESULT)
 
 genelist.file=$(RESULT)ListGenes.opt
 init.species.tree=mrp
-species.tree.file=../Trees_ids/SpeciesTree_user_ids_rooted.txt
+species.tree.file=$(BASEDIR)/Trees_ids/SpeciesTree_user_ids_rooted.txt
 species.names.file=$(RESULT)ListSpecies.txt
 starting.tree.file=$(RESULT)StartingTree.tree
 output.tree.file=$(RESULT)OutputSpeciesTree.tree
@@ -212,7 +212,7 @@ def RunPhyldogAnalysis(phyldogDir, ogs, speciesToUse, nParallel):
     if qRunSingley:
         nOGs = len(ogs)
         cmds = [["mpirun -np 2 phyldog param=%s%s"  % (phyldogDir, "GeneralOptions_OG%07d.opt" % i)] for i in xrange(nOGs)]
-        util.RunParallelOrderedCommandLists(nParallel, cmds, True)
+        util.RunParallelCommands(nParallel, cmds, True, qHideStdout=True)
     else:
         subprocess.call("mpirun -np %d phyldog param=GeneralOptions.opt" % nParallel, shell=True, cwd=phyldogDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stop = time.time()

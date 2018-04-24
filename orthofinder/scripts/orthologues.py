@@ -1009,6 +1009,8 @@ def OrthologuesWorkflow(workingDir_ogs,
         if qPhyldog:
 #            util.PrintTime("Do species tree for phyldog")
 #            spTreeFN_ids, spTreeUnrootedFN = db.SpeciesTreeOnly()
+            if userSpeciesTree: 
+                userSpeciesTree = ConvertUserSpeciesTree(db.workingDir + "Trees_ids/", userSpeciesTree, ogSet.SpeciesDict())
             util.PrintTime("Starting phyldog")
             species_tree_ids_labelled_phyldog = wrapper_phyldog.RunPhyldogAnalysis(resultsDir + "WorkingDirectory/phyldog/", ogSet.OGs(), speciesToUse, nHighParallel)
     else:
@@ -1031,7 +1033,12 @@ def OrthologuesWorkflow(workingDir_ogs,
     Phyldog (ust):     ConvertSpeciesTreeIDs
     Dendroblast (ust): ConvertSpeciesTreeIDs
     """    
-    if userSpeciesTree:
+    if qPhyldog:
+        rootedSpeciesTreeFN = [species_tree_ids_labelled_phyldog]
+        roots = [None]
+        qMultiple = False
+        all_stride_dup_genes = None
+    elif userSpeciesTree:
         util.PrintUnderline("Using user-supplied species tree") 
         userSpeciesTree = ConvertUserSpeciesTree(db.workingDir + "Trees_ids/", userSpeciesTree, ogSet.SpeciesDict())
         rootedSpeciesTreeFN = [userSpeciesTree]
@@ -1041,11 +1048,6 @@ def OrthologuesWorkflow(workingDir_ogs,
     elif len(ogSet.seqsInfo.speciesToUse) == 2:
         hardcodeSpeciesTree = GetSpeciesTreeRoot_TwoTaxa(ogSet.seqsInfo.speciesToUse, db.workingDir)
         rootedSpeciesTreeFN = [hardcodeSpeciesTree]
-        roots = [None]
-        qMultiple = False
-        all_stride_dup_genes = None
-    elif qPhyldog:
-        rootedSpeciesTreeFN = [species_tree_ids_labelled_phyldog]
         roots = [None]
         qMultiple = False
         all_stride_dup_genes = None
