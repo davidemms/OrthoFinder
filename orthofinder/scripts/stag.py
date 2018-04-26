@@ -30,7 +30,7 @@ import subprocess
 import numpy as np
 from itertools import combinations
 
-import tree       
+import tree, newick
 import consensus_tree as cons
         
 def CanRunCommand(command, qAllowStderr = False, qPrint = True):
@@ -186,7 +186,7 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=Tr
     for fn in glob.glob(dir_in + "/*"):
         try:
             t = tree.Tree(fn)
-        except tree.parser.newick.NewickError:
+        except newick.NewickError:
             print(os.path.split(fn)[1] + " - WARNING: ETE could not interpret tree file, it will be ignored")
             nFail += 1
             continue
