@@ -245,12 +245,13 @@ def GetSpeciesTreeRoot_TwoTaxa(taxa, workingDir):
 # ==============================================================================================================================      
 # DendroBlast   
 
-def Worker_OGMatrices_ReadBLASTAndUpdateDistances(cmd_queue, ogMatrices, nGenes, seqsInfo, fileInfo, ogsPerSpecies, qDoubleBlast):
+def Worker_OGMatrices_ReadBLASTAndUpdateDistances(cmd_queue, worker_status_queue, iWorker, ogMatrices, nGenes, seqsInfo, fileInfo, ogsPerSpecies, qDoubleBlast):
     speciesToUse = seqsInfo.speciesToUse
     with np.errstate(divide='ignore'):
         while True:
             try:
                 iiSp, sp1, nSeqs_sp1 = cmd_queue.get(True, 1)
+                worker_status_queue.put(("start", iWorker, iiSp))
                 Bs = [BlastFileProcessor.GetBLAST6Scores(seqsInfo, fileInfo, sp1, sp2, qExcludeSelfHits = False, qDoubleBlast=qDoubleBlast) for sp2 in speciesToUse]
                 mins = np.ones((nSeqs_sp1, 1), dtype=np.float64)*9e99 
                 maxes = np.zeros((nSeqs_sp1, 1), dtype=np.float64)
@@ -264,8 +265,15 @@ def Worker_OGMatrices_ReadBLASTAndUpdateDistances(cmd_queue, ogMatrices, nGenes,
                         for gi, i in og[iiSp]:
                             for gj, j in og[jjSp]:
                                     m[i][j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) * maxes_inv[gi.iSeq]
+                worker_status_queue.put(("finish", iWorker, iiSp))
             except Queue.Empty:
+                worker_status_queue.put(("empty", iWorker, None))
                 return 
+
+def PrintRAMError():
+    print("ERROR: The computer ran out of RAM and killed OrthoFinder processes")
+    print("Try using a computer with more RAM. If you used the '-a' option")
+    print("it may be possible to complete the run but removing this option.")
                 
 class DendroBLASTTrees(object):
     def __init__(self, ogSet, outD, nProcesses, qDoubleBlast):
@@ -305,12 +313,43 @@ class DendroBLASTTrees(object):
             cmd_queue = mp.Queue()
             for iiSp, sp1 in enumerate(self.ogSet.seqsInfo.speciesToUse):
                 cmd_queue.put((iiSp, sp1, nSeqs[sp1]))
-            runningProcesses = [mp.Process(target=Worker_OGMatrices_ReadBLASTAndUpdateDistances, args=(cmd_queue, ogMatrices, nGenes, self.ogSet.seqsInfo, self.ogSet.fileInfo, ogsPerSpecies, self.qDoubleBlast)) for i_ in xrange(self.nProcesses)]
+            worker_status_queue = mp.Queue()
+            runningProcesses = [mp.Process(target=Worker_OGMatrices_ReadBLASTAndUpdateDistances, args=(cmd_queue, worker_status_queue, iWorker, ogMatrices, nGenes, self.ogSet.seqsInfo, self.ogSet.fileInfo, ogsPerSpecies, self.qDoubleBlast)) for iWorker in xrange(self.nProcesses)]
             for proc in runningProcesses:
                 proc.start()
-            for proc in runningProcesses:
-                while proc.is_alive():
-                    proc.join() 
+            rota = [None for iWorker in xrange(self.nProcesses)]
+            unfinished = []
+            while True:
+                # get process alive/dead
+                time.sleep(1)
+                alive = [proc.is_alive() for proc in runningProcesses]
+                # read latest updates from queue, update rota
+                try:
+                    while True:
+                        status, iWorker, iTask = worker_status_queue.get(True, 0.1)
+                        if status == "start":
+                            rota[iWorker] = iTask
+                        elif status == "finish":
+                            rota[iWorker] = None
+                        elif status == "empty":
+                            rota[iWorker] = "empty"
+                except Queue.Empty:
+                    pass
+                # if worker is dead but didn't finish task, issue warning
+                for al, r in zip(alive, rota):
+                    if (not al) and (r != "empty"):
+                        PrintRAMError()
+                        util.Fail()
+                        unfinished.append(r)
+                if not any(alive):
+                    break
+                
+            if len(unfinished) != 0:
+                util.Fail()
+#                print("WARNING: Computer ran out of RAM and killed OrthoFinder processes")
+#                print("OrthoFinder will attempt to run these processes once more. If it is")
+#                print("unsuccessful again then it will have to exit. Consider using")
+#                print("the option '-a 1' or running on a machine with more RAM")
             #ogMatrices = [np.matrix(m) for m in ogMatrices]
             return ogs, ogMatrices      
                    
