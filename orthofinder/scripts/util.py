@@ -102,6 +102,10 @@ def CanRunCommand(command, qAllowStderr = False, qPrint = True):
         return True
     else:
         if qPrint: print(" - failed")
+        print("\nstdout:")        
+        for l in stdout: print(l)
+        print("\nstderr:")        
+        for l in stderr: print(l)
         return False
         
 def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qShell=True, qHideStdout=True):
