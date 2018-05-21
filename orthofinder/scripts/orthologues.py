@@ -962,7 +962,8 @@ def OrthologuesFromTrees(recon_method, groupsDir, workingDir, nHighParallel, spe
     speciesToUse, nSpAll, _ = util.GetSpeciesToUse(orthofinderWorkingDir + "SpeciesIDs.txt")    
     ogSet = OrthoGroupsSet(orthofinderWorkingDir, speciesToUse, nSpAll, clustersFilename_pairs, idExtractor = util.FirstWordExtractor)
     if qUserSpTree:
-        speciesToUseNames = ogSet.SpeciesDict().values()
+        sDict = ogSet.SpeciesDict()
+        speciesToUseNames = [sDict[str(iSp)] for iSp in ogSet.speciesToUse]
         CheckUserSpeciesTree(speciesTree_fn, speciesToUseNames)
         speciesTree_fn = ConvertUserSpeciesTree(workingDir + "Trees_ids/", speciesTree_fn, ogSet.SpeciesDict())
     util.PrintUnderline("Running Orthologue Prediction", True)
