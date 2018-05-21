@@ -273,7 +273,7 @@ def Worker_OGMatrices_ReadBLASTAndUpdateDistances(cmd_queue, worker_status_queue
 def PrintRAMError():
     print("ERROR: The computer ran out of RAM and killed OrthoFinder processes")
     print("Try using a computer with more RAM. If you used the '-a' option")
-    print("it may be possible to complete the run but removing this option.")
+    print("it may be possible to complete the run by removing this option.")
                 
 class DendroBLASTTrees(object):
     def __init__(self, ogSet, outD, nProcesses, qDoubleBlast):
