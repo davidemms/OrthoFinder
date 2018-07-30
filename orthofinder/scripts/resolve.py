@@ -402,6 +402,7 @@ def Resolve_Main(trees_fn_or_dir, species_tree_rooted_fn, GeneToSpecies, qTest):
     for trees_fn in trees:
         # Root using species tree if provided, otherwise tree should have been rooted already
         tree = tree_lib.Tree(trees_fn)
+#        tree = tree_lib.Tree(trees_fn, format=3)
         if len(tree) == 1: continue
         if species_tree_rooted_fn != None:
             tree.prune(tree.get_leaf_names())
@@ -433,7 +434,7 @@ def Resolve_Main(trees_fn_or_dir, species_tree_rooted_fn, GeneToSpecies, qTest):
             for n in tree.traverse("postorder"):
                 tree = resolve(n, GeneToSpecies)
             NumberOfOrthologues(tree, GeneToSpecies)    
-        tree.write(outfile=(trees_fn + ".rec.tre"))           
+        tree.write(outfile=(trees_fn + ".rec.tre"), format=3)           
            
 if __name__ == "__main__":
     with Finalise():

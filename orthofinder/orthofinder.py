@@ -1146,6 +1146,7 @@ def ProcessArgs(program_caller):
         print("ERROR: Phyldog currently needs a species tree to be provided")
         util.Fail()      
         
+    util.PrintTime("Starting OrthoFinder")    
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
     print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
     return options, fastaDir, workingDir, orthologuesDir            
@@ -1385,6 +1386,7 @@ def RunSearch(options, dirs, seqsInfo, program_caller):
         while proc.is_alive():
             proc.join()
     # remove BLAST databases
+    util.PrintTime("Done all-versus-all sequence search")
     if options.search_program == "blast":
         for f in glob.glob(dirs.workingDir + "BlastDBSpecies*"):
             os.remove(f)
