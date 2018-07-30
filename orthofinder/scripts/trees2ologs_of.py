@@ -280,13 +280,13 @@ def GetOrthologues_from_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, ne
     """ if dupsWriter != None then seqIDs and spIDs must also be provided"""
     qPrune=True
     orthologues = []
-    if (not os.path.exists(treeFN)) or os.stat(treeFN).st_size == 0: return set(orthologues), treeFN
+    if (not os.path.exists(treeFN)) or os.stat(treeFN).st_size == 0: return set(orthologues), treeFN, set()
     try:
         tree = tree_lib.Tree(treeFN)
     except:
         tree = tree_lib.Tree(treeFN, format=3)
 #    if qPrune: tree.prune(tree.get_leaf_names())
-    if len(tree) == 1: return set(orthologues), tree
+    if len(tree) == 1: return set(orthologues), tree, set()
     root = GetRoot(tree, species_tree_rooted, GeneToSpecies)
     if root == None: return set(orthologues), tree, set()
     # Pick the first root for now
