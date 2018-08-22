@@ -20,7 +20,7 @@
     
     "iqtree":{ 
     "program_type": "tree",
-    "cmd_line": "iqtree -s INPUT -pre PATH/IDENTIFIER > /dev/null",
+    "cmd_line": "iqtree -nt 1 -s INPUT -pre PATH/IDENTIFIER > /dev/null",
     "ouput_filename": "PATH/IDENTIFIER.treefile"
     },
     
