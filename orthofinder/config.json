@@ -18,6 +18,12 @@
     "ouput_filename": "PATH/RAxML_bestTree.IDENTIFIER"
     },
     
+    "raxml-ng":{ 
+    "program_type": "tree",
+    "cmd_line": "raxml-ng --msa INPUT --model LG+G4 --seed 12345 --threads 1",
+    "ouput_filename": "INPUT.raxml.bestTree"
+    },
+
     "iqtree":{ 
     "program_type": "tree",
     "cmd_line": "iqtree -s INPUT -pre PATH/IDENTIFIER > /dev/null",
