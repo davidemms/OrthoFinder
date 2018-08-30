@@ -30,6 +30,8 @@ import sys                                      # Y
 import subprocess                               # Y
 import os                                       # Y
 import glob                                     # Y
+import shutil                                   # Y
+import time                                     # Y
 import multiprocessing as mp                    # optional  (problems on OpenBSD)
 import itertools                                # Y
 import datetime                                 # Y
@@ -1390,6 +1392,16 @@ def RunSearch(options, dirs, seqsInfo, program_caller):
     if options.search_program == "blast":
         for f in glob.glob(dirs.workingDir + "BlastDBSpecies*"):
             os.remove(f)
+    if options.search_program == "mmseqs":
+        for i in xrange(dirs.nSpAll):
+            for j in xrange(dirs.nSpAll):
+                tmp_dir = "/tmp/tmpBlast%d_%d.txt" % (i,j)
+                if os.path.exists(tmp_dir):
+                    try:
+                        shutil.rmtree(tmp_dir)
+                    except OSError:
+                        time.sleep(1)
+                        shutil.rmtree(tmp_dir, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
 
 # 9
 def GetOrthologues(dirs, options, program_caller, clustersFilename_pairs, orthogroupsResultsFilesString=None):

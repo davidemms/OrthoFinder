@@ -184,7 +184,7 @@ class ProgramCaller(object):
         os.mkdir(d)
         try:
             fasta = self._WriteTestSequence_Longer(d)
-            dbname = d + "test_database"
+            dbname = d + method_name + "DBSpecies0"
             self.CallSearchMethod_DB(method_name, fasta, dbname)
             # it doesn't matter what file(s) it writes out the database to, only that we can use the database
             resultsfn = d + "test_search_results.txt"
@@ -232,7 +232,8 @@ class ProgramCaller(object):
 
     def _ReplaceVariables(self, instring, infilename, outfilename, identifier=None, dbname=None):
         path, basename = os.path.split(infilename)
-        outstring = instring.replace("INPUT", infilename).replace("OUTPUT", outfilename).replace("BASENAME", basename).replace("PATH", path) 
+        path_out, basename_out = os.path.split(outfilename)
+        outstring = instring.replace("INPUT", infilename).replace("OUTPUT", outfilename).replace("BASENAME", basename).replace("PATH", path).replace("BASEOUTNAME", basename_out) 
         if identifier != None:
             outstring = outstring.replace("IDENTIFIER", identifier)
         if dbname != None:
@@ -283,13 +284,13 @@ class ProgramCaller(object):
         return cmd, actual_target_fn
         
     def _WriteTestSequence(self, working_dir):
-        fn = working_dir + "Test.fa"
+        fn = working_dir + "Species0.fa"
         with open(fn, 'wb') as outfile:
             outfile.write(">a\nST\n>b\nKL\n>c\nSL\n>d\nKT")
         return fn
         
     def _WriteTestSequence_Longer(self, working_dir):
-        fn = working_dir + "Test.fa"
+        fn = working_dir + "Species0.fa"
         with open(fn, 'wb') as outfile:
             outfile.write(""">0_0
 MNINSPNDKEIALKSYTETFLDILRQELGDQMLYKNFFANFEIKDVSKIGHITIGTTNVTPNSQYVIRAY
