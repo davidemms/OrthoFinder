@@ -51,24 +51,42 @@ OrthoFinder runs on Linux and Mac, setup instructions are given below.
 
 To perform an analysis OrthoFinder requires some dependencies to be installed and in the system path (only the first two are needed to infer orthogroups and all four are needed to infer orthologues and gene trees as well):
 
-1. BLAST+ 
+1. DIAMOND or MMseqs2 (recommended, although BLAST+ can be used instead) 
 
 2. The MCL graph clustering algorithm 
 
 3. FastME (The appropriate version for your system, e.g. 'fastme-2.1.5-linux64', should be renamed `fastme', see instructions below.) 
-
-4. DLCpar (This is no longer required as of version 2.0)
 
 Brief instructions are given below although users can refer to the installation notes provided with these packages for more detailed instructions. 
 
 ### Dependencies
 Each of the following packages provide their own detailed instructions for installation, here we give a concise guide.
 
-#### BLAST+
-NCBI BLAST+ is available in the repositories from most Linux distributions and so can be installed in the same way as any other package. For example, on Ubuntu, Debian, Linux Mint:
-- `sudo apt-get install ncbi-blast+`
 
-Alternatively, instructions are provided for installing BLAST+ on Mac and various flavours of Linux on the "Standalone BLAST Setup for Unix" page of the BLAST+ Help manual currently at http://www.ncbi.nlm.nih.gov/books/NBK1762/. Follow the instructions under "Configuration" in the BLAST+ help manual to add BLAST+ to the PATH environment variable.
+#### DIAMOND
+Available here: https://github.com/bbuchfink/diamond/releases
+
+Download the the latest release, extract it and copy the executable to a directory in your system path, e.g.:
+- `wget https://github.com/bbuchfink/diamond/releases/download/v0.9.22/diamond-linux64.tar.gz`
+- `tar xzf diamond-linux64.tar.gz`
+- `sudo cp diamond /usr/local/bin`
+
+or alternaitvely if you don't have root privileges, instead of the last step above, add the directory containing the directory to your PATH variable. 
+E.g 
+- `mkdir ~/bin`
+- `cp diamond ~/bin`
+- ``export PATH=$PATH:~/bin/``
+
+#### MMseqs2
+Available here: https://github.com/soedinglab/MMseqs2/releases
+
+Download the appropriate version for your machine, extract it and copy the executable to a directory in your system path, e.g.:
+- `wget https://github.com/soedinglab/MMseqs2/releases/download/3-be8f6/MMseqs2-Linux-AVX2.tar.gz`
+- `tar xzf MMseqs2-Linux-AVX2.tar.gz`
+- `sudo cp mmseqs2/bin/mmseqs /usr/local/bin`
+
+or alternaitvely if you don't have root privileges, isntead of the last step above, add the directory containing the directory to your PATH variable 
+- ``export PATH=$PATH:`pwd`/mmseqs2/bin/``
 
 #### MCL
 The mcl clustering algorithm is available in the repositories of some Linux distributions and so can be installed in the same way as any other package. For example, on Ubuntu, Debian, Linux Mint:
@@ -81,18 +99,16 @@ FastME can be obtained from http://www.atgc-montpellier.fr/fastme/binaries.php. 
 
 - `sudo cp fastme-2.1.5-linux64 /usr/local/bin/fastme`
 
-#### DLCpar
-DLCpar can be downloaded from http://compbio.mit.edu/dlcpar/ and installed as for a standard python package:
+#### Optional: BLAST+ 
+NCBI BLAST+ is available in the repositories from most Linux distributions and so can be installed in the same way as any other package. For example, on Ubuntu, Debian, Linux Mint:
+- `sudo apt-get install ncbi-blast+`
 
-1. Download the latest version 
-2. Extract the package: `tar xzf dlcpar-1.0.tar.gz`
-3. `cd dlcpar-1.0/`
-4. `sudo python setup.py install`
+Alternatively, instructions are provided for installing BLAST+ on Mac and various flavours of Linux on the "Standalone BLAST Setup for Unix" page of the BLAST+ Help manual currently at http://www.ncbi.nlm.nih.gov/books/NBK1762/. Follow the instructions under "Configuration" in the BLAST+ help manual to add BLAST+ to the PATH environment variable.
 
 ### Running OrthoFinder
 Once the required dependencies have been installed, try running OrthoFinder on the example data:
 
-- `OrthoFinder-1.0.6/orthofinder -f ExampleDataset`
+- `OrthoFinder-1.0.6/orthofinder -f ExampleDataset -S diamond`
 
 Assuming everything was successful OrthoFinder will end by printing the location of the results files, a short paragraph providing a statistical summary and the OrthoFinder citation. If you make use of OrthoFinder for any of your work then please cite it as this helps support future development. 
 
