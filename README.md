@@ -41,17 +41,17 @@ One can still identify orthologues between the genes in each pair of species tho
 OrthoFinder runs on Linux and Mac, setup instructions are given below.
 
 ### Set Up
-1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases (for this example we will assume it is OrthoFinder-1.0.6.tar.gz, change this as appropriate.)
+1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases (for this example we will assume it is OrthoFinder-2.2.7.tar.gz, change this as appropriate.)
 
 2. In a terminal, 'cd' to where you downloaded the package 
 
-3. Extract the files: `tar xzf OrthoFinder-1.0.6.tar.gz`
+3. Extract the files: `tar xzf OrthoFinder-2.2.7.tar.gz`
 
-4. Test you can run OrthoFinder: `OrthoFinder-1.0.6/orthofinder -h`. OrthoFinder should print its 'help' text. 
+4. Test you can run OrthoFinder: `OrthoFinder-2.2.7/orthofinder -h`. OrthoFinder should print its 'help' text. 
 
 To perform an analysis OrthoFinder requires some dependencies to be installed and in the system path (only the first two are needed to infer orthogroups and all four are needed to infer orthologues and gene trees as well):
 
-1. DIAMOND or MMseqs2 (recommended, although BLAST+ can be used instead) 
+1. DIAMOND **or** MMseqs2 (recommended, although BLAST+ can be used instead) 
 
 2. The MCL graph clustering algorithm 
 
@@ -114,14 +114,20 @@ Assuming everything was successful OrthoFinder will end by printing the location
 
 If you have problems with this standalone binary version of OrthoFinder you can use the python source code version, which has a name of the form, 'OrthoFinder-1.0.6_source.tar.gz' and is available from the github 'releases tab'. See Section 'Python Source Code Version'.
 
-### Setup for advanced use
-The following steps are not required for the standard OrthoFinder use cases and are only needed if you want to run the 'trees_from_MSA' utility or you want to run OrthoFinder using the python source code version.
+#### Trees from MSA: `"-M msa"`
+The following steps are not required for the standard OrthoFinder use cases and are only needed if you want to infer maximum likelihood trees from multiple sequence alignments (MSA). This is considerably more costly computationally but more accurate. By default MAFFT is used for the alignment and FastTree for the tree inference. Both the executables should be in the system path. The option for this is, "-M msa".
 
-#### Trees from MSA
-To use the trees_from_MSA utility there are two additional dependencies which should be installed and in the system path:
+You can actually use **any** alignment or tree inference program you like the best! Be careful with the method you chose, OrthoFidner typically needs to infer about 10,000-20,000 gene trees. If you have many species or if the tree/alignment method isn't super-fast then this can take a very long time! MAFFT + FastTree provides a reasonable compromise. Orthofinder already knows how to call:
+- mafft
+- muscle
+- iqtree
+- raxml
+- raxml-ng
+- fasttree
 
-1. MAFFT
-2. FastTree 
+If you want to use a different program, there is a simple configuration file called "config.json" in the orthofinder directory. You just need to add an entry to tell it what the command line looks like for the program you want to use. There are lots of examples in the file that you can follow.
+
+For example, to you muscle and iqtree, the command like arguments you need to add are: `"-M msa -A muscle -T iqtree"`
 
 #### Python Source Code Version
 It is recommended that you use the standalone binaries for OrthoFinder which do not require python or scipy to be installed. However, the python source code version is available from the github 'releases' page (e.g. 'OrthoFinder-1.0.6_source.tar.gz' and requires python 2.7 and scipy to be installed. Up-to-date and clear instructions are provided here: http://www.scipy.org/install.html, be sure to chose a version using python 2.7. As websites can change, an alternative is to search online for "install scipy". 
