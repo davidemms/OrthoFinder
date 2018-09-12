@@ -1,10 +1,10 @@
-# OrthoFinder — Accurate inference of orthogroups, orthologues, gene trees and rooted species tree made easy!
+# OrthoFinder — Accurate inference of orthologs, orthogroups, the rooted species, gene trees and gene duplcation events tree made easy!
 
 ![OrthoFinder workflow](orthofinder/workflow.png)
 *Figure 1: Automatic OrthoFinder analysis*
 
 ## What does OrthoFinder do?
-OrthoFinder is a fast, accurate and comprehensive analysis tool for comparative genomics. It finds **orthologues** and **orthogroups** infers **rooted gene trees** for all orthogroups and infers a **rooted species tree** for the species being analysed. OrthoFinder also provides **comprehensive statistics** for comparative genomic analyses. OrthoFinder is simple to use and all you need to run it is a set of protein sequence files (one per species) in FASTA format.
+OrthoFinder is a fast, accurate and comprehensive platform for comparative genomics. It finds **orthologs** and **orthogroups**, infers **rooted gene trees** for all orthogroups and identifies all of the gene duplcation events in those gene trees. It also infers a **rooted species tree** for the species being analysed and maps the gene duplication events from the gene trees to branches in the species tree. OrthoFinder also provides **comprehensive statistics** for comparative genomic analyses. OrthoFinder is simple to use and all you need to run it is a set of protein sequence files (one per species) in FASTA format.
 
 For more details see the OrthoFinder paper below.
 
@@ -13,7 +13,7 @@ Emms, D.M. and Kelly, S. **(2015)** _OrthoFinder: solving fundamental biases in 
 https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2
 
 ## Contents
-* [What are orthogroups, orthologues & paralogues?](#orthogroups-orthologues--paralogues)
+* [What are orthogroups, orthologs & paralogs?](#orthogroups-orthologues--paralogues)
 * [Why use orthogroups in your analysis](#why-orthogroups)
 * [Installing OrthoFinder](#setting-up-orthofinder)
 * [Running OrthoFinder](#running-orthofinder)
@@ -21,21 +21,25 @@ https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2
 * [Adding and removing species from a completed OrthoFinder run](#advanced-usage)
 * [Preparing and using seperately run BLAST files](#running-blast-searches-separately--p-option)
 
-### Orthogroups, Orthologues & Paralogues
-'Orthologue' is a term that applies to genes from two species. Orthologues are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Figure 2A & B). An orthogroup is the natural extension of the concept of orthology to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). 
-When looking at the gene tree, the first divergence between the genes in an orthogroup is a speciation event and the same is true for orthologues.  
+### Orthogroups, Orthologs & Paralogs
+'Orthologue' is a term that applies to genes from two species. Orthologs are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Figure 2A & B). An orthogroup is the extension of the concept of orthology to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). 
 
-As a result of gene duplication events, it is possible to have multiple genes from the same species with both orthologues and orthogroups. In the example (Figure 2A & B), the human gene HuA has two genes that are orthologues of it in chicken, ChA1 and ChA2. Looking again at the orthogroup, we see that there are two chicken genes (Figure 2A) but only one gene from mouse and human. Some authors refer to the genes ChA1 and ChA2 as co-orthologues of HuA to emphasise the fact that there are multiple orthologues. These genes are nevertheless still orthologues and so we will usually just use this broader term. In fact, gene duplication events are so common that in addition to the one-to-many relationship implied by the term 'co-orthologues', there are frequently many-to-many relationships between orthologues. All of these relationships are identified by an OrthoFinder analysis.
+The example Figure 2 contains an orthogroup from three species, human, mouse and chicken. Human and mouse each have one gene in this orthogroup (HuA and MoA, respectively) while chicken has two genes (ChA1 and ChA2). The human and mouse genes are a pair of genes descended from a single gene in the last common ancestor of the two species, therefore these two genes are orthologs and there is a one-to-one orthology relationship between the two genes.
 
-Gene duplication events give rise to paralogues. Paralogues are pairs of genes that diverged from a single gene at a gene duplication event. The two chicken genes ChA1 and ChA2 are paralogues (Figure 2A & C). Two genes from different species can also be paralogues if they diverged from one another at a gene duplication event, although there are no examples of this in Figure 2. Since all branching events in a gene tree are either speciation events (that give rise to orthologues) or duplication events (that give rise to paralogues), any genes in the same orthogroup that are not orthologues must necessarily be paralogues.
+The two chicken genes arose from a gene duplication event after the lineage leading to chicken split from the lineage leading to human and mouse. As gene duplication events give rise to paralogs, ChA1 and ChA2 are paralogs of each other. However, both chicken genes are decended from a single gene in the last common ancestor of the three species. Therefore both chicken genes are orthologs of the human gene and the mouse gene. Although they are orthologs, sometimes these complex relationships are reffered to as co-orthologs (e.g. ChA1 and ChA2 are co-orthologs of HuA). In this case there is a many-to-one orthology relationship between the chicken genes and the human gene. There are only three kinds of orthology relationships one-to-one, many-to-one, and many-to-many. All of these relationships are identified by OrthoFinder.
 
 ![Orthologues, Orthogroups & Paralogues](orthofinder/Orthogroups_Orthologues_Paralogues.png)
 *Figure 2: Orthologues, Orthogroups & Paralogues*
 
 ### Why Orthogroups
-If you followed the explanations above it will be clear that an orthogroup is just a gene family/clade of genes defined at a specific taxonomic level—namely, those genes descended from a single gene at the time of the LCA. Some may regard this definition of an orthogroup as unsatisfactory since an orthogroup can contain genes that are paralogues of one another (ChA1 is a paralogue of ChA2 in Figure 2). However, this definition of an orthogroup is the only logically consistent way of extending the concept of orthology to multiple species. If there have been gene duplication events it is not possible to create a group of genes containing all orthologues and only orthologues—try it with the example above! 
+# Orthogroups allow to analyse all of your data
+All of the genes in an orthogroup are decended from a single ancestral gene. Thus all the genes in an orthogroup started out with the same sequence and function. As gene duplication and loss occur frequently in evolution, one-to-one orthologs are rare and limitation of analyses to on-to-one othologs limits an analysis to a small fraction of the available data. By analysing orhtogroups you can analyse all of your data. 
 
-One can still identify orthologues between the genes in each pair of species though, but the orthogroup is the correct unit of comparison when considering the group of species as a whole. In fact, one use for orthogroups is for identifying orthologues: The canonical way to identify orthologues is using a gene tree, and an orthogroup is exactly the set of genes that need to be in a the gene tree in order to identify all orthologues. This is the method used by OrthoFinder.
+# Orthogroups allow you to define the unit of comparison
+It is important to note that with orthogroups you choose where to define the limits of the unit of comparison. For example, if you just chose to analyse human and mouse in the above figure then you would have two orthogoups. 
+
+# Orthogroups are the only way to identify orthologs
+Orthology is defined by phylogeny. It is not definable by amino acid content, codon bias, GC content or other measures of sequence similarity. Methods that use such scores to define orthologs in the absence of phylogeny can only provide guesses. To provide a crude analogy guessing orthology from sequence similarity is akin to guessing colour from smell. The only way to truly identify orthologs is thus through analysis of phylogenetic trees. The only way to be sure that the orthology assignment is correct is by conducting a phylogenetic reconstruction of all genes decended from a single gene the last common ancestor of the species under consideration. This set of genes is an orthogroup. Thus the only way to define orthology is by analysing orthogroups.   
 
 ## Setting Up OrthoFinder
 OrthoFinder runs on Linux and Mac, setup instructions are given below.
