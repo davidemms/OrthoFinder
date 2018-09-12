@@ -21,8 +21,8 @@ https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2
 * [Adding and removing species from a completed OrthoFinder run](#advanced-usage)
 * [Preparing and using seperately run BLAST files](#running-blast-searches-separately--p-option)
 
-### Orthogroups, Orthologs & Paralogs
-'Orthologue' is a term that applies to genes from two species. Orthologs are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Figure 2A & B). An orthogroup is the extension of the concept of orthology to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). 
+## Orthogroups, Orthologs & Paralogs
+Orthologs are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Figure 2A & B). An orthogroup is the extension of the concept of orthology to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). 
 
 The example Figure 2 contains an orthogroup from three species, human, mouse and chicken. Human and mouse each have one gene in this orthogroup (HuA and MoA, respectively) while chicken has two genes (ChA1 and ChA2). The human and mouse genes are a pair of genes descended from a single gene in the last common ancestor of the two species, therefore these two genes are orthologs and there is a one-to-one orthology relationship between the two genes.
 
@@ -31,14 +31,14 @@ The two chicken genes arose from a gene duplication event after the lineage lead
 ![Orthologues, Orthogroups & Paralogues](orthofinder/Orthogroups_Orthologues_Paralogues.png)
 *Figure 2: Orthologues, Orthogroups & Paralogues*
 
-### Why Orthogroups
-# Orthogroups allow to analyse all of your data
+## Why Orthogroups
+### Orthogroups allow to analyse all of your data
 All of the genes in an orthogroup are decended from a single ancestral gene. Thus all the genes in an orthogroup started out with the same sequence and function. As gene duplication and loss occur frequently in evolution, one-to-one orthologs are rare and limitation of analyses to on-to-one othologs limits an analysis to a small fraction of the available data. By analysing orhtogroups you can analyse all of your data. 
 
-# Orthogroups allow you to define the unit of comparison
+### Orthogroups allow you to define the unit of comparison
 It is important to note that with orthogroups you choose where to define the limits of the unit of comparison. For example, if you just chose to analyse human and mouse in the above figure then you would have two orthogoups. 
 
-# Orthogroups are the only way to identify orthologs
+### Orthogroups are the only way to identify orthologs
 Orthology is defined by phylogeny. It is not definable by amino acid content, codon bias, GC content or other measures of sequence similarity. Methods that use such scores to define orthologs in the absence of phylogeny can only provide guesses. To provide a crude analogy guessing orthology from sequence similarity is akin to guessing colour from smell. The only way to truly identify orthologs is thus through analysis of phylogenetic trees. The only way to be sure that the orthology assignment is correct is by conducting a phylogenetic reconstruction of all genes decended from a single gene the last common ancestor of the species under consideration. This set of genes is an orthogroup. Thus the only way to define orthology is by analysing orthogroups.   
 
 ## Setting Up OrthoFinder
