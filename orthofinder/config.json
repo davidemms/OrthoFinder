@@ -18,6 +18,42 @@
     "cmd_line": "raxmlHPC-AVX -m PROTGAMMALG -p 12345 -s INPUT -n IDENTIFIER -w PATH > /dev/null",
     "ouput_filename": "PATH/RAxML_bestTree.IDENTIFIER"
     },
+
+    "raxmlHPC":{ 
+        "program_type": "tree",
+        "cmd_line": "raxmlHPC -m PROTGAMMALG -p 12345 -s INPUT -n IDENTIFIER -w PATH > /dev/null",
+        "ouput_filename": "PATH/RAxML_bestTree.IDENTIFIER"
+    },
+    
+    "raxmlHPC-AVX2":{ 
+        "program_type": "tree",
+        "cmd_line": "raxmlHPC-AVX2 -m PROTGAMMALG -p 12345 -s INPUT -n IDENTIFIER -w PATH > /dev/null",
+        "ouput_filename": "PATH/RAxML_bestTree.IDENTIFIER"
+    },
+    
+    "raxmlHPC-PTHREADS":{ 
+        "program_type": "tree",
+        "cmd_line": "raxmlHPC-PTHREADS -m PROTGAMMALG -p 12345 -s INPUT -n IDENTIFIER -w PATH > /dev/null",
+        "ouput_filename": "PATH/RAxML_bestTree.IDENTIFIER"
+    },
+    
+    "raxmlHPC-PTHREADS-AVX2":{ 
+        "program_type": "tree",
+        "cmd_line": "raxmlHPC-PTHREADS-AVX2 -m PROTGAMMALG -p 12345 -s INPUT -n IDENTIFIER -w PATH > /dev/null",
+        "ouput_filename": "PATH/RAxML_bestTree.IDENTIFIER"
+    },
+    
+    "raxmlHPC-PTHREADS-SSE3":{ 
+        "program_type": "tree",
+        "cmd_line": "raxmlHPC-PTHREADS-SSE3 -m PROTGAMMALG -p 12345 -s INPUT -n IDENTIFIER -w PATH > /dev/null",
+        "ouput_filename": "PATH/RAxML_bestTree.IDENTIFIER"
+    },
+
+    "raxmlHPC-SSE3":{ 
+        "program_type": "tree",
+        "cmd_line": "raxmlHPC-SSE3 -m PROTGAMMALG -p 12345 -s INPUT -n IDENTIFIER -w PATH > /dev/null",
+        "ouput_filename": "PATH/RAxML_bestTree.IDENTIFIER"
+    },
     
     "raxml-ng":{ 
     "program_type": "tree",
@@ -49,3 +85,6 @@
     "search_cmd": "mmseqs search PATH/mmseqsDBBASENAME DATABASE.fa OUTPUT.db /tmp/tmpBASEOUTNAME  --threads 1 ; mmseqs convertalis PATH/mmseqsDBBASENAME DATABASE.fa OUTPUT.db OUTPUT"
     }
 }
+
+
+
