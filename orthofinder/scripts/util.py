@@ -320,7 +320,7 @@ def Fail():
     ptm = parallel_task_manager.ParallelTaskManager_singleton()
     ptm.Stop()
     print("ERROR: An error occurred, please review error messages for more information.")
-    sys.exit()
+    sys.exit(1)
     
 """
 IDExtractor
