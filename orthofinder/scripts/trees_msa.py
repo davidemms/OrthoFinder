@@ -313,12 +313,13 @@ class TreesForOrthogroups(object):
         if qStopAfterAlignments:
             util.PrintUnderline("Inferring multiple sequence alignments")
             pc.RunParallelCommandsAndMoveResultsFile(nProcesses, alignCommands_and_filenames, False)
-            CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn, fSingleCopy)
+            if qDoSpeciesTree: CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn, fSingleCopy)
             # ids -> accessions
             alignmentFilesToUse = [self.GetAlignmentFilename(i) for i, _ in enumerate(alignCommands_and_filenames)]        
             accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in xrange(len(alignmentFilesToUse))]
-            alignmentFilesToUse.append(concatenated_algn_fn)
-            accessionAlignmentFNs.append(files.FileHandler.GetSpeciesTreeConcatAlignFN(True))
+            if qDoSpeciesTree: 
+                alignmentFilesToUse.append(concatenated_algn_fn)
+                accessionAlignmentFNs.append(files.FileHandler.GetSpeciesTreeConcatAlignFN(True))
             self.RenameAlignmentTaxa(alignmentFilesToUse, accessionAlignmentFNs, idDict)
             return resultsDirsFullPath[:2]
         

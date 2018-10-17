@@ -181,6 +181,7 @@ def resolve(n, M):
     if "recon" in n.features:
         sis = n.recon
         n.del_feature('recon')
+        # cannot assume that sis[0] or sis[1] this will be just a single node 
         if check_monophyly(n, sis[0]) and check_monophyly(n, sis[1]):
             s0 = n.get_common_ancestor(sis[0]) if len(sis[0]) > 1 else (n&sis[0][0])
             s1 = n.get_common_ancestor(sis[1]) if len(sis[1]) > 1 else (n&sis[1][0])
@@ -280,8 +281,8 @@ def resolve(n, M):
             return n.get_tree_root()
         elif case in c11_c:
             ws = [c for c in chb if c != x]
-            w_leaves = [c.get_leaf_names() for c in ws] 
-            n.up.add_feature("recon", (s.get_leaf_names(), w_leaves))     
+            w_leaves = [g for c in ws for g in c.get_leaf_names()]
+            n.up.add_feature("recon", (s.get_leaf_names(), w_leaves))  
             return n.get_tree_root()
         return n.get_tree_root()
     elif (dA==2 and dB==0) or (dA==0 and dB==2): 
@@ -401,6 +402,7 @@ def Resolve_Main(trees_fn_or_dir, species_tree_rooted_fn, GeneToSpecies, qTest):
     for trees_fn in trees:
         # Root using species tree if provided, otherwise tree should have been rooted already
         tree = tree_lib.Tree(trees_fn)
+#        tree = tree_lib.Tree(trees_fn, format=3)
         if len(tree) == 1: continue
         if species_tree_rooted_fn != None:
             tree.prune(tree.get_leaf_names())
@@ -432,7 +434,7 @@ def Resolve_Main(trees_fn_or_dir, species_tree_rooted_fn, GeneToSpecies, qTest):
             for n in tree.traverse("postorder"):
                 tree = resolve(n, GeneToSpecies)
             NumberOfOrthologues(tree, GeneToSpecies)    
-        tree.write(outfile=(trees_fn + ".rec.tre"))           
+        tree.write(outfile=(trees_fn + ".rec.tre"), format=3)           
            
 if __name__ == "__main__":
     with Finalise():

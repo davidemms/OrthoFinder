@@ -30,6 +30,8 @@ import sys                                      # Y
 import subprocess                               # Y
 import os                                       # Y
 import glob                                     # Y
+import shutil                                   # Y
+import time                                     # Y
 import multiprocessing as mp                    # optional  (problems on OpenBSD)
 import itertools                                # Y
 import datetime                                 # Y
@@ -789,9 +791,9 @@ def PrintHelp(program_caller):
     print(" -S <txt>          Sequence search program [Default = blast]")
     print("                   Options: " + ", ".join(['blast'] + search_ops))
     print(" -A <txt>          MSA program, requires '-M msa' [Default = mafft]")
-    print("                   Options: " + ", ".join(['mafft'] + msa_ops))
+    print("                   Options: " + ", ".join(msa_ops))
     print(" -T <txt>          Tree inference method, requires '-M msa' [Default = fasttree]")
-    print("                   Options: " + ", ".join(['mafft'] + tree_ops))
+    print("                   Options: " + ", ".join(tree_ops))  
 #    print(" -R <txt>          Tree reconciliation method [Default = of_recon]")
 #    print("                   Options: of_recon, dlcpar, dlcpar_deepsearch")
     print(" -s <file>         User-specified rooted species tree")
@@ -1149,9 +1151,13 @@ def ProcessArgs(program_caller):
         print("ERROR: Argument '-T' (tree inference program) also requires option '-M msa'")
         util.Fail()  
 
-    if options.msa_program != None and (not options.qMSATrees):
+    if options.msa_program != None and (not options.qMSATrees and not options.qPhyldog):
         print("ERROR: Argument '-A' (multiple sequence alignment inference program) also requires option '-M msa'")
-        util.Fail()    
+        util.Fail()       
+        
+    if options.qPhyldog and (not options.speciesTreeFN):
+        print("ERROR: Phyldog currently needs a species tree to be provided")
+        util.Fail()         
 
     if resultsDir_nonDefault != None and options.name != "":
         print("ERROR: Incompatible arguments, -o (non-default output directory) and -n (name for OrthoFinder run)")
@@ -1161,6 +1167,7 @@ def ProcessArgs(program_caller):
         print("ERROR: Incompatible arguments, -o (non-default output directory) can only be used with a new OrthoFinder run using option '-f'")
         util.Fail()       
         
+    util.PrintTime("Starting OrthoFinder")    
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
     print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
     return options, fastaDir, workingDir, orthologuesDir, resultsDir_nonDefault, pickleDir_nonDefault            
@@ -1397,9 +1404,20 @@ def RunSearch(options, speciessInfoObj, seqsInfo, program_caller):
         while proc.is_alive():
             proc.join()
     # remove BLAST databases
+    util.PrintTime("Done all-versus-all sequence search")
     if options.search_program == "blast":
         for f in glob.glob(scripts.files.FileHandler.GetWorkingDirectory1() + "BlastDBSpecies*"):
             os.remove(f)
+    if options.search_program == "mmseqs":
+        for i in xrange(dirs.nSpAll):
+            for j in xrange(dirs.nSpAll):
+                tmp_dir = "/tmp/tmpBlast%d_%d.txt" % (i,j)
+                if os.path.exists(tmp_dir):
+                    try:
+                        shutil.rmtree(tmp_dir)
+                    except OSError:
+                        time.sleep(1)
+                        shutil.rmtree(tmp_dir, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
 
 # 9
 def GetOrthologues(dirs, options, program_caller, orthogroupsResultsFilesString=None):
@@ -1440,6 +1458,9 @@ def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_na
     originalFastaFilenames = sorted([f for f in os.listdir(fastaDir) if os.path.isfile(os.path.join(fastaDir,f))])
     originalFastaFilenames = [f for f in originalFastaFilenames if len(f.rsplit(".", 1)) == 2 and f.rsplit(".", 1)[1].lower() in fastaExtensions]
     speciesToUse_prev_names = set(speciesToUse_prev_names)
+    if len(originalFastaFilenames) + len(speciesToUse_prev_names) < 2:
+        print("ERROR: At least two species are required")
+        util.Fail()
     if any([fn in speciesToUse_prev_names for fn in originalFastaFilenames]):
         print("ERROR: Attempted to add a second copy of a previously included species:")
         for fn in originalFastaFilenames:

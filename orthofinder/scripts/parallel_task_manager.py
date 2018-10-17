@@ -29,6 +29,12 @@ import multiprocessing as mp
 import Queue
 
 import util
+import sys
+import subprocess
+
+if sys.platform.startswith("linux"):
+    with open(os.devnull, "w") as f:
+        subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f)
 
 def _I_Spawn_Processes(message_to_spawner, message_to_PTM, cmds_queue):
     """

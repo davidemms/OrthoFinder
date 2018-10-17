@@ -47,7 +47,7 @@ Utilities
 SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")
 
 picProtocol = 1
-version = "2.3.0"
+version = "2.3.1"
 
 # Fix LD_LIBRARY_PATH when using pyinstaller 
 my_env = os.environ.copy()
@@ -101,6 +101,10 @@ def CanRunCommand(command, qAllowStderr = False, qPrint = True):
         return True
     else:
         if qPrint: print(" - failed")
+        print("\nstdout:")        
+        for l in stdout: print(l)
+        print("\nstderr:")        
+        for l in stderr: print(l)
         return False
         
 def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qShell=True, qHideStdout=True):
@@ -320,7 +324,7 @@ def Fail():
     ptm = parallel_task_manager.ParallelTaskManager_singleton()
     ptm.Stop()
     print("ERROR: An error occurred, please review error messages for more information.")
-    sys.exit()
+    sys.exit(1)
     
 """
 IDExtractor
@@ -509,3 +513,22 @@ class Finalise(object):
     def __exit__(self, type, value, traceback):
         ptm = parallel_task_manager.ParallelTaskManager_singleton()
         ptm.Stop()
+        
+
+""" TEMP """        
+def RunParallelCommands(nProcesses, commands, qShell, qHideStdout = False):
+    """nProcesss - the number of processes to run in parallel
+    commands - list of commands to be run in parallel
+    """
+    # Setup the workers and run
+    cmd_queue = mp.Queue()
+    for i, cmd in enumerate(commands):
+        cmd_queue.put((i, cmd))
+    runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, nProcesses, i+1, qShell)) for i_ in xrange(nProcesses)]
+    for proc in runningProcesses:
+        proc.start()
+    
+    for proc in runningProcesses:
+        while proc.is_alive():
+            proc.join(10.)
+            time.sleep(2)        
