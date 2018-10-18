@@ -1546,18 +1546,20 @@ if __name__ == "__main__":
         # 2.
         if options.qStartFromGroups or options.qStartFromTrees:
             # User can specify it using clusters_id_pairs file, process this first to get the workingDirectory
-            workingDir, orthofinderResultsDir, clustersFilename_pairs, qNewStructure = scripts.files.GetOGsFile(workingDir)
+            workingDir, orthofinderResultsDir, clustersFilename_pairs, qFromNewStructure = scripts.files.GetOGsFile(workingDir)
+        elif options.qStartFromBlast:
+            qFromNewStructure = scripts.files.IsNewDirStructure(workingDir)
         CheckDependencies(options, program_caller, next(d for d in [fastaDir, workingDir, orthologuesDir] if  d != None)) 
         
         # Create FileHandler
         if options.qStartFromBlast: 
-            if qNewStructure:
+            if qFromNewStructure:
                 scripts.files.FileHandler = scripts.files.__Files_new_structure_dont_recreate__()
                 scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir, orthofinderResultsDir, options.name)
             else:
                 scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir)
         elif options.qStartFromTrees:
-            if qNewStructure:
+            if qFromNewStructure:
                 scripts.files.FileHandler = scripts.files.__Files_new_structure_dont_recreate__()
             scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir)
             scripts.files.FileHandler.SetClustersFN(clustersFilename_pairs)
@@ -1577,6 +1579,7 @@ if __name__ == "__main__":
             print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, workingDir))
             # 3. 
             speciesInfoObj = ProcessesNewFasta(fastaDir, speciesInfoObj, speciesToUse_names, options.name)
+            scripts.files.FileHandler.LogSpecies()
             options = CheckOptions(options)
             # 4.
             seqsInfo = util.GetSeqsInfo(scripts.files.FileHandler.GetWorkingDirectory1(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
@@ -1601,6 +1604,7 @@ if __name__ == "__main__":
             # 3. 
             speciesInfoObj = None
             speciesInfoObj = ProcessesNewFasta(fastaDir, name = options.name)
+            scripts.files.FileHandler.LogSpecies()
             options = CheckOptions(options)
             # 4
             seqsInfo = util.GetSeqsInfo(scripts.files.FileHandler.GetWorkingDirectory1(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
@@ -1624,6 +1628,7 @@ if __name__ == "__main__":
         elif options.qStartFromBlast:
             # 0.
             speciesInfoObj, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            scripts.files.FileHandler.LogSpecies()
             print("Using previously calculated BLAST results in %s" % workingDir) 
             options = CheckOptions(options)
             # 4.
@@ -1642,6 +1647,7 @@ if __name__ == "__main__":
         elif options.qStartFromGroups:
             # 0.  
             speciesInfoObj, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            scripts.files.FileHandler.LogSpecies()
             options = CheckOptions(options)
             # 9
             GetOrthologues(speciesInfoObj, options, program_caller)
@@ -1649,6 +1655,7 @@ if __name__ == "__main__":
             util.PrintCitation() 
         elif options.qStartFromTrees:
             speciesInfoObj, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            scripts.files.FileHandler.LogSpecies()
             options = CheckOptions(options)
             summaryText = GetOrthologues_FromTrees(orthologuesDir, options)
             print(summaryText)
@@ -1657,6 +1664,7 @@ if __name__ == "__main__":
             raise NotImplementedError
             ptm = parallel_task_manager.ParallelTaskManager_singleton()
             ptm.Stop()
+        scripts.files.FileHandler.WriteToLog("OrthoFinder run completed\n\n", True)
     except Exception as e:
         ptm = parallel_task_manager.ParallelTaskManager_singleton()
         ptm.Stop()

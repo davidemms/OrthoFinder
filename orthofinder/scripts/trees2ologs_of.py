@@ -322,7 +322,7 @@ def GetOrthologues_from_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, ne
                         isSTRIDE = "Terminal"
                     else:
                         stNode = species_tree_rooted.get_common_ancestor(sp_present)
-                        isSTRIDE = "Shared" if all_stride_dup_genes == None else "STRIDE" if frozenset(n.get_leaf_names()) in all_stride_dup_genes else ""
+                        isSTRIDE = "Non-Terminal" if all_stride_dup_genes == None else "Non-Terminal: STRIDE" if frozenset(n.get_leaf_names()) in all_stride_dup_genes else "Non-Terminal"
                     dupsWriter.writerow(["OG%07d" % iog, spIDs[stNode.name] if len(stNode) == 1 else stNode.name, n.name, float(oSize)/(len(stNode)), isSTRIDE, ", ".join([seqIDs[g] for g in ch[0].get_leaf_names()]), ", ".join([seqIDs[g] for g in ch[1].get_leaf_names()])]) 
             else:
                 # sort out bad genes - no orthology for all the misplaced genes at this level (misplaced_genes). 
@@ -532,10 +532,11 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
     # Write directory and file structure
     speciesIDs = ogSet.speciesToUse
     nspecies = len(speciesIDs)      
-    dSuspect = files.FileHandler.GetPutativeXenelogsDir()
+    dSuspectGenes = files.FileHandler.GetSuspectGenesDir()
+    dSuspectOrthologues = files.FileHandler.GetPutativeXenelogsDir()
     dResultsOrthologues = files.FileHandler.GetOrthologuesDirectory()
     for index1 in xrange(nspecies):
-        with open(dSuspect + '%s.csv' % speciesDict[str(speciesIDs[index1])], 'wb') as outfile:
+        with open(dSuspectOrthologues + '%s.csv' % speciesDict[str(speciesIDs[index1])], 'wb') as outfile:
             writer1 = csv.writer(outfile, delimiter="\t")
             writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], "Other"))
         d = dResultsOrthologues + "Orthologues_" + speciesDict[str(speciesIDs[index1])] + "/"
@@ -569,7 +570,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
                 strsp0_ = strsp0+"_"
                 these_genes = [g for g in suspect_genes if g.startswith(strsp0_)]
                 if len(these_genes) > 0:
-                    with open(dResultsOrthologues + "Orthologues_" + speciesDict[strsp0] + "/Putative_Horizontal_Gene_Transfer.txt", 'ab') as outfile:
+                    with open(dSuspectGenes + speciesDict[strsp0] + ".txt", 'ab') as outfile:
                         outfile.write("\n".join([SequenceDict[g]]) + "\n")
             allOrthologues = [(iog, orthologues)]
             util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qSupport=False, qFixNegatives=True, label='n') 
@@ -604,7 +605,7 @@ def GetOrthologues_from_phyldog_tree(iog, treeFN, GeneToSpecies, qWrite=False, d
                     if len(sp_present) == 1:
                         isSTRIDE = "Terminal"
                     else:
-                        isSTRIDE = "Shared"
+                        isSTRIDE = "Non-Terminal"
                     dupsWriter.writerow(["OG%07d" % iog, spIDs[stNode] if len(stNode) == 1 else stNode, n.name, "-", isSTRIDE, ", ".join([seqIDs[g] for g in ch[0].get_leaf_names()]), ", ".join([seqIDs[g] for g in ch[1].get_leaf_names()])]) 
             else:
                 d0 = defaultdict(list)

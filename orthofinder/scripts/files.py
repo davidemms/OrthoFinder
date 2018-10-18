@@ -28,11 +28,30 @@
 
 """
 Handles location of all input and output files
+
+By default __Files_dont_recreate__ is created and stored as files.FileHandler for orthofinder to use. This is the *old* directory structure
+If the new directory stucture is requiredthe following code is called at the start:
+    scripts.files.FileHandler = scripts.files.__Files_new_structure_dont_recreate__()
+(this code should really be moved to this file)
+
+Either way, first step is to call (old directory structure) one of:
+
+    CreateOutputDirFromExistingDirs
+    CreateOutputDirFromStart_old
+    CreateOutputDirFromTrees
+    
+For (new directory structure) __Files_new_structure_dont_recreate__ the options are:
+    CreateOutputDirFromStart_new
+    CreateOutputDirFromExistingDirs
+    CreateOutputDirFromTrees
+
 """
 import os
+import sys
 import glob
 import time
 import shutil
+import datetime
 
 import util
 
@@ -248,6 +267,18 @@ class __Files_dont_recreate__(object):
         elif tree_generation_method == "dendroblast":
             for i, d in enumerate([self.wd2 + "Distances/", self.rd2 + "Gene_Trees/", self.wd2 + "Trees_ids/"]):
                 if not os.path.exists(d): os.mkdir(d)
+         
+    """ Standard Methods
+        ========================================================================================== """               
+    def WriteToLog(self, text, qWithTime=False):
+        pass
+        
+    def LogSpecies(self):
+        text = "Species used: \n"
+        fn = self.GetSpeciesIDsFN()
+        with open(fn, 'rb') as infile:
+            text += "".join(infile.readlines())
+        self.WriteToLog(text + "\n")
         
     """ Standard Dirctories
         ========================================================================================== """
@@ -324,6 +355,8 @@ class __Files_dont_recreate__(object):
         
     def SetClustersFN(self, pairsFN):
         self.clustersFilename = pairsFN[:-len("_id_pairs.txt")]
+        log = "Orthogroups used: %s\n\n" % self.clustersFilename
+        self.WriteToLog(log)
         
     def GetClustersFN(self):
         return self.clustersFilename + "_id_pairs.txt"
@@ -352,9 +385,14 @@ class __Files_dont_recreate__(object):
         
     def GetOlogStatsDir(self):
         return self.rd2
+    
+    def GetSuspectGenesDir(self):
+        d = self.rd2 + "Phylogenetically_Misplaced_Genes/"
+        if not os.path.exists(d): os.mkdir(d)
+        return d
         
     def GetPutativeXenelogsDir(self):
-        d = self.GetOrthologuesDirectory() + "Putative_Xenologues/"
+        d = self.rd2 + "Putative_Xenologues/"
         if not os.path.exists(d): os.mkdir(d)
         return d
     
@@ -435,14 +473,14 @@ class __Files_dont_recreate__(object):
             
     def GetOGsReconTreeDir(self, qResults=False):
         if qResults:
-            d = self.rd2 + "Recon_Gene_Trees/" 
+            d = self.rd2 + "Resolved_Gene_Trees/" 
             if not os.path.exists(d): os.mkdir(d)
             return d
         else:
             raise NotImplemented() 
             
     def GetOGsReconTreeFN(self, iOG):
-        return self.rd2 + "Recon_Gene_Trees/OG%07d_tree.txt" % iOG
+        return self.rd2 + "Resolved_Gene_Trees/OG%07d_tree.txt" % iOG
             
     def GetPhyldogWorkingDirectory(self):
         d = self.wd2 + "phyldog/"
@@ -503,6 +541,7 @@ class __Files_new_structure_dont_recreate__(__Files_dont_recreate__):
         print(self.rd1, self.wd1)
         with open(self.rd1 + "Log.txt", 'wb'), open(self.wd1 + "Log.txt", 'wb'):
             pass
+        self.StartLog()
         
     def CreateOutputDirFromExistingDirs(self, wd, rd, append_name = ""):
         if self.wd != None: raise Exception("Changing WorkingDirectory1")
@@ -516,6 +555,7 @@ class __Files_new_structure_dont_recreate__(__Files_dont_recreate__):
         self.rd1, self.wd1 = util.CreateNewPairedDirectories(base + "Results_" + ("" if append_name == "" else append_name + "_"), base + "WorkingDirectory_" + ("" if append_name == "" else append_name + "_"))
         with open(self.rd1 + "Log.txt", 'wb'), open(self.wd1 + "Log.txt", 'wb'):
             pass
+        self.StartLog()
     
     def CreateOutputDirFromTrees(self, orthologuesDir, userSpeciesTree):
         """
@@ -553,6 +593,22 @@ class __Files_new_structure_dont_recreate__(__Files_dont_recreate__):
         self.wd1, self.rd1, self.clustersFilename = self.GetOGsFile(self.rd1)
         if self.clustersFilename.endswith("_id_pairs.txt"):
             self.clustersFilename = self.clustersFilename[:-len("_id_pairs.txt")]
+        self.StartLog()
+        self.WriteToLog("Species Tree: %s\n" % self.speciesTreeRootedIDsFN)
+         
+    """ Standard Methods
+        ========================================================================================== """               
+    def WriteToLog(self, text, qWithTime=False):
+        with open(self.rd1 + "Log.txt", 'ab') as outfile:
+            prepend = ""
+            if qWithTime:
+                prepend = str(datetime.datetime.now()).rsplit(".", 1)[0] + " : "
+            outfile.write(prepend + text)
+    
+    def StartLog(self):
+        self.WriteToLog("Started OrthoFinder version " + util.version + "\n", True)
+        text = "Command Line: " + " ".join(sys.argv) + "\n\n"
+        self.WriteToLog(text)
         
     def MakeResultsDirectory2(self, tree_generation_method, stop_after="", append_name=""):
         """
@@ -583,17 +639,17 @@ class __Files_new_structure_dont_recreate__(__Files_dont_recreate__):
         return d + "Orthogroups" + ("" if self.iResultsVersion == 0 else "_%d" % self.iResultsVersion)
         
     def GetOGsStatsResultsDirectory(self):
-        d = self.rd1 + "ComparativeGenomicsStatistics/"
+        d = self.rd1 + "Comparative_Genomics_Statistics/"
         if not os.path.exists(d): os.mkdir(d)
         return d
         
     def GetDuplicationsFN(self):
-        d = self.rd1 + "GeneDuplications/"
+        d = self.rd1 + "Gene_Duplication_Events/"
         if not os.path.exists(d): os.mkdir(d)
         return d + "Duplications.csv"
         
     def GetPutativeXenelogsDir(self):
-        d = self.rd2 + "DubiousGenes/"
+        d = self.rd2 + "Phylogenetically_Misplaced_Genes/"
         if not os.path.exists(d): os.mkdir(d)
         return d
         
@@ -608,7 +664,7 @@ class __Files_new_structure_dont_recreate__(__Files_dont_recreate__):
         qUnique: bool, has a unique root been identified (as it may not be known exatly which branch the root belongs on)
         E.g. if there were just one species tree, the correct call would be GetSpeciesTreeResultsFN(0,True)
         """
-        d = self.rd2 + "SpeciesTree/"
+        d = self.rd2 + "Species_Tree/"
         if not os.path.exists(d): os.mkdir(d)
         if qUnique:
             return d + "SpeciesTree_rooted.txt"
