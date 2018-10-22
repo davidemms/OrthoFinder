@@ -122,10 +122,10 @@ class __Files_new_dont_manually_create__(object):
         self.StartLog()
         
     # RefactorDS - PreviousFilesLocator
-    def StartFromOrthogroups(self, wd_base, clustersFilename_pairs, dir_to_put_results_dir, append_name = ""):
+    def StartFromOrthogroupsOrSequenceSearch(self, wd_base, dir_to_put_results_dir, clustersFilename_pairs=None, append_name = ""):
         if self.wd1 != None: raise Exception("Changing WorkingDirectory1")
         self.wd1 = wd_base
-        self.clustersFilename = clustersFilename_pairs[:-len("_id_pairs.txt")]
+        if clustersFilename_pairs != None: self.clustersFilename = clustersFilename_pairs[:-len("_id_pairs.txt")]
         base = dir_to_put_results_dir +  "OrthoFinder/"
         if not os.path.exists(base): os.mkdir(base) 
         self.rd1, self.wd_current = util.CreateNewPairedDirectories(base + "Results_" + ("" if append_name == "" else append_name + "_"), dir_to_put_results_dir + "WorkingDirectory_" + ("" if append_name == "" else append_name + "_"))
@@ -175,10 +175,10 @@ class __Files_new_dont_manually_create__(object):
         self.WriteToLog("Species Tree: %s\n" % self.speciesTreeRootedIDsFN)
      
     # RefactorDS - this should just be the initialiser
-    def CreateOutputDirectories(self, options, previous_files_locator, resultsDir_nonDefault, fastaDir=None):
+    def CreateOutputDirectories(self, options, previous_files_locator, results_dir_home, fastaDir=None):
         if options.qStartFromBlast: 
             # RefactorDS - previously, checked if we wanted old or new
-            self.CreateOutputDirFromExistingDirs(workingDir, orthofinderResultsDir, options.name)   # for new structure
+            self.StartFromOrthogroupsOrSequenceSearch(previous_files_locator.GetBaseWD(), results_dir_home, append_name=options.name)   # for new structure
 #            self.CreateOutputDirFromExistingDirs(workingDir) # for old
         elif options.qStartFromTrees:
             self.CreateOutputDirFromExistingDirs(workingDir)
@@ -186,11 +186,12 @@ class __Files_new_dont_manually_create__(object):
             self.CreateOutputDirFromTrees(orthologuesDir, options.speciesTreeFN)
         elif options.qStartFromFasta:
             # But, by previous condition, not qStartFromBlast
-            self.CreateOutputDirFromStart_new(fastaDir, resultsDir_nonDefault, append_name=options.name)
+            self.CreateOutputDirFromStart_new(fastaDir, results_dir_home, append_name=options.name)
         elif options.qStartFromGroups:
-            self.StartFromOrthogroups(previous_files_locator.GetBaseWD(), 
+            self.StartFromOrthogroupsOrSequenceSearch(previous_files_locator.GetBaseWD(), 
+                                      previous_files_locator.GetHomeForResults(),
                                       previous_files_locator.clustersFilename_pairs, 
-                                      previous_files_locator.GetHomeForResults())
+                                      append_name=options.name)
     """ ========================================================================================== """
        
     # RefactorDS - FileHandler
@@ -494,6 +495,7 @@ class __Files_new_dont_manually_create__(object):
         self.WriteToLog("Started OrthoFinder version " + util.version + "\n", True)
         text = "Command Line: " + " ".join(sys.argv) + "\n\n"
         text += "WorkingDirectory_Base: %s\n" % self.wd1
+        if self.clustersFilename != None: text += "Orthogroups: %s\n" % self.clustersFilename
         self.WriteToLog(text)
     
     def LogWorkingDirectoryOGs(self, qCreatedThisRun):
@@ -733,16 +735,21 @@ class PreviousFilesLocator_old(PreviousFilesLocator):
         return self.continuationDir
 
     def GetBaseWD(self):
-        print("GetBaseWD")
-        print(self.wd1)
         return self.wd1
             
 """ ************************************************************************************************************************* """
 """ ************************************************************************************************************************* """
 """ ************************************************************************************************************************* """
 
-def InitialiseFileHandler(options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault):
+def InitialiseFileHandler(options, fastaDir=None, continuationDir=None, resultsDir_nonDefault=None, pickleDir_nonDefault=None):
     """
+    Creates a file handler object which will determine the location of all the files:
+    Results will be under the user specified directory of the default results location. Defaults:
+        - New, from start: FastaDir/OrthoFinder/Results_Date
+        - New, continuation: Existing_OrthoFinder_Dir/Results_Date
+        - Old, continuation: ContinuationDir/OrthoFinder/Results_Date
+        
+    
     Implementation
     1. Working out if an old directory structure is being used
     2. Construct and apporpriate PreviousFilesLocator if necessary - this locates all required files
@@ -758,14 +765,18 @@ def InitialiseFileHandler(options, fastaDir, continuationDir, resultsDir_nonDefa
     print("Args available")
     print((fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault))
     try:
-        previous_files_locator = PreviousFilesLocator(options, continuationDir)
+        pfl = PreviousFilesLocator(options, continuationDir)
     except Unprocessable:
         print("Using old file locator")
-        previous_files_locator = PreviousFilesLocator_old(options, continuationDir)
+        pfl = PreviousFilesLocator_old(options, continuationDir)
+    print("Previous file locator identified directories:")
+    print((pfl.GetBaseWD(), pfl.GetHomeForResults()))
+    results_dir_home = resultsDir_nonDefault if resultsDir_nonDefault != None else pfl.GetHomeForResults()
+    print("Dir for results: " + results_dir_home)
     
     # 3 
     # RefactorDS - this might be suitable as a constructor now
-    FileHandler.CreateOutputDirectories(options, previous_files_locator, resultsDir_nonDefault, fastaDir)    
+    FileHandler.CreateOutputDirectories(options, pfl, results_dir_home, fastaDir)    
        
 
     
