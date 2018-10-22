@@ -79,14 +79,12 @@ class __Files_new_dont_manually_create__(object):
     def __init__(self):
         self.baseOgFormat = "OG%07d"
         self.wd_base = None             # Base: blast, species & sequence IDs, species fasta files - should not request this and then write here
-        self.wd_current = None      # Location to write out any new files
+        self.wd_current = None          # Location to write out any new files
+        self.wd_trees = None            # Location of working dir containing tree files 
         self.rd1 = None
-        self.ologdir = None
-        self.fastaDir = None
         self.fileIdentifierString = "OrthoFinder"
         self.clustersFilename = None
         self.iResultsVersion = None
-        self.resultsBaseFilename = None
         self.nondefaultPickleDir = None
         self.speciesTreeRootedIDsFN = None
         self.multipleRootedSpeciesTreesDir = None
@@ -96,7 +94,7 @@ class __Files_new_dont_manually_create__(object):
      
     """ ========================================================================================== """
     # RefactorDS - FileHandler
-    def CreateOutputDirFromStart_new(self, fasta_dir, requested_results_dir = None, append_name = ""):
+    def CreateOutputDirFromStart_new(self, fasta_dir, dir_to_put_results_dir, append_name = ""):
         """
         The intial difference will be that results will go in OrthoFinder/Results_DATE or USER_SPECIFIED/RESULTS_DATE
         whereas before they went in Results_DATE or USER_SPECIFIED.
@@ -106,9 +104,9 @@ class __Files_new_dont_manually_create__(object):
             - * Use the same one? In which case WorkingDir must be kept completely separate. ANS. Yes, design is that correct files are identified
             - Create a new one?
         """
-        if requested_results_dir != None:
-            while requested_results_dir.endswith("/"): requested_results_dir=requested_results_dir[:-1]
-            base = requested_results_dir + append_name + "/"
+        if dir_to_put_results_dir != None:
+            while dir_to_put_results_dir.endswith("/"): dir_to_put_results_dir=dir_to_put_results_dir[:-1]
+            base = dir_to_put_results_dir + append_name + "/"
             if not os.path.exists(base): os.mkdir(base)
         else:
             if not fasta_dir.endswith("/"): fasta_dir+="/"        
@@ -116,6 +114,7 @@ class __Files_new_dont_manually_create__(object):
             if not os.path.exists(base): os.mkdir(base)           
         self.rd1, self.wd_current = util.CreateNewPairedDirectories(base + "Results_" + ("" if append_name == "" else append_name + "_"), base + "WorkingDirectory_" + ("" if append_name == "" else append_name + "_"))
         self.wd_base = self.wd_current
+        self.wd_trees = self.wd_base
         print(self.rd1, self.wd_current)
         with open(self.rd1 + "Log.txt", 'wb'), open(self.wd_current + "Log.txt", 'wb'):
             pass
@@ -191,8 +190,8 @@ class __Files_new_dont_manually_create__(object):
             
         resultsDir_new = orthologuesDir + "New_Analysis_From_Trees"      # for the Orthologues_Species/ directories
         self.rd2 = util.CreateNewWorkingDirectory(resultsDir_new + "_")
-        self.ologdir = self.rd2  + "Orthologues/"
-        os.mkdir(self.ologdir)
+        ologdir = self.rd2  + "Orthologues/"
+        os.mkdir(ologdir)
         self.wd_base, self.rd1, self.clustersFilename = self.GetOGsFile(self.rd1)
         if self.clustersFilename.endswith("_id_pairs.txt"):
             self.clustersFilename = self.clustersFilename[:-len("_id_pairs.txt")]
@@ -237,26 +236,26 @@ class __Files_new_dont_manually_create__(object):
         if not os.path.exists(d): os.mkdir(d)
         return d
    
-    # RefactorDS - FileHandler
-    def MakeResultsDirectory2(self, tree_generation_method, stop_after="", append_name=""):
-        """
-        Args
-        tree_method: msa, dendroblast, phyldog (determines the directory structure that will be created)
-        stop_after: seqs, align
-        """
-        if self.rd1 == None: raise Exception("No rd1") 
-        self.rd2 = util.CreateNewWorkingDirectory(self.GetResultsDirectory1() + "Orthologues_" + ("" if append_name == "" else append_name + "_"))   
-        self.wd2 = self.rd2 + "WorkingDirectory/"
-        os.mkdir(self.wd2)
-        os.mkdir(self.rd2 + "Orthologues/")
-        if tree_generation_method == "msa":
-            for i, d in enumerate([self.rd2 + "Sequences/", self.wd2 + "Sequences_ids/", self.rd2 + self.align_dir_name, self.wd2 + "Alignments_ids/", self.rd2 + "Gene_Trees/", self.wd2 + "Trees_ids/"]):
-                if stop_after == "seqs" and i == 2: break 
-                if stop_after == "align" and i == 4: break 
-                if not os.path.exists(d): os.mkdir(d)
-        elif tree_generation_method == "dendroblast":
-            for i, d in enumerate([self.wd2 + "Distances/", self.rd2 + "Gene_Trees/", self.wd2 + "Trees_ids/"]):
-                if not os.path.exists(d): os.mkdir(d)
+#    # RefactorDS - FileHandler
+#    def MakeResultsDirectory2(self, tree_generation_method, stop_after="", append_name=""):
+#        """
+#        Args
+#        tree_method: msa, dendroblast, phyldog (determines the directory structure that will be created)
+#        stop_after: seqs, align
+#        """
+#        if self.rd1 == None: raise Exception("No rd1") 
+#        self.rd2 = util.CreateNewWorkingDirectory(self.GetResultsDirectory1() + "Orthologues_" + ("" if append_name == "" else append_name + "_"))   
+#        self.wd2 = self.rd2 + "WorkingDirectory/"
+#        os.mkdir(self.wd2)
+#        os.mkdir(self.rd2 + "Orthologues/")
+#        if tree_generation_method == "msa":
+#            for i, d in enumerate([self.rd2 + "Sequences/", self.wd2 + "Sequences_ids/", self.rd2 + self.align_dir_name, self.wd2 + "Alignments_ids/", self.rd2 + "Gene_Trees/", self.wd2 + "Trees_ids/"]):
+#                if stop_after == "seqs" and i == 2: break 
+#                if stop_after == "align" and i == 4: break 
+#                if not os.path.exists(d): os.mkdir(d)
+#        elif tree_generation_method == "dendroblast":
+#            for i, d in enumerate([self.wd2 + "Distances/", self.rd2 + "Gene_Trees/", self.wd2 + "Trees_ids/"]):
+#                if not os.path.exists(d): os.mkdir(d)
          
     """ Standard Methods
         ========================================================================================== """               
@@ -547,17 +546,20 @@ class __Files_new_dont_manually_create__(object):
         stop_after: seqs, align
         """
         # RefactorDS - need to change where it puts things
+        print("**** MakeResultsDirectory2 ****")
         if self.rd1 == None: raise Exception("No rd1") 
         self.rd2 = self.rd1   
-        self.wd2 = self.wd_base 
+        self.wd2 = self.wd_current 
+        self.wd_trees = self.wd_current
         os.mkdir(self.rd2 + "Orthologues/")
         if tree_generation_method == "msa":
-            for i, d in enumerate([self.rd2 + "Sequences/", self.wd2 + "Sequences_ids/", self.rd2 + self.align_dir_name, self.wd2 + "Alignments_ids/", self.rd2 + "Gene_Trees/", self.wd2 + "Trees_ids/"]):
+            for i, d in enumerate([self.rd2 + "Sequences/", self.wd_current + "Sequences_ids/", self.rd2 + self.align_dir_name, self.wd_current + "Alignments_ids/", self.rd2 + "Gene_Trees/", self.wd_current + "Trees_ids/"]):
                 if stop_after == "seqs" and i == 2: break 
                 if stop_after == "align" and i == 4: break 
                 if not os.path.exists(d): os.mkdir(d)
         elif tree_generation_method == "dendroblast":
-            for i, d in enumerate([self.wd2 + "Distances/", self.rd2 + "Gene_Trees/", self.wd2 + "Trees_ids/"]):
+            for i, d in enumerate([self.wd_current + "Distances/", self.rd2 + "Gene_Trees/", self.wd_current + "Trees_ids/"]):
+                print(d)
                 if not os.path.exists(d): os.mkdir(d)
     
     def GetResultsFNBase(self):
@@ -638,6 +640,7 @@ class PreviousFilesLocator(object):
         print(orthofinderWorkingDir + "clusters_OrthoFinder_*.txt_id_pairs.txt")
         clustersFiles = glob.glob(orthofinderWorkingDir + "clusters_OrthoFinder_*.txt_id_pairs.txt")
         return orthofinderWorkingDir, userArg, clustersFiles[0] 
+        
     
 """ ************************************************************************************************************************* """
 
@@ -648,12 +651,8 @@ class PreviousFilesLocator_old(PreviousFilesLocator):
         self.wd_base = None
         self.continuationDir = continuationDir
         self.rd1 = None
-        self.ologdir = None
-        self.fastaDir = None
-        self.fileIdentifierString = "OrthoFinder"
         self.clustersFilename = None
         self.iResultsVersion = None
-        self.resultsBaseFilename = None
         self.nondefaultPickleDir = None
         self.speciesTreeRootedIDsFN = None
         self.multipleRootedSpeciesTreesDir = None
@@ -808,15 +807,19 @@ def InitialiseFileHandler(options, fastaDir=None, continuationDir=None, resultsD
     # 1 & 2
     print("Args available")
     print((fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault))
-    try:
-        pfl = PreviousFilesLocator(options, continuationDir)
-    except Unprocessable:
-        print("Using old file locator")
-        pfl = PreviousFilesLocator_old(options, continuationDir)
-    print("\nPrevious file locator identified directories:")
-    print((pfl.GetWD1(), pfl.GetHomeForResults()))
-    results_dir_home = resultsDir_nonDefault if resultsDir_nonDefault != None else pfl.GetHomeForResults()
-    print("\nDir for results: " + results_dir_home)
+    if options.qStartFromFasta and not options.qStartFromBlast:
+        pfl = None
+        results_dir_home = resultsDir_nonDefault if resultsDir_nonDefault != None else fastaDir
+    else:
+        try:
+            pfl = PreviousFilesLocator(options, continuationDir)
+        except Unprocessable:
+            print("Using old file locator")
+            pfl = PreviousFilesLocator_old(options, continuationDir)
+        print("\nPrevious file locator identified directories:")
+        print((pfl.GetWD1(), pfl.GetHomeForResults()))
+        results_dir_home = resultsDir_nonDefault if resultsDir_nonDefault != None else pfl.GetHomeForResults()
+        print("\nDir for results: " + results_dir_home)
     
     # 3 
     # RefactorDS - this might be suitable as a constructor now
