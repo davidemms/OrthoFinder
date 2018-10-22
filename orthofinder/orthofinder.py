@@ -948,8 +948,7 @@ def ProcessArgs(program_caller):
                 print("Repeated argument: -ft/--from-trees\n")
                 util.Fail()
             options.qStartFromTrees = True
-            orthologuesDir = GetDirectoryArgument(arg, args)
-            continuationDir = orthologuesDir + "../"
+            continuationDir = GetDirectoryArgument(arg, args)
         elif arg == "-t" or arg == "--threads":
             if len(args) == 0:
                 print("Missing option for command line argument %s\n" % arg)
@@ -1631,10 +1630,10 @@ if __name__ == "__main__":
             # 10
             util.PrintCitation() 
         elif options.qStartFromTrees:
-            speciesInfoObj, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            speciesInfoObj, _ = ProcessPreviousFiles(scripts.files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast)
             scripts.files.FileHandler.LogSpecies()
             options = CheckOptions(options)
-            summaryText = GetOrthologues_FromTrees(continuationDir, options)
+            summaryText = GetOrthologues_FromTrees(options)
             print(summaryText)
             util.PrintCitation() 
         else:

@@ -78,7 +78,7 @@ def IsWorkingDirectory(orthofinderWorkingDir):
 class __Files_new_dont_manually_create__(object):    
     def __init__(self):
         self.baseOgFormat = "OG%07d"
-        self.wd1 = None             # Base: blast, species & sequence IDs, species fasta files - should not request this and then write here
+        self.wd_base = None             # Base: blast, species & sequence IDs, species fasta files - should not request this and then write here
         self.wd_current = None      # Location to write out any new files
         self.rd1 = None
         self.ologdir = None
@@ -115,31 +115,56 @@ class __Files_new_dont_manually_create__(object):
             base = fasta_dir + "OrthoFinder/"
             if not os.path.exists(base): os.mkdir(base)           
         self.rd1, self.wd_current = util.CreateNewPairedDirectories(base + "Results_" + ("" if append_name == "" else append_name + "_"), base + "WorkingDirectory_" + ("" if append_name == "" else append_name + "_"))
-        self.wd1 = self.wd_current
+        self.wd_base = self.wd_current
         print(self.rd1, self.wd_current)
         with open(self.rd1 + "Log.txt", 'wb'), open(self.wd_current + "Log.txt", 'wb'):
             pass
         self.StartLog()
         
     # RefactorDS - PreviousFilesLocator
-    def StartFromOrthogroupsOrSequenceSearch(self, wd_base, dir_to_put_results_dir, clustersFilename_pairs=None, append_name = ""):
-        if self.wd1 != None: raise Exception("Changing WorkingDirectory1")
-        self.wd1 = wd_base
+    def StartFromOrthogroupsOrSequenceSearch(self, wd_base, dir_to_put_results_dir, clustersFilename_pairs=None, append_name = "", userSpeciesTree=None):
+        """
+        NEed to initialise:
+        wd_base
+        wd_trees
+        wd_current
+        """
+        if self.wd_base != None: raise Exception("Changing WorkingDirectory1")
+        self.wd_base = wd_base
         if clustersFilename_pairs != None: self.clustersFilename = clustersFilename_pairs[:-len("_id_pairs.txt")]
         base = dir_to_put_results_dir +  "OrthoFinder/"
         if not os.path.exists(base): os.mkdir(base) 
         self.rd1, self.wd_current = util.CreateNewPairedDirectories(base + "Results_" + ("" if append_name == "" else append_name + "_"), dir_to_put_results_dir + "WorkingDirectory_" + ("" if append_name == "" else append_name + "_"))
         with open(self.rd1 + "Log.txt", 'wb'), open(self.wd_current + "Log.txt", 'wb'):
             pass
+        self.wd_trees = self.wd_current
         self.StartLog()
     
+    
+    def StartFromTrees(self, 
+                       wd1, 
+                       wd2,
+                       dir_to_put_results_dir, 
+                       clustersFilename_pairs, 
+                       append_name=None,
+                       speciesTreeFN=None):
+        self.wd_base = wd1
+        self.wd_trees = wd2
+        base = dir_to_put_results_dir +  "OrthoFinder/"
+        if not os.path.exists(base): os.mkdir(base)
+        self.rd1, self.wd_current = util.CreateNewPairedDirectories(base + "Results_" + ("" if append_name == "" else append_name + "_"), dir_to_put_results_dir + "WorkingDirectory_" + ("" if append_name == "" else append_name + "_"))
+        self.rd2 = self.rd1
+        self.clustersFilename = clustersFilename_pairs[:-len("_id_pairs.txt")]
+        self.StartLog()
+        self.WriteToLog("Species Tree: %s\n" % self.speciesTreeRootedIDsFN)
+                                    
     # RefactorDS - PreviousFilesLocator
     def CreateOutputDirFromTrees(self, orthologuesDir, userSpeciesTree):
         """
         if userSpeciesTree == None: Use existing tree
         """
         self.rd2 = self.rd1
-        self.wd2 = self.wd1
+        self.wd2 = self.wd_base
         # Find species tree
         if userSpeciesTree == None:
             possibilities = ["SpeciesTree_ids_0_rooted.txt", "SpeciesTree_ids_1_rooted.txt", "SpeciesTree_user_ids.txt", "SpeciesTree_unrooted_0_rooted.txt", "STAG_SpeciesTree_ids_0_rooted.txt"] # etc (only need to determine if unique)
@@ -168,7 +193,7 @@ class __Files_new_dont_manually_create__(object):
         self.rd2 = util.CreateNewWorkingDirectory(resultsDir_new + "_")
         self.ologdir = self.rd2  + "Orthologues/"
         os.mkdir(self.ologdir)
-        self.wd1, self.rd1, self.clustersFilename = self.GetOGsFile(self.rd1)
+        self.wd_base, self.rd1, self.clustersFilename = self.GetOGsFile(self.rd1)
         if self.clustersFilename.endswith("_id_pairs.txt"):
             self.clustersFilename = self.clustersFilename[:-len("_id_pairs.txt")]
         self.StartLog()
@@ -178,17 +203,23 @@ class __Files_new_dont_manually_create__(object):
     def CreateOutputDirectories(self, options, previous_files_locator, results_dir_home, fastaDir=None):
         if options.qStartFromBlast: 
             # RefactorDS - previously, checked if we wanted old or new
-            self.StartFromOrthogroupsOrSequenceSearch(previous_files_locator.GetBaseWD(), results_dir_home, append_name=options.name)   # for new structure
+            self.StartFromOrthogroupsOrSequenceSearch(previous_files_locator.GetWD1(), 
+                                                      results_dir_home, 
+                                                      append_name=options.name)   # for new structure
 #            self.CreateOutputDirFromExistingDirs(workingDir) # for old
         elif options.qStartFromTrees:
-            self.CreateOutputDirFromExistingDirs(workingDir)
-            self.SetClustersFN(clustersFilename_pairs)
-            self.CreateOutputDirFromTrees(orthologuesDir, options.speciesTreeFN)
+            self.StartFromTrees(previous_files_locator.GetWD1(), 
+                                previous_files_locator.GetWDTrees(),
+                                results_dir_home, 
+                                previous_files_locator.clustersFilename_pairs, 
+                                options.name,
+                                options.speciesTreeFN if options.speciesTreeFN != None else previous_files_locator.GetSpeciesTreeFN())
+#            self.CreateOutputDirFromTrees(orthologuesDir, options.speciesTreeFN)
         elif options.qStartFromFasta:
             # But, by previous condition, not qStartFromBlast
             self.CreateOutputDirFromStart_new(fastaDir, results_dir_home, append_name=options.name)
         elif options.qStartFromGroups:
-            self.StartFromOrthogroupsOrSequenceSearch(previous_files_locator.GetBaseWD(), 
+            self.StartFromOrthogroupsOrSequenceSearch(previous_files_locator.GetWD1(), 
                                       previous_files_locator.GetHomeForResults(),
                                       previous_files_locator.clustersFilename_pairs, 
                                       append_name=options.name)
@@ -243,8 +274,8 @@ class __Files_new_dont_manually_create__(object):
         ========================================================================================== """
     
     def GetWorkingDirectory1_Read(self):
-        if self.wd1 == None: raise Exception("No wd1")
-        return self.wd1 
+        if self.wd_base == None: raise Exception("No wd1")
+        return self.wd_base 
         
     def GetWorkingDirectory_Write(self):
         if self.wd_current == None: raise Exception("No wd_current")
@@ -261,31 +292,33 @@ class __Files_new_dont_manually_create__(object):
     def GetOrthologuesDirectory(self):
         """"Where the directories of species orthologues are"""
         if self.rd2 == None: raise Exception("No rd2")
-        return self.rd2 + "Orthologues/"
+        d = self.rd2 + "Orthologues/"
+        if not os.path.exists(d): os.mkdir(d)
+        return d
         
     """ Orthogroups files 
         ========================================================================================== """
         
     def GetSpeciesIDsFN(self):
-        if self.wd1 == None: raise Exception("No wd1")
-        print(self.wd1 + "SpeciesIDs.txt")
-        return self.wd1 + "SpeciesIDs.txt"
+        if self.wd_base == None: raise Exception("No wd1")
+        print(self.wd_base + "SpeciesIDs.txt")
+        return self.wd_base + "SpeciesIDs.txt"
         
     def GetSequenceIDsFN(self):
-        if self.wd1 == None: raise Exception("No wd1")
-        return self.wd1 + "SequenceIDs.txt"
+        if self.wd_base == None: raise Exception("No wd1")
+        return self.wd_base + "SequenceIDs.txt"
         
     def GetSpeciesSeqsDir(self):
-        if self.wd1 == None: raise Exception("No wd1")
-        return self.wd1 
+        if self.wd_base == None: raise Exception("No wd1")
+        return self.wd_base 
         
     def GetSpeciesFastaFN(self, iSpecies):
-        if self.wd1 == None: raise Exception("No wd1")
-        return "%sSpecies%d.fa" % (self.wd1, iSpecies)
+        if self.wd_base == None: raise Exception("No wd1")
+        return "%sSpecies%d.fa" % (self.wd_base, iSpecies)
         
     def GetSortedSpeciesFastaFiles(self):
-        if self.wd1 == None: raise Exception("No wd1")
-        fastaFilenames = glob.glob(self.wd1 + "Species*.fa")
+        if self.wd_base == None: raise Exception("No wd1")
+        fastaFilenames = glob.glob(self.wd_base + "Species*.fa")
         speciesIndices = []
         for f in fastaFilenames:
             start = f.rfind("Species")
@@ -294,15 +327,15 @@ class __Files_new_dont_manually_create__(object):
         return sortedFasta  
         
     def GetSpeciesDatabaseN(self, iSpecies, program="Blast"):
-        if self.wd1 == None: raise Exception("No wd1")
-        return "%s%sDBSpecies%d" % (self.wd1, program, iSpecies)
+        if self.wd_base == None: raise Exception("No wd1")
+        return "%s%sDBSpecies%d" % (self.wd_base, program, iSpecies)
         
     def GetBlastResultsDir(self):
-        return self.wd1
+        return self.wd_base
         
     def GetBlastResultsFN(self, iSpeciesSearch, jSpeciesDB):
-        if self.wd1 == None: raise Exception("No wd1")
-        return "%sBlast%d_%d.txt" % (self.wd1, iSpeciesSearch, jSpeciesDB)
+        if self.wd_base == None: raise Exception("No wd1")
+        return "%sBlast%d_%d.txt" % (self.wd_base, iSpeciesSearch, jSpeciesDB)
         
     def GetGraphFilename(self):
         if self.wd_current == None: raise Exception("No wd_current")
@@ -360,37 +393,37 @@ class __Files_new_dont_manually_create__(object):
         if qResults:
             return self.rd2 + "Sequences/" + (self.baseOgFormat % iOG) + ".fa"
         else:
-            return self.wd2 + "Sequences_ids/" + (self.baseOgFormat % iOG) + ".fa"
+            return self.wd_current + "Sequences_ids/" + (self.baseOgFormat % iOG) + ".fa"
             
     def GetOGsAlignFN(self, iOG, qResults=False):
         if qResults:
             return self.align_dir_name + (self.baseOgFormat % iOG) + ".fa"
         else:
-            return self.wd2 + "Alignments_ids/" + (self.baseOgFormat % iOG) + ".fa"
+            return self.wd_current + "Alignments_ids/" + (self.baseOgFormat % iOG) + ".fa"
             
     def GetOGsTreeFN(self, iOG, qResults=False):
         if qResults:
             return self.rd2 + "Gene_Trees/" + (self.baseOgFormat % iOG) + "_tree.txt"
         else:
-            return self.wd2 + "Trees_ids/" + (self.baseOgFormat % iOG) + "_tree_id.txt"   
+            return self.wd_current + "Trees_ids/" + (self.baseOgFormat % iOG) + "_tree_id.txt"   
         
     def GetSpeciesTreeConcatAlignFN(self, qResults=False):
         if qResults:
             return self.align_dir_name + "SpeciesTreeAlignment.fa"
         else:
-            return self.wd2 + "Alignments_ids/SpeciesTreeAlignment.fa"  
+            return self.wd_current + "Alignments_ids/SpeciesTreeAlignment.fa"  
         
     def GetSpeciesTreeMatrixFN(self, qPutInWorkingDir = False):
         if qPutInWorkingDir:
-            return self.wd2 + "SpeciesMatrix.phy"
+            return self.wd_current + "SpeciesMatrix.phy"
         else:
-            return self.wd2 + "Distances/SpeciesMatrix.phy"
+            return self.wd_current + "Distances/SpeciesMatrix.phy"
             
     def GetSpeciesTreeUnrootedFN(self, qAccessions=False):
         if qAccessions:
-            return self.wd2 + "SpeciesTree_unrooted.txt"
+            return self.wd_trees + "SpeciesTree_unrooted.txt"
         else: 
-            return self.wd2 + "Trees_ids/SpeciesTree_unrooted_id.txt"  
+            return self.wd_trees + "Trees_ids/SpeciesTree_unrooted_id.txt"  
             
     def SetSpeciesTreeIDsRootedFN(self, fn):
         self.speciesTreeRootedIDsFN = fn
@@ -414,10 +447,10 @@ class __Files_new_dont_manually_create__(object):
             return self.multipleRootedSpeciesTreesDir + "SpeciesTree_rooted_at_outgroup_%d.txt" % i
         
     def GetSpeciesTreeUserSupplied_idsFN(self):
-        return self.wd2 + "SpeciesTree_UserSupplied_Rooted_IDs.txt"
+        return self.wd_current + "SpeciesTree_UserSupplied_Rooted_IDs.txt"
         
     def GetOGsDistMatFN(self, iOG):
-        return self.wd2 + "Distances/OG%07d.phy" % iOG
+        return self.wd_current + "Distances/OG%07d.phy" % iOG
         
     def GetSpeciesDict(self):
         d = util.FullAccession(self.GetSpeciesIDsFN()).GetIDToNameDict()
@@ -429,7 +462,7 @@ class __Files_new_dont_manually_create__(object):
         if qResults:
             return self.rd2 + "Gene_Trees/" 
         else:
-            return self.wd2 + "Trees_ids/" 
+            return self.wd_trees + "Trees_ids/" 
             
     def GetOGsReconTreeDir(self, qResults=False):
         if qResults:
@@ -443,12 +476,12 @@ class __Files_new_dont_manually_create__(object):
         return self.rd2 + "Resolved_Gene_Trees/OG%07d_tree.txt" % iOG
             
     def GetPhyldogWorkingDirectory(self):
-        d = self.wd2 + "phyldog/"
+        d = self.wd_current + "phyldog/"
         if not os.path.exists(d): os.mkdir(d)
         return d
             
     def GetPhyldogOGResultsTreeFN(self, i):
-        return self.wd2 + "phyldog/OG%07d.ReconciledTree.txt" % i
+        return self.wd_current + "phyldog/OG%07d.ReconciledTree.txt" % i
             
     def GetDuplicationsFN(self):
         return self.rd2 + "Duplications.csv"
@@ -459,7 +492,7 @@ class __Files_new_dont_manually_create__(object):
     def CleanWorkingDir2(self):
         dirs = ['Distances/']
         for d in dirs:
-            dFull = self.wd2 + d
+            dFull = self.wd_current + d
             if os.path.exists(dFull): 
                 try:
                     shutil.rmtree(dFull)
@@ -494,7 +527,7 @@ class __Files_new_dont_manually_create__(object):
     def StartLog(self):
         self.WriteToLog("Started OrthoFinder version " + util.version + "\n", True)
         text = "Command Line: " + " ".join(sys.argv) + "\n\n"
-        text += "WorkingDirectory_Base: %s\n" % self.wd1
+        text += "WorkingDirectory_Base: %s\n" % self.wd_base
         if self.clustersFilename != None: text += "Orthogroups: %s\n" % self.clustersFilename
         self.WriteToLog(text)
     
@@ -502,7 +535,7 @@ class __Files_new_dont_manually_create__(object):
         if qCreatedThisRun:
             self.WriteToLog("WorkingDirectory_OGs: %s\n" % self.wd_current)
         else:
-            self.WriteToLog("WorkingDirectory_OGs: %s\n" % self.wd1)
+            self.WriteToLog("WorkingDirectory_OGs: %s\n" % self.wd_base)
     
     def LogWorkingDirectoryTrees(self):
         self.WriteToLog("WorkingDirectory_Trees: %s\n" % self.wd2)
@@ -516,7 +549,7 @@ class __Files_new_dont_manually_create__(object):
         # RefactorDS - need to change where it puts things
         if self.rd1 == None: raise Exception("No rd1") 
         self.rd2 = self.rd1   
-        self.wd2 = self.wd1 
+        self.wd2 = self.wd_base 
         os.mkdir(self.rd2 + "Orthologues/")
         if tree_generation_method == "msa":
             for i, d in enumerate([self.rd2 + "Sequences/", self.wd2 + "Sequences_ids/", self.rd2 + self.align_dir_name, self.wd2 + "Alignments_ids/", self.rd2 + "Gene_Trees/", self.wd2 + "Trees_ids/"]):
@@ -612,7 +645,7 @@ class PreviousFilesLocator_old(PreviousFilesLocator):
     def __init__(self, options, continuationDir):
         if not continuationDir.endswith("/"): continuationDir += "/"
         self.baseOgFormat = "OG%07d"
-        self.wd1 = None
+        self.wd_base = None
         self.continuationDir = continuationDir
         self.rd1 = None
         self.ologdir = None
@@ -629,11 +662,14 @@ class PreviousFilesLocator_old(PreviousFilesLocator):
         
         if options.qStartFromGroups or options.qStartFromTrees:
             # User can specify it using clusters_id_pairs file, process this first to get the workingDirectory
-            self.wd1, self.orthofinderResultsDir, self.clustersFilename_pairs = self.GetOGsFile(continuationDir)
-            print("Found OGs files")
-            print(self.wd1, self.orthofinderResultsDir, self.clustersFilename_pairs)
+            ogs_dir = continuationDir + "../" if options.qStartFromTrees else continuationDir
+            self.wd_base, self.orthofinderResultsDir, self.clustersFilename_pairs = self.GetOGsFile(ogs_dir)
+            print("\nFound OGs files")
+            print(self.wd_base, self.orthofinderResultsDir, self.clustersFilename_pairs)
+            if options.qStartFromTrees:
+                self.FindFromTrees(continuationDir, options.speciesTreeFN)
         elif options.qStartFromBlast:
-            self.wd1 = continuationDir
+            self.wd_base = continuationDir
                 
     def GetOGsFile(self, userArg):
         """returns the WorkingDirectory, ResultsDirectory and clusters_id_pairs filename"""
@@ -705,8 +741,10 @@ class PreviousFilesLocator_old(PreviousFilesLocator):
         """
         if userSpeciesTree == None: Use existing tree
         """
+        print("\nFind from trees:")
+        print((orthologuesDir, userSpeciesTree))
         self.rd2 = self.rd1
-        self.wd2 = self.wd1
+        self.wd2 = orthologuesDir + "WorkingDirectory/"
         # Find species tree
         if userSpeciesTree == None:
             possibilities = ["SpeciesTree_ids_0_rooted.txt", "SpeciesTree_ids_1_rooted.txt", "SpeciesTree_user_ids.txt", "SpeciesTree_unrooted_0_rooted.txt", "STAG_SpeciesTree_ids_0_rooted.txt"] # etc (only need to determine if unique)
@@ -734,8 +772,14 @@ class PreviousFilesLocator_old(PreviousFilesLocator):
     def GetHomeForResults(self):
         return self.continuationDir
 
-    def GetBaseWD(self):
-        return self.wd1
+    def GetWD1(self):
+        return self.wd_base
+
+    def GetWDTrees(self):
+        return self.wd2
+
+    def GetSpeciesTreeFN(self):
+        return self.speciesTreeRootedIDsFN
             
 """ ************************************************************************************************************************* """
 """ ************************************************************************************************************************* """
@@ -769,10 +813,10 @@ def InitialiseFileHandler(options, fastaDir=None, continuationDir=None, resultsD
     except Unprocessable:
         print("Using old file locator")
         pfl = PreviousFilesLocator_old(options, continuationDir)
-    print("Previous file locator identified directories:")
-    print((pfl.GetBaseWD(), pfl.GetHomeForResults()))
+    print("\nPrevious file locator identified directories:")
+    print((pfl.GetWD1(), pfl.GetHomeForResults()))
     results_dir_home = resultsDir_nonDefault if resultsDir_nonDefault != None else pfl.GetHomeForResults()
-    print("Dir for results: " + results_dir_home)
+    print("\nDir for results: " + results_dir_home)
     
     # 3 
     # RefactorDS - this might be suitable as a constructor now
