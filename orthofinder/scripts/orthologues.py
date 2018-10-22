@@ -454,7 +454,7 @@ class DendroBLASTTrees(object):
         if qSTAG:
             # Trees must have been completed
             print("")
-            spTreeFN_ids = stag.Run_ForOrthoFinder(files.FileHandler.GetOGsTreeDir(), files.FileHandler.GetWorkingDirectory2(), self.ogSet.seqsInfo.speciesToUse)
+            spTreeFN_ids = stag.Run_ForOrthoFinder(files.FileHandler.GetOGsTreeDir(), files.FileHandler.GetWorkingDirectory_Write(), self.ogSet.seqsInfo.speciesToUse)
         seqDict = self.ogSet.Spec_SeqDict()
         for iog in xrange(len(self.ogSet.OGs())):
             util.RenameTreeTaxa(files.FileHandler.GetOGsTreeFN(iog), files.FileHandler.GetOGsTreeFN(iog, True), seqDict, qSupport=False, qFixNegatives=True)
@@ -743,7 +743,7 @@ def ReconciliationAndOrthologues(recon_method, ogSet, speciesTree_fn, nParallel,
     iSpeciesTree - which of the potential roots of the species tree is this
     method - can be dlcpar, dlcpar_deep, of_recon
     """
-    workingDir = files.FileHandler.GetWorkingDirectory2()    # workingDir - Orthologues working dir
+    workingDir = files.FileHandler.GetWorkingDirectory_Write()    # workingDir - Orthologues working dir
     resultsDir_ologs = files.FileHandler.GetOrthologuesDirectory()
     reconTreesRenamedDir = files.FileHandler.GetOGsReconTreeDir(True)
     if "dlcpar" in recon_method:
@@ -781,12 +781,12 @@ def OrthologuesFromTrees(recon_method, nHighParallel, userSpeciesTree_fn):
     Just infer orthologues from trees, don't do any of the preceeding steps.
     """
     speciesToUse, nSpAll, _ = util.GetSpeciesToUse(files.FileHandler.GetSpeciesIDsFN())    
-    ogSet = OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1(), speciesToUse, nSpAll, idExtractor = util.FirstWordExtractor)
+    ogSet = OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesToUse, nSpAll, idExtractor = util.FirstWordExtractor)
     if userSpeciesTree_fn != None:
         speciesDict = files.FileHandler.GetSpeciesDict()
         speciesToUseNames = [speciesDict[str(iSp)] for iSp in ogSet.speciesToUse]
         CheckUserSpeciesTree(userSpeciesTree_fn, speciesToUseNames)
-        speciesTreeFN_ids = files.FileHandler.GetWorkingDirectory2() + "SpeciesTree_user_ids_rooted.txt"
+        speciesTreeFN_ids = files.FileHandler.GetWorkingDirectory_Write() + "SpeciesTree_user_ids_rooted.txt"
         ConvertUserSpeciesTree(userSpeciesTree_fn, speciesDict, speciesTreeFN_ids)
         files.FileHandler.SetSpeciesTreeIDsRootedFN(speciesTreeFN_ids)
     util.PrintUnderline("Running Orthologue Prediction", True)
@@ -826,7 +826,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
     Variables:
     - ogSet - all the relevant information about the orthogroups, species etc.
     """
-    ogSet = OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1(), speciesToUse, nSpAll, idExtractor = util.FirstWordExtractor)
+    ogSet = OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesToUse, nSpAll, idExtractor = util.FirstWordExtractor)
     
     tree_generation_method = "msa" if qMSA or qPhyldog else "dendroblast"
     stop_after = "seqs" if qStopAfterSeqs else "align" if qStopAfterAlign else ""
@@ -875,6 +875,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
     else:
         db = DendroBLASTTrees(ogSet, nLowParrallel, qDoubleBlast)
         spTreeFN_ids, spTreeUnrootedFN, qSTAG = db.RunAnalysis()
+    files.FileHandler.LogWorkingDirectoryTrees()
     qSpeciesTreeSupports = False if (userSpeciesTree or qMSA or qPhyldog) else qSTAG
     
     """ === 2 ===
@@ -899,7 +900,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
         all_stride_dup_genes = None
     elif userSpeciesTree:
         util.PrintUnderline("Using user-supplied species tree") 
-        speciesTreeFN_ids = files.FileHandler.GetWorkingDirectory2() + "SpeciesTree_user_ids_rooted.txt"
+        speciesTreeFN_ids = files.FileHandler.GetWorkingDirectory_Write() + "SpeciesTree_user_ids_rooted.txt"
         ConvertUserSpeciesTree(userSpeciesTree, ogSet.SpeciesDict(), speciesTreeFN_ids)
         rootedSpeciesTreeFN = [speciesTreeFN_ids]
         roots = [None]

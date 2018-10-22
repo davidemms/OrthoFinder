@@ -910,8 +910,7 @@ def ProcessArgs(program_caller):
 
     options = Options()
     fastaDir = None
-    workingDir = None
-    orthologuesDir = None
+    continuationDir = None
     resultsDir_nonDefault = None
     pickleDir_nonDefault = None
     
@@ -937,20 +936,20 @@ def ProcessArgs(program_caller):
                 print("Repeated argument: -b/--blast\n")
                 util.Fail()
             options.qStartFromBlast = True
-            workingDir = GetDirectoryArgument(arg, args)
+            continuationDir = GetDirectoryArgument(arg, args)
         elif arg == "-fg" or arg == "--from-groups":
             if options.qStartFromGroups:
                 print("Repeated argument: -fg/--from-groups\n")
                 util.Fail()
             options.qStartFromGroups = True
-            workingDir = GetDirectoryArgument(arg, args)
+            continuationDir = GetDirectoryArgument(arg, args)
         elif arg == "-ft" or arg == "--from-trees":
             if options.qStartFromTrees:
                 print("Repeated argument: -ft/--from-trees\n")
                 util.Fail()
             options.qStartFromTrees = True
             orthologuesDir = GetDirectoryArgument(arg, args)
-            workingDir = orthologuesDir + "../"
+            continuationDir = orthologuesDir + "../"
         elif arg == "-t" or arg == "--threads":
             if len(args) == 0:
                 print("Missing option for command line argument %s\n" % arg)
@@ -1170,7 +1169,7 @@ def ProcessArgs(program_caller):
     util.PrintTime("Starting OrthoFinder")    
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
     print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
-    return options, fastaDir, workingDir, orthologuesDir, resultsDir_nonDefault, pickleDir_nonDefault            
+    return options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault            
 
 def GetXMLSpeciesInfo(seqsInfoObj, options):
     # speciesInfo:  name, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile
@@ -1295,6 +1294,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast):
     if options.speciesXMLInfoFN:
         MCL.WriteOrthoXML(speciesXML, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml", speciesInfoObj.speciesToUse)
     util.PrintTime("Done orthogroups")
+    scripts.files.FileHandler.LogWorkingDirectoryOGs(True)
     return statsFile, summaryText, orthogroupsResultsFilesString
 
 # 0
@@ -1406,7 +1406,7 @@ def RunSearch(options, speciessInfoObj, seqsInfo, program_caller):
     # remove BLAST databases
     util.PrintTime("Done all-versus-all sequence search")
     if options.search_program == "blast":
-        for f in glob.glob(scripts.files.FileHandler.GetWorkingDirectory1() + "BlastDBSpecies*"):
+        for f in glob.glob(scripts.files.FileHandler.GetWorkingDirectory1_Read() + "BlastDBSpecies*"):
             os.remove(f)
     if options.search_program == "mmseqs":
         for i in xrange(dirs.nSpAll):
@@ -1542,47 +1542,24 @@ if __name__ == "__main__":
         print("")
         print("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version)
         program_caller = GetProgramCaller()
-        options, fastaDir, workingDir, orthologuesDir, resultsDir_nonDefault, pickleDir_nonDefault = ProcessArgs(program_caller)  
-        # 2.
-        if options.qStartFromGroups or options.qStartFromTrees:
-            # User can specify it using clusters_id_pairs file, process this first to get the workingDirectory
-            workingDir, orthofinderResultsDir, clustersFilename_pairs, qFromNewStructure = scripts.files.GetOGsFile(workingDir)
-        elif options.qStartFromBlast:
-            qFromNewStructure = scripts.files.IsNewDirStructure(workingDir)
-        CheckDependencies(options, program_caller, next(d for d in [fastaDir, workingDir, orthologuesDir] if  d != None)) 
         
-        # Create FileHandler
-        if options.qStartFromBlast: 
-            if qFromNewStructure:
-                scripts.files.FileHandler = scripts.files.__Files_new_structure_dont_recreate__()
-                scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir, orthofinderResultsDir, options.name)
-            else:
-                scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir)
-        elif options.qStartFromTrees:
-            if qFromNewStructure:
-                scripts.files.FileHandler = scripts.files.__Files_new_structure_dont_recreate__()
-            scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir)
-            scripts.files.FileHandler.SetClustersFN(clustersFilename_pairs)
-            scripts.files.FileHandler.CreateOutputDirFromTrees(orthologuesDir, options.speciesTreeFN)
-        elif options.qStartFromFasta:
-            # But, by previous condition, not qStartFromBlast
-            scripts.files.FileHandler = scripts.files.__Files_new_structure_dont_recreate__()
-            scripts.files.FileHandler.CreateOutputDirFromStart_new(fastaDir, resultsDir_nonDefault, append_name=options.name)
-        elif options.qStartFromGroups:
-            scripts.files.FileHandler.CreateOutputDirFromExistingDirs(workingDir, orthofinderResultsDir)
-            scripts.files.FileHandler.SetClustersFN(clustersFilename_pairs)
+        options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault = ProcessArgs(program_caller)  
+        
+        scripts.files.InitialiseFileHandler(options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault)     
+                    
+        CheckDependencies(options, program_caller, scripts.files.FileHandler.GetWorkingDirectory1_Read()) 
             
         # if using previous Trees etc., check these are all present - Job for orthologues
         if options.qStartFromBlast and options.qStartFromFasta:
             # 0. Check Files
-            speciesInfoObj, speciesToUse_names = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
-            print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, workingDir))
+            speciesInfoObj, speciesToUse_names = ProcessPreviousFiles(continuationDir, options.qDoubleBlast)
+            print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, continuationDir))
             # 3. 
             speciesInfoObj = ProcessesNewFasta(fastaDir, speciesInfoObj, speciesToUse_names, options.name)
             scripts.files.FileHandler.LogSpecies()
             options = CheckOptions(options)
             # 4.
-            seqsInfo = util.GetSeqsInfo(scripts.files.FileHandler.GetWorkingDirectory1(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
+            seqsInfo = util.GetSeqsInfo(scripts.files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # 5.
             if options.speciesXMLInfoFN:   
                 speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
@@ -1607,7 +1584,7 @@ if __name__ == "__main__":
             scripts.files.FileHandler.LogSpecies()
             options = CheckOptions(options)
             # 4
-            seqsInfo = util.GetSeqsInfo(scripts.files.FileHandler.GetWorkingDirectory1(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
+            seqsInfo = util.GetSeqsInfo(scripts.files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # 5.
             if options.speciesXMLInfoFN:   
                 speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
@@ -1627,12 +1604,12 @@ if __name__ == "__main__":
             
         elif options.qStartFromBlast:
             # 0.
-            speciesInfoObj, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            speciesInfoObj, _ = ProcessPreviousFiles(continuationDir, options.qDoubleBlast)
             scripts.files.FileHandler.LogSpecies()
-            print("Using previously calculated BLAST results in %s" % workingDir) 
+            print("Using previously calculated BLAST results in %s" % continuationDir) 
             options = CheckOptions(options)
             # 4.
-            seqsInfo = util.GetSeqsInfo(workingDir, speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
+            seqsInfo = util.GetSeqsInfo(continuationDir, speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # 5.
             if options.speciesXMLInfoFN:   
                 speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
@@ -1646,7 +1623,7 @@ if __name__ == "__main__":
             util.PrintCitation() 
         elif options.qStartFromGroups:
             # 0.  
-            speciesInfoObj, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
+            speciesInfoObj, _ = ProcessPreviousFiles(continuationDir, options.qDoubleBlast)
             scripts.files.FileHandler.LogSpecies()
             options = CheckOptions(options)
             # 9
@@ -1657,7 +1634,7 @@ if __name__ == "__main__":
             speciesInfoObj, _ = ProcessPreviousFiles(workingDir, options.qDoubleBlast)
             scripts.files.FileHandler.LogSpecies()
             options = CheckOptions(options)
-            summaryText = GetOrthologues_FromTrees(orthologuesDir, options)
+            summaryText = GetOrthologues_FromTrees(continuationDir, options)
             print(summaryText)
             util.PrintCitation() 
         else:
