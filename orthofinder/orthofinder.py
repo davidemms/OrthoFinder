@@ -1603,12 +1603,12 @@ if __name__ == "__main__":
             
         elif options.qStartFromBlast:
             # 0.
-            speciesInfoObj, _ = ProcessPreviousFiles(continuationDir, options.qDoubleBlast)
+            speciesInfoObj, _ = ProcessPreviousFiles(scripts.files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast)
             scripts.files.FileHandler.LogSpecies()
-            print("Using previously calculated BLAST results in %s" % continuationDir) 
+            print("Using previously calculated BLAST results in %s" % scripts.files.FileHandler.GetWorkingDirectory1_Read()) 
             options = CheckOptions(options)
             # 4.
-            seqsInfo = util.GetSeqsInfo(continuationDir, speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
+            seqsInfo = util.GetSeqsInfo(scripts.files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # 5.
             if options.speciesXMLInfoFN:   
                 speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
