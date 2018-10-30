@@ -134,16 +134,16 @@ class __Files_new_dont_manually_create__(object):
                        wd1, 
                        wd2,
                        base, 
-                       clustersFilename_pairs, 
-                       append_name=None,
-                       speciesTreeFN=None):
+                       clustersFilename_pairs,
+                       speciesTreeFN, 
+                       append_name=None):
         self.wd_base = wd1
         self.wd_trees = wd2
         self.rd1, self.wd_current = util.CreateNewPairedDirectories(base + "Results_" + ("" if append_name == "" else append_name + "_"), base + "WorkingDirectory_" + ("" if append_name == "" else append_name + "_"))
         self.rd2 = self.rd1
         self.clustersFilename = clustersFilename_pairs[:-len("_id_pairs.txt")]
         self.StartLog()
-        self.WriteToLog("Species Tree: %s\n" % self.speciesTreeRootedIDsFN)
+        self.WriteToLog("Species Tree: %s\n" % speciesTreeFN)
                                          
     # RefactorDS - this should just be the initialiser
     def CreateOutputDirectories(self, options, previous_files_locator, base_dir, fastaDir=None):
@@ -172,9 +172,9 @@ class __Files_new_dont_manually_create__(object):
             self.StartFromTrees(previous_files_locator.GetWD1(), 
                                 previous_files_locator.GetWDTrees(),
                                 base_dir, 
-                                previous_files_locator.clustersFilename_pairs, 
-                                options.name,
-                                options.speciesTreeFN if options.speciesTreeFN != None else previous_files_locator.GetSpeciesTreeFN())
+                                previous_files_locator.clustersFilename_pairs,
+                                options.speciesTreeFN if options.speciesTreeFN != None else previous_files_locator.GetSpeciesTreeFN(), 
+                                options.name)
 #            self.CreateOutputDirFromTrees(orthologuesDir, options.speciesTreeFN)
         elif options.qStartFromFasta:
             # But, by previous condition, not qStartFromBlast
@@ -591,10 +591,6 @@ class PreviousFilesLocator(object):
             return
         if not IsNewDirStructure(continuationDir): raise Unprocessable("Input directory structure is not processable as new structure")
         self.ProcessLog(continuationDir + "/Log.txt")
-        if options.qStartFromGroups:
-            pass
-        else:
-            raise NotImplementedError
         
     def ProcessLog(self, logFN):
         """
@@ -638,6 +634,12 @@ class PreviousFilesLocator(object):
 
     def GetWD1(self):
         return self.wd_base
+
+    def GetWDTrees(self):
+        return self.wd_trees
+        
+    def GetSpeciesTreeFN(self):
+        return self.wd_trees + "Species_Tree/SpeciesTree_rooted.txt" 
         
     def GetHomeForResults(self):
         return self.home_for_results
