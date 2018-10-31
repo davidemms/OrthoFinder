@@ -24,12 +24,9 @@
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com 
 
-nThreadsDefault = 16
-nAlgDefault = 1
 
 import os
 import sys
-import glob
 import time
 import numpy as np
 import subprocess
@@ -37,6 +34,9 @@ import datetime
 import Queue
 import multiprocessing as mp
 from collections import namedtuple
+
+nAlgDefault = 1
+nThreadsDefault = mp.cpu_count()
 
 import tree, parallel_task_manager
 
