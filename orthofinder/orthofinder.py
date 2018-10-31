@@ -877,7 +877,7 @@ class Options(object):#
         self.msa_program = None
         self.tree_program = None
         self.recon_method = "of_recon"
-        self.name = ""   # name to identify this set of results
+        self.name = None   # name to identify this set of results
         self.qDoubleBlast = True
         self.qPhyldog = False
         self.speciesXMLInfoFN = None
@@ -997,6 +997,7 @@ def ProcessArgs(program_caller):
                 print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
             options.name = args.pop(0)
+            while options.name.endswith("/"): options.name = options.name[:-1]
             if any([symbol in options.name for symbol in [" ", "/"]]): 
                 print("Invalid symbol for command line argument %s\n" % arg)
                 util.Fail()
@@ -1008,6 +1009,8 @@ def ProcessArgs(program_caller):
                 print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
             resultsDir_nonDefault = args.pop(0)
+            while resultsDir_nonDefault.endswith("/"): resultsDir_nonDefault = resultsDir_nonDefault[:-1]
+            resultsDir_nonDefault += "/"
             if os.path.exists(resultsDir_nonDefault):
                 print("ERROR: non-default output directory already exists: %s\n" % resultsDir_nonDefault)
                 util.Fail()
@@ -1155,11 +1158,7 @@ def ProcessArgs(program_caller):
         
     if options.qPhyldog and (not options.speciesTreeFN):
         print("ERROR: Phyldog currently needs a species tree to be provided")
-        util.Fail()         
-
-    if resultsDir_nonDefault != None and options.name != "":
-        print("ERROR: Incompatible arguments, -o (non-default output directory) and -n (name for OrthoFinder run)")
-        util.Fail()      
+        util.Fail()          
 
     if resultsDir_nonDefault != None and ((not options.qStartFromFasta) or options.qStartFromBlast):
         print("ERROR: Incompatible arguments, -o (non-default output directory) can only be used with a new OrthoFinder run using option '-f'")
@@ -1445,7 +1444,7 @@ def GetOrthologues(dirs, options, program_caller, orthogroupsResultsFilesString=
 def GetOrthologues_FromTrees(options):
     return orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.speciesTreeFN)
  
-def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_names=[], name = ""):
+def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_names=[]):
     """
     Process fasta files and return a Directory object with all paths completed.
     """
@@ -1554,7 +1553,7 @@ if __name__ == "__main__":
             speciesInfoObj, speciesToUse_names = ProcessPreviousFiles(continuationDir, options.qDoubleBlast)
             print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, continuationDir))
             # 3. 
-            speciesInfoObj = ProcessesNewFasta(fastaDir, speciesInfoObj, speciesToUse_names, options.name)
+            speciesInfoObj = ProcessesNewFasta(fastaDir, speciesInfoObj, speciesToUse_names)
             scripts.files.FileHandler.LogSpecies()
             options = CheckOptions(options)
             # 4.
@@ -1579,7 +1578,7 @@ if __name__ == "__main__":
         elif options.qStartFromFasta:
             # 3. 
             speciesInfoObj = None
-            speciesInfoObj = ProcessesNewFasta(fastaDir, name = options.name)
+            speciesInfoObj = ProcessesNewFasta(fastaDir)
             scripts.files.FileHandler.LogSpecies()
             options = CheckOptions(options)
             # 4

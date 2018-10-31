@@ -869,7 +869,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
 #            util.PrintTime("Do species tree for phyldog")
 #            spTreeFN_ids, spTreeUnrootedFN = db.SpeciesTreeOnly()
             if userSpeciesTree: 
-                userSpeciesTree = ConvertUserSpeciesTree(db.workingDir + "Trees_ids/", userSpeciesTree, ogSet.SpeciesDict())
+                userSpeciesTree = ConvertUserSpeciesTree(userSpeciesTree, ogSet.SpeciesDict(), files.FileHandler.GetSpeciesTreeUnrootedFN())
             util.PrintTime("Starting phyldog")
             species_tree_ids_labelled_phyldog = wrapper_phyldog.RunPhyldogAnalysis(files.FileHandler.GetPhyldogWorkingDirectory(), ogSet.OGs(), speciesToUse, nHighParallel)
     else:

@@ -241,8 +241,8 @@ def GetDirectoryName(baseDirName, i):
         return baseDirName + ("_%d" % i) + os.sep
 
 """Call GetNameForNewWorkingDirectory before a call to CreateNewWorkingDirectory to find out what directory will be created"""
-def CreateNewWorkingDirectory(baseDirectoryName):
-    dateStr = datetime.date.today().strftime("%b%d") 
+def CreateNewWorkingDirectory(baseDirectoryName, qDate=True):
+    dateStr = datetime.date.today().strftime("%b%d") if qDate else ""
     iAppend = 0
     newDirectoryName = GetDirectoryName(baseDirectoryName + dateStr, iAppend)
     while os.path.exists(newDirectoryName):
