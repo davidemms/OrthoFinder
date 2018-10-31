@@ -70,6 +70,7 @@ class __Files_new_dont_manually_create__(object):
         self.nondefaultPickleDir = None
         self.speciesTreeRootedIDsFN = None
         self.multipleRootedSpeciesTreesDir = None
+        self.species_ids_corrected = None
         # to be modified as appropriate
      
     """ ========================================================================================== """
@@ -164,8 +165,17 @@ class __Files_new_dont_manually_create__(object):
                                 clustersFilename_pairs,
                                 speciesTreeFN, 
                                 user_name=options.name)
+        if (options.qStartFromGroups or options.qStartFromTrees) and previous_files_locator.species_ids_lines != None:
+            # In only these cases, it's possible that the SpeciesIDs.txt file is out of sync and the version in the previous log should be used instead
+            self.CreateCorrectedSpeciesIDsFile(previous_files_locator.species_ids_lines)
+
+    def CreateCorrectedSpeciesIDsFile(self, species_ids_lines):
+        self.species_ids_corrected = self.wd_current + "SpeciesIDs.txt"
+        with open(self.species_ids_corrected, 'wb') as outfile:
+            outfile.write(species_ids_lines)
                                                       
     """ ========================================================================================== """
+       
        
     # RefactorDS - FileHandler
     def SetNondefaultPickleDir(self, d):
@@ -218,6 +228,8 @@ class __Files_new_dont_manually_create__(object):
         ========================================================================================== """
         
     def GetSpeciesIDsFN(self):
+        if self.species_ids_corrected != None:
+            return self.species_ids_corrected
         if self.wd_base == None: raise Exception("No wd1")
         return self.wd_base + "SpeciesIDs.txt"
         
@@ -483,6 +495,7 @@ class PreviousFilesLocator(object):
         self.wd_trees = None
         self.home_for_results = None
         self.speciesTreeRootedIDsFN = None
+        self.species_ids_lines = None
                 
     def GetHomeForResults(self):
         return self.home_for_results
@@ -521,6 +534,12 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
         """
         with open(logFN, 'rb') as infile:
             for line in infile:
+                if line.startswith("Species used:"):
+                    self.species_ids_lines = ""
+                    line = infile.next()
+                    while line.rstrip() != "":
+                        self.species_ids_lines += line
+                        line = infile.next()
                 wd_base_str = "WorkingDirectory_Base: "
                 wd_trees_str = "WorkingDirectory_Trees: "
                 clusters_str = "FN_Orthogroups: "
