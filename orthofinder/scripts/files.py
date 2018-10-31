@@ -76,7 +76,7 @@ class __Files_new_dont_manually_create__(object):
      
     """ ========================================================================================== """
     # RefactorDS - FileHandler
-    def CreateOutputDirFromStart_new(self, fasta_dir, base, append_name = ""):
+    def CreateOutputDirFromStart_new(self, fasta_dir, base, append_name = "", old_wd_base=None):
         """
         The intial difference will be that results will go in OrthoFinder/Results_DATE or USER_SPECIFIED/RESULTS_DATE
         whereas before they went in Results_DATE or USER_SPECIFIED.
@@ -87,8 +87,8 @@ class __Files_new_dont_manually_create__(object):
             - Create a new one?
         """
         self.rd1, self.wd_current = util.CreateNewPairedDirectories(base + "Results_" + ("" if append_name == "" else append_name + "_"), base + "WorkingDirectory_" + ("" if append_name == "" else append_name + "_"))
-        self.wd_base = self.wd_current
-        self.wd_trees = self.wd_base
+        self.wd_base = self.wd_current if old_wd_base == None else old_wd_base
+        self.wd_trees = self.wd_current
         print(self.rd1, self.wd_current)
         with open(self.rd1 + "Log.txt", 'wb'):
             pass
@@ -128,11 +128,25 @@ class __Files_new_dont_manually_create__(object):
         self.WriteToLog("Species Tree: %s\n" % speciesTreeFN)
                                          
     def CreateOutputDirectories(self, options, previous_files_locator, base_dir, fastaDir=None):
-        if options.qStartFromBlast: 
+        if options.qStartFromFasta and options.qStartFromBlast:
+            wd1 = previous_files_locator.GetStartFromBlast()
+            self.CreateOutputDirFromStart_new(fastaDir, base_dir, append_name=options.name, old_wd_base = wd1)
+        
+        elif options.qStartFromFasta:
+            self.CreateOutputDirFromStart_new(fastaDir, base_dir, append_name=options.name)
+            
+        elif options.qStartFromBlast: 
             wd1 = previous_files_locator.GetStartFromBlast()
             self.StartFromOrthogroupsOrSequenceSearch(wd1, 
                                                       base_dir,
                                                       append_name=options.name)  
+            
+        elif options.qStartFromGroups:
+            wd1, clustersFilename_pairs = previous_files_locator.GetStartFromOGs()
+            self.StartFromOrthogroupsOrSequenceSearch(wd1, 
+                                                      base_dir,
+                                                      clustersFilename_pairs, 
+                                                      append_name=options.name)
                                                       
         elif options.qStartFromTrees:
             wd1, clustersFilename_pairs, wd_trees, speciesTreeFN = previous_files_locator.GetStartFromTrees()
@@ -143,16 +157,6 @@ class __Files_new_dont_manually_create__(object):
                                 clustersFilename_pairs,
                                 speciesTreeFN, 
                                 options.name)
-                                
-        elif options.qStartFromFasta:
-            self.CreateOutputDirFromStart_new(fastaDir, base_dir, append_name=options.name)
-            
-        elif options.qStartFromGroups:
-            wd1, clustersFilename_pairs = previous_files_locator.GetStartFromOGs()
-            self.StartFromOrthogroupsOrSequenceSearch(wd1, 
-                                                      base_dir,
-                                                      clustersFilename_pairs, 
-                                                      append_name=options.name)
                                                       
     """ ========================================================================================== """
        
