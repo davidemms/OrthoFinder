@@ -1293,7 +1293,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast):
     if options.speciesXMLInfoFN:
         MCL.WriteOrthoXML(speciesXML, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml", speciesInfoObj.speciesToUse)
     util.PrintTime("Done orthogroups")
-    scripts.files.FileHandler.LogWorkingDirectoryOGs(True)
+    scripts.files.FileHandler.LogOGs()
     return statsFile, summaryText, orthogroupsResultsFilesString
 
 # 0

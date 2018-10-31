@@ -80,13 +80,10 @@ class __Files_new_dont_manually_create__(object):
         """
         The intial difference will be that results will go in OrthoFinder/Results_DATE or USER_SPECIFIED/RESULTS_DATE
         whereas before they went in Results_DATE or USER_SPECIFIED.
-        
-        Question, what if there is an OrthoFinder directory in fasta_dir already?
-        Options:
-            - * Use the same one? In which case WorkingDir must be kept completely separate. ANS. Yes, design is that correct files are identified
-            - Create a new one?
         """
-        self.rd1, self.wd_current = util.CreateNewPairedDirectories(base + "Results_" + ("" if append_name == "" else append_name + "_"), base + "WorkingDirectory_" + ("" if append_name == "" else append_name + "_"))
+        self.rd1 = util.CreateNewWorkingDirectory(base + "Results_" + ("" if append_name == "" else append_name + "_"))
+        self.wd_current = self.rd1 + "WorkingDirectory/"
+        os.mkdir(self.wd_current)
         self.wd_base = self.wd_current if old_wd_base == None else old_wd_base
         self.wd_trees = self.wd_current
         print(self.rd1, self.wd_current)
@@ -105,7 +102,9 @@ class __Files_new_dont_manually_create__(object):
         if self.wd_base != None: raise Exception("Changing WorkingDirectory1")
         self.wd_base = wd_base
         if clustersFilename_pairs != None: self.clustersFilename = clustersFilename_pairs[:-len("_id_pairs.txt")]
-        self.rd1, self.wd_current = util.CreateNewPairedDirectories(base + "Results_" + ("" if append_name == "" else append_name + "_"), base + "WorkingDirectory_" + ("" if append_name == "" else append_name + "_"))
+        self.rd1 = util.CreateNewWorkingDirectory(base + "Results_" + ("" if append_name == "" else append_name + "_"))
+        self.wd_current = self.rd1 + "WorkingDirectory/"
+        os.mkdir(self.wd_current)
         with open(self.rd1 + "Log.txt", 'wb'):
             pass
         self.wd_trees = self.wd_current
@@ -121,7 +120,9 @@ class __Files_new_dont_manually_create__(object):
                        append_name=None):
         self.wd_base = wd1
         self.wd_trees = wd2
-        self.rd1, self.wd_current = util.CreateNewPairedDirectories(base + "Results_" + ("" if append_name == "" else append_name + "_"), base + "WorkingDirectory_" + ("" if append_name == "" else append_name + "_"))
+        self.rd1 = util.CreateNewWorkingDirectory(base + "Results_" + ("" if append_name == "" else append_name + "_"))
+        self.wd_current = self.rd1 + "WorkingDirectory/"
+        os.mkdir(self.wd_current)
         self.rd2 = self.rd1
         self.clustersFilename = clustersFilename_pairs[:-len("_id_pairs.txt")]
         self.StartLog()
@@ -173,10 +174,7 @@ class __Files_new_dont_manually_create__(object):
         return d
             
     """ Standard Methods
-        ========================================================================================== """               
-    def WriteToLog(self, text, qWithTime=False):
-        pass
-        
+        ========================================================================================== """                       
     def LogSpecies(self):
         text = "Species used: \n"
         fn = self.GetSpeciesIDsFN()
@@ -268,16 +266,6 @@ class __Files_new_dont_manually_create__(object):
     def GetClustersFN(self):
         return self.clustersFilename + "_id_pairs.txt"
         
-    def GetResultsFNBase(self):
-        if self.rd1 == None: 
-            raise Exception("No rd1")
-        if self.iResultsVersion == None:
-            raise Exception("Base results identifier has not been created")
-        return self.rd1 + "Orthogroups" + ("" if self.iResultsVersion == 0 else "_%d" % self.iResultsVersion)
-        
-    def GetOGsStatsResultsDirectory(self):
-        return self.GetResultsDirectory1() 
-        
     """ Orthologues files
         ========================================================================================== """
         
@@ -289,17 +277,9 @@ class __Files_new_dont_manually_create__(object):
         
     def GetResultsTreesDir(self):
         return self.rd2 + "Gene_Trees/"
-        
-    def GetOlogStatsDir(self):
-        return self.rd2
     
     def GetSuspectGenesDir(self):
         d = self.rd2 + "Phylogenetically_Misplaced_Genes/"
-        if not os.path.exists(d): os.mkdir(d)
-        return d
-        
-    def GetPutativeXenelogsDir(self):
-        d = self.rd2 + "Putative_Xenologues/"
         if not os.path.exists(d): os.mkdir(d)
         return d
     
@@ -345,21 +325,6 @@ class __Files_new_dont_manually_create__(object):
     def GetSpeciesTreeIDsRootedFN(self):
         return self.speciesTreeRootedIDsFN
         
-    def GetSpeciesTreeResultsFN(self, i, qUnique):
-        """
-        The results species tree (rooted, accessions, support values)
-        i: index for species tree, starting at 0
-        qUnique: bool, has a unique root been identified (as it may not be known exatly which branch the root belongs on)
-        E.g. if there were just one species tree, the correct call would be GetSpeciesTreeResultsFN(0,True)
-        """
-        if qUnique:
-            return self.rd2 + "SpeciesTree_rooted.txt"
-        else:
-            if not self.multipleRootedSpeciesTreesDir:
-                self.multipleRootedSpeciesTreesDir = self.rd2 + "Potential_Rooted_Species_Trees/"
-                if not os.path.exists(self.multipleRootedSpeciesTreesDir): os.mkdir(self.multipleRootedSpeciesTreesDir)
-            return self.multipleRootedSpeciesTreesDir + "SpeciesTree_rooted_at_outgroup_%d.txt" % i
-        
     def GetSpeciesTreeUserSupplied_idsFN(self):
         return self.wd_current + "SpeciesTree_UserSupplied_Rooted_IDs.txt"
         
@@ -396,10 +361,6 @@ class __Files_new_dont_manually_create__(object):
             
     def GetPhyldogOGResultsTreeFN(self, i):
         return self.wd_current + "phyldog/OG%07d.ReconciledTree.txt" % i
-            
-    def GetDuplicationsFN(self):
-        return self.rd2 + "Duplications.csv"
-        
     
     """ ========================================================================================== """
          
@@ -429,14 +390,11 @@ class __Files_new_dont_manually_create__(object):
         self.WriteToLog("Started OrthoFinder version " + util.version + "\n", True)
         text = "Command Line: " + " ".join(sys.argv) + "\n\n"
         text += "WorkingDirectory_Base: %s\n" % self.wd_base
-        if self.clustersFilename != None: text += "Orthogroups: %s\n" % self.clustersFilename
         self.WriteToLog(text)
+        if self.clustersFilename != None:self.LogOGs()
     
-    def LogWorkingDirectoryOGs(self, qCreatedThisRun):
-        if qCreatedThisRun:
-            self.WriteToLog("WorkingDirectory_OGs: %s\n" % self.wd_current)
-        else:
-            self.WriteToLog("WorkingDirectory_OGs: %s\n" % self.wd_base)
+    def LogOGs(self):
+        self.WriteToLog("FN_Orthogroups: %s\n" % (self.clustersFilename + "_id_pairs.txt"))
     
     def LogWorkingDirectoryTrees(self):
         self.WriteToLog("WorkingDirectory_Trees: %s\n" % self.wd2)
@@ -486,11 +444,7 @@ class __Files_new_dont_manually_create__(object):
     def GetPutativeXenelogsDir(self):
         d = self.rd2 + "Phylogenetically_Misplaced_Genes/"
         if not os.path.exists(d): os.mkdir(d)
-        return d
-        
-    def GetOlogStatsDir(self):
-        return self.GetOGsStatsResultsDirectory()
-    
+        return d    
             
     def GetSpeciesTreeResultsFN(self, i, qUnique):
         """
@@ -564,38 +518,43 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
         """
         with open(logFN, 'rb') as infile:
             for line in infile:
-                wd_base = "WorkingDirectory_OGs: "
-                wd_trees = "WorkingDirectory_Trees: "
-                if line.startswith(wd_base): 
-                    self.wd_base = line.rstrip()[len(wd_base):]
+                wd_base_str = "WorkingDirectory_Base: "
+                wd_trees_str = "WorkingDirectory_Trees: "
+                clusters_str = "FN_Orthogroups: "
+                if line.startswith(wd_base_str): 
+                    self.wd_base = line.rstrip()[len(wd_base_str):]
                     if not os.path.exists(self.wd_base):
                         # try to see if it's a relative directory to current one
-                        self.wd_base = os.path.split(logFN)[0] + "/../" + os.path.split(self.wd_base[:-1])[1] + "/"
+                        path, d_wd = os.path.split(self.wd_base[:-1])
+                        path, d_res = os.path.split(path)
+                        self.wd_base = os.path.split(logFN)[0] + ("/../%s/%s/" % (d_res, d_wd))
                         if not os.path.exists(self.wd_base):
                             print("ERROR: Missing directory: %s" % self.wd_base)
                             util.Fail()
-                    self._GetOGsFile()
-                if line.startswith(wd_trees): 
-                    self.wd_trees = line.rstrip()[len(wd_trees):]
+                if line.startswith(clusters_str): 
+                    clusters_fn_full_path = line.rstrip()[len(clusters_str):]
+                    self.clustersFilename_pairs = clusters_fn_full_path 
+                    if not os.path.exists(self.clustersFilename_pairs):
+                        # try to see if it's a relative directory to current one
+                        path, clusters_fn = os.path.split(self.clustersFilename_pairs)
+                        path, d_wd = os.path.split(path)
+                        path, d_res = os.path.split(path)
+                        self.clustersFilename_pairs = os.path.split(logFN)[0] + ("/../%s/%s/%s" %(d_res, d_wd, clusters_fn))
+                        if not os.path.exists(self.clustersFilename_pairs):
+                            print("ERROR: Missing orthogroups file: %s or %s" % (self.clustersFilename_pairs, clusters_fn_full_path))
+                            util.Fail()
+#                    self._GetOGsFile(wd_ogs_path)
+                if line.startswith(wd_trees_str): 
+                    self.wd_trees = line.rstrip()[len(wd_trees_str):]
                     self.speciesTreeRootedIDsFN = self.wd_trees + "Species_Tree/SpeciesTree_rooted.txt" 
                     if not os.path.exists(self.wd_trees):
                         # try to see if it's a relative directory to current one
-                        self.wd_base = os.path.split(logFN)[0] + "/../" + os.path.split(self.wd_trees[:-1])[1] + "/"
+                        path, d_wd = os.path.split(self.wd_trees[:-1])
+                        path, d_res = os.path.split(path)
+                        self.wd_trees = os.path.split(logFN)[0] + ("/../%s/%s/" % (d_res, d_wd))
                         if not os.path.exists(self.wd_trees):
                             print("ERROR: Missing directory: %s" % self.wd_trees)
-                            util.Fail()
-            
-    def _GetOGsFile(self):
-        """returns the WorkingDirectory, ResultsDirectory and clusters_id_pairs filename"""
-        clustersFiles = glob.glob(self.wd_base + "clusters_OrthoFinder_*.txt_id_pairs.txt")
-        if len(clustersFiles) == 0:
-            print("ERROR: Didn't find a clusters_OrthoFinder_*.txt_id_pairs.txt file in " + self.wd_base)
-            util.Fail()
-        if len(clustersFiles) > 1:
-            print("ERROR: Found more than one clusters_OrthoFinder_*.txt_id_pairs.txt files")
-            util.Fail()
-        self.clustersFilename_pairs = clustersFiles[0] 
-        
+                            util.Fail()       
     
 """ ************************************************************************************************************************* """
 

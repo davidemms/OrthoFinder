@@ -676,7 +676,7 @@ def WriteOrthologuesStats(ogSet, nOrtho_sp):
     """
     speciesToUse = ogSet.speciesToUse
     speciesDict = ogSet.SpeciesDict()
-    d = files.FileHandler.GetOlogStatsDir()
+    d = files.FileHandler.GetOGsStatsResultsDirectory()
     WriteOrthologuesMatrix(d + "OrthologuesStats_Totals.csv", nOrtho_sp.n, speciesToUse, speciesDict)
     WriteOrthologuesMatrix(d + "OrthologuesStats_one-to-one.csv", nOrtho_sp.n_121, speciesToUse, speciesDict)
     WriteOrthologuesMatrix(d + "OrthologuesStats_one-to-many.csv", nOrtho_sp.n_12m, speciesToUse, speciesDict)
