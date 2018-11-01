@@ -682,6 +682,35 @@ def WriteOrthologuesStats(ogSet, nOrtho_sp):
     WriteOrthologuesMatrix(d + "OrthologuesStats_one-to-many.tsv", nOrtho_sp.n_12m, speciesToUse, speciesDict)
     WriteOrthologuesMatrix(d + "OrthologuesStats_many-to-one.tsv", nOrtho_sp.n_m21, speciesToUse, speciesDict)
     WriteOrthologuesMatrix(d + "OrthologuesStats_many-to-many.tsv", nOrtho_sp.n_m2m, speciesToUse, speciesDict)
+    # Duplications
+    nodeCount = defaultdict(int)
+    nodeCount_50 = defaultdict(int)
+    ogCount = defaultdict(int)
+    ogCount_50 = defaultdict(int)
+    with open(files.FileHandler.GetDuplicationsFN(), 'rb') as infile:
+        reader = csv.reader(infile, delimiter="\t")
+        reader.next()
+        for og, node, _, support, _, _, _ in reader:
+            support = float(support)
+            nodeCount[node] += 1
+            ogCount[og] += 1
+            if support >= 0.5:
+                nodeCount_50[node] += 1
+                ogCount_50[og] += 1
+    with open(d + "Duplications_per_Species_Tree_Node.tsv", 'wb') as outfile:
+        writer = csv.writer(outfile, delimiter="\t")
+        writer.writerow(["Species Tree Node", "Duplications (all)", "Duplications (50% support)"])
+#        max_node = max([int(s[1:]) for s in nodeCount.keys()])    # Get largest node number
+        for node in nodeCount:
+            writer.writerow([node, nodeCount[node], nodeCount_50[node]])
+    with open(d + "Duplications_per_Orthogroup.tsv", 'wb') as outfile:
+        writer = csv.writer(outfile, delimiter="\t")
+        writer.writerow(["Orthogroup", "Duplications (all)", "Duplications (50% support)"])
+        max_og = max([int(s[2:]) for s in ogCount.keys()]) 
+        pat = files.FileHandler.baseOgFormat 
+        for i in xrange(max_og + 1):
+            og = pat % i
+            writer.writerow([og, ogCount[og], ogCount_50[og]])
 
 def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
     speciesDict = ogSet.SpeciesDict()
