@@ -264,10 +264,14 @@ class TreesForOrthogroups(object):
     def GetTreeFilename(self, iOG, qResults=False):
         return files.FileHandler.GetOGsTreeFN(iOG, qResults)
         
-    def WriteFastaFiles(self, fastaWriter, ogs, idDict):
-        for iOg, og in enumerate(ogs):
-            fastaWriter.WriteSeqsToFasta_withNewAccessions(og, self.GetFastaFilename(iOg, True), idDict)
-            fastaWriter.WriteSeqsToFasta(og, self.GetFastaFilename(iOg))
+    def WriteFastaFiles(self, fastaWriter, ogs, idDict, qBoth):
+        # The results ones are now written by default after orthogroups, check they're not already there
+        if not os.path.exists(self.GetFastaFilename(0, True)):
+            for iOg, og in enumerate(ogs):
+                fastaWriter.WriteSeqsToFasta_withNewAccessions(og, self.GetFastaFilename(iOg, True), idDict)
+        if qBoth: 
+            for iOg, og in enumerate(ogs):
+                fastaWriter.WriteSeqsToFasta(og, self.GetFastaFilename(iOg))
               
     def GetAlignmentCommandsAndNewFilenames(self, ogs):
 #        if self.msa_program != "mafft":
@@ -299,7 +303,7 @@ class TreesForOrthogroups(object):
         
         # 1.
         fastaWriter = FastaWriter(files.FileHandler.GetSpeciesSeqsDir())
-        self.WriteFastaFiles(fastaWriter, ogs, idDict)
+        self.WriteFastaFiles(fastaWriter, ogs, idDict, True)
         if qStopAfterSeqs: return resultsDirsFullPath
 
         # 3

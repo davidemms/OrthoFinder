@@ -1287,12 +1287,23 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast):
     idsDict = MCL.WriteOrthogroupFiles(ogs, [scripts.files.FileHandler.GetSequenceIDsFN()], resultsBaseFilename, clustersFilename_pairs)
     speciesNamesDict = SpeciesNameDict(scripts.files.FileHandler.GetSpeciesIDsFN())
     orthogroupsResultsFilesString = MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesInfoObj.speciesToUse, resultsBaseFilename)
+    
+    # Write Orthogroup FASTA files    
+    ogSet = scripts.orthologues.OrthoGroupsSet(scripts.files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll, idExtractor = scripts.util.FirstWordExtractor)
+    treeGen = scripts.trees_msa.TreesForOrthogroups(None, None, None)
+    fastaWriter = scripts.trees_msa.FastaWriter(scripts.files.FileHandler.GetSpeciesSeqsDir())
+    d_seqs = scripts.files.FileHandler.GetResultsSeqsDir()
+    if not os.path.exists(d_seqs): os.mkdir(d_seqs)
+    treeGen.WriteFastaFiles(fastaWriter, ogSet.OGs(qInclAll=True), idsDict, False)
+    orthogroupsResultsFilesString += ("\nSequences for orthogroups:\n   %s\n" % scripts.files.FileHandler.GetResultsSeqsDir())
+    
     print(orthogroupsResultsFilesString)
     summaryText, statsFile = Stats(ogs, speciesNamesDict, speciesInfoObj.speciesToUse, scripts.files.FileHandler.iResultsVersion)
     if options.speciesXMLInfoFN:
         MCL.WriteOrthoXML(speciesXML, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml", speciesInfoObj.speciesToUse)
     util.PrintTime("Done orthogroups")
     scripts.files.FileHandler.LogOGs()
+    
     return statsFile, summaryText, orthogroupsResultsFilesString
 
 # 0
@@ -1639,7 +1650,7 @@ if __name__ == "__main__":
             raise NotImplementedError
             ptm = parallel_task_manager.ParallelTaskManager_singleton()
             ptm.Stop()
-        scripts.files.FileHandler.WriteToLog("OrthoFinder run completed\n\n", True)
+        scripts.files.FileHandler.WriteToLog("\nOrthoFinder run completed\n\n", True)
     except Exception as e:
         ptm = parallel_task_manager.ParallelTaskManager_singleton()
         ptm.Stop()

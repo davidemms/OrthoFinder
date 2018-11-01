@@ -130,7 +130,6 @@ class __Files_new_dont_manually_create__(object):
             self.rd1 = util.CreateNewWorkingDirectory(base + "Results_" + user_name, qDate=False)
         self.wd_current = self.rd1 + "WorkingDirectory/"
         os.mkdir(self.wd_current)
-        self.rd2 = self.rd1
         self.clustersFilename = clustersFilename_pairs[:-len("_id_pairs.txt")]
         self.StartLog()
         self.WriteToLog("Species Tree: %s\n" % speciesTreeFN)
@@ -192,7 +191,7 @@ class __Files_new_dont_manually_create__(object):
     """ Standard Methods
         ========================================================================================== """                       
     def LogSpecies(self):
-        text = "Species used: \n"
+        text = "\nSpecies used: \n"
         fn = self.GetSpeciesIDsFN()
         with open(fn, 'rb') as infile:
             text += "".join(infile.readlines())
@@ -214,13 +213,13 @@ class __Files_new_dont_manually_create__(object):
         return self.rd1 
         
     def GetResultsDirectory2(self):
-        if self.rd2 == None: raise Exception("No rd2")
-        return self.rd2 
+        if self.rd1 == None: raise Exception("No rd1")
+        return self.rd1 
         
     def GetOrthologuesDirectory(self):
         """"Where the directories of species orthologues are"""
-        if self.rd2 == None: raise Exception("No rd2")
-        d = self.rd2 + "Orthologues/"
+        if self.rd1 == None: raise Exception("No rd1")
+        d = self.rd1 + "Orthologues/"
         if not os.path.exists(d): os.mkdir(d)
         return d
         
@@ -287,40 +286,35 @@ class __Files_new_dont_manually_create__(object):
         ========================================================================================== """
         
     def GetResultsSeqsDir(self):
-        return self.rd2 + "Sequences/"
+        return self.rd1 + "Orthogroup_Sequences/"
         
     def GetResultsAlignDir(self):
-        return self.rd2 + "MultipleSequenceAlignments/"
+        return self.rd1 + "MultipleSequenceAlignments/"
         
     def GetResultsTreesDir(self):
-        return self.rd2 + "Gene_Trees/"
-    
-    def GetSuspectGenesDir(self):
-        d = self.rd2 + "Phylogenetically_Misplaced_Genes/"
-        if not os.path.exists(d): os.mkdir(d)
-        return d
+        return self.rd1 + "Gene_Trees/"
     
     def GetOGsSeqFN(self, iOG, qResults=False):
         if qResults:
-            return self.rd2 + "Sequences/" + (self.baseOgFormat % iOG) + ".fa"
+            return self.rd1 + "Orthogroup_Sequences/" + (self.baseOgFormat % iOG) + ".fa"
         else:
             return self.wd_current + "Sequences_ids/" + (self.baseOgFormat % iOG) + ".fa"
             
     def GetOGsAlignFN(self, iOG, qResults=False):
         if qResults:
-            return self.rd2 + "MultipleSequenceAlignments/" + (self.baseOgFormat % iOG) + ".fa"
+            return self.rd1 + "MultipleSequenceAlignments/" + (self.baseOgFormat % iOG) + ".fa"
         else:
             return self.wd_current + "Alignments_ids/" + (self.baseOgFormat % iOG) + ".fa"
             
     def GetOGsTreeFN(self, iOG, qResults=False):
         if qResults:
-            return self.rd2 + "Gene_Trees/" + (self.baseOgFormat % iOG) + "_tree.txt"
+            return self.rd1 + "Gene_Trees/" + (self.baseOgFormat % iOG) + "_tree.txt"
         else:
             return self.wd_current + "Trees_ids/" + (self.baseOgFormat % iOG) + "_tree_id.txt"   
         
     def GetSpeciesTreeConcatAlignFN(self, qResults=False):
         if qResults:
-            return self.rd2 + "MultipleSequenceAlignments/" + "SpeciesTreeAlignment.fa"
+            return self.rd1 + "MultipleSequenceAlignments/" + "SpeciesTreeAlignment.fa"
         else:
             return self.wd_current + "Alignments_ids/SpeciesTreeAlignment.fa"  
         
@@ -356,20 +350,20 @@ class __Files_new_dont_manually_create__(object):
             
     def GetOGsTreeDir(self, qResults=False):
         if qResults:
-            return self.rd2 + "Gene_Trees/" 
+            return self.rd1 + "Gene_Trees/" 
         else:
             return self.wd_trees + "Trees_ids/" 
             
     def GetOGsReconTreeDir(self, qResults=False):
         if qResults:
-            d = self.rd2 + "Resolved_Gene_Trees/" 
+            d = self.rd1 + "Resolved_Gene_Trees/" 
             if not os.path.exists(d): os.mkdir(d)
             return d
         else:
             raise NotImplemented() 
             
     def GetOGsReconTreeFN(self, iOG):
-        return self.rd2 + "Resolved_Gene_Trees/OG%07d_tree.txt" % iOG
+        return self.rd1 + "Resolved_Gene_Trees/OG%07d_tree.txt" % iOG
             
     def GetPhyldogWorkingDirectory(self):
         d = self.wd_current + "phyldog/"
@@ -424,17 +418,16 @@ class __Files_new_dont_manually_create__(object):
         """
         # RefactorDS - need to change where it puts things
         if self.rd1 == None: raise Exception("No rd1") 
-        self.rd2 = self.rd1   
         self.wd2 = self.wd_current 
         self.wd_trees = self.wd_current
-        os.mkdir(self.rd2 + "Orthologues/")
+        os.mkdir(self.rd1 + "Orthologues/")
         if tree_generation_method == "msa":
-            for i, d in enumerate([self.rd2 + "Sequences/", self.wd_current + "Sequences_ids/", self.rd2 + "MultipleSequenceAlignments/", self.wd_current + "Alignments_ids/", self.rd2 + "Gene_Trees/", self.wd_current + "Trees_ids/"]):
+            for i, d in enumerate([self.GetResultsSeqsDir(), self.wd_current + "Sequences_ids/", self.GetResultsAlignDir(), self.wd_current + "Alignments_ids/", self.GetResultsTreesDir(), self.wd_current + "Trees_ids/"]):
                 if stop_after == "seqs" and i == 2: break 
                 if stop_after == "align" and i == 4: break 
                 if not os.path.exists(d): os.mkdir(d)
         elif tree_generation_method == "dendroblast":
-            for i, d in enumerate([self.wd_current + "Distances/", self.rd2 + "Gene_Trees/", self.wd_current + "Trees_ids/"]):
+            for i, d in enumerate([self.wd_current + "Distances/", self.GetResultsTreesDir(), self.wd_current + "Trees_ids/"]):
                 if not os.path.exists(d): os.mkdir(d)
     
     def GetResultsFNBase(self):
@@ -455,9 +448,14 @@ class __Files_new_dont_manually_create__(object):
         d = self.rd1 + "Gene_Duplication_Events/"
         if not os.path.exists(d): os.mkdir(d)
         return d + "Duplications.csv"
+    
+    def GetSuspectGenesDir(self):
+        d = self.rd1 + "Phylogenetically_Misplaced_Genes/"
+        if not os.path.exists(d): os.mkdir(d)
+        return d
         
     def GetPutativeXenelogsDir(self):
-        d = self.rd2 + "Phylogenetically_Misplaced_Genes/"
+        d = self.rd1 + "Putative_Xenologs/"
         if not os.path.exists(d): os.mkdir(d)
         return d    
             
@@ -468,7 +466,7 @@ class __Files_new_dont_manually_create__(object):
         qUnique: bool, has a unique root been identified (as it may not be known exatly which branch the root belongs on)
         E.g. if there were just one species tree, the correct call would be GetSpeciesTreeResultsFN(0,True)
         """
-        d = self.rd2 + "Species_Tree/"
+        d = self.rd1 + "Species_Tree/"
         if not os.path.exists(d): os.mkdir(d)
         if qUnique:
             return d + "SpeciesTree_rooted.txt"
