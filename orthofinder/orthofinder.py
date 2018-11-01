@@ -643,7 +643,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
     filename_sp = ogStatsResultsDir +  "Statistics_PerSpecies" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
     filename_sum = ogStatsResultsDir +  "Statistics_Overall" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
     filename_overlap = ogStatsResultsDir +  "Orthogroups_SpeciesOverlaps" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
-    filename_single_copy = ogStatsResultsDir +  "SingleCopyOrthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".txt"
+    filename_single_copy = scripts.files.FileHandler.GetResultsFNBase() + "_SingleCopyOrthologues.txt"
     percentFormat = "%0.1f"
     with open(filename_sp, 'wb') as outfile_species, open(filename_sum, 'wb') as outfile_sum:
         writer_sp = csv.writer(outfile_species, delimiter="\t")
@@ -719,7 +719,14 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
         writer_sum.writerow(["Number of single-copy orthogroups", nSingleCopy])
         with open(filename_single_copy, 'wb') as outfile_singlecopy:
             outfile_singlecopy.write("\n".join(["OG%07d" % i_ for i_ in singleCopyOGs]))
-        
+        # Link single-copy orthologues
+        f =  scripts.files.FileHandler.GetOGsSeqFN
+        in_fn = [f(i, True) for i in singleCopyOGs]
+        g_fmt = scripts.files.FileHandler.GetResultsSeqsDir_SingleCopy() + scripts.files.FileHandler.baseOgFormat + ".fa"
+        out_fn =[g_fmt % i for i in singleCopyOGs]
+        for i, o in zip(in_fn, out_fn):
+            os.symlink(i, o)
+            
         # Results filenames
         writer_sum.writerow(["Date", str(datetime.datetime.now()).split()[0]])
         writer_sum.writerow(["Orthogroups file", "Orthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"])

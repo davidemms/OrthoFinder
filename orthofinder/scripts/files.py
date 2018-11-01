@@ -284,6 +284,11 @@ class __Files_new_dont_manually_create__(object):
         
     """ Orthologues files
         ========================================================================================== """
+    
+    def GetResultsSeqsDir_SingleCopy(self):
+        d = self.GetResultsSeqsDir() + "SingleCopyOrthologues/"
+        if not os.path.exists(d): os.mkdir(d)
+        return d        
         
     def GetResultsSeqsDir(self):
         return self.rd1 + "Orthogroup_Sequences/"
