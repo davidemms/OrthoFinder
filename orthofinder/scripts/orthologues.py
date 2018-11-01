@@ -703,6 +703,14 @@ def WriteOrthologuesStats(ogSet, nOrtho_sp):
 #        max_node = max([int(s[1:]) for s in nodeCount.keys()])    # Get largest node number
         for node in nodeCount:
             writer.writerow([node, nodeCount[node], nodeCount_50[node]])
+    # Write on species tree
+    in_tree_fn = files.FileHandler.GetSpeciesTreeResultsFN(0, True)[:-4] + "_node_labels.txt"
+    out_tree_fn = os.path.split(files.FileHandler.GetDuplicationsFN())[0] + "/SpeciesTree_Gene_Duplications_0.5_Support.txt"
+    t = tree.Tree(in_tree_fn, format=1)
+    for n in t.traverse():
+        n.name = n.name + "_" + str(nodeCount_50[n.name])
+    with open(out_tree_fn, 'wb') as outfile:
+        outfile.write(t.write(format=1)[:-1] + t.name + ";")
     with open(d + "Duplications_per_Orthogroup.tsv", 'wb') as outfile:
         writer = csv.writer(outfile, delimiter="\t")
         writer.writerow(["Orthogroup", "Duplications (all)", "Duplications (50% support)"])
