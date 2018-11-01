@@ -677,11 +677,11 @@ def WriteOrthologuesStats(ogSet, nOrtho_sp):
     speciesToUse = ogSet.speciesToUse
     speciesDict = ogSet.SpeciesDict()
     d = files.FileHandler.GetOGsStatsResultsDirectory()
-    WriteOrthologuesMatrix(d + "OrthologuesStats_Totals.csv", nOrtho_sp.n, speciesToUse, speciesDict)
-    WriteOrthologuesMatrix(d + "OrthologuesStats_one-to-one.csv", nOrtho_sp.n_121, speciesToUse, speciesDict)
-    WriteOrthologuesMatrix(d + "OrthologuesStats_one-to-many.csv", nOrtho_sp.n_12m, speciesToUse, speciesDict)
-    WriteOrthologuesMatrix(d + "OrthologuesStats_many-to-one.csv", nOrtho_sp.n_m21, speciesToUse, speciesDict)
-    WriteOrthologuesMatrix(d + "OrthologuesStats_many-to-many.csv", nOrtho_sp.n_m2m, speciesToUse, speciesDict)
+    WriteOrthologuesMatrix(d + "OrthologuesStats_Totals.tsv", nOrtho_sp.n, speciesToUse, speciesDict)
+    WriteOrthologuesMatrix(d + "OrthologuesStats_one-to-one.tsv", nOrtho_sp.n_121, speciesToUse, speciesDict)
+    WriteOrthologuesMatrix(d + "OrthologuesStats_one-to-many.tsv", nOrtho_sp.n_12m, speciesToUse, speciesDict)
+    WriteOrthologuesMatrix(d + "OrthologuesStats_many-to-one.tsv", nOrtho_sp.n_m21, speciesToUse, speciesDict)
+    WriteOrthologuesMatrix(d + "OrthologuesStats_many-to-many.tsv", nOrtho_sp.n_m2m, speciesToUse, speciesDict)
 
 def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
     speciesDict = ogSet.SpeciesDict()

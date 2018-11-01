@@ -232,9 +232,9 @@ class MCL:
         ogs_ints = [[map(int, sequence.split("_")) for sequence in og] for og in ogs]
     
         # write out
-        outputFilename = resultsBaseFilename + ".csv"
-        outputFilename_counts = resultsBaseFilename + ".GeneCount.csv"
-        singleGeneFilename = resultsBaseFilename + "_UnassignedGenes.csv"
+        outputFilename = resultsBaseFilename + ".tsv"
+        outputFilename_counts = resultsBaseFilename + ".GeneCount.tsv"
+        singleGeneFilename = resultsBaseFilename + "_UnassignedGenes.tsv"
         with open(outputFilename, 'wb') as outputFile, open(singleGeneFilename, 'wb') as singleGeneFile, open(outputFilename_counts, 'wb') as outFile_counts:
             fileWriter = csv.writer(outputFile, delimiter="\t")
             fileWriter_counts = csv.writer(outFile_counts, delimiter="\t")
@@ -640,9 +640,9 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
     properOGs = [og for og in allOgs if len(og) > 1]
     allGenes = [g for og in allOgs for g in og]
     ogStatsResultsDir = scripts.files.FileHandler.GetOGsStatsResultsDirectory()
-    filename_sp = ogStatsResultsDir +  "Statistics_PerSpecies" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
-    filename_sum = ogStatsResultsDir +  "Statistics_Overall" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
-    filename_overlap = ogStatsResultsDir +  "Orthogroups_SpeciesOverlaps" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"
+    filename_sp = ogStatsResultsDir +  "Statistics_PerSpecies" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".tsv"
+    filename_sum = ogStatsResultsDir +  "Statistics_Overall" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".tsv"
+    filename_overlap = ogStatsResultsDir +  "Orthogroups_SpeciesOverlaps" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".tsv"
     filename_single_copy = scripts.files.FileHandler.GetResultsFNBase() + "_SingleCopyOrthologues.txt"
     percentFormat = "%0.1f"
     with open(filename_sp, 'wb') as outfile_species, open(filename_sum, 'wb') as outfile_sum:
@@ -729,8 +729,8 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
             
         # Results filenames
         writer_sum.writerow(["Date", str(datetime.datetime.now()).split()[0]])
-        writer_sum.writerow(["Orthogroups file", "Orthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".csv"])
-        writer_sum.writerow(["Unassigned genes file", "Orthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + "_UnassignedGenes.csv"])
+        writer_sum.writerow(["Orthogroups file", "Orthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".tsv"])
+        writer_sum.writerow(["Unassigned genes file", "Orthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + "_UnassignedGenes.tsv"])
         writer_sum.writerow(["Per-species statistics", os.path.split(filename_sp)[1]])
         writer_sum.writerow(["Overall statistics", os.path.split(filename_sum)[1]])
         writer_sum.writerow(["Orthogroups shared between species", os.path.split(filename_overlap)[1]])

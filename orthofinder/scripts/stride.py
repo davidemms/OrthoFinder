@@ -631,7 +631,7 @@ def WriteResults(species_tree_fn_or_text, roots, S, clades, clusters_counter, ou
         else:
             p = 0.
         table[node.name] = [node.name, "X" if (clade in roots or anticlade in roots) else "", "%0.1f%%" % (100.*p) , X, clusters_counter[y]]
-    with open(output_dir + "Duplication_counts.csv", 'wb') as outfile:
+    with open(output_dir + "Duplication_counts.tsv", 'wb') as outfile:
         writer = csv.writer(outfile, delimiter="\t")
         writer.writerow(["Branch", "MP Root", "Probability", "Duplications supporting clade", "Duplications supporting opposite clade"])
         qSingle = len(thisRoot) == 1

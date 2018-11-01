@@ -388,7 +388,7 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
     for i in xrange(nSpecies):
         sp0 = str(iSpeciesToUse[i])
         if qContainsSuspectOlogs: 
-            outfile1_sus = open(dSuspect + "%s.csv" % speciesDict[sp0], 'ab')
+            outfile1_sus = open(dSuspect + "%s.tsv" % speciesDict[sp0], 'ab')
             writer1_sus = csv.writer(outfile1_sus, delimiter="\t")
         strsp0 = sp0 + "_"
         isp0 = sp_to_index[sp0]
@@ -399,9 +399,9 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
             strsp1 = sp1 + "_"
             isp1 = sp_to_index[sp1]
             d1 = resultsDir + "Orthologues_" + speciesDict[sp1] + "/"
-            with open(d0 + '%s__v__%s.csv' % (speciesDict[sp0], speciesDict[sp1]), 'ab') as outfile1, open(d1 + '%s__v__%s.csv' % (speciesDict[sp1], speciesDict[sp0]), 'ab') as outfile2:
+            with open(d0 + '%s__v__%s.tsv' % (speciesDict[sp0], speciesDict[sp1]), 'ab') as outfile1, open(d1 + '%s__v__%s.tsv' % (speciesDict[sp1], speciesDict[sp0]), 'ab') as outfile2:
                 if qContainsSuspectOlogs:
-                    outfile2_sus = open(dSuspect + "%s.csv" % speciesDict[sp1], 'ab')
+                    outfile2_sus = open(dSuspect + "%s.tsv" % speciesDict[sp1], 'ab')
                     writer2_sus = csv.writer(outfile2_sus, delimiter="\t")
                 writer1 = csv.writer(outfile1, delimiter="\t")
                 writer2 = csv.writer(outfile2, delimiter="\t")
@@ -536,14 +536,14 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
     dSuspectOrthologues = files.FileHandler.GetPutativeXenelogsDir()
     dResultsOrthologues = files.FileHandler.GetOrthologuesDirectory()
     for index1 in xrange(nspecies):
-        with open(dSuspectOrthologues + '%s.csv' % speciesDict[str(speciesIDs[index1])], 'wb') as outfile:
+        with open(dSuspectOrthologues + '%s.tsv' % speciesDict[str(speciesIDs[index1])], 'wb') as outfile:
             writer1 = csv.writer(outfile, delimiter="\t")
             writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], "Other"))
         d = dResultsOrthologues + "Orthologues_" + speciesDict[str(speciesIDs[index1])] + "/"
         if not os.path.exists(d): os.mkdir(d)     
         for index2 in xrange(nspecies):
             if index2 == index1: continue
-            with open(d + '%s__v__%s.csv' % (speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]), 'wb') as outfile:
+            with open(d + '%s__v__%s.tsv' % (speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]), 'wb') as outfile:
                 writer1 = csv.writer(outfile, delimiter="\t")
                 writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]))
     # Infer orthologues and write them to file           
@@ -636,7 +636,7 @@ def DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDirectory, GeneToSpecies, 
         if not os.path.exists(d): os.mkdir(d)     
         for index2 in xrange(nspecies):
             if index2 == index1: continue
-            with open(d + '%s__v__%s.csv' % (speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]), 'wb') as outfile:
+            with open(d + '%s__v__%s.tsv' % (speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]), 'wb') as outfile:
                 writer1 = csv.writer(outfile, delimiter="\t")
                 writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]))
     nOgs = len(ogSet.OGs())

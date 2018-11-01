@@ -286,7 +286,7 @@ class __Files_new_dont_manually_create__(object):
         ========================================================================================== """
     
     def GetResultsSeqsDir_SingleCopy(self):
-        d = self.GetResultsSeqsDir() + "SingleCopyOrthologues/"
+        d = self.rd1 + "Single_Copy_Orthologue_Sequences/"
         if not os.path.exists(d): os.mkdir(d)
         return d        
         
@@ -452,7 +452,7 @@ class __Files_new_dont_manually_create__(object):
     def GetDuplicationsFN(self):
         d = self.rd1 + "Gene_Duplication_Events/"
         if not os.path.exists(d): os.mkdir(d)
-        return d + "Duplications.csv"
+        return d + "Duplications.tsv"
     
     def GetSuspectGenesDir(self):
         d = self.rd1 + "Phylogenetically_Misplaced_Genes/"
