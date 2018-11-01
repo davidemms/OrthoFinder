@@ -725,7 +725,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
         g_fmt = scripts.files.FileHandler.GetResultsSeqsDir_SingleCopy() + scripts.files.FileHandler.baseOgFormat + ".fa"
         out_fn =[g_fmt % i for i in singleCopyOGs]
         for i, o in zip(in_fn, out_fn):
-            os.symlink(i, o)
+            shutil.copy(i, o)
             
         # Results filenames
         writer_sum.writerow(["Date", str(datetime.datetime.now()).split()[0]])
