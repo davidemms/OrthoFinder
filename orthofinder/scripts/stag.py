@@ -241,16 +241,14 @@ def InferSpeciesTree(tree_dir, species, outputFN, astral_jar=None):
         n.name = species[int(n.name)]
     t.write(outfile=outputFN)
 
-def Run_ForOrthoFinder(dir_in, d_out, speciesToUse):
-    dir_matrices = d_out + "Distances_SpeciesTree/"
+def Run_ForOrthoFinder(dir_in, d_working, speciesToUse, speciesTreeIds_FN_out):
+    dir_matrices = d_working + "Distances_SpeciesTree/"
     os.mkdir(dir_matrices)
-    dir_trees_out = d_out + "SpeciesTrees_ids/"
+    dir_trees_out = d_working + "SpeciesTrees_ids/"
     os.mkdir(dir_trees_out)
     gene_to_species = GeneToSpecies_OrthoFinder(speciesToUse)
     ProcessTrees(dir_in, dir_matrices, dir_trees_out, gene_to_species, qVerbose=False)
-    outputFN = d_out + "STAG_SpeciesTree_ids.tre"
-    InferSpeciesTree(dir_trees_out, gene_to_species.species, outputFN)
-    return outputFN
+    InferSpeciesTree(dir_trees_out, gene_to_species.species, speciesTreeIds_FN_out)
     
 def main(args):
     dir_in = args.gene_trees

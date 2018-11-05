@@ -121,7 +121,13 @@ class __Files_new_dont_manually_create__(object):
                        base, 
                        clustersFilename_pairs,
                        speciesTreeFN, 
+                       qIsUSerSpeciesTree,
                        user_name=None):
+        """
+        Convert user species tree here if necessary
+        For OF species tree copy it to location given by FileHandler
+        For user species tree, this must be done immediately by OF code
+        """
         self.wd_base = wd1
         self.wd_trees = wd2
         if user_name == None:
@@ -132,7 +138,10 @@ class __Files_new_dont_manually_create__(object):
         os.mkdir(self.wd_current)
         self.clustersFilename = clustersFilename_pairs[:-len("_id_pairs.txt")]
         self.StartLog()
+        if not qIsUSerSpeciesTree:
+            shutil.copy(speciesTreeFN, self.GetSpeciesTreeIDsRootedFN())
         self.WriteToLog("Species Tree: %s\n" % speciesTreeFN)
+        self.LogWorkingDirectoryTrees()
                                          
     def CreateOutputDirectories(self, options, previous_files_locator, base_dir, fastaDir=None):
         if options.qStartFromFasta and options.qStartFromBlast:
@@ -157,12 +166,14 @@ class __Files_new_dont_manually_create__(object):
                                                       
         elif options.qStartFromTrees:
             wd1, clustersFilename_pairs, wd_trees, speciesTreeFN = previous_files_locator.GetStartFromTrees()
+            qIsUserSpeciesTree = (options.speciesTreeFN != None)
             speciesTreeFN = options.speciesTreeFN if options.speciesTreeFN != None else speciesTreeFN
             self.StartFromTrees(wd1, 
                                 wd_trees,
                                 base_dir, 
                                 clustersFilename_pairs,
                                 speciesTreeFN, 
+                                qIsUserSpeciesTree,
                                 user_name=options.name)
         if (options.qStartFromGroups or options.qStartFromTrees) and previous_files_locator.species_ids_lines != None:
             # In only these cases, it's possible that the SpeciesIDs.txt file is out of sync and the version in the previous log should be used instead
@@ -315,7 +326,7 @@ class __Files_new_dont_manually_create__(object):
         if qResults:
             return self.rd1 + "Gene_Trees/" + (self.baseOgFormat % iOG) + "_tree.txt"
         else:
-            return self.wd_current + "Trees_ids/" + (self.baseOgFormat % iOG) + "_tree_id.txt"   
+            return self.wd_trees + "Trees_ids/" + (self.baseOgFormat % iOG) + "_tree_id.txt"   
         
     def GetSpeciesTreeConcatAlignFN(self, qResults=False):
         if qResults:
@@ -333,16 +344,30 @@ class __Files_new_dont_manually_create__(object):
         if qAccessions:
             return self.wd_trees + "SpeciesTree_unrooted.txt"
         else: 
-            return self.wd_trees + "Trees_ids/SpeciesTree_unrooted_id.txt"  
-            
-    def SetSpeciesTreeIDsRootedFN(self, fn):
-        self.speciesTreeRootedIDsFN = fn
-            
+            return self.wd_trees + "SpeciesTree_unrooted_ids.txt"  
+                        
     def GetSpeciesTreeIDsRootedFN(self):
-        return self.speciesTreeRootedIDsFN
-        
-    def GetSpeciesTreeUserSupplied_idsFN(self):
-        return self.wd_current + "SpeciesTree_UserSupplied_Rooted_IDs.txt"
+        return self.wd_current + "SpeciesTree_rooted_ids.txt"
+            
+    def GetSpeciesTreeResultsFN(self, i, qUnique):
+        """
+        The results species tree (rooted, accessions, support values)
+        i: index for species tree, starting at 0
+        qUnique: bool, has a unique root been identified (as it may not be known exatly which branch the root belongs on)
+        E.g. if there were just one species tree, the correct call would be GetSpeciesTreeResultsFN(0,True)
+        """
+        d = self.rd1 + "Species_Tree/"
+        if not os.path.exists(d): os.mkdir(d)
+        if qUnique:
+            return d + "SpeciesTree_rooted.txt"
+        else:
+            if not self.multipleRootedSpeciesTreesDir:
+                self.multipleRootedSpeciesTreesDir = d + "Potential_Rooted_Species_Trees/"
+                if not os.path.exists(self.multipleRootedSpeciesTreesDir): os.mkdir(self.multipleRootedSpeciesTreesDir)
+            return self.multipleRootedSpeciesTreesDir + "SpeciesTree_rooted_at_outgroup_%d.txt" % i    
+            
+    def GetSpeciesTreeResultsNodeLabelsFN(self):
+        return self.GetSpeciesTreeResultsFN(0, True)[:-4] + "_node_labels.txt"
         
     def GetOGsDistMatFN(self, iOG):
         return self.wd_current + "Distances/OG%07d.phy" % iOG
@@ -413,7 +438,7 @@ class __Files_new_dont_manually_create__(object):
         self.WriteToLog("FN_Orthogroups: %s\n" % (self.clustersFilename + "_id_pairs.txt"))
     
     def LogWorkingDirectoryTrees(self):
-        self.WriteToLog("WorkingDirectory_Trees: %s\n" % self.wd2)
+        self.WriteToLog("WorkingDirectory_Trees: %s\n" % self.wd_trees)
         
     def MakeResultsDirectory2(self, tree_generation_method, stop_after="", append_name=""):
         """
@@ -423,7 +448,6 @@ class __Files_new_dont_manually_create__(object):
         """
         # RefactorDS - need to change where it puts things
         if self.rd1 == None: raise Exception("No rd1") 
-        self.wd2 = self.wd_current 
         self.wd_trees = self.wd_current
         os.mkdir(self.rd1 + "Orthologues/")
         if tree_generation_method == "msa":
@@ -463,24 +487,6 @@ class __Files_new_dont_manually_create__(object):
         d = self.rd1 + "Putative_Xenologs/"
         if not os.path.exists(d): os.mkdir(d)
         return d    
-            
-    def GetSpeciesTreeResultsFN(self, i, qUnique):
-        """
-        The results species tree (rooted, accessions, support values)
-        i: index for species tree, starting at 0
-        qUnique: bool, has a unique root been identified (as it may not be known exatly which branch the root belongs on)
-        E.g. if there were just one species tree, the correct call would be GetSpeciesTreeResultsFN(0,True)
-        """
-        d = self.rd1 + "Species_Tree/"
-        if not os.path.exists(d): os.mkdir(d)
-        if qUnique:
-            return d + "SpeciesTree_rooted.txt"
-        else:
-            if not self.multipleRootedSpeciesTreesDir:
-                self.multipleRootedSpeciesTreesDir = d + "Potential_Rooted_Species_Trees/"
-                if not os.path.exists(self.multipleRootedSpeciesTreesDir): os.mkdir(self.multipleRootedSpeciesTreesDir)
-            return self.multipleRootedSpeciesTreesDir + "SpeciesTree_rooted_at_outgroup_%d.txt" % i    
-
 
 FileHandler = __Files_new_dont_manually_create__()
                     
@@ -571,7 +577,7 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
 #                    self._GetOGsFile(wd_ogs_path)
                 if line.startswith(wd_trees_str): 
                     self.wd_trees = line.rstrip()[len(wd_trees_str):]
-                    self.speciesTreeRootedIDsFN = self.wd_trees + "Species_Tree/SpeciesTree_rooted.txt" 
+                    self.speciesTreeRootedIDsFN = self.wd_trees + "SpeciesTree_rooted_ids.txt" 
                     if not os.path.exists(self.wd_trees):
                         # try to see if it's a relative directory to current one
                         path, d_wd = os.path.split(self.wd_trees[:-1])

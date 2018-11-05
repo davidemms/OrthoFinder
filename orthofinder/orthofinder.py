@@ -61,6 +61,15 @@ if getattr(sys, 'frozen', False):
 else:
     __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
     
+max_int = sys.maxsize
+ok = False
+while not ok:
+    try:
+        csv.field_size_limit(max_int)
+        ok = True
+    except OverflowError:
+        max_int = int(max_int/10)
+    
 fastaExtensions = {"fa", "faa", "fasta", "fas"}
 if sys.platform.startswith("linux"):
     with open(os.devnull, "w") as f:
