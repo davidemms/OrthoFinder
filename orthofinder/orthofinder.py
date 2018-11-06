@@ -804,7 +804,7 @@ def PrintHelp(program_caller):
     print(" -a <int>          Number of parallel analysis threads [Default = %d]" % util.nAlgDefault)
     print(" -M <txt>          Method for gene tree inference. Options 'dendroblast' & 'msa'")
     print("                   [Default = dendroblast]")
-    print(" -S <txt>          Sequence search program [Default = blast]")
+    print(" -S <txt>          Sequence search program [Default = diamond]")
     print("                   Options: " + ", ".join(['blast'] + search_ops))
     print(" -A <txt>          MSA program, requires '-M msa' [Default = mafft]")
     print("                   Options: " + ", ".join(msa_ops))
@@ -889,7 +889,7 @@ class Options(object):#
         self.qStopAfterAlignments = False
         self.qStopAfterTrees = False
         self.qMSATrees = False
-        self.search_program = "blast"
+        self.search_program = "diamond"
         self.msa_program = None
         self.tree_program = None
         self.recon_method = "of_recon"
@@ -1179,6 +1179,10 @@ def ProcessArgs(program_caller):
     if resultsDir_nonDefault != None and ((not options.qStartFromFasta) or options.qStartFromBlast):
         print("ERROR: Incompatible arguments, -o (non-default output directory) can only be used with a new OrthoFinder run using option '-f'")
         util.Fail()       
+        
+    if options.search_program not in (program_caller.ListSearchMethods() + ['blast']):
+        print("ERROR: Search program (%s) not configured in config.json file" % options.search_program)
+        util.Fail()
         
     util.PrintTime("Starting OrthoFinder")    
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
