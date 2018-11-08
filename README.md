@@ -30,12 +30,57 @@ To Run OrthoFinder on the Example Data type
 
 `OrthoFinder-2.2.7/orthofinder -f ExampleDataset -S diamond`
 
+## What OrthoFinder provides
+A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplcation events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
+
+### Results Files: Orthogroups Directory
+1. **Orthogroups.csv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species.
+
+2. **Orthogroups_UnassignedGenes.csv** is a tab separated text file that is identical in format to Orthogroups.csv but contains all of the genes that were not assigned to any orthogroup.
+
+3. **Orthogroups.txt** (legacy format) is a second file containing the orthogroups described in the Orthogroups.csv file but using the OrthoMCL output format. 
+
+4. **Orthogroups.GeneCount.csv** is a tab separated text file that is identical in format to Orthogroups.csv but contains counts of the number of genes for each species in each orthogroup.
+
+### Results Files: Orthologs Directory 
+Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologs diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each set of orthologues is cross-referenced to the orthogroup that contains them. The Orthologs directory contains one sub directory for each species that in turn contains a file for each pairwise species comparison listing the orthologs between that species pair.
+
+### Results Files: Gene Trees Directory
+1. A phylogenetic tree inferred for each orthogroup
+
+### Results Files: Resolved Gene Trees Directory
+1. A phylogenetic tree inferred for each orthogroup resolved using the OrthoFinder duplication-loss coalescent model.
+
+### Results Files: Species Tree Directory
+1. **Species_Tree_rooted.csv** A STAG species tree inferred from all orthogroups containing STAG support values at internal nodes and rooted using STRIDE.
+
+2. **Species_Tree_rooted_node_labels.csv** The same tree as above but with labelled nodes to help interpret the gene duplcation data.
+
+### Results Files: Comparative Genomics Statistics Directory
+1. **Orthogroups_SpeicesOverlaps.csv** is a tab separated text file that contains the number of orthogroups shared between each species pair as a square matrix.
+
+2. **SingleCopyOrthogroups.txt** is a text file containing a list of all the orthogroups that contain only single copy orthologs. 
+
+3. **Statistics_Overall.csv** is a tab separated text file that contains general statistics about orthogroup sizes and proportion of genes assigned to orthogroups.
+
+4. **Statistics_PerSpecies.csv** is a tab separated text file that contains the same information as the Statistics_Overall.csv file but for each individual species.
+
+Most of the terms in the files 'Statistics_Overall.csv' and 'Statistics_PerSpecies.csv' are self-explanatory, the remainder are defined below.
+
+- Species-specific orthogroup: An orthogroups that consist entirely of genes from one species.
+- G50: The number of genes in the orthogroup such that 50% of genes are in orthogroups of that size or larger.
+- O50: The smallest number of orthogroups such that 50% of genes are in orthogroups of that size or larger.
+- Single-copy orthogroup: An orthogroup with exactly one gene (and no more) from each species. These orthogroups are ideal for inferring a species tree and many other analyses. 
+- Unassigned gene: A gene that has not been put into an orthogroup with any other genes.
+
+### Results Files: WorkingDirectory
+This contains all the files necessary for orthofinder to run. You can ignore this.
+
 ## Additional Information
 * [What are orthogroups, orthologs & paralogs?](#orthogroups-orthologues--paralogues)
 * [Why use orthogroups in your analysis](#why-orthogroups)
 * [Installing Dependencies](#setting-up-orthofinder)
 * [Running OrthoFinder](#running-orthofinder)
-* [OrthoFinder results files and statistics](#results-files)
 * [Adding and removing species from a completed OrthoFinder run](#advanced-usage)
 * [Preparing and using seperately run BLAST files](#running-blast-searches-separately--p-option)
 
@@ -142,68 +187,6 @@ Performing a complete OrthoFinder analysis is simple:
 The argument 'number_of_threads' is an optional argument to specify the number of parallel threads to use for the BLAST searches, tree inference and reconciliation. As the BLAST queries can be a time-consuming step it is best to use at least as many BLAST processes as there are CPUs on the machine. 
 
 The OrthoFinder run will finish by printing the location of the results files, a short paragraph providing a descriptive statistical summary and the OrthoFinder citation. If you make use of OrthoFinder for any of your work then please cite it as this helps justify OrthoFinder support and future development. The OrthoFinder results files are described in the section "Results Files".
-
-## Results Files
-A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplcation events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
-
-### Results Files: Orthogroups Directory
-1. **Orthogroups.csv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species.
-
-2. **Orthogroups_UnassignedGenes.csv** is a tab separated text file that is identical in format to Orthogroups.csv but contains all of the genes that were not assigned to any orthogroup.
-
-3. **Orthogroups.txt** (legacy format) is a second file containing the orthogroups described in the Orthogroups.csv file but using the OrthoMCL output format. 
-
-4. **Orthogroups.GeneCount.csv** is a tab separated text file that is identical in format to Orthogroups.csv but contains counts of the number of genes for each species in each orthogroup.
-
-### Results Files: Orthologs Directory 
-1. One sub directory for each species that contains a file for each pairwise species comparison listing the orthologs between that species pair. i.e. all of the orthologs.
-
-### Results Files: Gene Trees Directory
-1. A phylogenetic tree inferred for each orthogroup
-
-### Results Files: Resolved Gene Trees Directory
-1. A phylogenetic tree inferred for each orthogroup resolved using the OrthoFinder duplication-loss coalescent model.
-
-### Results Files: Species Tree Directory
-1. **Species_Tree_rooted.csv** A STAG species tree inferred from all orthogroups containing STAG support values at internal nodes and rooted using STRIDE.
-
-2. **Species_Tree_rooted_node_labels.csv** The same tree as above but with labelled nodes to help interpret the gene duplcation data.
-
-### Results Files: Comparative Genomics Statistics Directory
-1. **Orthogroups_SpeicesOverlaps.csv** is a tab separated text file that contains the number of orthogroups shared between each species pair as a square matrix.
-
-2. **SingleCopyOrthogroups.txt** is a text file containing a list of all the orthogroups that contain only single copy orthologs. 
-
-3. **Statistics_Overall.csv** is a tab separated text file that contains general statistics about orthogroup sizes and proportion of genes assigned to orthogroups.
-
-4. **Statistics_PerSpecies.csv** is a tab separated text file that contains the same information as the Statistics_Overall.csv file but for each individual species.
-
-### Results Files: WorkingDirectory
-This contains all the files necessary for orthofinder to run. You can ignore this.
-
-
-
-The statistics calculated from the orthogroup analysis provide the basis for any comparative genomics analysis. They are easily plotted and can also be used for quality control.
-
-1. **Statistics_Overall.csv** is a tab separated text file giving useful statistics from the orthogroup analysis.
-
-2. **Statistics_PerSpecies.csv** is a tab separated text file giving many of the same statistics as the 'Statistics_Overall.csv' file but on a species-by-species basis.
-
-3. **Orthogroups_SpeciesOverlaps.csv** is a tab separated text file containing a matrix of the number of orthogroups shared by each species-pair (i.e. the number of orthogroups which contain at least one gene from each of the species-pairs).
-
-Most of the terms in the files 'Statistics_Overall.csv' and 'Statistics_PerSpecies.csv' are self-explanatory, the remainder are defined below.
-
-- Species-specific orthogroup: An orthogroups that consist entirely of genes from one species.
-- G50: The number of genes in the orthogroup such that 50% of genes are in orthogroups of that size or larger.
-- O50: The smallest number of orthogroups such that 50% of genes are in orthogroups of that size or larger.
-- Single-copy orthogroup: An orthogroup with exactly one gene (and no more) from each species. These orthogroups are ideal for inferring a species tree and many other analyses. 
-- Unassigned gene: A gene that has not been put into an orthogroup with any other genes.
-
-### Results Files: Orthologues
-The orthologues spreadsheets are contained in sub-directories, one per species. Within these directories is one spreadsheet per species-pair giving all the inferred orthologues between those two species. The spreadsheets contain one column for the genes from one species and one column for genes from the other species. Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologues diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each set of orthologues is cross-referenced to the orthogroup that contains them.
-
-### Results Files: Gene Trees and Species Tree
-The gene trees for each orthogroup and the rooted species tree are in newick format and can be viewed using programs such as Dendroscope (http://dendroscope.org/) or FigTree (http://tree.bio.ed.ac.uk/software/figtree/).
 
 ## Advanced Usage
 OrthoFinder provides a number of options to allow you to incrementally add and remove species.
