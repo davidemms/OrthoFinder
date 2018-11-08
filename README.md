@@ -4,7 +4,7 @@
 *Figure 1: Automatic OrthoFinder analysis*
 
 ## What does OrthoFinder do?
-OrthoFinder is a fast, accurate and comprehensive platform for comparative genomics. It finds **orthologs** and **orthogroups**, infers **rooted gene trees** for all orthogroups and identifies all of the gene duplcation events in those gene trees. It also infers a **rooted species tree** for the species being analysed and maps the gene duplication events from the gene trees to branches in the species tree. OrthoFinder also provides **comprehensive statistics** for comparative genomic analyses. OrthoFinder is simple to use and all you need to run it is a set of protein sequence files (one per species) in FASTA format.
+OrthoFinder is a fast, accurate and comprehensive platform for comparative genomics. It finds **orthogroups** and **orthologs**, infers **rooted gene trees** for all orthogroups and identifies all of the **gene duplcation events** in those gene trees. It also infers a **rooted species tree** for the species being analysed and maps the gene duplication events from the gene trees to branches in the species tree. OrthoFinder also provides **comprehensive statistics** for comparative genomic analyses. OrthoFinder is simple to use and all you need to run it is a set of protein sequence files (one per species) in FASTA format.
 
 For more details see the OrthoFinder paper below.
 
@@ -12,10 +12,27 @@ Emms, D.M. and Kelly, S. **(2015)** _OrthoFinder: solving fundamental biases in 
 
 https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2
 
-## Contents
+Emms, D.M. and Kelly, S. **(2018)** _OrthoFinder2: fast and accurate phylogenomic orthology analysis from gene sequences._ **bioRxiv** 
+
+### Installing OrthoFinder
+1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases (for this example we will assume it is OrthoFinder-2.2.7.tar.gz, change this as appropriate.)
+
+2. In a terminal, 'cd' to where you downloaded the package 
+
+3. Extract the files: `tar xzf OrthoFinder-2.2.7.tar.gz`
+
+4. Install dependencies: MCL, FastME and DIAMOND (see below)
+
+5. Test you can run OrthoFinder: `OrthoFinder-2.2.7/orthofinder -h`. OrthoFinder should print its 'help' text. 
+
+## Running OrthoFinder
+To Run OrthoFinder on the Example Data type
+`OrthoFinder-2.2.7/orthofinder -f ExampleDataset -S diamond`
+
+## Additional Information
 * [What are orthogroups, orthologs & paralogs?](#orthogroups-orthologues--paralogues)
 * [Why use orthogroups in your analysis](#why-orthogroups)
-* [Installing OrthoFinder](#setting-up-orthofinder)
+* [Installing Dependencies](#setting-up-orthofinder)
 * [Running OrthoFinder](#running-orthofinder)
 * [OrthoFinder results files and statistics](#results-files)
 * [Adding and removing species from a completed OrthoFinder run](#advanced-usage)
@@ -41,18 +58,7 @@ It is important to note that with orthogroups you choose where to define the lim
 ### Orthogroups are the only way to identify orthologs
 Orthology is defined by phylogeny. It is not definable by amino acid content, codon bias, GC content or other measures of sequence similarity. Methods that use such scores to define orthologs in the absence of phylogeny can only provide guesses. To provide a crude analogy guessing orthology from sequence similarity is akin to guessing colour from smell. The only way to truly identify orthologs is thus through analysis of phylogenetic trees. The only way to be sure that the orthology assignment is correct is by conducting a phylogenetic reconstruction of all genes decended from a single gene the last common ancestor of the species under consideration. This set of genes is an orthogroup. Thus the only way to define orthology is by analysing orthogroups.   
 
-## Setting Up OrthoFinder
-OrthoFinder runs on Linux and Mac, setup instructions are given below.
-
-### Set Up
-1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases (for this example we will assume it is OrthoFinder-2.2.7.tar.gz, change this as appropriate.)
-
-2. In a terminal, 'cd' to where you downloaded the package 
-
-3. Extract the files: `tar xzf OrthoFinder-2.2.7.tar.gz`
-
-4. Test you can run OrthoFinder: `OrthoFinder-2.2.7/orthofinder -h`. OrthoFinder should print its 'help' text. 
-
+### Installing Dependencies
 To perform an analysis OrthoFinder requires some dependencies to be installed and in the system path (only the first two are needed to infer orthogroups and all four are needed to infer orthologues and gene trees as well):
 
 1. DIAMOND **or** MMseqs2 (recommended, although BLAST+ can be used instead) 
@@ -108,15 +114,6 @@ NCBI BLAST+ is available in the repositories from most Linux distributions and s
 - `sudo apt-get install ncbi-blast+`
 
 Alternatively, instructions are provided for installing BLAST+ on Mac and various flavours of Linux on the "Standalone BLAST Setup for Unix" page of the BLAST+ Help manual currently at http://www.ncbi.nlm.nih.gov/books/NBK1762/. Follow the instructions under "Configuration" in the BLAST+ help manual to add BLAST+ to the PATH environment variable.
-
-### Running OrthoFinder
-Once the required dependencies have been installed, try running OrthoFinder on the example data:
-
-- `OrthoFinder-1.0.6/orthofinder -f ExampleDataset -S diamond`
-
-Assuming everything was successful OrthoFinder will end by printing the location of the results files, a short paragraph providing a statistical summary and the OrthoFinder citation. If you make use of OrthoFinder for any of your work then please cite it as this helps support future development. 
-
-If you have problems with this standalone binary version of OrthoFinder you can use the python source code version, which has a name of the form, 'OrthoFinder-1.0.6_source.tar.gz' and is available from the github 'releases tab'. See Section 'Python Source Code Version'.
 
 #### Trees from MSA: `"-M msa"`
 The following steps are not required for the standard OrthoFinder use cases and are only needed if you want to infer maximum likelihood trees from multiple sequence alignments (MSA). This is considerably more costly computationally but more accurate. By default MAFFT is used for the alignment and FastTree for the tree inference. Both the executables should be in the system path. The option for this is, "-M msa".
