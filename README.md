@@ -80,7 +80,6 @@ This contains all the files necessary for orthofinder to run. You can ignore thi
 * [What are orthogroups, orthologs & paralogs?](#orthogroups-orthologues--paralogues)
 * [Why use orthogroups in your analysis](#why-orthogroups)
 * [Installing Dependencies](#setting-up-orthofinder)
-* [Running OrthoFinder](#running-orthofinder)
 * [Adding and removing species from a completed OrthoFinder run](#advanced-usage)
 * [Preparing and using seperately run BLAST files](#running-blast-searches-separately--p-option)
 
@@ -174,22 +173,6 @@ For example, to you muscle and iqtree, the command like arguments you need to ad
 
 #### Python Source Code Version
 It is recommended that you use the standalone binaries for OrthoFinder which do not require python or scipy to be installed. However, the python source code version is available from the github 'releases' page (e.g. 'OrthoFinder-1.0.6_source.tar.gz' and requires python 2.7 and scipy to be installed. Up-to-date and clear instructions are provided here: http://www.scipy.org/install.html, be sure to chose a version using python 2.7. As websites can change, an alternative is to search online for "install scipy". 
-
-## Performing Your Own OrthoFinder Analysis
-Performing a complete OrthoFinder analysis is simple:
-
-1. Download the amino acid sequences, in FASTA format, for the species you want to analyse. If you have the option, it is best to use a version containing a single representative/longest transcript-variant for each gene.
-2. Optionally, you may want to rename the files to something simple since the filenames will be used as species identifiers in the results. E.g if you were using the 'Homo_sapiens.GRCh38.pep.all.fa' file you could rename it to 'Homo_sapiens.fa' or 'Human.fa'.
-3. Place the FASTA files all in a single directory.
-4. To perform a complete OrthoFinder analysis requires just one command: 
-`orthofinder -f fasta_files_directory [-t number_of_threads]`
-
-The argument 'number_of_threads' is an optional argument to specify the number of parallel threads to use for the BLAST searches, tree inference and reconciliation. As the BLAST queries can be a time-consuming step it is best to use at least as many BLAST processes as there are CPUs on the machine. 
-
-The OrthoFinder run will finish by printing the location of the results files, a short paragraph providing a descriptive statistical summary and the OrthoFinder citation. If you make use of OrthoFinder for any of your work then please cite it as this helps justify OrthoFinder support and future development. The OrthoFinder results files are described in the section "Results Files".
-
-## Advanced Usage
-OrthoFinder provides a number of options to allow you to incrementally add and remove species.
 
 ### Adding Extra Species
 OrthoFinder allows you to add extra species without re-running the previously computed BLAST searches:
