@@ -811,7 +811,7 @@ def PrintHelp(program_caller):
     print(" -T <txt>          Tree inference method, requires '-M msa' [Default = fasttree]")
     print("                   Options: " + ", ".join(tree_ops))  
 #    print(" -R <txt>          Tree reconciliation method [Default = of_recon]")
-#    print("                   Options: of_recon, dlcpar, dlcpar_deepsearch")
+#    print("                   Options: of_recon, dlcpar, dlcpar_convergedsearch")
     print(" -s <file>         User-specified rooted species tree")
     print(" -I <int>          MCL inflation parameter [Default = %0.1f]" % g_mclInflation)
     print(" -x <file>         Info for outputting results in OrthoXML format")
@@ -1108,7 +1108,7 @@ def ProcessArgs(program_caller):
                 print("Valid options are: {%s}\n" % (", ".join(choices)))
                 util.Fail()
         elif arg == "-R" or arg == "--recon_method":
-            choices = ['of_recon', 'dlcpar', 'dlcpar_deepsearch']
+            choices = ['of_recon', 'dlcpar', 'dlcpar_convergedsearch', 'only_overlap']
             switch_used = arg
             if len(args) == 0:
                 print("Missing option for command line argument %s\n" % arg)
@@ -1670,7 +1670,7 @@ if __name__ == "__main__":
             raise NotImplementedError
             ptm = parallel_task_manager.ParallelTaskManager_singleton()
             ptm.Stop()
-        scripts.files.FileHandler.WriteToLog("\nOrthoFinder run completed\n\n", True)
+        scripts.files.FileHandler.WriteToLog("OrthoFinder run completed\n", True)
     except Exception as e:
         ptm = parallel_task_manager.ParallelTaskManager_singleton()
         ptm.Stop()

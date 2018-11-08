@@ -275,7 +275,7 @@ def GetRoot(tree, species_tree_rooted, GeneToSpecies):
         else:
             return None # single species tree
 
-def GetOrthologues_from_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, neighbours, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None):
+def GetOrthologues_from_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, neighbours, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False):
     """ if dupsWriter != None then seqIDs and spIDs must also be provided"""
     qPrune=True
     orthologues = []
@@ -292,7 +292,7 @@ def GetOrthologues_from_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, ne
     if root != tree:
         tree.set_outgroup(root)
 
-    tree = Resolve(tree, GeneToSpecies)
+    if not qNoRecon: tree = Resolve(tree, GeneToSpecies)
     if qPrune: tree.prune(tree.get_leaf_names())
 #    tree.write(outfile="/home/david/projects/OrthoFinder/Development/Orthologues/ReplacingDLCpar/Overlaps/Orthologues_M3/" + os.path.split(treeFN)[1] + ".rec.txt")
     if len(tree) == 1: return set(orthologues), tree, set()
@@ -523,7 +523,7 @@ def GetOrthologuesStandalone_Serial(trees_dir, species_tree_rooted_fn, GeneToSpe
         print(treeFn)
         GetOrthologues_from_tree(0, treeFn, species_tree_rooted, GeneToSpecies, neighbours, True)        
         
-def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, all_stride_dup_genes):   
+def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, all_stride_dup_genes, qNoRecon):   
     """
     """
      # Create directory structure
@@ -560,7 +560,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
         dupWriter = csv.writer(outfile, delimiter="\t")
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
         for iog in xrange(nOgs):
-            orthologues, recon_tree, suspect_genes = GetOrthologues_from_tree(iog, files.FileHandler.GetOGsTreeFN(iog), species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes)
+            orthologues, recon_tree, suspect_genes = GetOrthologues_from_tree(iog, files.FileHandler.GetOGsTreeFN(iog), species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes, qNoRecon=qNoRecon)
             qContainsSuspectGenes = len(suspect_genes) > 0
             if (not qInitialisedSuspectGenesDirs) and qContainsSuspectGenes:
                 qInitialisedSuspectGenesDirs = True

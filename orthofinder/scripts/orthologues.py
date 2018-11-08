@@ -562,7 +562,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
             print("ERROR: Cannot run dlcpar_search")
             print("Please check DLCpar is installed and that the executables are in the system path.\n")
             return False
-        if recon_method == "dlcpar_deepsearch":
+        if recon_method == "dlcpar_convergedsearch":
             capture = subprocess.Popen("dlcpar_search --version", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
             stdout = "".join([x for x in capture.stdout])
             version = stdout.split()[-1]
@@ -582,7 +582,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
                     pass
                     # need to check next level down
             if not versionOK:
-                print("ERROR: dlcpar_deepsearch requires dlcpar_search version 1.0.1 or above")
+                print("ERROR: dlcpar_convergedsearch requires dlcpar_search version 1.0.1 or above")
                 return False                   
     
     # FastTree & MAFFT
@@ -787,7 +787,7 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=No
     resultsDir_ologs = files.FileHandler.GetOrthologuesDirectory()
     reconTreesRenamedDir = files.FileHandler.GetOGsReconTreeDir(True)
     if "dlcpar" in recon_method:
-        qDeepSearch = (recon_method == "dlcpar_deepsearch")
+        qDeepSearch = (recon_method == "dlcpar_convergedsearch")
         util.PrintTime("Starting DLCpar")
         dlcparResultsDir, dlcparLocusTreePat = trees2ologs_dlcpar.RunDlcpar(ogSet, speciesTree_ids_fn, workingDir, nParallel, qDeepSearch)
         util.PrintTime("Done DLCpar")
@@ -806,7 +806,8 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=No
         util.PrintTime("Done Orthologues from Phyldog")
     else:
         util.PrintTime("Starting OF Orthologues")
-        nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, speciesTree_ids_fn, trees2ologs_of.GeneToSpecies_dash, all_stride_dup_genes)
+        qNoRecon = ("only_overlap" == recon_method)
+        nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, speciesTree_ids_fn, trees2ologs_of.GeneToSpecies_dash, all_stride_dup_genes, qNoRecon)
         util.PrintTime("Done OF Orthologues")
     nOrthologues_SpPair += TwoAndThreeGeneOrthogroups(ogSet, resultsDir_ologs)
     WriteOrthologuesStats(ogSet, nOrthologues_SpPair)
