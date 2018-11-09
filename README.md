@@ -4,7 +4,7 @@
 *Figure 1: Automatic OrthoFinder analysis*
 
 ## What does OrthoFinder do?
-OrthoFinder is a fast, accurate and comprehensive platform for comparative genomics. It finds **orthologs** and **orthogroups**, infers **rooted gene trees** for all orthogroups and identifies all of the gene duplcation events in those gene trees. It also infers a **rooted species tree** for the species being analysed and maps the gene duplication events from the gene trees to branches in the species tree. OrthoFinder also provides **comprehensive statistics** for comparative genomic analyses. OrthoFinder is simple to use and all you need to run it is a set of protein sequence files (one per species) in FASTA format.
+OrthoFinder is a fast, accurate and comprehensive platform for comparative genomics. It finds **orthogroups** and **orthologs**, infers **rooted gene trees** for all orthogroups and identifies all of the **gene duplcation events** in those gene trees. It also infers a **rooted species tree** for the species being analysed and maps the gene duplication events from the gene trees to branches in the species tree. OrthoFinder also provides **comprehensive statistics** for comparative genomic analyses. OrthoFinder is simple to use and all you need to run it is a set of protein sequence files (one per species) in FASTA format.
 
 For more details see the OrthoFinder paper below.
 
@@ -12,12 +12,74 @@ Emms, D.M. and Kelly, S. **(2015)** _OrthoFinder: solving fundamental biases in 
 
 https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2
 
-## Contents
+Emms, D.M. and Kelly, S. **(2018)** _OrthoFinder2: fast and accurate phylogenomic orthology analysis from gene sequences._ **bioRxiv** 
+
+### Installing OrthoFinder
+1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases (for this example we will assume it is OrthoFinder-2.2.7.tar.gz, change this as appropriate.)
+
+2. In a terminal, 'cd' to where you downloaded the package 
+
+3. Extract the files: `tar xzf OrthoFinder-2.2.7.tar.gz`
+
+4. Install dependencies: MCL, FastME and DIAMOND (see below)
+
+5. Test you can run OrthoFinder: `OrthoFinder-2.2.7/orthofinder -h`. OrthoFinder should print its 'help' text. 
+
+## Running OrthoFinder
+To Run OrthoFinder on the Example Data type
+
+`OrthoFinder-2.2.7/orthofinder -f ExampleDataset -S diamond`
+
+## What OrthoFinder provides
+A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplcation events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
+
+### Results Files: Orthogroups Directory
+1. **Orthogroups.csv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species.
+
+2. **Orthogroups_UnassignedGenes.csv** is a tab separated text file that is identical in format to Orthogroups.csv but contains all of the genes that were not assigned to any orthogroup.
+
+3. **Orthogroups.txt** (legacy format) is a second file containing the orthogroups described in the Orthogroups.csv file but using the OrthoMCL output format. 
+
+4. **Orthogroups.GeneCount.csv** is a tab separated text file that is identical in format to Orthogroups.csv but contains counts of the number of genes for each species in each orthogroup.
+
+### Results Files: Orthologs Directory 
+Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologs diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each set of orthologues is cross-referenced to the orthogroup that contains them. The Orthologs directory contains one sub directory for each species that in turn contains a file for each pairwise species comparison listing the orthologs between that species pair.
+
+### Results Files: Gene Trees Directory
+1. A phylogenetic tree inferred for each orthogroup
+
+### Results Files: Resolved Gene Trees Directory
+1. A phylogenetic tree inferred for each orthogroup resolved using the OrthoFinder duplication-loss coalescent model.
+
+### Results Files: Species Tree Directory
+1. **Species_Tree_rooted.csv** A STAG species tree inferred from all orthogroups containing STAG support values at internal nodes and rooted using STRIDE.
+
+2. **Species_Tree_rooted_node_labels.csv** The same tree as above but with labelled nodes to help interpret the gene duplcation data.
+
+### Results Files: Comparative Genomics Statistics Directory
+1. **Orthogroups_SpeicesOverlaps.csv** is a tab separated text file that contains the number of orthogroups shared between each species pair as a square matrix.
+
+2. **SingleCopyOrthogroups.txt** is a text file containing a list of all the orthogroups that contain only single copy orthologs. 
+
+3. **Statistics_Overall.csv** is a tab separated text file that contains general statistics about orthogroup sizes and proportion of genes assigned to orthogroups.
+
+4. **Statistics_PerSpecies.csv** is a tab separated text file that contains the same information as the Statistics_Overall.csv file but for each individual species.
+
+Most of the terms in the files 'Statistics_Overall.csv' and 'Statistics_PerSpecies.csv' are self-explanatory, the remainder are defined below.
+
+- Species-specific orthogroup: An orthogroups that consist entirely of genes from one species.
+- G50: The number of genes in the orthogroup such that 50% of genes are in orthogroups of that size or larger.
+- O50: The smallest number of orthogroups such that 50% of genes are in orthogroups of that size or larger.
+- Single-copy orthogroup: An orthogroup with exactly one gene (and no more) from each species. These orthogroups are ideal for inferring a species tree and many other analyses. 
+- Unassigned gene: A gene that has not been put into an orthogroup with any other genes.
+
+### Results Files: WorkingDirectory
+This contains all the files necessary for orthofinder to run. You can ignore this.
+
+## Additional Information
 * [What are orthogroups, orthologs & paralogs?](#orthogroups-orthologues--paralogues)
 * [Why use orthogroups in your analysis](#why-orthogroups)
-* [Installing OrthoFinder](#setting-up-orthofinder)
-* [Running OrthoFinder](#running-orthofinder)
-* [OrthoFinder results files and statistics](#results-files)
+* [Installing Dependencies](#setting-up-orthofinder)
 * [Adding and removing species from a completed OrthoFinder run](#advanced-usage)
 * [Preparing and using seperately run BLAST files](#running-blast-searches-separately--p-option)
 
@@ -41,18 +103,7 @@ It is important to note that with orthogroups you choose where to define the lim
 ### Orthogroups are the only way to identify orthologs
 Orthology is defined by phylogeny. It is not definable by amino acid content, codon bias, GC content or other measures of sequence similarity. Methods that use such scores to define orthologs in the absence of phylogeny can only provide guesses. To provide a crude analogy guessing orthology from sequence similarity is akin to guessing colour from smell. The only way to truly identify orthologs is thus through analysis of phylogenetic trees. The only way to be sure that the orthology assignment is correct is by conducting a phylogenetic reconstruction of all genes decended from a single gene the last common ancestor of the species under consideration. This set of genes is an orthogroup. Thus the only way to define orthology is by analysing orthogroups.   
 
-## Setting Up OrthoFinder
-OrthoFinder runs on Linux and Mac, setup instructions are given below.
-
-### Set Up
-1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases (for this example we will assume it is OrthoFinder-2.2.7.tar.gz, change this as appropriate.)
-
-2. In a terminal, 'cd' to where you downloaded the package 
-
-3. Extract the files: `tar xzf OrthoFinder-2.2.7.tar.gz`
-
-4. Test you can run OrthoFinder: `OrthoFinder-2.2.7/orthofinder -h`. OrthoFinder should print its 'help' text. 
-
+### Installing Dependencies
 To perform an analysis OrthoFinder requires some dependencies to be installed and in the system path (only the first two are needed to infer orthogroups and all four are needed to infer orthologues and gene trees as well):
 
 1. DIAMOND **or** MMseqs2 (recommended, although BLAST+ can be used instead) 
@@ -62,10 +113,6 @@ To perform an analysis OrthoFinder requires some dependencies to be installed an
 3. FastME (The appropriate version for your system, e.g. 'fastme-2.1.5-linux64', should be renamed `fastme', see instructions below.) 
 
 Brief instructions are given below although users can refer to the installation notes provided with these packages for more detailed instructions. 
-
-### Dependencies
-Each of the following packages provide their own detailed instructions for installation, here we give a concise guide.
-
 
 #### DIAMOND
 Available here: https://github.com/bbuchfink/diamond/releases
@@ -109,15 +156,6 @@ NCBI BLAST+ is available in the repositories from most Linux distributions and s
 
 Alternatively, instructions are provided for installing BLAST+ on Mac and various flavours of Linux on the "Standalone BLAST Setup for Unix" page of the BLAST+ Help manual currently at http://www.ncbi.nlm.nih.gov/books/NBK1762/. Follow the instructions under "Configuration" in the BLAST+ help manual to add BLAST+ to the PATH environment variable.
 
-### Running OrthoFinder
-Once the required dependencies have been installed, try running OrthoFinder on the example data:
-
-- `OrthoFinder-1.0.6/orthofinder -f ExampleDataset -S diamond`
-
-Assuming everything was successful OrthoFinder will end by printing the location of the results files, a short paragraph providing a statistical summary and the OrthoFinder citation. If you make use of OrthoFinder for any of your work then please cite it as this helps support future development. 
-
-If you have problems with this standalone binary version of OrthoFinder you can use the python source code version, which has a name of the form, 'OrthoFinder-1.0.6_source.tar.gz' and is available from the github 'releases tab'. See Section 'Python Source Code Version'.
-
 #### Trees from MSA: `"-M msa"`
 The following steps are not required for the standard OrthoFinder use cases and are only needed if you want to infer maximum likelihood trees from multiple sequence alignments (MSA). This is considerably more costly computationally but more accurate. By default MAFFT is used for the alignment and FastTree for the tree inference. Both the executables should be in the system path. The option for this is, "-M msa".
 
@@ -135,57 +173,6 @@ For example, to you muscle and iqtree, the command like arguments you need to ad
 
 #### Python Source Code Version
 It is recommended that you use the standalone binaries for OrthoFinder which do not require python or scipy to be installed. However, the python source code version is available from the github 'releases' page (e.g. 'OrthoFinder-1.0.6_source.tar.gz' and requires python 2.7 and scipy to be installed. Up-to-date and clear instructions are provided here: http://www.scipy.org/install.html, be sure to chose a version using python 2.7. As websites can change, an alternative is to search online for "install scipy". 
-
-## Performing Your Own OrthoFinder Analysis
-Performing a complete OrthoFinder analysis is simple:
-
-1. Download the amino acid sequences, in FASTA format, for the species you want to analyse. If you have the option, it is best to use a version containing a single representative/longest transcript-variant for each gene.
-2. Optionally, you may want to rename the files to something simple since the filenames will be used as species identifiers in the results. E.g if you were using the 'Homo_sapiens.GRCh38.pep.all.fa' file you could rename it to 'Homo_sapiens.fa' or 'Human.fa'.
-3. Place the FASTA files all in a single directory.
-4. To perform a complete OrthoFinder analysis requires just one command: 
-`orthofinder -f fasta_files_directory [-t number_of_threads]`
-
-The argument 'number_of_threads' is an optional argument to specify the number of parallel threads to use for the BLAST searches, tree inference and reconciliation. As the BLAST queries can be a time-consuming step it is best to use at least as many BLAST processes as there are CPUs on the machine. 
-
-The OrthoFinder run will finish by printing the location of the results files, a short paragraph providing a descriptive statistical summary and the OrthoFinder citation. If you make use of OrthoFinder for any of your work then please cite it as this helps justify OrthoFinder support and future development. The OrthoFinder results files are described in the section "Results Files".
-
-## Results Files
-A standard OrthoFinder run produces a set of files describing the orthogroups, orthologues and gene trees for the set of species being analysed. Their locations are given at the end of an OrthoFinder run.
-
-### Results Files: Orthogroups
-OrthoFinder generates the main orthogroup file, 'Orthogroups.csv', and two supporting files:
-
-1. **Orthogroups.csv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species.
-
-2. **Orthogroups_UnassignedGenes.csv** is a tab separated text file that is identical in format to Orthogroups.csv but contains all of the genes that were not assigned to any orthogroup.
-
-3. **Orthogroups.txt** (legacy format) is a second file containing the orthogroups described in the Orthogroups.csv file but using the OrthoMCL output format. 
-
-### Results Files: Orthogroup Statistics
-The statistics calculated from the orthogroup analysis provide the basis for any comparative genomics analysis. They are easily plotted and can also be used for quality control.
-
-1. **Statistics_Overall.csv** is a tab separated text file giving useful statistics from the orthogroup analysis.
-
-2. **Statistics_PerSpecies.csv** is a tab separated text file giving many of the same statistics as the 'Statistics_Overall.csv' file but on a species-by-species basis.
-
-3. **Orthogroups_SpeciesOverlaps.csv** is a tab separated text file containing a matrix of the number of orthogroups shared by each species-pair (i.e. the number of orthogroups which contain at least one gene from each of the species-pairs).
-
-Most of the terms in the files 'Statistics_Overall.csv' and 'Statistics_PerSpecies.csv' are self-explanatory, the remainder are defined below.
-
-- Species-specific orthogroup: An orthogroups that consist entirely of genes from one species.
-- G50: The number of genes in the orthogroup such that 50% of genes are in orthogroups of that size or larger.
-- O50: The smallest number of orthogroups such that 50% of genes are in orthogroups of that size or larger.
-- Single-copy orthogroup: An orthogroup with exactly one gene (and no more) from each species. These orthogroups are ideal for inferring a species tree and many other analyses. 
-- Unassigned gene: A gene that has not been put into an orthogroup with any other genes.
-
-### Results Files: Orthologues
-The orthologues spreadsheets are contained in sub-directories, one per species. Within these directories is one spreadsheet per species-pair giving all the inferred orthologues between those two species. The spreadsheets contain one column for the genes from one species and one column for genes from the other species. Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologues diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each set of orthologues is cross-referenced to the orthogroup that contains them.
-
-### Results Files: Gene Trees and Species Tree
-The gene trees for each orthogroup and the rooted species tree are in newick format and can be viewed using programs such as Dendroscope (http://dendroscope.org/) or FigTree (http://tree.bio.ed.ac.uk/software/figtree/).
-
-## Advanced Usage
-OrthoFinder provides a number of options to allow you to incrementally add and remove species.
 
 ### Adding Extra Species
 OrthoFinder allows you to add extra species without re-running the previously computed BLAST searches:
