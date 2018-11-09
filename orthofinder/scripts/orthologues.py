@@ -687,6 +687,7 @@ def WriteOrthologuesStats(ogSet, nOrtho_sp):
     nodeCount_50 = defaultdict(int)
     ogCount = defaultdict(int)
     ogCount_50 = defaultdict(int)
+    if not os.path.exists(files.FileHandler.GetDuplicationsFN()): return
     with open(files.FileHandler.GetDuplicationsFN(), 'rb') as infile:
         reader = csv.reader(infile, delimiter="\t")
         reader.next()
