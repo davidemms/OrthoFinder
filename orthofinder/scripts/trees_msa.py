@@ -39,25 +39,32 @@ import util, program_caller as pc
 import files
 
 class FastaWriter(object):
-    def __init__(self, fastaFileDir):
+    def __init__(self, fastaFileDir_list, speciesToUse):
+        """
+        The ist of previous directories could incude species that are no longer used, 
+        but not ones that are conflicting
+        """
         self.SeqLists = dict()
         qFirst = True
         accession = ""
         sequence = ""
-        for fn in glob.glob(fastaFileDir + "Species*.fa"):
-            with open(fn, 'rb') as fastaFile:
-                for line in fastaFile:
-                    if line[0] == ">":
-                        # deal with old sequence
-                        if not qFirst:
-                            self.SeqLists[accession] = sequence
-                            sequence = ""
-                        qFirst = False
-                        # get id for new sequence
-                        accession = line[1:].rstrip()
-                    else:
-                        sequence += line
-                self.SeqLists[accession] = sequence
+        required_files = set(["Speices%d.fa" for i in speciesToUse])
+        for d in fastaFileDir_list:
+            for fn in glob.glob(d + "Species*.fa"):
+                if os.path.basename(fn) not in required_files: continue
+                with open(fn, 'rb') as fastaFile:
+                    for line in fastaFile:
+                        if line[0] == ">":
+                            # deal with old sequence
+                            if not qFirst:
+                                self.SeqLists[accession] = sequence
+                                sequence = ""
+                            qFirst = False
+                            # get id for new sequence
+                            accession = line[1:].rstrip()
+                        else:
+                            sequence += line
+                    self.SeqLists[accession] = sequence
     
     def WriteSeqsToFasta(self, seqs, outFilename):
         with open(outFilename, 'wb') as outFile:
@@ -192,8 +199,8 @@ def ReadAlignment(fn):
             if line.startswith(">"):
                 if accession != None:
                     if length != None and len(seq) != length:
-                        print("ERROR: Sequence length mismatch in MSA: %s & %d" % (length, len(seq)))
-                        util.Fail()
+                        text  = "ERROR: Sequence length mismatch in MSA: %s & %d" % (length, len(seq))
+                        files.FileHandler.LogFailAndExit(text)
                     msa[accession] = seq
                 accession = line[1:]
                 seq = ""
@@ -201,8 +208,8 @@ def ReadAlignment(fn):
                 seq += line
         if accession != None:
             if length != None and len(seq) != length:
-                print("Error: Sequence length mismatch in MSA: %s & %d" % (length, len(seq)))
-                util.Fail()
+                text = "Error: Sequence length mismatch in MSA: %s & %d" % (length, len(seq))
+                files.FileHandler.LogFailAndExit(text)
             msa[accession] = seq
     return MSA(msa)
 
@@ -296,7 +303,7 @@ class TreesForOrthogroups(object):
                     else:
                         outfile.write(line)
           
-    def DoTrees(self, ogs, ogMatrix, idDict, speciesIdDict, nProcesses, qStopAfterSeqs, qStopAfterAlignments, qDoSpeciesTree):
+    def DoTrees(self, ogs, ogMatrix, idDict, speciesIdDict, speciesToUse, nProcesses, qStopAfterSeqs, qStopAfterAlignments, qDoSpeciesTree):
         idDict.update(speciesIdDict) # smae code will then also convert concatenated alignment for species tree
         # 0       
         resultsDirsFullPath = [files.FileHandler.GetResultsSeqsDir(), files.FileHandler.GetResultsAlignDir(), files.FileHandler.GetResultsTreesDir()]
@@ -370,8 +377,8 @@ class TreesForOrthogroups(object):
             if os.path.exists(speciesTreeFN_ids):
                 util.RenameTreeTaxa(speciesTreeFN_ids, files.FileHandler.GetSpeciesTreeUnrootedFN(True), idDict, qSupport=qHaveSupport, qFixNegatives=True)
             else:
-                print("ERROR: Species tree inference failed")
-                util.Fail()
+                text = "ERROR: Species tree inference failed"
+                files.FileHandler.LogFailAndExit(text)
         self.RenameAlignmentTaxa(alignmentFilesToUse, accessionAlignmentFNs, idDict)
         qHaveSupport = None
         for i in xrange(len(treeCommands_and_filenames)):

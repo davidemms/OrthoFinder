@@ -96,15 +96,15 @@ class Seq(object):
 # ==============================================================================================================================
         
 class OrthoGroupsSet(object):
-    def __init__(self, orthofinderWorkingDir, speciesToUse, nSpAll, idExtractor = util.FirstWordExtractor):
+    def __init__(self, orthofinderWorkingDir_list, speciesToUse, nSpAll, idExtractor = util.FirstWordExtractor):
         self.speciesIDsEx = util.FullAccession(files.FileHandler.GetSpeciesIDsFN())
         self._Spec_SeqIDs = None
         self._extractor = idExtractor
         self.seqIDsEx = None
         self.ogs_all = None
         self.iOgs4 = 0
-        self.speciesToUse = speciesToUse
-        self.seqsInfo = util.GetSeqsInfo(orthofinderWorkingDir, self.speciesToUse, nSpAll)
+        self.speciesToUse = speciesToUse     # list of ints
+        self.seqsInfo = util.GetSeqsInfo(orthofinderWorkingDir_list, self.speciesToUse, nSpAll)
         self.id_to_og = None
 
     def SequenceDict(self):
@@ -114,7 +114,7 @@ class OrthoGroupsSet(object):
             except RuntimeError as error:
                 print(error.message)
                 if error.message.startswith("ERROR"): 
-                    util.Fail()
+                    files.FileHandler.LogFailAndExit()
                 else:
                     print("Tried to use only the first part of the accession in order to list the sequences in each orthogroup\nmore concisely but these were not unique. The full accession line will be used instead.\n")     
                     self.seqIDsEx = util.FullAccession(files.FileHandler.GetSequenceIDsFN())
@@ -228,14 +228,14 @@ def GetSpeciesTreeRoot_TwoTaxa(taxa):
 # ==============================================================================================================================      
 # DendroBlast   
 
-def Worker_OGMatrices_ReadBLASTAndUpdateDistances(cmd_queue, worker_status_queue, iWorker, ogMatrices, nGenes, seqsInfo, blastDir, ogsPerSpecies, qDoubleBlast):
+def Worker_OGMatrices_ReadBLASTAndUpdateDistances(cmd_queue, worker_status_queue, iWorker, ogMatrices, nGenes, seqsInfo, blastDir_list, ogsPerSpecies, qDoubleBlast):
     speciesToUse = seqsInfo.speciesToUse
     with np.errstate(divide='ignore'):
         while True:
             try:
                 iiSp, sp1, nSeqs_sp1 = cmd_queue.get(True, 1)
                 worker_status_queue.put(("start", iWorker, iiSp))
-                Bs = [BlastFileProcessor.GetBLAST6Scores(seqsInfo, blastDir, sp1, sp2, qExcludeSelfHits = False, qDoubleBlast=qDoubleBlast) for sp2 in speciesToUse]    
+                Bs = [BlastFileProcessor.GetBLAST6Scores(seqsInfo, blastDir_list, sp1, sp2, qExcludeSelfHits = False, qDoubleBlast=qDoubleBlast) for sp2 in speciesToUse]    
                 mins = np.ones((nSeqs_sp1, 1), dtype=np.float64)*9e99 
                 maxes = np.zeros((nSeqs_sp1, 1), dtype=np.float64)
                 for B in Bs:
@@ -253,10 +253,11 @@ def Worker_OGMatrices_ReadBLASTAndUpdateDistances(cmd_queue, worker_status_queue
                 worker_status_queue.put(("empty", iWorker, None))
                 return 
 
-def PrintRAMError():
-    print("ERROR: The computer ran out of RAM and killed OrthoFinder processes")
-    print("Try using a computer with more RAM. If you used the '-a' option")
-    print("it may be possible to complete the run by removing this option.")
+def GetRAMErrorText():
+    text = "ERROR: The computer ran out of RAM and killed OrthoFinder processes\n"
+    text += "Try using a computer with more RAM. If you used the '-a' option\n"
+    text += "it may be possible to complete the run by removing this option."
+    return text
                 
 class DendroBLASTTrees(object):
     def __init__(self, ogSet, nProcesses, qDoubleBlast):
@@ -281,12 +282,12 @@ class DendroBLASTTrees(object):
             nGenes = [len(og) for og in ogs]
             nSeqs = self.ogSet.seqsInfo.nSeqsPerSpecies
             ogMatrices = [[mp.Array('d', n, lock=False) for _ in xrange(n)] for n in nGenes]
-            blastDir = files.FileHandler.GetBlastResultsDir()
+            blastDir_list = files.FileHandler.GetBlastResultsDir()
             cmd_queue = mp.Queue()
             for iiSp, sp1 in enumerate(self.ogSet.seqsInfo.speciesToUse):
                 cmd_queue.put((iiSp, sp1, nSeqs[sp1]))
             worker_status_queue = mp.Queue()
-            runningProcesses = [mp.Process(target=Worker_OGMatrices_ReadBLASTAndUpdateDistances, args=(cmd_queue, worker_status_queue, iWorker, ogMatrices, nGenes, self.ogSet.seqsInfo, blastDir, ogsPerSpecies, self.qDoubleBlast)) for iWorker in xrange(self.nProcesses)]
+            runningProcesses = [mp.Process(target=Worker_OGMatrices_ReadBLASTAndUpdateDistances, args=(cmd_queue, worker_status_queue, iWorker, ogMatrices, nGenes, self.ogSet.seqsInfo, blastDir_list, ogsPerSpecies, self.qDoubleBlast)) for iWorker in xrange(self.nProcesses)]
             for proc in runningProcesses:
                 proc.start()
             rota = [None for iWorker in xrange(self.nProcesses)]
@@ -310,14 +311,14 @@ class DendroBLASTTrees(object):
                 # if worker is dead but didn't finish task, issue warning
                 for al, r in zip(alive, rota):
                     if (not al) and (r != "empty"):
-                        PrintRAMError()
-                        util.Fail()
+                        text = GetRAMErrorText()
+                        files.FileHandler.LogFailAndExit(text)
                         unfinished.append(r)
                 if not any(alive):
                     break
                 
             if len(unfinished) != 0:
-                util.Fail()
+                files.FileHandler.LogFailAndExit()
 #                print("WARNING: Computer ran out of RAM and killed OrthoFinder processes")
 #                print("OrthoFinder will attempt to run these processes once more. If it is")
 #                print("unsuccessful again then it will have to exit. Consider using")
@@ -895,7 +896,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
             util.RenameTreeTaxa(spTreeFN_ids, files.FileHandler.GetSpeciesTreeUnrootedFN(True), ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True)
         qDoMSASpeciesTree = (not qLessThanFourSpecies) and (not userSpeciesTree)
         util.PrintTime("Starting MSA/Trees")
-        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.OrthogroupMatrix(), ogSet.Spec_SeqDict(), ogSet.SpeciesDict(), nHighParallel, qStopAfterSeqs, qStopAfterAlign or qPhyldog, qDoSpeciesTree=qDoMSASpeciesTree) 
+        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.OrthogroupMatrix(), ogSet.Spec_SeqDict(), ogSet.SpeciesDict(), ogSet.speciesToUse, nHighParallel, qStopAfterSeqs, qStopAfterAlign or qPhyldog, qDoSpeciesTree=qDoMSASpeciesTree) 
         util.PrintTime("Done MSA/Trees")
         if qDoMSASpeciesTree:
             spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()

@@ -44,7 +44,7 @@ import tree, parallel_task_manager
 Utilities
 -------------------------------------------------------------------------------
 """
-SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")
+SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")    # speciesToUse - lsit of ints
 
 picProtocol = 1
 version = "2.3.1"
@@ -279,12 +279,14 @@ def SortArrayPairByFirst(useForSortAr, keepAlignedAr, qLargestFirst=False):
     return useForSortAr, keepAlignedAr      
 
 # Get Info from seqs IDs file?
-def GetSeqsInfo(inputDirectory, speciesToUse, nSpAll):
+def GetSeqsInfo(inputDirectory_list, speciesToUse, nSpAll):
     seqStartingIndices = [0]
     nSeqs = 0
     nSeqsPerSpecies = dict()
     for iFasta in xrange(nSpAll):
-        fastaFilename = inputDirectory + "Species%d.fa" % iFasta
+        for d in inputDirectory_list:
+            fastaFilename = d + "Species%d.fa" % iFasta
+            if os.path.exists(fastaFilename): break
         n = 0
         with open(fastaFilename) as infile:
             for line in infile:
@@ -299,7 +301,7 @@ def GetSeqsInfo(inputDirectory, speciesToUse, nSpAll):
     return SequencesInfo(nSeqs=nSeqs, nSpecies=nSpecies, speciesToUse=speciesToUse, seqStartingIndices=seqStartingIndices, nSeqsPerSpecies=nSeqsPerSpecies)
  
 def GetSpeciesToUse(speciesIDsFN):
-    """Returns species indices to use and total number of species available """
+    """Returns species indices (int) to use and total number of species available """
     speciesToUse = []
     speciesToUse_names = []
     nSkipped = 0

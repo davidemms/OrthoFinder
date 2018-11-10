@@ -208,12 +208,12 @@ class MCL:
         except KeyError as e:
             sys.stderr.write("ERROR: Sequence ID not found in %s\n" % idsFilename)
             sys.stderr.write(str(e) + "\n")
-            util.Fail()        
+            scripts.files.FileHandler.LogFailAndExit(("ERROR: Sequence ID not found in %s\n" % idsFilename) + str(e) + "\n")        
         except RuntimeError as error:
             print(error.message)
             if error.message.startswith("ERROR"):
-                print("ERROR: %s contains a duplicate ID. The IDs for the orthogroups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
-                util.Fail()
+                err_text = "ERROR: %s contains a duplicate ID. The IDs for the orthogroups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename)
+                scripts.files.FileHandler.LogFailAndExit(err_text)
             else:
                 print("Tried to use only the first part of the accession in order to list the sequences in each orthogroup\nmore concisely but these were not unique. The full accession line will be used instead.\n")     
                 try:
@@ -224,8 +224,8 @@ class MCL:
                         fullDict.update(idDict)
                     MCL.CreateOGs(ogs, outputFN, fullDict)   
                 except:
-                    print("ERROR: %s contains a duplicate ID. The IDs for the orthogroups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename))
-                    util.Fail()
+                    err_text = "ERROR: %s contains a duplicate ID. The IDs for the orthogroups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename) 
+                    scripts.files.FileHandler.LogFailAndExit(err_text)
         return fullDict
     
     @staticmethod
@@ -382,9 +382,9 @@ def GetOrderedSearchCommands(seqsInfo, speciesInfoObj, qDoubleBlast, search_prog
     taskSizes = [seqsInfo.nSeqsPerSpecies[i]*seqsInfo.nSeqsPerSpecies[j] for i,j in speciesPairs]
     taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
     if search_program == "blast":
-        commands = [" ".join(["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", scripts.files.FileHandler.GetSpeciesFastaFN(iFasta), "-db", scripts.files.FileHandler.GetSpeciesDatabaseN(iDB), "-out", scripts.files.FileHandler.GetBlastResultsFN(iFasta, iDB)]) for iFasta, iDB in speciesPairs]
+        commands = [" ".join(["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", scripts.files.FileHandler.GetSpeciesFastaFN(iFasta), "-db", scripts.files.FileHandler.GetSpeciesDatabaseN(iDB), "-out", scripts.files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)]) for iFasta, iDB in speciesPairs]
     else:
-        commands = [program_caller.GetSearchMethodCommand_Search(search_program, scripts.files.FileHandler.GetSpeciesFastaFN(iFasta), scripts.files.FileHandler.GetSpeciesDatabaseN(iDB, search_program), scripts.files.FileHandler.GetBlastResultsFN(iFasta, iDB)) for iFasta, iDB in speciesPairs]
+        commands = [program_caller.GetSearchMethodCommand_Search(search_program, scripts.files.FileHandler.GetSpeciesFastaFN(iFasta), scripts.files.FileHandler.GetSpeciesDatabaseN(iDB, search_program), scripts.files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)) for iFasta, iDB in speciesPairs]
     return commands     
 
 """
@@ -474,13 +474,13 @@ class WaterfallMethod:
             return sparse.lil_matrix(B.get_shape())
             
     @staticmethod
-    def ProcessBlastHits(seqsInfo, blastDir, Lengths, iSpecies, qDoubleBlast):
+    def ProcessBlastHits(seqsInfo, blastDir_list, Lengths, iSpecies, qDoubleBlast):
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
             # process up to the best hits for each species
             Bi = []
             for jSpecies in xrange(seqsInfo.nSpecies):
-                Bij = BlastFileProcessor.GetBLAST6Scores(seqsInfo, blastDir, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)  
+                Bij = BlastFileProcessor.GetBLAST6Scores(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)  
                 Bij = WaterfallMethod.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
                 Bi.append(Bij)
             matrices.DumpMatrixArray("B", Bi, iSpecies)
@@ -1274,9 +1274,9 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast):
     # Process BLAST hits
     util.PrintTime("Initial processing of each species")
     cmd_queue = mp.Queue()
-    blastDir = scripts.files.FileHandler.GetBlastResultsDir()
+    blastDir_list = scripts.files.FileHandler.GetBlastResultsDir()
     for iSpecies in xrange(seqsInfo.nSpecies):
-        cmd_queue.put((seqsInfo, blastDir, Lengths, iSpecies))
+        cmd_queue.put((seqsInfo, blastDir_list, Lengths, iSpecies))
     runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, qDoubleBlast)) for i_ in xrange(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
@@ -1311,7 +1311,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast):
     # Write Orthogroup FASTA files    
     ogSet = scripts.orthologues.OrthoGroupsSet(scripts.files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll, idExtractor = scripts.util.FirstWordExtractor)
     treeGen = scripts.trees_msa.TreesForOrthogroups(None, None, None)
-    fastaWriter = scripts.trees_msa.FastaWriter(scripts.files.FileHandler.GetSpeciesSeqsDir())
+    fastaWriter = scripts.trees_msa.FastaWriter(scripts.files.FileHandler.GetSpeciesSeqsDir(), speciesInfoObj.speciesToUse)
     d_seqs = scripts.files.FileHandler.GetResultsSeqsDir()
     if not os.path.exists(d_seqs): os.mkdir(d_seqs)
     treeGen.WriteFastaFiles(fastaWriter, ogSet.OGs(qInclAll=True), idsDict, False)
@@ -1327,7 +1327,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast):
     return statsFile, summaryText, orthogroupsResultsFilesString
 
 # 0
-def ProcessPreviousFiles(workingDir, qDoubleBlast):
+def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
     """Checks for:
     workingDir should be the WorkingDirectory containing Blast*.txt files
     
@@ -1340,21 +1340,21 @@ def ProcessPreviousFiles(workingDir, qDoubleBlast):
     
     """
     # check BLAST results directory exists
-    if not os.path.exists(workingDir):
-        print("Previous/Pre-calculated BLAST results directory does not exist: %s\n" % workingDir)
-        util.Fail()
+    if not os.path.exists(workingDir_list[0]):
+        err_text = "Previous/Pre-calculated BLAST results directory does not exist: %s\n" % workingDir_list[0]
+        scripts.files.FileHandler.LogFailAndExit(err_text)
         
     speciesInfo = scripts.files.SpeciesInfo()
     if not os.path.exists(scripts.files.FileHandler.GetSpeciesIDsFN()):
-        print("%s file must be provided if using previously calculated BLAST results" % scripts.files.FileHandler.GetSpeciesIDsFN())
-        util.Fail()
+        err_text = "%s file must be provided if using previously calculated BLAST results" % scripts.files.FileHandler.GetSpeciesIDsFN()
+        scripts.files.FileHandler.LogFailAndExit(err_text)
     speciesInfo.speciesToUse, speciesInfo.nSpAll, speciesToUse_names = util.GetSpeciesToUse(scripts.files.FileHandler.GetSpeciesIDsFN())
  
     # check fasta files are present 
     previousFastaFiles = scripts.files.FileHandler.GetSortedSpeciesFastaFiles()
     if len(previousFastaFiles) == 0:
-        print("No processed fasta files in the supplied previous working directory: %s\n" % workingDir)
-        util.Fail()
+        err_text = "No processed fasta files in the supplied previous working directory:\n" + workingDir_list + "\n"
+        scripts.files.FileHandler.LogFailAndExit(err_text)
     tokens = previousFastaFiles[-1][:-3].split("Species")
     lastFastaNumberString = tokens[-1]
     iLastFasta = 0
@@ -1362,11 +1362,9 @@ def ProcessPreviousFiles(workingDir, qDoubleBlast):
     try:
         iLastFasta = int(lastFastaNumberString)
     except:
-        print("Filenames for processed fasta files are incorrect: %s\n" % previousFastaFiles[-1])
-        util.Fail()
+        scripts.files.FileHandler.LogFailAndExit("Filenames for processed fasta files are incorrect: %s\n" % previousFastaFiles[-1])
     if nFasta != iLastFasta + 1:
-        print("Not all expected fasta files are present. Index of last fasta file is %s but found %d fasta files.\n" % (lastFastaNumberString, len(previousFastaFiles)))
-        util.Fail()
+        scripts.files.FileHandler.LogFailAndExit("Not all expected fasta files are present. Index of last fasta file is %s but found %d fasta files.\n" % (lastFastaNumberString, len(previousFastaFiles)))
     
     # check BLAST files
     blast_fns_triangular = [scripts.files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies >= iSpecies]
@@ -1381,19 +1379,17 @@ def ProcessPreviousFiles(workingDir, qDoubleBlast):
             for qHave, fn in zip(have_remainder, blast_fns_remainder):
                 if not qHave: print("BLAST results file is missing: %s" % fn)
             if not all(have_triangular):
-                util.Fail()
+                scripts.files.FileHandler.LogFailAndExit()
             else:
                 # would be able to do it using just one-way blast
-                print("Required BLAST results files are present for using the one-way sequence search option (default) but not the double BLAST search ('-d' option)")
-                util.Fail()
+                scripts.files.FileHandler.LogFailAndExit("ERROR: Required BLAST results files are present for using the one-way sequence search option (default) but not the double BLAST search ('-d' option)")
     else:
         if not all(have_triangular):
-            util.Fail()
+            scripts.files.FileHandler.LogFailAndExit()
                             
     # check SequenceIDs.txt and SpeciesIDs.txt files are present
     if not os.path.exists(scripts.files.FileHandler.GetSequenceIDsFN()):
-        print("%s file must be provided if using previous calculated BLAST results" % scripts.files.FileHandler.GetSequenceIDsFN())
-        util.Fail()
+        scripts.files.FileHandler.LogFailAndExit("ERROR: %s file must be provided if using previous calculated BLAST results" % scripts.files.FileHandler.GetSequenceIDsFN())
     return speciesInfo, speciesToUse_names
 
 # 6
@@ -1435,11 +1431,11 @@ def RunSearch(options, speciessInfoObj, seqsInfo, program_caller):
     # remove BLAST databases
     util.PrintTime("Done all-versus-all sequence search")
     if options.search_program == "blast":
-        for f in glob.glob(scripts.files.FileHandler.GetWorkingDirectory1_Read() + "BlastDBSpecies*"):
+        for f in glob.glob(scripts.files.FileHandler.GetWorkingDirectory1_Read()[0] + "BlastDBSpecies*"):
             os.remove(f)
     if options.search_program == "mmseqs":
-        for i in xrange(dirs.nSpAll):
-            for j in xrange(dirs.nSpAll):
+        for i in xrange(speciessInfoObj.nSpAll):
+            for j in xrange(speciessInfoObj.nSpAll):
                 tmp_dir = "/tmp/tmpBlast%d_%d.txt" % (i,j)
                 if os.path.exists(tmp_dir):
                     try:
@@ -1506,8 +1502,8 @@ def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_na
         speciesInfoObj = speciesInfoObj_prev
     iSeq = 0
     iSpecies = 0
-    # check if SpeciesIDs.txt already exists
-    if os.path.exists(scripts.files.FileHandler.GetSpeciesIDsFN()):
+    # If it's a previous analysis:
+    if len(speciesToUse_prev_names) != 0:
         with open(scripts.files.FileHandler.GetSpeciesIDsFN(), 'rb') as infile:
             for line in infile: pass
         if line.startswith("#"): line = line[1:]
@@ -1517,7 +1513,7 @@ def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_na
     with open(scripts.files.FileHandler.GetSequenceIDsFN(), 'ab') as idsFile, open(scripts.files.FileHandler.GetSpeciesIDsFN(), 'ab') as speciesFile:
         for fastaFilename in originalFastaFilenames:
             newSpeciesIDs.append(iSpecies)
-            outputFasta = open(scripts.files.FileHandler.GetSpeciesFastaFN(iSpecies), 'wb')
+            outputFasta = open(scripts.files.FileHandler.GetSpeciesFastaFN(iSpecies, qForCreation=True), 'wb')
             fastaFilename = fastaFilename.rstrip()
             speciesFile.write("%d: %s\n" % (iSpecies, fastaFilename))
             baseFilename, extension = os.path.splitext(fastaFilename)
@@ -1576,12 +1572,12 @@ if __name__ == "__main__":
         
         scripts.files.InitialiseFileHandler(options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault)     
                     
-        CheckDependencies(options, program_caller, scripts.files.FileHandler.GetWorkingDirectory1_Read()) 
+        CheckDependencies(options, program_caller, scripts.files.FileHandler.GetWorkingDirectory1_Read()[0]) 
             
         # if using previous Trees etc., check these are all present - Job for orthologues
         if options.qStartFromBlast and options.qStartFromFasta:
             # 0. Check Files
-            speciesInfoObj, speciesToUse_names = ProcessPreviousFiles(continuationDir, options.qDoubleBlast)
+            speciesInfoObj, speciesToUse_names = ProcessPreviousFiles(scripts.files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast)
             print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, continuationDir))
             # 3. 
             speciesInfoObj = ProcessesNewFasta(fastaDir, speciesInfoObj, speciesToUse_names)
@@ -1635,7 +1631,7 @@ if __name__ == "__main__":
             # 0.
             speciesInfoObj, _ = ProcessPreviousFiles(scripts.files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast)
             scripts.files.FileHandler.LogSpecies()
-            print("Using previously calculated BLAST results in %s" % scripts.files.FileHandler.GetWorkingDirectory1_Read()) 
+            print("Using previously calculated BLAST results in %s" % (scripts.files.FileHandler.GetWorkingDirectory1_Read()[0]))
             options = CheckOptions(options)
             # 4.
             seqsInfo = util.GetSeqsInfo(scripts.files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
