@@ -663,7 +663,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
         # Number of genes
         allGenesCounter = Counter([g[0] for g in allGenes])
         nGenes = sum(allGenesCounter.values())
-#        writer_sum.writerow(["Number of species", len(iSpecies)])
+        writer_sum.writerow(["Number of species", len(iSpecies)])
         writer_sp.writerow(["Number of genes"] + [allGenesCounter[iSp] for iSp in iSpecies])
         writer_sum.writerow(["Number of genes", nGenes])
         
