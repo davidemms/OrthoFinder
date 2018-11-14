@@ -48,7 +48,7 @@ class FastaWriter(object):
         qFirst = True
         accession = ""
         sequence = ""
-        required_files = set(["Speices%d.fa" for i in speciesToUse])
+        required_files = set(["Species%d.fa" %i for i in speciesToUse])
         for d in fastaFileDir_list:
             for fn in glob.glob(d + "Species*.fa"):
                 if os.path.basename(fn) not in required_files: continue
@@ -309,7 +309,7 @@ class TreesForOrthogroups(object):
         resultsDirsFullPath = [files.FileHandler.GetResultsSeqsDir(), files.FileHandler.GetResultsAlignDir(), files.FileHandler.GetResultsTreesDir()]
         
         # 1.
-        fastaWriter = FastaWriter(files.FileHandler.GetSpeciesSeqsDir())
+        fastaWriter = FastaWriter(files.FileHandler.GetSpeciesSeqsDir(), speciesToUse)
         self.WriteFastaFiles(fastaWriter, ogs, idDict, True)
         if qStopAfterSeqs: return resultsDirsFullPath
 
