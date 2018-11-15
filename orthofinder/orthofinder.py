@@ -249,7 +249,7 @@ class MCL:
             fileWriter_counts = csv.writer(outFile_counts, delimiter="\t")
             singleGeneWriter = csv.writer(singleGeneFile, delimiter="\t")
             for writer in [fileWriter, singleGeneWriter]:
-                row = [""] + [speciesNamesDict[index] for index in speciesToUse]
+                row = ["Orthogroup"] + [speciesNamesDict[index] for index in speciesToUse]
                 writer.writerow(row)
             fileWriter_counts.writerow(row + ['Total'])
             
