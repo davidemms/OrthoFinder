@@ -817,6 +817,7 @@ def PrintHelp(program_caller):
     print(" -x <file>         Info for outputting results in OrthoXML format")
     print(" -p <dir>          Write the temporary pickle files to <dir>")
     print(" -1                Only perform one-way sequence search ")
+    print(" -X                Don't add species names to sequence IDs")
     print(" -n <txt>          Name to append to the results directory")  
     print(" -o <txt>          Non-default results directory")  
     print(" -h                Print this help text")
@@ -889,6 +890,7 @@ class Options(object):#
         self.qStopAfterAlignments = False
         self.qStopAfterTrees = False
         self.qMSATrees = False
+        self.qAddSpeciesToIDs = True
         self.search_program = "diamond"
         self.msa_program = None
         self.tree_program = None
@@ -987,6 +989,8 @@ def ProcessArgs(program_caller):
                 util.Fail()   
         elif arg == "-1":
             options.qDoubleBlast = False
+        elif arg == "-X":
+            options.qAddSpeciesToIDs = False
         elif arg == "-I" or arg == "--inflation":
             if len(args) == 0:
                 print("Missing option for command line argument %s\n" % arg)
@@ -1262,7 +1266,7 @@ def CheckDependencies(options, program_caller, dirForTempFiles):
             print("Either install the required dependencies or use the option '-og' to stop the analysis after the inference of orthogroups.\n")
             util.Fail()
 
-def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast):
+def DoOrthogroups(options, speciesInfoObj, seqsInfo):
     # Run Algorithm, cluster and output cluster files with original accessions
     util.PrintUnderline("Running OrthoFinder algorithm")
     # it's important to free up the memory from python used for processing the genomes
@@ -1277,7 +1281,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast):
     blastDir_list = scripts.files.FileHandler.GetBlastResultsDir()
     for iSpecies in xrange(seqsInfo.nSpecies):
         cmd_queue.put((seqsInfo, blastDir_list, Lengths, iSpecies))
-    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, qDoubleBlast)) for i_ in xrange(options.nProcessAlg)]
+    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, options.qDoubleBlast)) for i_ in xrange(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
     util.ManageQueue(runningProcesses, cmd_queue)
@@ -1309,7 +1313,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, qDoubleBlast):
     orthogroupsResultsFilesString = MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesInfoObj.speciesToUse, resultsBaseFilename)
     
     # Write Orthogroup FASTA files    
-    ogSet = scripts.orthologues.OrthoGroupsSet(scripts.files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll, idExtractor = scripts.util.FirstWordExtractor)
+    ogSet = scripts.orthologues.OrthoGroupsSet(scripts.files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll, options.qAddSpeciesToIDs, idExtractor = scripts.util.FirstWordExtractor)
     treeGen = scripts.trees_msa.TreesForOrthogroups(None, None, None)
     fastaWriter = scripts.trees_msa.FastaWriter(scripts.files.FileHandler.GetSpeciesSeqsDir(), speciesInfoObj.speciesToUse)
     d_seqs = scripts.files.FileHandler.GetResultsSeqsDir()
@@ -1457,6 +1461,7 @@ def GetOrthologues(dirs, options, program_caller, orthogroupsResultsFilesString=
                                                                     options.nBlast,
                                                                     options.nProcessAlg,
                                                                     options.qDoubleBlast,
+                                                                    options.qAddSpeciesToIDs,
                                                                     options.speciesTreeFN, 
                                                                     options.qStopAfterSeqs,
                                                                     options.qStopAfterAlignments,
@@ -1469,7 +1474,7 @@ def GetOrthologues(dirs, options, program_caller, orthogroupsResultsFilesString=
     print(orthologuesResultsFilesString.rstrip())    
 
 def GetOrthologues_FromTrees(options):
-    return orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.speciesTreeFN)
+    return orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.speciesTreeFN, options.qAddSpeciesToIDs)
  
 def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_names=[]):
     """
@@ -1594,7 +1599,7 @@ if __name__ == "__main__":
             # 7.  
             RunSearch(options, speciesInfoObj, seqsInfo, program_caller)
             # 8.
-            statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo, options.qDoubleBlast)
+            statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo)
             # 9.
             if not options.qStopAfterGroups:
                 GetOrthologues(speciesInfoObj, options, program_caller, orthogroupsResultsFilesString)
@@ -1619,7 +1624,7 @@ if __name__ == "__main__":
             # 7. 
             RunSearch(options, speciesInfoObj, seqsInfo, program_caller)
             # 8.  
-            statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo, options.qDoubleBlast)    
+            statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo)    
             # 9. 
             if not options.qStopAfterGroups:
                 GetOrthologues(speciesInfoObj, options, program_caller, orthogroupsResultsFilesString)
@@ -1639,7 +1644,7 @@ if __name__ == "__main__":
             if options.speciesXMLInfoFN:   
                 speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
             # 8        
-            statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo, options.qDoubleBlast)    
+            statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo)    
             # 9
             if not options.qStopAfterGroups:
                 GetOrthologues(speciesInfoObj, options, program_caller, orthogroupsResultsFilesString)

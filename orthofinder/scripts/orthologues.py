@@ -96,7 +96,7 @@ class Seq(object):
 # ==============================================================================================================================
         
 class OrthoGroupsSet(object):
-    def __init__(self, orthofinderWorkingDir_list, speciesToUse, nSpAll, idExtractor = util.FirstWordExtractor):
+    def __init__(self, orthofinderWorkingDir_list, speciesToUse, nSpAll, qAddSpeciesToIDs, idExtractor = util.FirstWordExtractor):
         self.speciesIDsEx = util.FullAccession(files.FileHandler.GetSpeciesIDsFN())
         self._Spec_SeqIDs = None
         self._extractor = idExtractor
@@ -106,6 +106,7 @@ class OrthoGroupsSet(object):
         self.speciesToUse = speciesToUse     # list of ints
         self.seqsInfo = util.GetSeqsInfo(orthofinderWorkingDir_list, self.speciesToUse, nSpAll)
         self.id_to_og = None
+        self.qAddSpeciesToIDs = qAddSpeciesToIDs
 
     def SequenceDict(self):
         if self.seqIDsEx == None:
@@ -128,6 +129,9 @@ class OrthoGroupsSet(object):
         if self._Spec_SeqIDs != None:
             return self._Spec_SeqIDs
         seqs = self.SequenceDict()
+        if not self.qAddSpeciesToIDs:
+            self._Spec_SeqIDs = seqs
+            return seqs
         specs = self.SpeciesDict()
         specs_ed = {k:v.replace(".", "_").replace(" ", "_") for k,v in specs.items()}
         self._Spec_SeqIDs = {seqID:specs_ed[seqID.split("_")[0]] + "_" + name for seqID, name in seqs.items()}
@@ -816,7 +820,7 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=No
 #    print("Identified %d orthologues" % nOrthologues)
         
                 
-def OrthologuesFromTrees(recon_method, nHighParallel, userSpeciesTree_fn):
+def OrthologuesFromTrees(recon_method, nHighParallel, userSpeciesTree_fn, qAddSpeciesToIDs):
     """
     userSpeciesTree_fn - None if not supplied otherwise rooted tree using user species names (not orthofinder IDs)
     qUserSpTree - is the speciesTree_fn user-supplied
@@ -824,7 +828,7 @@ def OrthologuesFromTrees(recon_method, nHighParallel, userSpeciesTree_fn):
     Just infer orthologues from trees, don't do any of the preceeding steps.
     """
     speciesToUse, nSpAll, _ = util.GetSpeciesToUse(files.FileHandler.GetSpeciesIDsFN())    
-    ogSet = OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesToUse, nSpAll, idExtractor = util.FirstWordExtractor)
+    ogSet = OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesToUse, nSpAll, qAddSpeciesToIDs, idExtractor = util.FirstWordExtractor)
     if userSpeciesTree_fn != None:
         speciesDict = files.FileHandler.GetSpeciesDict()
         speciesToUseNames = [speciesDict[str(iSp)] for iSp in ogSet.speciesToUse]
@@ -847,6 +851,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
                        nHighParallel,
                        nLowParrallel,
                        qDoubleBlast,
+                       qAddSpeciesToIDs,
                        userSpeciesTree = None, 
                        qStopAfterSeqs = False,
                        qStopAfterAlign = False,
@@ -868,7 +873,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
     Variables:
     - ogSet - all the relevant information about the orthogroups, species etc.
     """
-    ogSet = OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesToUse, nSpAll, idExtractor = util.FirstWordExtractor)
+    ogSet = OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesToUse, nSpAll, qAddSpeciesToIDs, idExtractor = util.FirstWordExtractor)
     
     tree_generation_method = "msa" if qMSA or qPhyldog else "dendroblast"
     stop_after = "seqs" if qStopAfterSeqs else "align" if qStopAfterAlign else ""
