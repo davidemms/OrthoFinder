@@ -203,7 +203,7 @@ def OverlapSize(node, GeneToSpecies):
     intersection = descendents[0].intersection(descendents[1])
     return len(intersection), intersection, descendents[0], descendents[1]
 
-def ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, relOverlapCutoff=4):
+def ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, GeneToSpecies, relOverlapCutoff=4):
     """
     Is an overlap suspicious and if so can ift be resolved by identifying genes that are out of place?
     Args:
@@ -231,18 +231,18 @@ def ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, relOverlapCutoff=4):
     nB_removed = 0
     qResolved = True
     for sp in overlap:
-        A = [g for g in ch[0].get_leaf_names() if g.split("_")[0] == sp]
-        B = [g for g in ch[1].get_leaf_names() if g.split("_")[0] == sp]
+        A = [g for g in ch[0].get_leaf_names() if GeneToSpecies(g) == sp]
+        B = [g for g in ch[1].get_leaf_names() if GeneToSpecies(g) == sp]
         A_levels = []
         B_levels = []
         for X, level in zip((A,B),(A_levels, B_levels)):
             for g in X:
                 gene_node = tree & g
                 r = gene_node.up
-                nextSpecies = set([gg.split("_")[0] for gg in r.get_leaf_names()])
+                nextSpecies = set([GeneToSpecies(gg) for gg in r.get_leaf_names()])
                 while len(nextSpecies) == 1:
                     r = r.up
-                    nextSpecies = set([gg.split("_")[0] for gg in r.get_leaf_names()])
+                    nextSpecies = set([GeneToSpecies(gg) for gg in r.get_leaf_names()])
 #                print((g, sp,nextSpecies))
                 nextSpecies.remove(sp)
                 # get the level
@@ -311,7 +311,7 @@ def GetOrthologues_from_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, ne
         if len(ch) == 2: 
             oSize, overlap, sp0, sp1 = OverlapSize(n, GeneToSpecies)
             if oSize != 0:
-                qResolved, misplaced_genes = ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours)
+                qResolved, misplaced_genes = ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, GeneToSpecies)
             else:
                 misplaced_genes = empty_set
             if oSize != 0 and not qResolved:
