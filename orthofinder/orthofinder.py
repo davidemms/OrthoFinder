@@ -1345,19 +1345,19 @@ def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
     """
     # check BLAST results directory exists
     if not os.path.exists(workingDir_list[0]):
-        err_text = "Previous/Pre-calculated BLAST results directory does not exist: %s\n" % workingDir_list[0]
+        err_text = "ERROR: Previous/Pre-calculated BLAST results directory does not exist: %s\n" % workingDir_list[0]
         scripts.files.FileHandler.LogFailAndExit(err_text)
         
     speciesInfo = scripts.files.SpeciesInfo()
     if not os.path.exists(scripts.files.FileHandler.GetSpeciesIDsFN()):
-        err_text = "%s file must be provided if using previously calculated BLAST results" % scripts.files.FileHandler.GetSpeciesIDsFN()
+        err_text = "ERROR: %s file must be provided if using previously calculated BLAST results" % scripts.files.FileHandler.GetSpeciesIDsFN()
         scripts.files.FileHandler.LogFailAndExit(err_text)
     speciesInfo.speciesToUse, speciesInfo.nSpAll, speciesToUse_names = util.GetSpeciesToUse(scripts.files.FileHandler.GetSpeciesIDsFN())
  
     # check fasta files are present 
     previousFastaFiles = scripts.files.FileHandler.GetSortedSpeciesFastaFiles()
     if len(previousFastaFiles) == 0:
-        err_text = "No processed fasta files in the supplied previous working directory:\n" + workingDir_list + "\n"
+        err_text = "ERROR: No processed fasta files in the supplied previous working directory:\n" + workingDir_list + "\n"
         scripts.files.FileHandler.LogFailAndExit(err_text)
     tokens = previousFastaFiles[-1][:-3].split("Species")
     lastFastaNumberString = tokens[-1]
@@ -1366,9 +1366,9 @@ def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
     try:
         iLastFasta = int(lastFastaNumberString)
     except:
-        scripts.files.FileHandler.LogFailAndExit("Filenames for processed fasta files are incorrect: %s\n" % previousFastaFiles[-1])
+        scripts.files.FileHandler.LogFailAndExit("ERROR: Filenames for processed fasta files are incorrect: %s\n" % previousFastaFiles[-1])
     if nFasta != iLastFasta + 1:
-        scripts.files.FileHandler.LogFailAndExit("Not all expected fasta files are present. Index of last fasta file is %s but found %d fasta files.\n" % (lastFastaNumberString, len(previousFastaFiles)))
+        scripts.files.FileHandler.LogFailAndExit("ERROR: Not all expected fasta files are present. Index of last fasta file is %s but found %d fasta files.\n" % (lastFastaNumberString, len(previousFastaFiles)))
     
     # check BLAST files
     blast_fns_triangular = [scripts.files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies >= iSpecies]
