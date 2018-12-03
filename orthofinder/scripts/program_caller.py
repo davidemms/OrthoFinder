@@ -286,7 +286,14 @@ class ProgramCaller(object):
     def _WriteTestSequence(self, working_dir):
         fn = working_dir + "Species0.fa"
         with open(fn, 'wb') as outfile:
-            outfile.write(">a\nST\n>b\nKL\n>c\nSL\n>d\nKT")
+            outfile.write(""">A
+MSKVIELKGIYAKYNKKSDYILEDLNLNVESGEFIAIIGPSGVGKSTLFKVIVNALEISKGSVRLFGQNI
+>B
+MLKLLSKFPLKVKLMALFAVILSTLHPFLSILIPTVTRQLITYLANSNINSEVSVYIFKSSWIIGSFSYA
+>C
+MQITVKDLVHTFLAKTPYELNAIDNINVTIKQGEFVGVIGQTGSGKTTFIEHLNALLLPSAGSVEWVFEN
+>D
+MIKVTDLMFKYPSAQANAIEKLNLEIESGKYVAILGHNGSGKSTFSKLLVALYKPADGKIELDGTTISKE""")
         return fn
         
     def _WriteTestSequence_Longer(self, working_dir):
