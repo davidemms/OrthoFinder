@@ -1485,8 +1485,19 @@ def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_na
     if not os.path.exists(fastaDir):
         print("\nDirectory does not exist: %s" % fastaDir)
         util.Fail()
-    originalFastaFilenames = sorted([f for f in os.listdir(fastaDir) if os.path.isfile(os.path.join(fastaDir,f))])
-    originalFastaFilenames = [f for f in originalFastaFilenames if len(f.rsplit(".", 1)) == 2 and f.rsplit(".", 1)[1].lower() in fastaExtensions]
+    files_in_directory = sorted([f for f in os.listdir(fastaDir) if os.path.isfile(os.path.join(fastaDir,f))])
+    originalFastaFilenames = []
+    excludedFiles = []
+    for f in files_in_directory:
+        if len(f.rsplit(".", 1)) == 2 and f.rsplit(".", 1)[1].lower() in fastaExtensions and not f.startswith("._"):
+            originalFastaFilenames.append(f)
+        else:
+            excludedFiles.append(f)
+    if len(excludedFiles) != 0:
+        print("\nWARNING: Files have been ignored as they don't appear to be FASTA files:")
+        for f in excludedFiles:
+            print(f)
+        print("OrthoFinder expects FASTA files to have one of the following extensions: %s" % (", ".join(fastaExtensions)))
     speciesToUse_prev_names = set(speciesToUse_prev_names)
     if len(originalFastaFilenames) + len(speciesToUse_prev_names) < 2:
         print("ERROR: At least two species are required")
