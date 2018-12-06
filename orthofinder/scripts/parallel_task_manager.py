@@ -56,11 +56,11 @@ def _I_Spawn_Processes(message_to_spawner, message_to_PTM, cmds_queue):
             if message == None: 
                 return
             # In which case, thread has been informed that there are tasks in the queue.
-            nParallel, nTasks, qShell, qListOfLists, qHideStdout = message
+            nParallel, nTasks, qShell, qListOfLists = message
             if qListOfLists:
-                runningProcesses = [mp.Process(target=util.Worker_RunOrderedCommandList, args = (cmds_queue, nParallel, nTasks, qShell, qHideStdout)) for i_ in xrange(nParallel)]           
+                runningProcesses = [mp.Process(target=util.Worker_RunOrderedCommandList, args = (cmds_queue, nParallel, nTasks, qShell)) for i_ in xrange(nParallel)]           
             else:
-                runningProcesses = [mp.Process(target=util.Worker_RunCommand, args = (cmds_queue, nParallel, nTasks, qShell, qHideStdout)) for i_ in xrange(nParallel)] 
+                runningProcesses = [mp.Process(target=util.Worker_RunCommand, args = (cmds_queue, nParallel, nTasks, qShell)) for i_ in xrange(nParallel)] 
             for proc in runningProcesses:
                 proc.start()
             for proc in runningProcesses:
@@ -98,7 +98,7 @@ class ParallelTaskManager_singleton:
         if not ParallelTaskManager_singleton.instance:
             ParallelTaskManager_singleton.instance = ParallelTaskManager_singleton.__Singleton()
         
-    def RunParallel(self, cmd_list, qListOfLists, nParallel, qShell, qHideStdout):
+    def RunParallel(self, cmd_list, qListOfLists, nParallel, qShell):
         """
         Args:
             cmd_list - list of commands or list of lists of commands (in which elelments in inner list must be run in order)
@@ -109,7 +109,7 @@ class ParallelTaskManager_singleton:
         nTasks = len(cmd_list)
         for i, x in enumerate(cmd_list):
             self.instance.cmds_queue.put((i, x))
-        self.instance.message_to_spawner.put((nParallel, nTasks, qShell, qListOfLists, qHideStdout))
+        self.instance.message_to_spawner.put((nParallel, nTasks, qShell, qListOfLists))
         while True:
             try:
                 signal = self.instance.message_to_PTM.get()

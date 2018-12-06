@@ -92,8 +92,8 @@ def RunBlastDBCommand(command):
     stdout = [x for x in capture.stdout]
     stderr = [x for x in capture.stderr]
     nLines_success= 10
-    if len(stdout) > nLines_success or len(stderr) > 0:
-        print("\nWarning:")
+    if len(stdout) > nLines_success or len(stderr) > 0 or capture.returncode != 0:
+        print("\nWARNING:")
         print("".join(stdout[2:]))
         if len(stderr) > 0: print(stderr)
             
@@ -192,7 +192,7 @@ class MCL:
     @staticmethod               
     def RunMCL(graphFilename, clustersFilename, nProcesses, inflation):
         command = ["mcl", graphFilename, "-I", str(inflation), "-o", clustersFilename, "-te", str(nProcesses), "-V", "all"]
-        util.RunCommand(command, qShell=False, qHideOutput=False)
+        util.RunCommand(command, qShell=False, qPrintOnError=True)
         util.PrintTime("Ran MCL")  
     
     @staticmethod
@@ -1407,7 +1407,9 @@ def CreateSearchDatabases(seqsInfoObj, options, program_caller):
         else:
             command = program_caller.GetSearchMethodCommand_DB(options.search_program, scripts.files.FileHandler.GetSpeciesFastaFN(iSp), scripts.files.FileHandler.GetSpeciesDatabaseN(iSp, options.search_program))
             util.PrintTime("Creating %s database %d of %d" % (options.search_program, iSp + 1, nDB))
-            util.RunCommand(command, qHideOutput=True)
+            ret_code = util.RunCommand(command, qPrintOnError=True)
+            if ret_code != 0:
+                scripts.files.FileHandler.LogFailAndExit("ERROR: diamond makedb failed")
 
 # 7
 def RunSearch(options, speciessInfoObj, seqsInfo, program_caller):

@@ -454,7 +454,7 @@ class DendroBLASTTrees(object):
                 cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs)
                 cmds_trees = [[cmd_spTree]] + cmds_trees
         util.PrintUnderline("Inferring gene and species trees")
-        util.RunParallelOrderedCommandLists(self.nProcesses, cmds_trees, qHideStdout = True)
+        util.RunParallelOrderedCommandLists(self.nProcesses, cmds_trees)
         if qSTAG:
             # Trees must have been completed
             print("")
@@ -479,7 +479,7 @@ class DendroBLASTTrees(object):
             ogMatrices = self.CompleteOGMatrices(ogs, ogMatrices_partial)
             D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
             cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs, True)
-            util.RunOrderedCommandList([cmd_spTree], True, True)
+            util.RunOrderedCommandList([cmd_spTree], True)
         spTreeUnrootedFN = files.FileHandler.GetSpeciesTreeUnrootedFN(True) 
         util.RenameTreeTaxa(spTreeFN_ids, spTreeUnrootedFN, self.ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True)  
         return spTreeFN_ids

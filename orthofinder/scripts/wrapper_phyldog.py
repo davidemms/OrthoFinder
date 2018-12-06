@@ -214,7 +214,7 @@ def RunPhyldogAnalysis(phyldogDir, ogs, speciesToUse, nParallel):
     if qRunSingley:
         nOGs = len(ogs)
         cmds = [["mpirun -np 2 phyldog param=%s%s"  % (phyldogDir, "GeneralOptions_OG%07d.opt" % i)] for i in xrange(nOGs)]
-        util.RunParallelCommands(nParallel, cmds, True, qHideStdout=True)
+        util.RunParallelCommands(nParallel, cmds, True)
     else:
         subprocess.call("mpirun -np %d phyldog param=GeneralOptions.opt" % nParallel, shell=True, cwd=phyldogDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stop = time.time()

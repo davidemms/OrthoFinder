@@ -123,7 +123,7 @@ def RunDlcpar(ogSet, speciesTreeFN, workingDir, nParallel, qDeepSearch):
         dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -i %d --nprescreen 100 --nconverge %d' % (speciesTreeFN, geneMapFN, fn, i, n) for (fn, i, n) in zip(filenames, nIter, nNoImprov)]
     else:
         dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -x 1' % (speciesTreeFN, geneMapFN, fn) for fn in filenames]
-    util.RunParallelOrderedCommandLists(nParallel, [[c] for c in dlcCommands], qHideStdout = True)
+    util.RunParallelOrderedCommandLists(nParallel, [[c] for c in dlcCommands])
     return dlcparResultsDir, "OG%07d_tree_id.dlcpar.locus.tree"
 
 
