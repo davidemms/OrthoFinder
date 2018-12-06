@@ -89,6 +89,7 @@ if getattr(sys, 'frozen', False):
          
 def RunBlastDBCommand(command):
     capture = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
+    capture.wait()
     stdout = [x for x in capture.stdout]
     stderr = [x for x in capture.stderr]
     nLines_success= 10
