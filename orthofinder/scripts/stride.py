@@ -414,7 +414,10 @@ Parallelisation wrappers
 
 def SupportedHierachies_wrapper(treeName, GeneToSpecies, species, dict_clades, clade_names, qWriteDupTrees=False):
     if not os.path.exists(treeName): return [], []
-    t = tree.Tree(treeName, format=1)
+    try:
+        t = tree.Tree(treeName, format=1)
+    except:
+        return [], []
     G = set(t.get_leaf_names())
     S = set(map(GeneToSpecies, G))
     if not S.issubset(species):
