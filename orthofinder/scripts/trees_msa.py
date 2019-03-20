@@ -324,7 +324,12 @@ class TreesForOrthogroups(object):
         if qStopAfterAlignments:
             util.PrintUnderline("Inferring multiple sequence alignments")
             pc.RunParallelCommandsAndMoveResultsFile(nProcesses, alignCommands_and_filenames, False)
-            if qDoSpeciesTree: CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn, fSingleCopy)
+            if qDoSpeciesTree:
+                CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn, fSingleCopy)
+                # write OGs used to file
+                dSpeciesTree = os.path.split(files.FileHandler.GetSpeciesTreeResultsFN(0, True))[0] + "/"
+                with open(dSpeciesTree + "Orthogroups_for_concatenated_alignment.txt", 'wb') as outfile:
+                    for iog in iOgsForSpeciesTree: outfile.write("OG%07d\n" % iog)
             # ids -> accessions
             alignmentFilesToUse = [self.GetAlignmentFilename(i) for i, _ in enumerate(alignCommands_and_filenames)]        
             accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in xrange(len(alignmentFilesToUse))]
@@ -351,6 +356,10 @@ class TreesForOrthogroups(object):
                 commands_and_filenames.append([alignCommands_and_filenames[i], treeCommands_and_filenames[i]])
             pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
             CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn, fSingleCopy)
+            # write OGs used to file
+            dSpeciesTree = os.path.split(files.FileHandler.GetSpeciesTreeResultsFN(0, True))[0] + "/"
+            with open(dSpeciesTree + "Orthogroups_for_concatenated_alignment.txt", 'wb') as outfile:
+                for iog in iOgsForSpeciesTree: outfile.write("OG%07d\n" % iog)
             # Add species tree to list of commands to run
             commands_and_filenames = [self.program_caller.GetTreeCommands(self.tree_program, [concatenated_algn_fn], [speciesTreeFN_ids], ["SpeciesTree"])]
             util.PrintUnderline("Inferring remaining multiple sequence alignments and gene trees") 
