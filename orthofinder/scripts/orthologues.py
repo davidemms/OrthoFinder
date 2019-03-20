@@ -442,7 +442,9 @@ class DendroBLASTTrees(object):
         util.PrintTime("Done")
         cmds_trees = self.PrepareGeneTreeCommand()
         qLessThanFourSpecies = len(self.ogSet.seqsInfo.speciesToUse) < 4
-        if qLessThanFourSpecies:
+        if not qSpeciesTree:
+            qSTAG = False
+        elif qLessThanFourSpecies:
             qSTAG = False
             spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
             WriteSpeciesTreeIDs_TwoThree(self.ogSet.seqsInfo.speciesToUse, spTreeFN_ids)
@@ -453,7 +455,7 @@ class DendroBLASTTrees(object):
                 D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
                 cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs)
                 cmds_trees = [[cmd_spTree]] + cmds_trees
-        util.PrintUnderline("Inferring gene and species trees")
+        util.PrintUnderline("Inferring gene and species trees" if qSpeciesTree else "Inferring gene trees")
         util.RunParallelOrderedCommandLists(self.nProcesses, cmds_trees)
         if qSTAG:
             # Trees must have been completed
@@ -927,7 +929,9 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
             species_tree_ids_labelled_phyldog = wrapper_phyldog.RunPhyldogAnalysis(files.FileHandler.GetPhyldogWorkingDirectory(), ogSet.OGs(), speciesToUse, nHighParallel)
     else:
         db = DendroBLASTTrees(ogSet, nLowParrallel, qDoubleBlast)
-        spTreeFN_ids, qSTAG = db.RunAnalysis()
+        spTreeFN_ids, qSTAG = db.RunAnalysis(userSpeciesTree == None)
+        if userSpeciesTree != None:
+            spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
     files.FileHandler.LogWorkingDirectoryTrees()
     qSpeciesTreeSupports = False if (userSpeciesTree or qMSA or qPhyldog) else qSTAG
     """
@@ -987,7 +991,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
         for r in roots: print("  " + (", ".join([spDict[s] for s in r]))  )
         qMultiple = len(roots) > 1
     shutil.copy(rootedSpeciesTreeFN[0], files.FileHandler.GetSpeciesTreeIDsRootedFN())
-        
+
     """
     SpeciesTree:
     We now have a list of rooted species trees: rootedSpeciesTreeFN (this should be recorded by the file handler)
