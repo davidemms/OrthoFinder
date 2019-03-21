@@ -438,7 +438,7 @@ def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qSupport, qFixNegati
         if label != None:
             with open(newTreeFilename, 'wb') as outfile:
                 outfile.write(t.write(format=3)[:-1] + label + "0;")  # internal + terminal branch lengths, leaf names, node names. (tree library won't label root node)
-        elif t.name != "":
+        elif t.name == "N0" or t.name == "n0":
             with open(newTreeFilename, 'wb') as outfile:
                 outfile.write(t.write(format=3)[:-1] + t.name + ";")  # internal + terminal branch lengths, leaf names, node names. (tree library won't label root node)
         else:
