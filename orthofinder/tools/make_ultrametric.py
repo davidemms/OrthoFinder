@@ -23,7 +23,7 @@ def CheckTree(t):
         print("Input tree must be rooted")
         Fail()
 
-def main(tree_fn):
+def main(tree_fn, r=None):
     if not os.path.exists(tree_fn):
         print("Input tree file does not exist: %s" % tree_fn)
     t = tree.Tree(tree_fn, format=1)
@@ -52,12 +52,19 @@ def main(tree_fn):
             f = (d-x)/(y + z)
             n.dist = f * n.dist
         print("Branch length for ultrametric tree: %f" % n.dist)
+    if r != None:
+        x = r/d
+        print("\nRescaling branch lengths by factor of %0.2f so that root age is %f" % (x, r))
+        for n in t.traverse():
+            if n.is_root(): continue
+            n.dist = x * n.dist
     outfn = tree_fn + ".ultrametric.tre"
     t.write(outfile=outfn, format=5)
     print("\nUltrametric tree written to: %s\n" % outfn)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("tree_fn")
+    parser = argparse.ArgumentParser(description="Modify branch lengths on a rooted tree so that it is ultrametric")
+    parser.add_argument("tree_fn", help="File containing a rooted tree in newick format")
+    parser.add_argument("-r", "--root_age", type=float, help="Rescale branch lengths by a multiplicative factor to achieve requested root age")
     args = parser.parse_args()
-    main(args.tree_fn)
+    main(args.tree_fn, args.root_age)
