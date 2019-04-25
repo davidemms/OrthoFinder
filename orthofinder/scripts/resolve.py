@@ -6,10 +6,12 @@ Created on Thu Jul 27 14:15:17 2017
 """  
 import parallel_task_manager
 
+import os
 import glob
 import argparse
 import tree as tree_lib
 
+import util
 import trees2ologs_of as om1
     
 def DetachAndCleanup(top, n):
@@ -325,6 +327,32 @@ def resolve(n, M):
         return n.get_tree_root()
     return n.get_tree_root()
 
+def SpeciesOverlapDuplications(tree, GeneToSpecies):
+    import numpy as np
+    import itertools
+    species = list(set(map(GeneToSpecies, tree.get_leaf_names())))
+    genes = tree.get_leaf_names()
+    gDict = {gene:i for i,gene in enumerate(genes)}
+    sDict = {sp:i for i,sp in enumerate(species)}
+    for n in tree.traverse('postorder'):
+        if n.is_leaf(): continue
+        ch = n.get_children()
+        if len(ch) == 2:
+            l0 = ch[0].get_leaf_names()
+            l1 = ch[1].get_leaf_names()
+            s0 = {GeneToSpecies(l) for l in l0}
+            s1 = {GeneToSpecies(l) for l in l1}
+            if s0&s1:
+                n.name = "D"
+            else:
+                n.name = "S"
+        elif len(ch) > 2:
+            sp = [{GeneToSpecies(l) for l in c.get_leaf_names()} for c in ch]
+            if any(sp0&sp1 for sp0, sp1 in itertools.combinations(sp, 2)):
+                n.name = "D"
+            else:
+                n.name = "S"
+
 def NumberOfOrthologues(tree, GeneToSpecies):
     import numpy as np
     import itertools
@@ -376,8 +404,39 @@ class Finalise(object):
     def __exit__(self, type, value, traceback):
         ptm = parallel_task_manager.ParallelTaskManager_singleton()
         ptm.Stop()
-        
-def Resolve_Main(trees_fn_or_dir, species_tree_rooted_fn, GeneToSpecies, qTest):   
+
+def DoTrees(trees_queue, GeneToSpecies, out_dir, species_tree_rooted, qResolve):
+    import Queue
+    # Root using species tree if provided, otherwise tree should have been rooted already
+    while True:
+        try:
+            trees_fn = trees_queue.get(True, 0.1)
+            # print("Start: " + trees_fn)
+            tree = tree_lib.Tree(trees_fn)
+        #        tree = tree_lib.Tree(trees_fn, format=3)
+            if len(tree) == 1: continue
+            if species_tree_rooted != None:
+                tree.prune(tree.get_leaf_names())
+                roots = om1.GetRoots(tree, species_tree_rooted, GeneToSpecies)
+                if len(roots) == 0: continue
+                # Pick the first root for now
+                root = roots[0]
+                if root != tree:
+                    tree.set_outgroup(root)
+                tree.write(outfile=(out_dir + "/" + os.path.basename(trees_fn) + "_rooted.tre"))
+            if qResolve:
+                om1.StoreSpeciesSets(tree, GeneToSpecies)
+                # Perform full reconciliation
+                for n in tree.traverse("postorder"):
+                    tree = resolve(n, GeneToSpecies)
+            # NumberOfOrthologues(tree, GeneToSpecies)
+            SpeciesOverlapDuplications(tree, GeneToSpecies)
+            # print("Done: " + trees_fn)
+            tree.write(outfile=(out_dir + "/" + os.path.basename(trees_fn) + ".rec.tre"), format=3)
+        except Queue.Empty:
+            return
+
+def Resolve_Main(trees_fn_or_dir, out_dir, species_tree_rooted_fn, GeneToSpecies, nThreads, qResolve=True, qTest=False):
     """
     Resolves the single tree or trees in the directory trees_fn. If no species tree is provided then the gene tree is assumed to 
     be rooted
@@ -385,9 +444,11 @@ def Resolve_Main(trees_fn_or_dir, species_tree_rooted_fn, GeneToSpecies, qTest):
         trees_fn - tree filename or directory containing trees
         species_tree_rooted_fn - species tree used to root the tree. If None then the gene tree is assumed to be rooted already
     """
+    import multiprocessing as mp
     if species_tree_rooted_fn != None:
         species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
-        
+    else:
+        species_tree_rooted = None
     qDir = True
     try:
         tree = tree_lib.Tree(trees_fn_or_dir)
@@ -398,50 +459,31 @@ def Resolve_Main(trees_fn_or_dir, species_tree_rooted_fn, GeneToSpecies, qTest):
             qDir = False
         except:
             pass
-    trees = glob.glob(trees_fn_or_dir + "/*") if qDir else [trees_fn_or_dir] 
-    for trees_fn in trees:
-        # Root using species tree if provided, otherwise tree should have been rooted already
-        tree = tree_lib.Tree(trees_fn)
-#        tree = tree_lib.Tree(trees_fn, format=3)
-        if len(tree) == 1: continue
-        if species_tree_rooted_fn != None:
-            tree.prune(tree.get_leaf_names())
-            roots = om1.GetRoots(tree, species_tree_rooted, GeneToSpecies)
-            if len(roots) == 0: continue
-            # Pick the first root for now
-            root = roots[0]
-            if root != tree:
-                tree.set_outgroup(root)
-            tree.write(outfile=trees_fn+"_rooted.tre")
-        om1.StoreSpeciesSets(tree, GeneToSpecies)  
-        if qTest:
-            # Just perform a single reconciliation (including making move that is flagged but not initially applied in the reconciliation_
-            for iNode, n in enumerate(tree.traverse()):
-                n.dist = float(iNode * 0.01)
-            ch = tree.get_children()
-            if len(ch) != 2:
-                print("ERROR: Not binary")
-                return tree
-            print(tree)
-            n = ch[0] if len(ch[0]) > len(ch[1]) else ch[1]
-            tree = resolve(n, GeneToSpecies)
-            print(tree)
-            if "recon" in tree.features or "recon_2" in tree.features:
-                tree = resolve(tree, GeneToSpecies)
-                print(tree)
-        else:
-            # Perform full reconciliation
-            for n in tree.traverse("postorder"):
-                tree = resolve(n, GeneToSpecies)
-            NumberOfOrthologues(tree, GeneToSpecies)    
-        tree.write(outfile=(trees_fn + ".rec.tre"), format=3)           
-           
+    trees = glob.glob(trees_fn_or_dir + "/*") if qDir else [trees_fn_or_dir]
+
+    # for trees_fn in trees:
+    #     DoTree(trees_fn, GeneToSpecies, out_dir, species_tree_rooted, qTest)
+    import Queue
+    queue = mp.Queue()
+    for t in trees:
+        queue.put(t)
+    # DoTree(trees_fn, GeneToSpecies, out_dir, species_tree_rooted, qTest)
+    runningProcesses = [mp.Process(target=DoTrees, args=(queue, GeneToSpecies, out_dir, species_tree_rooted, qResolve)) for i_ in xrange(nThreads)]
+    for proc in runningProcesses:
+        proc.start()
+    for proc in runningProcesses:
+        proc.join()
+    # util.ManageQueue(runningProcesses, queue)
+
 if __name__ == "__main__":
     with Finalise():
         parser = argparse.ArgumentParser()
         parser.add_argument("gene_tree")
+        parser.add_argument("out_dir")
         parser.add_argument("-r", "--rooted_species_tree")
+        parser.add_argument("-n", "--nthreads", type=int, default=1)
         parser.add_argument("-s", "--separator", choices=("dot", "dash", "second_dash", "3rd_dash", "hyphen"), help="Separator been species name and gene name in gene tree taxa")
-        parser.add_argument("-t", "--test", action="store_true", help="Perform a single operation on the largest node one step down--allows testing of the method")
+        # parser.add_argument("-t", "--test", action="store_true", help="Perform a single operation on the largest node one step down--allows testing of the method")
+        parser.add_argument("--no_resolve", action="store_true", help="Only perform species-overlap duplication analysis")
         args = parser.parse_args()
-        Resolve_Main(args.gene_tree, args.rooted_species_tree, om1.GetGeneToSpeciesMap(args), args.test)
+        Resolve_Main(args.gene_tree, args.out_dir, args.rooted_species_tree, om1.GetGeneToSpeciesMap(args), args.nthreads, not args.no_resolve, False)

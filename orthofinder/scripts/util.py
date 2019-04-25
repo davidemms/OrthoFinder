@@ -193,7 +193,7 @@ def ManageQueue(runningProcesses, cmd_queue):
     nProcesses = len(runningProcesses)
     while True:
         if runningProcesses.count(None) == len(runningProcesses): break
-        time.sleep(2)
+        time.sleep(.1)
 #        for proc in runningProcesses:
         for i in xrange(nProcesses):
             proc = runningProcesses[i]
@@ -203,12 +203,12 @@ def ManageQueue(runningProcesses, cmd_queue):
                     qError = True
                     while True:
                         try:
-                            cmd_queue.get(True, 1)
+                            cmd_queue.get(True, .1)
                         except Queue.Empty:
                             break
                 runningProcesses[i] = None
     if qError:
-        Fail()              
+        Fail()
 
 """ 
 Run a method in parallel
@@ -217,7 +217,7 @@ Run a method in parallel
 def Worker_RunMethod(Function, args_queue):
     while True:
         try:
-            args = args_queue.get(True, 1)
+            args = args_queue.get(True, .1)
             Function(*args)
         except Queue.Empty:
             return 
