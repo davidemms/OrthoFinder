@@ -52,7 +52,7 @@ def _I_Spawn_Processes(message_to_spawner, message_to_PTM, cmds_queue):
     while True:
         try:
             # peak in qoq - it is the only mehtod that tried to remove things from the queue
-            message = message_to_spawner.get(timeout=1)
+            message = message_to_spawner.get(timeout=.1)
             if message == None: 
                 return
             # In which case, thread has been informed that there are tasks in the queue.
@@ -67,9 +67,9 @@ def _I_Spawn_Processes(message_to_spawner, message_to_PTM, cmds_queue):
                 while proc.is_alive():
                     proc.join() 
             message_to_PTM.put("Done")
-            time.sleep(2)
+            time.sleep(1)
         except Queue.Empty:
-            time.sleep(4) # there wasn't anything this time, sleep then try again
+            time.sleep(1) # there wasn't anything this time, sleep then try again
     pass
     
 

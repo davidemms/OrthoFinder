@@ -72,35 +72,39 @@ Command & parallel command management
 -------------------------------------------------------------------------------
 """
 
-def RunCommand(command, qShell=True, qPrintOnError=False):
+def RunCommand(command, qShell=True, qPrintOnError=False, qPrintStderr=True):
     """ Run a single command """
     if qPrintOnError:
-        capture = subprocess.Popen(command, env=my_env, shell=qShell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        returncode = capture.wait()
-        stdout = [x for x in capture.stdout]
-        stderr = [x for x in capture.stderr]
-        if returncode != 0:
-            print("\nERROR: command returned an error, %d" % capture.returncode)
+        popen = subprocess.Popen(command, env=my_env, shell=qShell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = popen.communicate()
+        if popen.returncode != 0:
+            print("\nERROR: external program called by OrthoFinder returned an error code: %d" % popen.returncode)
             print("\nCommand: %s" % command)
-            print("\nstdout\n------\n%s" % "\n".join(stdout))
-            print("stderr\n------\n%s" % "\n".join(stderr))
-        return returncode
+            print("\nstdout\n------\n%s" % stdout)
+            print("stderr\n------\n%s" % stderr)
+        elif qPrintStderr and len(stderr) > 0:
+            print("\nWARNING: program called by OrthoFinder produced output to stderr")
+            print("\nCommand: %s" % command)
+            print("\nstdout\n------\n%s" % stdout)
+            print("stderr\n------\n%s" % stderr)
+        return popen.returncode
     else:
-        subprocess.call(command, env=my_env, shell=qShell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
+        popen = subprocess.Popen(command, env=my_env, shell=qShell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        popen.communicate()
+        return popen.returncode
+
 def RunOrderedCommandList(commandList, qShell=True):
     """ Run a list of commands """
     FNULL = open(os.devnull, 'w')
     for cmd in commandList:
-        subprocess.call(cmd, shell=qShell, stdout=subprocess.PIPE, stderr=FNULL, close_fds=True, env=my_env)
+        popen = subprocess.Popen(cmd, shell=qShell, stdout=subprocess.PIPE, stderr=FNULL, close_fds=True, env=my_env)
+        popen.communicate()
     
 def CanRunCommand(command, qAllowStderr = False, qPrint = True):
     if qPrint: PrintNoNewLine("Test can run \"%s\"" % command)       # print without newline
     capture = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
     stdout = [x for x in capture.stdout]
     stderr = [x for x in capture.stderr]
-#    print(stdout)
-#    print(stderr)
     if len(stdout) > 0 and (qAllowStderr or len(stderr) == 0):
         if qPrint: print(" - ok")
         return True
@@ -112,7 +116,7 @@ def CanRunCommand(command, qAllowStderr = False, qPrint = True):
         for l in stderr: print(l)
         return False
         
-def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qShell=True):
+def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qShell=True, qPrintOnError=False, qPrintStderr=True):
     """ Run commands from queue until the queue is empty """
     while True:
         try:
@@ -120,7 +124,7 @@ def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qShell=True):
             nDone = i - nProcesses + 1
             if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
                 PrintTime("Done %d of %d" % (nDone, nToDo))
-            RunCommand(command, qShell)
+            RunCommand(command, qShell, qPrintOnError, qPrintStderr)
         except Queue.Empty:
             return   
             
@@ -150,7 +154,8 @@ def Worker_RunCommands_And_Move(cmd_and_filename_queue, nProcesses, nToDo, qList
             if not qListOfLists:
                 command_fns_list = [command_fns_list]
             for command, fns in command_fns_list:
-                subprocess.call(command, env=my_env, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                popen = subprocess.Popen(command, env=my_env, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                popen.communicate()
                 if fns != None:
                     actual, target = fns
                     if os.path.exists(actual):

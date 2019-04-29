@@ -89,14 +89,22 @@ if getattr(sys, 'frozen', False):
          
 def RunBlastDBCommand(command):
     capture = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
-    capture.wait()
-    stdout = [x for x in capture.stdout]
-    stderr = [x for x in capture.stderr]
+    stdout, stderr = capture.communicate()
+    n_stdout_lines = stdout.count("\n")
+    n_stderr_lines = stderr.count("\n")
     nLines_success= 10
-    if len(stdout) > nLines_success or len(stderr) > 0 or capture.returncode != 0:
-        print("\nWARNING:")
-        print("".join(stdout[2:]))
-        if len(stderr) > 0: print(stderr)
+    if n_stdout_lines > nLines_success or n_stderr_lines > 0 or capture.returncode != 0:
+        print("\nWARNING: Likely problem with input FASTA files")
+        if capture.returncode != 0:
+            print("makeblastdb returned an error code: %d" % capture.returncode)
+        else:
+            print("makeblastdb produced unexpected output")
+        print("Command: %s" % " ".join(command))
+        print("stdout:\n-------")
+        print(stdout)
+        if len(stderr) > 0:
+            print("stderr:\n-------")
+            print(stderr)
             
 def SpeciesNameDict(speciesIDsFN):
     speciesNamesDict = dict()
@@ -1408,7 +1416,7 @@ def CreateSearchDatabases(seqsInfoObj, options, program_caller):
         else:
             command = program_caller.GetSearchMethodCommand_DB(options.search_program, scripts.files.FileHandler.GetSpeciesFastaFN(iSp), scripts.files.FileHandler.GetSpeciesDatabaseN(iSp, options.search_program))
             util.PrintTime("Creating %s database %d of %d" % (options.search_program, iSp + 1, nDB))
-            ret_code = util.RunCommand(command, qPrintOnError=True)
+            ret_code = util.RunCommand(command, qPrintOnError=True, qPrintStderr=False)
             if ret_code != 0:
                 scripts.files.FileHandler.LogFailAndExit("ERROR: diamond makedb failed")
 
@@ -1429,7 +1437,7 @@ def RunSearch(options, speciessInfoObj, seqsInfo, program_caller):
     cmd_queue = mp.Queue()
     for iCmd, cmd in enumerate(commands):
         cmd_queue.put((iCmd+1, cmd))           
-    runningProcesses = [mp.Process(target=util.Worker_RunCommand, args=(cmd_queue, options.nBlast, len(commands), True)) for i_ in xrange(options.nBlast)]
+    runningProcesses = [mp.Process(target=util.Worker_RunCommand, args=(cmd_queue, options.nBlast, len(commands), True, True)) for i_ in xrange(options.nBlast)]
     for proc in runningProcesses:
         proc.start()#
     for proc in runningProcesses:

@@ -216,7 +216,8 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=Tr
         matrixFN = dir_matrices + os.path.split(fn)[1] + ".dist.phylip"
         treeOutFN = dir_trees_out + os.path.split(fn)[1] + ".tre"
         WritePhylipMatrix(D, species_names_fastme, matrixFN, max_og=1e6)
-        subprocess.call("fastme -i %s -o %s -w O -s -n" % (matrixFN, treeOutFN), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        popen = subprocess.Popen("fastme -i %s -o %s -w O -s -n" % (matrixFN, treeOutFN), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        popen.communicate()
         nSuccess += 1
         if qVerbose: print(os.path.split(fn)[1] + " - Processed")
     if qVerbose: print("\nExamined %d trees" % (nSuccess + nNotAllPresent + nFail))
