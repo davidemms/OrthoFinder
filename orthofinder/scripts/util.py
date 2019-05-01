@@ -44,13 +44,19 @@ import tree, parallel_task_manager
 Utilities
 -------------------------------------------------------------------------------
 """
-SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")    # speciesToUse - lsit of ints
+SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")    # speciesToUse - list of ints
 
 picProtocol = 1
-version = "2.3.3"
+version = "2.3.4"
+
+if getattr(sys, 'frozen', False):
+    __location__ = os.path.split(sys.executable)[0]
+else:
+    __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__))) + "/../"
 
 # Fix LD_LIBRARY_PATH when using pyinstaller 
 my_env = os.environ.copy()
+my_env['PATH'] = os.path.join(__location__, 'bin:') + my_env['PATH']
 if getattr(sys, 'frozen', False):
     if 'LD_LIBRARY_PATH_ORIG' in my_env:
         my_env['LD_LIBRARY_PATH'] = my_env['LD_LIBRARY_PATH_ORIG']  

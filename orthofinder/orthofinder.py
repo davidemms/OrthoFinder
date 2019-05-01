@@ -77,6 +77,7 @@ if sys.platform.startswith("linux"):
 
 # Fix LD_LIBRARY_PATH when using pyinstaller 
 my_env = os.environ.copy()
+my_env['PATH'] = os.path.join(__location__, 'bin:') + my_env['PATH']
 if getattr(sys, 'frozen', False):
     if 'LD_LIBRARY_PATH_ORIG' in my_env:
         my_env['LD_LIBRARY_PATH'] = my_env['LD_LIBRARY_PATH_ORIG']  

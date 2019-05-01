@@ -176,7 +176,7 @@ def GetDistances_fast(t, nSp, g_to_i):
         D[i,i]=0.
     return D
 
-def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=True, qSkipSingleCopy=False):
+def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=True, qSkipSingleCopy=False, qForOF=False):
     nSp = GeneToSpecies.NumberOfSpecies()
     s_to_i = GeneToSpecies.SpeciesToIndexDict()
     nSuccess = 0
@@ -216,21 +216,31 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=Tr
         matrixFN = dir_matrices + os.path.split(fn)[1] + ".dist.phylip"
         treeOutFN = dir_trees_out + os.path.split(fn)[1] + ".tre"
         WritePhylipMatrix(D, species_names_fastme, matrixFN, max_og=1e6)
-        popen = subprocess.Popen("fastme -i %s -o %s -w O -s -n" % (matrixFN, treeOutFN), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        popen.communicate()
+        command = "fastme -i %s -o %s -w O -s -n" % (matrixFN, treeOutFN)
+        if qForOF:
+            import util
+            util.RunCommand(command, True, True, True)
+        else:
+            popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            popen.communicate()
         nSuccess += 1
         if qVerbose: print(os.path.split(fn)[1] + " - Processed")
     if qVerbose: print("\nExamined %d trees" % (nSuccess + nNotAllPresent + nFail))
     print("%d trees had all species present and will be used by STAG to infer the species tree\n" % nSuccess)
       
-def Astral(tree_dir, astral_jar_file):
+def Astral(tree_dir, astral_jar_file, qForOF=False):
     treesFN = tree_dir + "../TreesFile.txt"
     with open(treesFN, 'wb') as outfile:
         for fn in glob.glob(tree_dir + "/*"):
             t = tree.Tree(fn)    
             outfile.write(t.write(format=9) + "\n")
     speciesTreeFN = tree_dir + "../SpeciesTree_ids.txt"
-    subprocess.call(" ".join(["java", "-Xmx6000M", "-jar", astral_jar_file, "-i", treesFN, "-o", speciesTreeFN]), shell=True)
+    command = " ".join(["java", "-Xmx6000M", "-jar", astral_jar_file, "-i", treesFN, "-o", speciesTreeFN])
+    if qForOF:
+        import util
+        util.RunCommand(command, True, True, True)
+    else:
+        subprocess.call(command, shell=True)
     return tree.Tree(speciesTreeFN)     
       
 def InferSpeciesTree(tree_dir, species, outputFN, astral_jar=None):
@@ -248,7 +258,7 @@ def Run_ForOrthoFinder(dir_in, d_working, speciesToUse, speciesTreeIds_FN_out):
     dir_trees_out = d_working + "SpeciesTrees_ids/"
     os.mkdir(dir_trees_out)
     gene_to_species = GeneToSpecies_OrthoFinder(speciesToUse)
-    ProcessTrees(dir_in, dir_matrices, dir_trees_out, gene_to_species, qVerbose=False)
+    ProcessTrees(dir_in, dir_matrices, dir_trees_out, gene_to_species, qVerbose=False, qForOF=True)
     InferSpeciesTree(dir_trees_out, gene_to_species.species, speciesTreeIds_FN_out)
     
 def main(args):
