@@ -65,19 +65,19 @@ The Orthologues directory contains one sub-directory for each species that in tu
 
 4. **OrthologuesStats_*.tsv files** are tab separated text files containing matrices giving the numbers of orthologues in one-to-one, one-to-many and many-to-many relationships between each pair of species.
 
-- ***OrthologuesStats_one-to-one.tsv*** the number of one-to-one orthologues between each species pair. Note, this matrix is symmetrical. 
+- ***OrthologuesStats_one-to-one.tsv*** is the number of one-to-one orthologues between each species pair. Note, this matrix is symmetrical. 
 
-- ***OrthologuesStats_many-to-one.tsv***
+- ***OrthologuesStats_many-to-many.tsv*** contains the number of orthologues in a many-to-many relationship for each species pair (due to gene duplication events in both lineages post-speciation). Entry (i,j) is the number of genes in species i that are in a many-to-many orthology relationship with genes in species j.
 
-- ***OrthologuesStats_one-to-many.tsv***
+- ***OrthologuesStats_many-to-one.tsv***: entry (i,j) gives the number of genes in species i that are in a one-to-many orthology relationship with genes from species j. There is a walk-through of an example results file here: https://github.com/davidemms/OrthoFinder/issues/259.
 
-- ***OrthologuesStats_many-to-many.tsv***
+- ***OrthologuesStats_one-to-many.tsv***: entry (i,j) gives the number of genes in species i that are in a many-to-one orthology relationship with a gene from species j. There is a walk-through of an example results file here: https://github.com/davidemms/OrthoFinder/issues/259.
 
 - ***OrthologuesStats_Total.tsv*** contains the totals for each species pair of orthologues of whatever multiplicity. Entry (i,j) is the total number of genes in species i that have orthologues in species j.
 
-2. **Statistics_Overall.tsv** is a tab separated text file that contains general statistics about orthogroup sizes and proportion of genes assigned to orthogroups.
+5. **Statistics_Overall.tsv** is a tab separated text file that contains general statistics about orthogroup sizes and proportion of genes assigned to orthogroups.
 
-3. **Statistics_PerSpecies.tsv** is a tab separated text file that contains the same information as the Statistics_Overall.csv file but for each individual species.
+6. **Statistics_PerSpecies.tsv** is a tab separated text file that contains the same information as the Statistics_Overall.csv file but for each individual species.
 
 Most of the terms in the files 'Statistics_Overall.csv' and 'Statistics_PerSpecies.csv' are self-explanatory, the remainder are defined below.
 
@@ -86,6 +86,17 @@ Most of the terms in the files 'Statistics_Overall.csv' and 'Statistics_PerSpeci
 - O50: The smallest number of orthogroups such that 50% of genes are in orthogroups of that size or larger.
 - Single-copy orthogroup: An orthogroup with exactly one gene (and no more) from each species. These orthogroups are ideal for inferring a species tree and many other analyses. 
 - Unassigned gene: A gene that has not been put into an orthogroup with any other genes.
+
+### Results Files: Gene Duplication Events Directory
+1. **Duplications.tsv** is a tab separated text file that lists all the gene duplication events identified by examining each node of each orthogroup gene tree. The columns are "Orthogroup", "Species Tree node" (branch of the species tree on which the duplication took place, see Species_Tree/SpeciesTree_rooted_node_labels.txt), "Gene tree node" (node corresponding to the gene duplication event, see corresponding orthogroup tree in Resolved_Gene_Trees/); "Support" (proportion of expected species for which both copies of the duplicated gene are present); "Type" ("Terminal": duplication on a terminal branch of the species tree, "Non-Terminal": duplication on an internal branch of the species tree & therefore shared by more than one species, "Non-Terminal: STRIDE": Non-Terminal duplication that also passes the very stringent [STRIDE](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5850722/) checks for what the topology of the gene tree should be post-duplication); "Genes 1" (the list of genes descended from one of the copies of the duplicate gene), "Genes 2" (the list of genes descended from the other copy of the duplicate gene.
+
+2. **SpeciesTree_Gene_Duplications_0.5_Support.txt** provides a summation of the above duplications over the branches of the species tree. It is a text file in newick format. The numbers after each node or species name are the number of gene duplication events with at least 50% support that occurred on the branch leading to the node/species. The branch lengths are the standard branch lengths, as give in Species_Tree/SpeciesTree_rooted.txt.
+
+### Results Files: Orthogroup Sequences
+1. A FASTA file for each orthogroup giving the amino acid sequences for each gene in the orthogroup.
+
+### Results Files: Single Copy Orthologue Sequences
+1. The same files as the "Orthogroup Sequences" directory but restricted to only those orthogroups which contain exactly one gene per species.
 
 ### Results Files: WorkingDirectory
 This contains all the files necessary for orthofinder to run. You can ignore this.
