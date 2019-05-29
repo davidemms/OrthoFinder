@@ -32,36 +32,52 @@ To Run OrthoFinder on the Example Data type
 A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplcation events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
 
 ### Results Files: Orthogroups Directory
-1. **Orthogroups.csv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species.
+1. **Orthogroups.tsv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species.
 
-2. **Orthogroups_UnassignedGenes.csv** is a tab separated text file that is identical in format to Orthogroups.csv but contains all of the genes that were not assigned to any orthogroup.
+2. **Orthogroups_UnassignedGenes.tsv** is a tab separated text file that is identical in format to Orthogroups.csv but contains all of the genes that were not assigned to any orthogroup.
 
-3. **Orthogroups.txt** (legacy format) is a second file containing the orthogroups described in the Orthogroups.csv file but using the OrthoMCL output format. 
+3. **Orthogroups.txt** (legacy format) is a second file containing the orthogroups described in the Orthogroups.tsv file but using the OrthoMCL output format. 
 
-4. **Orthogroups.GeneCount.csv** is a tab separated text file that is identical in format to Orthogroups.csv but contains counts of the number of genes for each species in each orthogroup.
+4. **Orthogroups.GeneCount.tsv** is a tab separated text file that is identical in format to Orthogroups.csv but contains counts of the number of genes for each species in each orthogroup.
 
-### Results Files: Orthologs Directory 
-Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologs diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each set of orthologues is cross-referenced to the orthogroup that contains them. The Orthologs directory contains one sub directory for each species that in turn contains a file for each pairwise species comparison listing the orthologs between that species pair.
+5. **Orthogroups_SingleCopyOrthologues.txt** is a list of orthogroups that contain exactly one gene per species i.e. they contain one-to-one orthologues. They are ideally suited to between-species comparisons and to species tree inference. 
+
+### Results Files: Orthologues Directory 
+The Orthologues directory contains one sub-directory for each species that in turn contains a file for each pairwise species comparison, listing the orthologs between that species pair. Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologs diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each row in a file contains the gene(s) in one species that are orthologues of the gene(s) in the other species and each row is cross-referenced to the orthogroup that contains those genes. 
 
 ### Results Files: Gene Trees Directory
 1. A phylogenetic tree inferred for each orthogroup
 
 ### Results Files: Resolved Gene Trees Directory
-1. A phylogenetic tree inferred for each orthogroup resolved using the OrthoFinder duplication-loss coalescent model.
+1. A rooted phylogenetic tree inferred for each orthogroup and resolved using the OrthoFinder duplication-loss coalescent model.
 
 ### Results Files: Species Tree Directory
-1. **Species_Tree_rooted.csv** A STAG species tree inferred from all orthogroups, containing STAG support values at internal nodes and rooted using STRIDE.
+1. **SpeciesTree_rooted.txt** A STAG species tree inferred from all orthogroups, containing STAG support values at internal nodes and rooted using STRIDE.
 
-2. **Species_Tree_rooted_node_labels.csv** The same tree as above but with nodes given labels (instead of support values) to allow the location of gene duplication events to specified. 
+2. **SpeciesTree_rooted_node_labels.csv** The same tree as above but with the nodes given labels (instead of support values) to allow other results files to cross-reference branches/nodes in the species tree (e.g. location of gene duplication events).
 
 ### Results Files: Comparative Genomics Statistics Directory
-1. **Orthogroups_SpeicesOverlaps.csv** is a tab separated text file that contains the number of orthogroups shared between each species pair as a square matrix.
+1. **Duplications_per_Orthogroup.tsv** is a tab separated text file that gives the number of duplications identified in each orthogroup. This master file for this data is Gene_Duplication_Events/Duplications.tsv.
 
-2. **SingleCopyOrthogroups.txt** is a text file containing a list of all the orthogroups that contain only single copy orthologs. 
+2. **Duplications_per_Species_Tree_Node.tsv** is a tab separated text file that gives the number of duplications identified as occuring along each branch of the species tree. This master file for this data is Gene_Duplication_Events/Duplications.tsv.
 
-3. **Statistics_Overall.csv** is a tab separated text file that contains general statistics about orthogroup sizes and proportion of genes assigned to orthogroups.
+3. **Orthogroups_SpeciesOverlaps.tsv** is a tab separated text file that contains the number of orthogroups shared between each species-pair as a square matrix.
 
-4. **Statistics_PerSpecies.csv** is a tab separated text file that contains the same information as the Statistics_Overall.csv file but for each individual species.
+4. **OrthologuesStats_*.tsv files** are tab separated text files containing matrices giving the numbers of orthologues in one-to-one, one-to-many and many-to-many relationships between each pair of species.
+
+- ***OrthologuesStats_one-to-one.tsv*** the number of one-to-one orthologues between each species pair. Note, this matrix is symmetrical. 
+
+- ***OrthologuesStats_many-to-one.tsv***
+
+- ***OrthologuesStats_one-to-many.tsv***
+
+- ***OrthologuesStats_many-to-many.tsv***
+
+- ***OrthologuesStats_Total.tsv*** contains the totals for each species pair of orthologues of whatever multiplicity. Entry (i,j) is the total number of genes in species i that have orthologues in species j.
+
+2. **Statistics_Overall.tsv** is a tab separated text file that contains general statistics about orthogroup sizes and proportion of genes assigned to orthogroups.
+
+3. **Statistics_PerSpecies.tsv** is a tab separated text file that contains the same information as the Statistics_Overall.csv file but for each individual species.
 
 Most of the terms in the files 'Statistics_Overall.csv' and 'Statistics_PerSpecies.csv' are self-explanatory, the remainder are defined below.
 
