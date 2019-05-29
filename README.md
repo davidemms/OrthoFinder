@@ -4,13 +4,13 @@
 *Figure 1: Automatic OrthoFinder analysis*
 
 ## What does OrthoFinder do?
-OrthoFinder is a fast, accurate and comprehensive platform for comparative genomics. It finds **orthogroups** and **orthologs**, infers **rooted gene trees** for all orthogroups and identifies all of the **gene duplcation events** in those gene trees. It also infers a **rooted species tree** for the species being analysed and maps the gene duplication events from the gene trees to branches in the species tree. OrthoFinder also provides **comprehensive statistics** for comparative genomic analyses. OrthoFinder is simple to use and all you need to run it is a set of protein sequence files (one per species) in FASTA format.
+OrthoFinder is a fast, accurate and comprehensive platform for comparative genomics. It finds **orthogroups** and **orthologs**, infers **rooted gene trees** for all orthogroups and identifies all of the **gene duplication events** in those gene trees. It also infers a **rooted species tree** for the species being analysed and maps the gene duplication events from the gene trees to branches in the species tree. OrthoFinder also provides **comprehensive statistics** for comparative genomic analyses. OrthoFinder is simple to use and all you need to run it is a set of protein sequence files (one per species) in FASTA format.
 
 For more details see the OrthoFinder papers below.
 
 [Emms, D.M. and Kelly, S. **(2015)** _OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy._ **Genome Biology** 16:157](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2)
 
-[Emms, D.M. and Kelly, S. **(2018)** _OrthoFinder2: fast and accurate phylogenomic orthology analysis from gene sequences._ **bioRxiv**](https://www.biorxiv.org/content/early/2018/11/08/466201)
+[Emms, D.M. and Kelly, S. **(2018)** _OrthoFinder2: fast and accurate phylogenomic orthology analysis from gene sequences._  **bioRxiv**](https://www.biorxiv.org/content/early/2018/11/08/466201)
 
 ### Installing OrthoFinder
 1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases (for this example we will assume it is OrthoFinder-2.2.7.tar.gz, change this as appropriate.)
@@ -29,7 +29,7 @@ To Run OrthoFinder on the Example Data type
 `OrthoFinder-2.2.7/orthofinder -f ExampleDataset -S diamond`
 
 ## What OrthoFinder provides
-A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplcation events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
+A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplication events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
 
 ### Results Files: Orthogroups Directory
 1. **Orthogroups.tsv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species.
@@ -59,7 +59,7 @@ The Orthologues directory contains one sub-directory for each species that in tu
 ### Results Files: Comparative Genomics Statistics Directory
 1. **Duplications_per_Orthogroup.tsv** is a tab separated text file that gives the number of duplications identified in each orthogroup. This master file for this data is Gene_Duplication_Events/Duplications.tsv.
 
-2. **Duplications_per_Species_Tree_Node.tsv** is a tab separated text file that gives the number of duplications identified as occuring along each branch of the species tree. This master file for this data is Gene_Duplication_Events/Duplications.tsv.
+2. **Duplications_per_Species_Tree_Node.tsv** is a tab separated text file that gives the number of duplications identified as occurring along each branch of the species tree. This master file for this data is Gene_Duplication_Events/Duplications.tsv.
 
 3. **Orthogroups_SpeciesOverlaps.tsv** is a tab separated text file that contains the number of orthogroups shared between each species-pair as a square matrix.
 
@@ -106,27 +106,27 @@ This contains all the files necessary for orthofinder to run. You can ignore thi
 * [Why use orthogroups in your analysis](#why-orthogroups)
 * [Installing Dependencies](#setting-up-orthofinder)
 * [Adding and removing species from a completed OrthoFinder run](#advanced-usage)
-* [Preparing and using seperately run BLAST files](#running-blast-searches-separately--p-option)
+* [Preparing and using separately run BLAST files](#running-blast-searches-separately--p-option)
 
 ## Orthogroups, Orthologs & Paralogs
 Orthologs are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Figure 2A & B). An orthogroup is the extension of the concept of orthology to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). 
 
 The example Figure 2 contains an orthogroup from three species, human, mouse and chicken. Human and mouse each have one gene in this orthogroup (HuA and MoA, respectively) while chicken has two genes (ChA1 and ChA2). The human and mouse genes are a pair of genes descended from a single gene in the last common ancestor of the two species, therefore these two genes are orthologs and there is a one-to-one orthology relationship between the two genes.
 
-The two chicken genes arose from a gene duplication event after the lineage leading to chicken split from the lineage leading to human and mouse. As gene duplication events give rise to paralogs, ChA1 and ChA2 are paralogs of each other. However, both chicken genes are decended from a single gene in the last common ancestor of the three species. Therefore both chicken genes are orthologs of the human gene and the mouse gene. Although they are orthologs, sometimes these complex relationships are reffered to as co-orthologs (e.g. ChA1 and ChA2 are co-orthologs of HuA). In this case there is a many-to-one orthology relationship between the chicken genes and the human gene. There are only three kinds of orthology relationships one-to-one, many-to-one, and many-to-many. All of these relationships are identified by OrthoFinder.
+The two chicken genes arose from a gene duplication event after the lineage leading to chicken split from the lineage leading to human and mouse. As gene duplication events give rise to paralogs, ChA1 and ChA2 are paralogs of each other. However, both chicken genes are descended from a single gene in the last common ancestor of the three species. Therefore, both chicken genes are orthologs of the human gene and the mouse gene. Although they are orthologs, sometimes these complex relationships are referred to as co-orthologs (e.g. ChA1 and ChA2 are co-orthologs of HuA). In this case there is a many-to-one orthology relationship between the chicken genes and the human gene. There are only three kinds of orthology relationships one-to-one, many-to-one, and many-to-many. All of these relationships are identified by OrthoFinder.
 
 ![Orthologues, Orthogroups & Paralogues](orthofinder/Orthogroups_Orthologues_Paralogues.png)
 *Figure 2: Orthologues, Orthogroups & Paralogues*
 
 ## Why Orthogroups
-### Orthogroups allow to analyse all of your data
-All of the genes in an orthogroup are decended from a single ancestral gene. Thus all the genes in an orthogroup started out with the same sequence and function. As gene duplication and loss occur frequently in evolution, one-to-one orthologs are rare and limitation of analyses to on-to-one othologs limits an analysis to a small fraction of the available data. By analysing orhtogroups you can analyse all of your data. 
+### Orthogroups allow you to analyse all of your data
+All of the genes in an orthogroup are descended from a single ancestral gene. Thus, all the genes in an orthogroup started out with the same sequence and function. As gene duplication and loss occur frequently in evolution, one-to-one orthologs are rare and limitation of analyses to on-to-one orthologs limits an analysis to a small fraction of the available data. By analysing orthogroups you can analyse all of your data. 
 
 ### Orthogroups allow you to define the unit of comparison
-It is important to note that with orthogroups you choose where to define the limits of the unit of comparison. For example, if you just chose to analyse human and mouse in the above figure then you would have two orthogoups. 
+It is important to note that with orthogroups you choose where to define the limits of the unit of comparison. For example, if you just chose to analyse human and mouse in the above figure then you would have two orthogroups. 
 
 ### Orthogroups are the only way to identify orthologs
-Orthology is defined by phylogeny. It is not definable by amino acid content, codon bias, GC content or other measures of sequence similarity. Methods that use such scores to define orthologs in the absence of phylogeny can only provide guesses. To provide a crude analogy guessing orthology from sequence similarity is akin to guessing colour from smell. The only way to truly identify orthologs is thus through analysis of phylogenetic trees. The only way to be sure that the orthology assignment is correct is by conducting a phylogenetic reconstruction of all genes decended from a single gene the last common ancestor of the species under consideration. This set of genes is an orthogroup. Thus the only way to define orthology is by analysing orthogroups.   
+Orthology is defined by phylogeny. It is not definable by amino acid content, codon bias, GC content or other measures of sequence similarity. Methods that use such scores to define orthologs in the absence of phylogeny can only provide guesses. To provide a crude analogy guessing orthology from sequence similarity is akin to guessing colour from smell. The only way to truly identify orthologs is thus through analysis of phylogenetic trees. The only way to be sure that the orthology assignment is correct is by conducting a phylogenetic reconstruction of all genes descended from a single gene the last common ancestor of the species under consideration. This set of genes is an orthogroup. Thus, the only way to define orthology is by analysing orthogroups.   
 
 ### Installing Dependencies
 To perform an analysis OrthoFinder requires some dependencies to be installed and in the system path (only the first two are needed to infer orthogroups and all four are needed to infer orthologues and gene trees as well):
@@ -142,13 +142,13 @@ Brief instructions are given below although users can refer to the installation 
 #### DIAMOND
 Available here: https://github.com/bbuchfink/diamond/releases
 
-Download the the latest release, extract it and copy the executable to a directory in your system path, e.g.:
+Download the latest release, extract it and copy the executable to a directory in your system path, e.g.:
 - `wget https://github.com/bbuchfink/diamond/releases/download/v0.9.22/diamond-linux64.tar.gz`
 - `tar xzf diamond-linux64.tar.gz`
 - `sudo cp diamond /usr/local/bin`
 
-or alternaitvely if you don't have root privileges, instead of the last step above, add the directory containing the directory to your PATH variable. 
-E.g 
+or alternatively if you don't have root privileges, instead of the last step above, add the directory containing the directory to your PATH variable. 
+E.g. 
 - `mkdir ~/bin`
 - `cp diamond ~/bin`
 - ``export PATH=$PATH:~/bin/``
@@ -157,7 +157,7 @@ E.g
 The mcl clustering algorithm is available in the repositories of some Linux distributions and so can be installed in the same way as any other package. For example, on Ubuntu, Debian, Linux Mint:
 - `sudo apt-get install mcl`
 
-Alternatively it can be built from source which will likely require the 'build-essential' or equivalent package on the Linux distribution being used. Instructions are provided on the MCL webpage, http://micans.org/mcl/.  
+Alternatively, it can be built from source which will likely require the 'build-essential' or equivalent package on the Linux distribution being used. Instructions are provided on the MCL webpage, http://micans.org/mcl/.  
 
 #### FastME
 FastME can be obtained from http://www.atgc-montpellier.fr/fastme/binaries.php. The package contains a 'binaries/' directory. Choose the appropriate one for your system and copy it to somewhere in the system path e.g. '/usr/local/bin'** and name it 'fastme'. I.e.:
@@ -178,13 +178,13 @@ Download the appropriate version for your machine, extract it and copy the execu
 - `tar xzf MMseqs2-Linux-AVX2.tar.gz`
 - `sudo cp mmseqs2/bin/mmseqs /usr/local/bin`
 
-or alternaitvely if you don't have root privileges, isntead of the last step above, add the directory containing the directory to your PATH variable 
+or alternatively if you don't have root privileges, instead of the last step above, add the directory containing the directory to your PATH variable 
 - ``export PATH=$PATH:`pwd`/mmseqs2/bin/``
 
 #### Trees from MSA: `"-M msa"`
-The following steps are not required for the standard OrthoFinder use cases and are only needed if you want to infer maximum likelihood trees from multiple sequence alignments (MSA). This is considerably more costly computationally but more accurate. By default MAFFT is used for the alignment and FastTree for the tree inference. Both the executables should be in the system path. The option for this is, "-M msa".
+The following steps are not required for the standard OrthoFinder use cases and are only needed if you want to infer maximum likelihood trees from multiple sequence alignments (MSA). This is considerably more costly computationally but more accurate. By default, MAFFT is used for the alignment and FastTree for the tree inference. Both the executables should be in the system path. The option for this is, "-M msa".
 
-You can actually use **any** alignment or tree inference program you like the best! Be careful with the method you chose, OrthoFidner typically needs to infer about 10,000-20,000 gene trees. If you have many species or if the tree/alignment method isn't super-fast then this can take a very long time! MAFFT + FastTree provides a reasonable compromise. Orthofinder already knows how to call:
+You can actually use **any** alignment or tree inference program you like the best! Be careful with the method you chose, OrthoFinder typically needs to infer about 10,000-20,000 gene trees. If you have many species or if the tree/alignment method isn't super-fast then this can take a very long time! MAFFT + FastTree provides a reasonable compromise. Orthofinder already knows how to call:
 - mafft
 - muscle
 - iqtree
@@ -197,7 +197,7 @@ If you want to use a different program, there is a simple configuration file cal
 For example, to you muscle and iqtree, the command like arguments you need to add are: `"-M msa -A muscle -T iqtree"`
 
 #### Python Source Code Version
-It is recommended that you use the standalone binaries for OrthoFinder which do not require python or scipy to be installed. However, the python source code version is available from the github 'releases' page (e.g. 'OrthoFinder-1.0.6_source.tar.gz' and requires python 2.7 and scipy to be installed. Up-to-date and clear instructions are provided here: http://www.scipy.org/install.html, be sure to chose a version using python 2.7. As websites can change, an alternative is to search online for "install scipy". 
+It is recommended that you use the standalone binaries for OrthoFinder which do not require python or scipy to be installed. However, the python source code version is available from the github 'releases' page (e.g. 'OrthoFinder-1.0.6_source.tar.gz' and requires python 2.7 and scipy to be installed. Up-to-date and clear instructions are provided here: http://www.scipy.org/install.html, be sure to choose a version using python 2.7. As websites can change, an alternative is to search online for "install scipy". 
 
 ### Adding Extra Species
 OrthoFinder allows you to add extra species without re-running the previously computed BLAST searches:
@@ -217,18 +217,15 @@ where 'previous_orthofinder_directory' is the OrthoFinder 'WorkingDirectory/' co
 The previous two options can be combined, comment out the species to be removed as described above and use the command:
 - `orthofinder -b previous_orthofinder_directory -f new_fasta_directory`
 
-### Inferring MSA Gene Trees (to be replaced)
-**This functionality is to be incorporated into the main 'orthofinder' program, replacing the 'trees_from_MSA' utility.**
+### Inferring Multiple Sequence Alignment (MSA) Gene Trees
+This functionality has been incorporated into the main 'orthofinder' program, replacing the old 'trees_from_MSA' utility. Trees can be inferred using MSAs by using the option "-M msa". If orthogroups have already been inferred then MSA trees can be inferred directly from them (rather than from inferring the orthogroups again from the start) by additionally using the option "-fg" option: "-M msa -fg *previous_results_directory*" instead of "-M msa -f *input_proteomes_directory*".
 
-The 'trees_from_MSA' utility will automatically generate multiple sequence alignments and gene trees for each orthogroup generated by OrthoFinder. For example, once OrthoFinder has been run on the example dataset, trees_from_MSA can be run using:
+By default MAFFT is used to generate the multiple sequence alignments and FastTree to generate the gene trees. Alternatively, any other program can be used in place of these. Many popular programs have already been configured by having an entry in the config.json file in the orthofinder directory. All options currently available can be seen by using the option "-h" to see the help file. The config.json file is user-editable to allow for any other desired program to be added. MAFFT, FastTree, or whatever programs are used instead need to be in the system path.
 
-- `trees_from_MSA orthofinder_results_directory [-t number_of_threads]`
+### Parallelising OrthoFinder Algorithm 
+There are two separate options for controlling the parallelisation of OrthoFinder. The '-t' option should always be used, typically with as many cores as are available. This determines how many highly-parallelisable tasks such as DIAMOND/BLAST searches, MSAs etc are run in parallel. 
 
-This will use MAFFT to generate the multiple sequence alignments and FastTree to generate the gene trees. Both of these programs need to be installed and in the system path.
-
-### Parallelising OrthoFinder Algorithm (-a option)
-There are two separate options for controlling the parallelisation of OrthoFinder. The '-t' option should always be used whereas RAM requirements may affect whether you use the '-a' option or not.
-
+In addition, most of the internal steps of the OrthoFinder algorithm have been parallelised but by default run sequentially. Running these steps in parallel can be requested using the '-a' option. However, some of the steps can lead to large RAM requirements, potentially more than the computer has. This is the reason for this parallelisation being under separate control. These steps typically only make up a small part of the OrthoFinder runtime and so there is a lot less to gain from running these in parallel. If unsure, don't use this option.
 
 - **'-t number_of_threads'**:
 This option should always be used. It makes the BLAST searches, the tree inference and gene-tree reconciliation run in parallel. These are all highly-parallelisable and the BLAST searches in particular are by far the most time-consuming task. You should use as many threads as there are cores available.
