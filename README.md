@@ -1,4 +1,4 @@
-# OrthoFinder — Accurate inference of orthologs, orthogroups, the rooted species, gene trees and gene duplcation events tree made easy!
+# OrthoFinder — Accurate inference of orthologs, orthogroups, the rooted species, gene trees and gene duplication events made easy!
 
 ![OrthoFinder workflow](orthofinder/workflow.png)
 *Figure 1: Automatic OrthoFinder analysis*
