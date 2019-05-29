@@ -153,17 +153,6 @@ E.g
 - `cp diamond ~/bin`
 - ``export PATH=$PATH:~/bin/``
 
-#### MMseqs2
-Available here: https://github.com/soedinglab/MMseqs2/releases
-
-Download the appropriate version for your machine, extract it and copy the executable to a directory in your system path, e.g.:
-- `wget https://github.com/soedinglab/MMseqs2/releases/download/3-be8f6/MMseqs2-Linux-AVX2.tar.gz`
-- `tar xzf MMseqs2-Linux-AVX2.tar.gz`
-- `sudo cp mmseqs2/bin/mmseqs /usr/local/bin`
-
-or alternaitvely if you don't have root privileges, isntead of the last step above, add the directory containing the directory to your PATH variable 
-- ``export PATH=$PATH:`pwd`/mmseqs2/bin/``
-
 #### MCL
 The mcl clustering algorithm is available in the repositories of some Linux distributions and so can be installed in the same way as any other package. For example, on Ubuntu, Debian, Linux Mint:
 - `sudo apt-get install mcl`
@@ -180,6 +169,17 @@ NCBI BLAST+ is available in the repositories from most Linux distributions and s
 - `sudo apt-get install ncbi-blast+`
 
 Alternatively, instructions are provided for installing BLAST+ on Mac and various flavours of Linux on the "Standalone BLAST Setup for Unix" page of the BLAST+ Help manual currently at http://www.ncbi.nlm.nih.gov/books/NBK1762/. Follow the instructions under "Configuration" in the BLAST+ help manual to add BLAST+ to the PATH environment variable.
+
+#### Optional: MMseqs2
+Available here: https://github.com/soedinglab/MMseqs2/releases
+
+Download the appropriate version for your machine, extract it and copy the executable to a directory in your system path, e.g.:
+- `wget https://github.com/soedinglab/MMseqs2/releases/download/3-be8f6/MMseqs2-Linux-AVX2.tar.gz`
+- `tar xzf MMseqs2-Linux-AVX2.tar.gz`
+- `sudo cp mmseqs2/bin/mmseqs /usr/local/bin`
+
+or alternaitvely if you don't have root privileges, isntead of the last step above, add the directory containing the directory to your PATH variable 
+- ``export PATH=$PATH:`pwd`/mmseqs2/bin/``
 
 #### Trees from MSA: `"-M msa"`
 The following steps are not required for the standard OrthoFinder use cases and are only needed if you want to infer maximum likelihood trees from multiple sequence alignments (MSA). This is considerably more costly computationally but more accurate. By default MAFFT is used for the alignment and FastTree for the tree inference. Both the executables should be in the system path. The option for this is, "-M msa".
