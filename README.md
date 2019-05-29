@@ -50,9 +50,9 @@ Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene
 1. A phylogenetic tree inferred for each orthogroup resolved using the OrthoFinder duplication-loss coalescent model.
 
 ### Results Files: Species Tree Directory
-1. **Species_Tree_rooted.csv** A STAG species tree inferred from all orthogroups containing STAG support values at internal nodes and rooted using STRIDE.
+1. **Species_Tree_rooted.csv** A STAG species tree inferred from all orthogroups, containing STAG support values at internal nodes and rooted using STRIDE.
 
-2. **Species_Tree_rooted_node_labels.csv** The same tree as above but with labelled nodes to help interpret the gene duplcation data.
+2. **Species_Tree_rooted_node_labels.csv** The same tree as above but with nodes given labels (instead of support values) to allow the location of gene duplication events to specified. 
 
 ### Results Files: Comparative Genomics Statistics Directory
 1. **Orthogroups_SpeicesOverlaps.csv** is a tab separated text file that contains the number of orthogroups shared between each species pair as a square matrix.
