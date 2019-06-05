@@ -23,6 +23,8 @@ For more details see the OrthoFinder papers below.
 
 5. Test you can run OrthoFinder: `OrthoFinder-2.2.7/orthofinder -h`. OrthoFinder should print its 'help' text. 
 
+6. If you want to move the orthofinder executable to another location then you must also place the accompanying config.json file in the same directory.
+
 ## Running OrthoFinder
 To Run OrthoFinder on the Example Data type
 
