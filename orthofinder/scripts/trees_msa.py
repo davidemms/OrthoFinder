@@ -224,7 +224,7 @@ def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, 
         for name, al in alignment.seqs.items():
             if name.split()[0] in selectedSeqs:
                 iSp = name.split("_")[0]
-                speciesInThisOg.add(iSp)  # this allows for the MSa method to have failed to put the sequence in the MSA
+                speciesInThisOg.add(iSp)  # this allows for the MSA method to have failed to put the sequence in the MSA
                 al = al.replace('*', '-')
                 concatentaedAlignments[iSp] += al
         # now put blanks for the missing species

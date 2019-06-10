@@ -65,8 +65,8 @@ def GetBLAST6Scores(seqsInfo, blastDir_list, iSpecies, jSpecies, qExcludeSelfHit
             for row in blastreader:    
                 # Get hit and query IDs
                 try:
-                    sequence1ID = int(row[iQ].split(sep, 1)[1])
-                    sequence2ID = int(row[iH].split(sep, 1)[1])     
+                    sequence1ID = int(row[iQ].split(sep, 2)[1])
+                    sequence2ID = int(row[iH].split(sep, 2)[1])
                 except (IndexError, ValueError):
                     sys.stderr.write("\nERROR: Query or hit sequence ID in BLAST results file was missing or incorrectly formatted.\n")
                     raise
