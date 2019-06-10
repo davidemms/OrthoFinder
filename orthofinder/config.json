@@ -46,6 +46,6 @@
     "mmseqs":{ 
     "program_type": "search",
     "db_cmd": "mmseqs createdb INPUT OUTPUT.fa ; mmseqs createindex OUTPUT.fa /tmp",
-    "search_cmd": "mmseqs search PATH/mmseqsDBBASENAME DATABASE.fa OUTPUT.db /tmp/tmpBASEOUTNAME  --threads 1 ; mmseqs convertalis PATH/mmseqsDBBASENAME DATABASE.fa OUTPUT.db OUTPUT"
+    "search_cmd": "mmseqs search PATH/mmseqsDBBASENAME DATABASE.fa OUTPUT.db /tmp/tmpBASEOUTNAME  --threads 1 ; mmseqs convertalis --threads 1 PATH/mmseqsDBBASENAME DATABASE.fa OUTPUT.db OUTPUT"
     }
 }
