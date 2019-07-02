@@ -264,9 +264,10 @@ def GetRAMErrorText():
     return text
                 
 class DendroBLASTTrees(object):
-    def __init__(self, ogSet, nProcesses, qDoubleBlast):
+    def __init__(self, ogSet, nProcesses_alg, nProcess_std, qDoubleBlast):
         self.ogSet = ogSet
-        self.nProcesses = nProcesses
+        self.nProcesses = nProcesses_alg
+        self.nProcess_std = nProcess_std
         self.qDoubleBlast = qDoubleBlast
         # Check files exist
     
@@ -456,7 +457,7 @@ class DendroBLASTTrees(object):
                 cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs)
                 cmds_trees = [[cmd_spTree]] + cmds_trees
         util.PrintUnderline("Inferring gene and species trees" if qSpeciesTree else "Inferring gene trees")
-        util.RunParallelOrderedCommandLists(self.nProcesses, cmds_trees)
+        util.RunParallelOrderedCommandLists(self.nProcess_std, cmds_trees)
         if qSTAG:
             # Trees must have been completed
             print("")
@@ -915,7 +916,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
             st = "\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0]
             st += "\nMultiple sequence alignments:\n   %s\n" % seqs_alignments_dirs[1]
             return st
-        db = DendroBLASTTrees(ogSet, nLowParrallel, qDoubleBlast)
+        db = DendroBLASTTrees(ogSet, nLowParrallel, nHighParallel, qDoubleBlast)
         if qDB_SpeciesTree and not userSpeciesTree and not qLessThanFourSpecies:
             util.PrintUnderline("Inferring species tree (calculating gene distances)")
             print("Loading BLAST scores")
@@ -928,7 +929,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
             util.PrintTime("Starting phyldog")
             species_tree_ids_labelled_phyldog = wrapper_phyldog.RunPhyldogAnalysis(files.FileHandler.GetPhyldogWorkingDirectory(), ogSet.OGs(), speciesToUse, nHighParallel)
     else:
-        db = DendroBLASTTrees(ogSet, nLowParrallel, qDoubleBlast)
+        db = DendroBLASTTrees(ogSet, nLowParrallel, nHighParallel, qDoubleBlast)
         spTreeFN_ids, qSTAG = db.RunAnalysis(userSpeciesTree == None)
         if userSpeciesTree != None:
             spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
