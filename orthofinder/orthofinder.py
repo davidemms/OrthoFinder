@@ -545,19 +545,26 @@ class WaterfallMethod:
             pool.close()
             matrices.DeleteMatrices("B") 
             matrices.DeleteMatrices("connect") 
-            
+    
     @staticmethod
     def GetMostDistant_s(RBH, B, seqsInfo, iSpec):
+        # most distant RBB - as cut-off for connecting to other genes
         mostDistant = numeric.transpose(np.ones(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]])*1e9)
+        # Best hit in another species: species-specific paralogues will now be connected - closer than any gene in any other species
+        bestHit = numeric.transpose(np.zeros(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]))
         for kSpec in xrange(seqsInfo.nSpecies):
             B[kSpec] = B[kSpec].tocsr()
             if iSpec == kSpec:
                 continue
+            bestHit = np.maximum(bestHit, matrices.sparse_max_row(B[kSpec]))
             I, J = RBH[kSpec].nonzero()
             if len(I) > 0:
                 mostDistant[I] = np.minimum(B[kSpec][I, J], mostDistant[I])
+        # anything that doesn't have an RBB, set to distance to the closest gene in another species. I.e. it will hit just that gene and all genes closer to it in the its own species
+        I = mostDistant > 1e8
+        mostDistant[I] = bestHit[I] + 1e-6   # to connect to one in it's own species it must be closer than other species. We can deal with hits outside the species later 
         return mostDistant
-    
+
     @staticmethod
     def ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec):
         connect = []

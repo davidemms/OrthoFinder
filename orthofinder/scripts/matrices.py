@@ -26,6 +26,7 @@
 
 import os
 import glob
+import numpy as np
 import cPickle as pic
 
 import util, files
@@ -67,3 +68,8 @@ def MatricesAndTr_s(Xarr, Yarr):
 def DeleteMatrices(baseName):
     for f in glob.glob(files.FileHandler.GetPickleDir() + baseName + "*_*.pic"):
         if os.path.exists(f): os.remove(f)
+
+def sparse_max_row(csr_mat):
+    ret = np.zeros(csr_mat.shape[0])
+    ret[np.diff(csr_mat.indptr) != 0] = np.maximum.reduceat(csr_mat.data,csr_mat.indptr[:-1][np.diff(csr_mat.indptr)>0])
+    return ret
