@@ -506,6 +506,7 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, qWriteDupTre
     species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
     pool = mp.Pool(nProcessors, maxtasksperchild=1)       
     list_of_dicts = pool.map(SupportedHierachies_wrapper2, [(fn, GeneToSpeciesMap, species, dict_clades, clade_names, qWriteDupTrees) for fn in glob.glob(treesDir + "/*")])
+    pool.close()
     clusters = Counter()
     all_stride_dup_genes = set()
     for l, stride_dup_genes in list_of_dicts:

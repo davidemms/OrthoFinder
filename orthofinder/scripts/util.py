@@ -47,7 +47,7 @@ Utilities
 SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")    # speciesToUse - list of ints
 
 picProtocol = 1
-version = "2.3.4"
+version = "2.3.5"
 
 if getattr(sys, 'frozen', False):
     __location__ = os.path.split(sys.executable)[0]

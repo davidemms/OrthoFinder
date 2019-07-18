@@ -542,6 +542,7 @@ class WaterfallMethod:
                 subprocess.call("cat " + graphFN + "_%d" % iSp + " >> " + graphFN, shell=True)
                 os.remove(graphFN + "_%d" % iSp)
             # Cleanup
+            pool.close()
             matrices.DeleteMatrices("B") 
             matrices.DeleteMatrices("connect") 
             
