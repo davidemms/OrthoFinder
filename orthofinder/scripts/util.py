@@ -419,11 +419,18 @@ def HaveSupportValues(speciesTreeFN_ids):
         pass
     return qHaveSupport
 
-def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qSupport, qFixNegatives=False, inFormat=None, label=None):
+def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qSupport, qFixNegatives=False, inFormat=None, label=None, qViaCopy=False):
+    """
+    qViaCopy - create a copy of the tree and edit this copy. I.e. don't make changes to the original 
+    """
     if label != None: qSupport = False
+    qHaveSupport = False
     try:
-        if type(treeFN_or_tree) == tree.TreeNode:
-            t = treeFN_or_tree
+        if type(treeFN_or_tree) is tree.TreeNode:
+            if qViaCopy:
+                t = treeFN_or_tree.copy("newick")
+            else:
+                t = treeFN_or_tree
         else:
             qHaveSupport = False
             if inFormat == None:

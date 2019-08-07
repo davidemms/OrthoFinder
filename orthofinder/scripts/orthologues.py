@@ -463,9 +463,6 @@ class DendroBLASTTrees(object):
             print("")
             spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
             stag.Run_ForOrthoFinder(files.FileHandler.GetOGsTreeDir(), files.FileHandler.GetWorkingDirectory_Write(), self.ogSet.seqsInfo.speciesToUse, spTreeFN_ids)
-        seqDict = self.ogSet.Spec_SeqDict()
-        for iog in xrange(len(self.ogSet.OGs())):
-            util.RenameTreeTaxa(files.FileHandler.GetOGsTreeFN(iog), files.FileHandler.GetOGsTreeFN(iog, True), seqDict, qSupport=False, qFixNegatives=True)
         if qSpeciesTree:
             util.RenameTreeTaxa(spTreeFN_ids, files.FileHandler.GetSpeciesTreeUnrootedFN(True), self.ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True)        
             return spTreeFN_ids, qSTAG
@@ -942,14 +939,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
     
     With phyldog, we also have species_tree_ids_labelled_phyldog - with the node labels given by phyldog
     """    
-    
-    """ === 2 ===
-    Check can continue with analysis 
-    """
-#    if len(ogSet.speciesToUse) < 4: 
-#        print("ERROR: Not enough species to infer species tree")
-#        util.Fail()
-     
+         
     """ === 3 ===
     MSA:               RootSpeciesTree
     Phyldog:           RootSpeciesTree    
@@ -999,6 +989,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
     """
         
     if qStopAfterTrees:
+        # root the gene trees using the species tree and write out their accessions - really I could remove the whole '-ot, -os, -oa' options, they are probably rarely used if ever.
         if userSpeciesTree:
             st = ""
             if qMSA:
@@ -1013,6 +1004,13 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
             util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qSupport=qSpeciesTreeSupports, qFixNegatives=True)
             labeled_tree_fn = files.FileHandler.GetSpeciesTreeResultsNodeLabelsFN()
             util.RenameTreeTaxa(speciesTree_fn, labeled_tree_fn, db.ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True, label='N')
+        idDict = ogSet.Spec_SeqDict()
+        qHaveSupport = None 
+        for iog in xrange(len(ogSet.OGs())):
+            infn = files.FileHandler.GetOGsTreeFN(iog)
+            if os.path.exists(infn):
+                if qHaveSupport is None: qHaveSupport = util.HaveSupportValues(infn)
+                util.RenameTreeTaxa(infn, files.FileHandler.GetOGsTreeFN(iog, True), idDict, qSupport=qHaveSupport, qFixNegatives=True)       
         files.FileHandler.CleanWorkingDir2()
         return GetResultsFilesString(resultsSpeciesTrees, seqs_alignments_dirs if qMSA else None, False)
     

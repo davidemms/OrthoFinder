@@ -275,26 +275,40 @@ def GetRoot(tree, species_tree_rooted, GeneToSpecies):
         else:
             return None # single species tree
 
-def GetOrthologues_from_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, neighbours, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False):
-    """ if dupsWriter != None then seqIDs and spIDs must also be provided"""
-    qPrune=True
-    orthologues = []
-    if (not os.path.exists(treeFN)) or os.stat(treeFN).st_size == 0: return set(orthologues), treeFN, set()
+def CheckAndRootTree(treeFN, species_tree_rooted, GeneToSpecies):
+    """
+    Check that the tree can be analysed and rooted
+    Root tree
+    Returns None if this fails, i.e. checks: exists, has more than one gene, can be rooted
+    """
+    if (not os.path.exists(treeFN)) or os.stat(treeFN).st_size == 0: return
+    qHaveSupport = False
     try:
-        tree = tree_lib.Tree(treeFN)
+        tree = tree_lib.Tree(treeFN, format=2)
+        qHaveSupport = True
     except:
-        tree = tree_lib.Tree(treeFN, format=3)
-#    if qPrune: tree.prune(tree.get_leaf_names())
-    if len(tree) == 1: return set(orthologues), tree, set()
+        try:
+            tree = tree_lib.Tree(treeFN)
+        except:
+            tree = tree_lib.Tree(treeFN, format=3)
+    if len(tree) == 1: return 
     root = GetRoot(tree, species_tree_rooted, GeneToSpecies)
-    if root == None: return set(orthologues), tree, set()
+    if root == None: return 
     # Pick the first root for now
     if root != tree:
         tree.set_outgroup(root)
+    return tree, qHaveSupport
 
     if not qNoRecon: tree = Resolve(tree, GeneToSpecies)
     if qPrune: tree.prune(tree.get_leaf_names())
-#    tree.write(outfile="/home/david/projects/OrthoFinder/Development/Orthologues/ReplacingDLCpar/Overlaps/Orthologues_M3/" + os.path.split(treeFN)[1] + ".rec.txt")
+    if len(tree) == 1: return set(orthologues), tree, set()
+
+def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neighbours, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False, orig_fn=None):
+    """ if dupsWriter != None then seqIDs and spIDs must also be provided"""
+    qPrune=True
+    orthologues = []
+    if not qNoRecon: tree = Resolve(tree, GeneToSpecies)
+    if qPrune: tree.prune(tree.get_leaf_names())
     if len(tree) == 1: return set(orthologues), tree, set()
     """ At this point need to label the tree nodes """
     iNode = 1
@@ -369,8 +383,8 @@ def GetOrthologues_from_tree(iog, treeFN, species_tree_rooted, GeneToSpecies, ne
                     orthologues.append((d0, d1, d0_sus, d1_sus))
 #    raise Exception("WriteQfO2")
     if qWrite:
-        directory = os.path.split(treeFN)[0]
-        WriteQfO2(orthologues, directory + "/../Orthologues_M3/" + os.path.split(treeFN)[1], qAppend=False)
+        directory = os.path.split(orig_fn)[0]
+        WriteQfO2(orthologues, directory + "/../Orthologues_M3/" + os.path.split(orig_fn)[1], qAppend=False)
     return orthologues, tree, suspect_genes
 
 def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, qContainsSuspectOlogs):
@@ -491,12 +505,18 @@ def GetSpeciesNeighbours(t):
     neighbours = {sp:{other:n for n,others in enumerate(lev) for other in others} for sp, lev in levels.items()}
     return neighbours
 
+def RootAndGetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neighbours, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False):
+    rooted_tree_ids, qHaveSupport = CheckAndRootTree(tree, species_tree_rooted, GeneToSpecies) # this can be parallelised easily
+    if rooted_tree_ids is None: return
+    GetOrthologues_from_tree(iog, rooted_tree_ids, species_tree_rooted, GeneToSpecies, neighbours, qWrite=qWrite, dupsWriter=dupsWriter, seqIDs=seqIDs, spIDs=spIDs, all_stride_dup_genes=all_stride_dup_genes, qNoRecon=qNoRecon, orig_fn=tree)
+
 def GetOrthologuesStandalone_Parallel(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree):
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
     neighbours = GetSpeciesNeighbours(species_tree_rooted)
     args_queue = mp.Queue()
     for treeFn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")): args_queue.put((0, treeFn, species_tree_rooted, GeneToSpecies, neighbours, True))
-    util.RunMethodParallel(GetOrthologues_from_tree, args_queue, 8)
+    # Now need to root the tree first
+    util.RunMethodParallel(RootAndGetOrthologues_from_tree, args_queue, 16)
 
 def RootTreeStandalone_Serial(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree):
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
@@ -521,7 +541,8 @@ def GetOrthologuesStandalone_Serial(trees_dir, species_tree_rooted_fn, GeneToSpe
 #    args_queue = mp.Queue()
     for treeFn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")): 
         print(treeFn)
-        GetOrthologues_from_tree(0, treeFn, species_tree_rooted, GeneToSpecies, neighbours, True)        
+        # Now need to root the tree first
+        RootAndGetOrthologues_from_tree(0, treeFn, species_tree_rooted, GeneToSpecies, neighbours, True)        
         
 def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, all_stride_dup_genes, qNoRecon):   
     """
@@ -556,11 +577,16 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
     nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
     species = speciesDict.keys()
     reconTreesRenamedDir = files.FileHandler.GetOGsReconTreeDir(True)
+    spec_seq_dict = ogSet.Spec_SeqDict()
     with open(files.FileHandler.GetDuplicationsFN(), 'wb') as outfile:
         dupWriter = csv.writer(outfile, delimiter="\t")
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
         for iog in xrange(nOgs):
-            orthologues, recon_tree, suspect_genes = GetOrthologues_from_tree(iog, files.FileHandler.GetOGsTreeFN(iog), species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes, qNoRecon=qNoRecon)
+            rooted_tree_ids, qHaveSupport = CheckAndRootTree(files.FileHandler.GetOGsTreeFN(iog), species_tree_rooted, GeneToSpecies) # this can be parallelised easily
+            if rooted_tree_ids is None: continue
+            # Write rooted tree with accessions
+            util.RenameTreeTaxa(rooted_tree_ids, files.FileHandler.GetOGsTreeFN(iog, True), spec_seq_dict, qSupport=qHaveSupport, qFixNegatives=True, qViaCopy=True)
+            orthologues, recon_tree, suspect_genes = GetOrthologues_from_tree(iog, rooted_tree_ids, species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=dupWriter, seqIDs=spec_seq_dict, spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes, qNoRecon=qNoRecon)
             qContainsSuspectGenes = len(suspect_genes) > 0
             if (not qInitialisedSuspectGenesDirs) and qContainsSuspectGenes:
                 qInitialisedSuspectGenesDirs = True
@@ -579,7 +605,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
                         outfile.write("\n".join([SequenceDict[g]]) + "\n")
             allOrthologues = [(iog, orthologues)]
             # don't relabel nodes, they've already been done
-            util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qSupport=False, qFixNegatives=True)
+            util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, spec_seq_dict, qSupport=False, qFixNegatives=True)
             if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
                 util.PrintTime("Done %d of %d" % (iog, nOgs))
             nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, dResultsOrthologues, qContainsSuspectGenes)
@@ -707,8 +733,8 @@ if __name__ == "__main__":
     print(output_dir)
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
-#    GetOrthologuesStandalone_Parallel(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
-    GetOrthologuesStandalone_Serial(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
+    GetOrthologuesStandalone_Parallel(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
+    # GetOrthologuesStandalone_Serial(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
 #    RootTreeStandalone_Serial(args.trees_dir, args.rooted_species_tree, GeneToSpecies, output_dir, qSingleTree)
     util.Success()
 

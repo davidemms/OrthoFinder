@@ -376,7 +376,7 @@ class TreesForOrthogroups(object):
             commands_and_filenames.append([alignCommands_and_filenames[i]])
         pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
         
-        # Convert ids to accessions
+        # Convert ids to accessions for MSA
         accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in xrange(len(alignmentFilesToUse))]
         # Add concatenated Alignment
         if qDoSpeciesTree:
@@ -389,10 +389,4 @@ class TreesForOrthogroups(object):
                 text = "ERROR: Species tree inference failed"
                 files.FileHandler.LogFailAndExit(text)
         self.RenameAlignmentTaxa(alignmentFilesToUse, accessionAlignmentFNs, idDict)
-        qHaveSupport = None
-        for i in xrange(len(treeCommands_and_filenames)):
-            infn = self.GetTreeFilename(i)
-            if os.path.exists(infn):
-                if qHaveSupport == None: qHaveSupport = util.HaveSupportValues(infn)
-                util.RenameTreeTaxa(infn, self.GetTreeFilename(i, True), idDict, qSupport=qHaveSupport, qFixNegatives=True)       
         return resultsDirsFullPath[:2]

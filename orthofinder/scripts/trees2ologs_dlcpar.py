@@ -114,6 +114,9 @@ def RunDlcpar(ogSet, speciesTreeFN, workingDir, nParallel, qDeepSearch):
     dlcparResultsDir = workingDir + 'dlcpar/'
     if not os.path.exists(dlcparResultsDir): os.mkdir(dlcparResultsDir)
     RootGeneTreesArbitrarily(nOGs, dlcparResultsDir)
+    spec_seq_dict = ogSet.Spec_SeqDict()
+    for iog in xrange(len(ogs)):
+        util.RenameTreeTaxa(files.FileHandler.GetOGsTreeFN(iog), files.FileHandler.GetOGsTreeFN(iog, True), spec_seq_dict, qSupport=False, qFixNegatives=True, qViaCopy=False)
     geneMapFN = WriteGeneSpeciesMap(dlcparResultsDir, ogSet.SpeciesDict())
     filenames = [dlcparResultsDir + os.path.split(files.FileHandler.GetOGsTreeFN(i))[1] for i in xrange(nOGs)]
     if qDeepSearch:
