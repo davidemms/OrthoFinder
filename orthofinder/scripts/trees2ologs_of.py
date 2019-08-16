@@ -37,6 +37,30 @@ def GeneToSpecies_dot(g):
   
 def GeneToSpecies_hyphen(g):
   return g.split("-", 1)[0]  
+
+
+def SpeciesAndGene_dash(g):
+  return g.split("_", 1)
+    
+def SpeciesAndGene_secondDash(g):
+    a,b,c = g.split("_", 2)
+    return (a+"_"+b, c)
+  
+def SpeciesAndGene_3rdDash(g):
+    a,b,c,d = g.split("_", 3)
+    return (a+"_"+b+"_"+c, d)
+  
+def SpeciesAndGene_dot(g):
+  return g.split(".", 1)
+  
+def SpeciesAndGene_hyphen(g):
+  return g.split("-", 1)
+  
+SpeciesAndGene_lookup = {GeneToSpecies_dash:SpeciesAndGene_dash, 
+                        GeneToSpecies_secondDash:SpeciesAndGene_secondDash,
+                        GeneToSpecies_3rdDash:SpeciesAndGene_3rdDash,
+                        GeneToSpecies_dot:SpeciesAndGene_dot,
+                        GeneToSpecies_hyphen:SpeciesAndGene_hyphen}
     
 class RootMap(object):
     def __init__(self, setA, setB, GeneToSpecies):
@@ -180,11 +204,11 @@ def WriteQfO2(orthologues_list_pairs_list, outfilename, qAppend = True):
     """
     with open(outfilename, 'ab' if qAppend else 'wb') as outfile:
         for gs1, gs2, _, _ in orthologues_list_pairs_list:
-            for g1 in gs1:
-                g1 = g1.split()[0].split("_")[-1]
-                for g2 in gs2:
-                    g2 = g2.split()[0].split("_")[-1]
-                    outfile.write("%s\t%s\n" % (g1, g2))
+            for sp1, genes1 in gs1.items():
+                for sp2, genes2 in gs2.items():
+                    for g1 in genes1:
+                        for g2 in genes2:
+                            outfile.write("%s_%s\t%s_%s\n" % (sp1, g1, sp2, g2))
     
 def GetGeneToSpeciesMap(args):
     GeneToSpecies = GeneToSpecies_dash
@@ -306,6 +330,7 @@ def CheckAndRootTree(treeFN, species_tree_rooted, GeneToSpecies):
 def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neighbours, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False, orig_fn=None):
     """ if dupsWriter != None then seqIDs and spIDs must also be provided"""
     qPrune=True
+    SpeciesAndGene = SpeciesAndGene_lookup[GeneToSpecies]
     orthologues = []
     if not qNoRecon: tree = Resolve(tree, GeneToSpecies)
     if qPrune: tree.prune(tree.get_leaf_names())
@@ -344,7 +369,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                 d0 = defaultdict(list)
                 d0_sus = defaultdict(list)
                 for g in [g for g in ch[0].get_leaf_names() if g not in misplaced_genes]:
-                    sp, seq = g.split("_")
+                    sp, seq = SpeciesAndGene(g)
                     if g in suspect_genes:
                         d0_sus[sp].append(seq)
                     else:
@@ -353,7 +378,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                 d1 = defaultdict(list)
                 d1_sus = defaultdict(list)
                 for g in [g for g in ch[1].get_leaf_names() if g not in misplaced_genes]:
-                    sp, seq = g.split("_")
+                    sp, seq = SpeciesAndGene(g)
                     if g in suspect_genes:
                         d1_sus[sp].append(seq)
                     else:
@@ -367,7 +392,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                     d0 = defaultdict(list)
                     d0_sus = defaultdict(list)
                     for g in n0.get_leaf_names():
-                        sp, seq = g.split("_")
+                        sp, seq = SpeciesAndGene(g)
                         if g in suspect_genes:
                             d0_sus[sp].append(seq)
                         else:
@@ -375,7 +400,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                     d1 = defaultdict(list)
                     d1_sus = defaultdict(list)
                     for g in n1.get_leaf_names():
-                        sp, seq = g.split("_")
+                        sp, seq = SpeciesAndGene(g)
                         if g in suspect_genes:
                             d1_sus[sp].append(seq)
                         else:
@@ -384,7 +409,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
 #    raise Exception("WriteQfO2")
     if qWrite:
         directory = os.path.split(orig_fn)[0]
-        WriteQfO2(orthologues, directory + "/../Orthologues_M3/" + os.path.split(orig_fn)[1], qAppend=False)
+        WriteQfO2(orthologues, directory + "_Orthologues_M3/" + os.path.split(orig_fn)[1], qAppend=False)
     return orthologues, tree, suspect_genes
 
 def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, qContainsSuspectOlogs):
@@ -729,7 +754,7 @@ if __name__ == "__main__":
         os.mkdir(output_dir)
     
     GeneToSpecies = GetGeneToSpeciesMap(args)
-    output_dir = output_dir + "/../Orthologues_M3/"
+    output_dir = output_dir + "_Orthologues_M3/"
     print(output_dir)
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
