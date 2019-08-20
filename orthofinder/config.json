@@ -30,6 +30,12 @@
     "cmd_line": "iqtree -s INPUT -pre PATH/IDENTIFIER > /dev/null",
     "ouput_filename": "PATH/IDENTIFIER.treefile"
     },
+
+    "iqtree_and_trim":{ 
+    "program_type": "tree",
+    "cmd_line": "noisy INPUT ; iqtree -s INPUT_out.fas -pre PATH/IDENTIFIER > /dev/null",
+    "ouput_filename": "PATH/IDENTIFIER.treefile"
+    },
     
     "diamond":{ 
     "program_type": "search",
