@@ -627,7 +627,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
                 these_genes = [g for g in suspect_genes if g.startswith(strsp0_)]
                 if len(these_genes) > 0:
                     with open(dSuspectGenes + speciesDict[strsp0] + ".txt", 'ab') as outfile:
-                        outfile.write("\n".join([SequenceDict[g]]) + "\n")
+                        outfile.write("\n".join([SequenceDict[g] for g in these_genes]) + "\n")
             allOrthologues = [(iog, orthologues)]
             # don't relabel nodes, they've already been done
             util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, spec_seq_dict, qSupport=False, qFixNegatives=True)
