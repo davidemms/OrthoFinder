@@ -1563,6 +1563,7 @@ def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_na
                         outputFasta.write(">%s\n" % newID)    
                         iSeq += 1
                     else:
+                        line = line.upper()    # allow lowercase letters in sequences
                         if not qHasAA and (iLine < mLinesToCheck):
 #                            qHasAA = qHasAA or any([c in line for c in ['D','E','F','H','I','K','L','M','N','P','Q','R','S','V','W','Y']])
                             qHasAA = qHasAA or any([c in line for c in ['E','F','I','L','P','Q']]) # AAs minus nucleotide ambiguity codes
