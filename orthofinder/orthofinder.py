@@ -1312,7 +1312,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo):
         proc.start()
     util.ManageQueue(runningProcesses, cmd_queue)
     
-    util.PrintTime("Connected putatitive homologs") 
+    util.PrintTime("Connected putative homologues") 
     WaterfallMethod.WriteGraphParallel(seqsInfo, options.nProcessAlg)
     
     # 5b. MCL     
