@@ -670,7 +670,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
     filename_sp = ogStatsResultsDir +  "Statistics_PerSpecies" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".tsv"
     filename_sum = ogStatsResultsDir +  "Statistics_Overall" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".tsv"
     filename_overlap = ogStatsResultsDir +  "Orthogroups_SpeciesOverlaps" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".tsv"
-    filename_single_copy = scripts.files.FileHandler.GetResultsFNBase() + "_SingleCopyOrthologues.txt"
+    filename_single_copy = scripts.files.FileHandler.GetOrthogroupResultsFNBase() + "_SingleCopyOrthologues.txt"
     percentFormat = "%0.1f"
     with open(filename_sp, 'wb') as outfile_species, open(filename_sum, 'wb') as outfile_sum:
         writer_sp = csv.writer(outfile_species, delimiter="\t")
@@ -1322,10 +1322,10 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo):
     MCLread.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
     
     util.PrintUnderline("Writing orthogroups to file")
-    if options.qStopAfterGroups: util.PrintCitation()
+    if options.qStopAfterGroups: util.PrintCitation(scripts.files.FileHandler.GetResultsDirectory1())
     ogs = MCLread.GetPredictedOGs(clustersFilename_pairs)
     
-    resultsBaseFilename = scripts.files.FileHandler.GetResultsFNBase()
+    resultsBaseFilename = scripts.files.FileHandler.GetOrthogroupResultsFNBase()
     idsDict = MCL.WriteOrthogroupFiles(ogs, [scripts.files.FileHandler.GetSequenceIDsFN()], resultsBaseFilename, clustersFilename_pairs)
     speciesNamesDict = SpeciesNameDict(scripts.files.FileHandler.GetSpeciesIDsFN())
     orthogroupsResultsFilesString = MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesInfoObj.speciesToUse, resultsBaseFilename)
@@ -1637,7 +1637,7 @@ if __name__ == "__main__":
                 GetOrthologues(speciesInfoObj, options, program_caller, orthogroupsResultsFilesString)
             # 10.
             print("\n" + statsFile + "\n\n" + summaryText) 
-            util.PrintCitation()
+            util.PrintCitation(scripts.files.FileHandler.GetResultsDirectory1())
                 
         elif options.qStartFromFasta:
             # 3. 
@@ -1662,7 +1662,7 @@ if __name__ == "__main__":
                 GetOrthologues(speciesInfoObj, options, program_caller, orthogroupsResultsFilesString)
             # 10.
             print("\n" + statsFile + "\n\n" + summaryText) 
-            util.PrintCitation()
+            util.PrintCitation(scripts.files.FileHandler.GetResultsDirectory1())
             
         elif options.qStartFromBlast:
             # 0.
@@ -1682,7 +1682,7 @@ if __name__ == "__main__":
                 GetOrthologues(speciesInfoObj, options, program_caller, orthogroupsResultsFilesString)
             # 10
             print("\n" + statsFile + "\n\n" + summaryText) 
-            util.PrintCitation() 
+            util.PrintCitation(scripts.files.FileHandler.GetResultsDirectory1()) 
         elif options.qStartFromGroups:
             # 0.  
             speciesInfoObj, _ = ProcessPreviousFiles(continuationDir, options.qDoubleBlast)
@@ -1691,14 +1691,14 @@ if __name__ == "__main__":
             # 9
             GetOrthologues(speciesInfoObj, options, program_caller)
             # 10
-            util.PrintCitation() 
+            util.PrintCitation(scripts.files.FileHandler.GetResultsDirectory1()) 
         elif options.qStartFromTrees:
             speciesInfoObj, _ = ProcessPreviousFiles(scripts.files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast)
             scripts.files.FileHandler.LogSpecies()
             options = CheckOptions(options)
             summaryText = GetOrthologues_FromTrees(options)
             print(summaryText)
-            util.PrintCitation() 
+            util.PrintCitation(scripts.files.FileHandler.GetResultsDirectory1()) 
         else:
             raise NotImplementedError
             ptm = parallel_task_manager.ParallelTaskManager_singleton()

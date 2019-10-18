@@ -503,7 +503,7 @@ class __Files_new_dont_manually_create__(object):
             for i, d in enumerate([self.wd_current + "Distances/", self.GetResultsTreesDir(), self.wd_current + "Trees_ids/"]):
                 if not os.path.exists(d): os.mkdir(d)
     
-    def GetResultsFNBase(self):
+    def GetOrthogroupResultsFNBase(self):
         if self.rd1 == None: 
             raise Exception("No rd1")
         if self.iResultsVersion == None:
