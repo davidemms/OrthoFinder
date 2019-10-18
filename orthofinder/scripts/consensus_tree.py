@@ -26,7 +26,7 @@ import glob
 import argparse
 from collections import Counter, defaultdict
 
-import tree
+import tree, newick
 
 class BitVector(object):
     """
@@ -150,20 +150,34 @@ def GetAllSplits(trees_dir):
     if len(treesFNs) == 0:
         print("ERROR: No trees found in directory")
         raise Exception()
-    first_tree = tree.Tree(treesFNs[0])
+    iFirst = 0
+    first_tree = None
+    while iFirst < len(treesFNs):
+        try:
+            first_tree = tree.Tree(treesFNs[iFirst])
+            break
+        except newick.NewickError:
+            print("Could not read tree, skipping: %s" % treesFNs[iFirst])
+            iFirst += 1
+    if first_tree is None:
+        print("ERROR: Could not read any of the trees for STAG species tree inference in %s" % trees_dir)
+        util.Fail()
     taxa_ordered = first_tree.get_leaf_names()
     taxa_index = {taxon:i for i, taxon in enumerate(taxa_ordered)}
     splits = []
     UpdateSplits(splits, first_tree, taxa_index)
-    for i, treeFN in enumerate(treesFNs[1:]):
-        t = tree.Tree(treeFN)
-        UpdateSplits(splits, t, taxa_index)
+    for treeFN in treesFNs[iFirst+1:]:
+        try:
+            t = tree.Tree(treeFN)
+            UpdateSplits(splits, t, taxa_index)
+        except newick.NewickError:
+            print("Could not read tree, skipping: %s" % treeFN)
     return splits, taxa_index, taxa_ordered, len(treesFNs)
 
 def GetCompatibleSplits(splits_lengths):
     """
     Args:
-        splits_lengths - listof (split, length) tuples
+        splits_lengths - list of (split, length) tuples
     Returns:
         compatible_splits, dict:split->list_of_lengths
     """
