@@ -226,7 +226,7 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=Tr
         nSuccess += 1
         if qVerbose: print(os.path.split(fn)[1] + " - Processed")
     if qVerbose: print("\nExamined %d trees" % (nSuccess + nNotAllPresent + nFail))
-    print("%d trees had all species present and will be used by STAG to infer the species tree\n" % nSuccess)
+    print("%d trees had all species present and will be used by STAG to infer the species tree" % nSuccess)
       
 def Astral(tree_dir, astral_jar_file, qForOF=False):
     treesFN = tree_dir + "../TreesFile.txt"

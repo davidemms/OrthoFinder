@@ -645,26 +645,7 @@ def PrintHelp():
         
     print("""-h, --help
    Print this help text""")
-    util.PrintCitation()   
-
-def GetResultsFilesString(rootedSpeciesTreeFN, seqs_alignments_dirs=None, qHaveOrthologues=True):
-    """uses species tree directory to infer position of remaining files
-    """
-    st = ""
-    if seqs_alignments_dirs != None:
-        st += "\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0]
-        st += "\nMultiple sequence alignments:\n   %s\n" % seqs_alignments_dirs[1]
-    st += "\nGene trees:\n   %s\n" % (files.FileHandler.GetOGsTreeDir(True))
-    if len(rootedSpeciesTreeFN) == 1:
-        st += "\nRooted species tree:\n   %s\n" % rootedSpeciesTreeFN[0]
-        if qHaveOrthologues: st += "\nSpecies-by-species orthologues directory:\n   %s\n" % (files.FileHandler.GetOrthologuesDirectory())
-    else:
-        st += "\nWARNING:\n"
-        st += "   Multiple potential outgroups were identified for the species tree.\n\n"       
-        st += "Rooted species trees:\n"
-        for tFN in rootedSpeciesTreeFN:
-            st += "   %s\n" % tFN
-    return st
+    util.PrintCitation()       
             
 def WriteOrthologuesMatrix(fn, matrix, speciesToUse, speciesDict):
     with open(fn, 'wb') as outfile:
@@ -841,7 +822,6 @@ def OrthologuesFromTrees(recon_method, nHighParallel, userSpeciesTree_fn, qAddSp
     util.PrintUnderline("Writing results files")
     util.PrintTime("Writing results files")
     files.FileHandler.CleanWorkingDir2()
-    return "Species-by-species orthologues directory:\n   %s\n" % files.FileHandler.GetOrthologuesDirectory()
     
 def OrthologuesWorkflow(speciesToUse, nSpAll, 
                        tree_options,
@@ -907,12 +887,10 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
             spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
         if qStopAfterSeqs:
             print("")
-            return ("\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0])
+            return
         elif qStopAfterAlign:
             print("")
-            st = "\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0]
-            st += "\nMultiple sequence alignments:\n   %s\n" % seqs_alignments_dirs[1]
-            return st
+            return 
         db = DendroBLASTTrees(ogSet, nLowParrallel, nHighParallel, qDoubleBlast)
         if qDB_SpeciesTree and not userSpeciesTree and not qLessThanFourSpecies:
             util.PrintUnderline("Inferring species tree (calculating gene distances)")
@@ -987,16 +965,10 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
     SpeciesTree:
     We now have a list of rooted species trees: rootedSpeciesTreeFN (this should be recorded by the file handler)
     """
-        
     if qStopAfterTrees:
         # root the gene trees using the species tree and write out their accessions - really I could remove the whole '-ot, -os, -oa' options, they are probably rarely used if ever.
         if userSpeciesTree:
-            st = ""
-            if qMSA:
-                st += "\nSequences for orthogroups:\n   %s\n" % seqs_alignments_dirs[0]
-                st += "\nMultiple sequence alignments:\n   %s\n" % seqs_alignments_dirs[1]
-            st += "\nGene trees:\n   %s\n" % (files.FileHandler.GetResultsTreesDir())
-            return st
+            return
         # otherwise, root species tree
         resultsSpeciesTrees = []
         for i, (r, speciesTree_fn) in enumerate(zip(roots, rootedSpeciesTreeFN)):
@@ -1012,9 +984,8 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
                 if qHaveSupport is None: qHaveSupport = util.HaveSupportValues(infn)
                 util.RenameTreeTaxa(infn, files.FileHandler.GetOGsTreeFN(iog, True), idDict, qSupport=qHaveSupport, qFixNegatives=True)       
         files.FileHandler.CleanWorkingDir2()
-        return GetResultsFilesString(resultsSpeciesTrees, seqs_alignments_dirs if qMSA else None, False)
     
-    if qMultiple: util.PrintUnderline("\nMultiple potential species tree roots were identified, only one will be analyed.", True)
+    if qMultiple: print("\nWARNING: Multiple potential species tree roots were identified, only one will be analyed.")
     resultsSpeciesTrees = []
     i = 0
     r = roots[0]
@@ -1039,8 +1010,6 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
     
     files.FileHandler.CleanWorkingDir2()
     util.PrintUnderline("Writing results files", True)
-    
-    return GetResultsFilesString(resultsSpeciesTrees, seqs_alignments_dirs if qMSA else None)
     
     
     

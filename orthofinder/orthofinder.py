@@ -281,8 +281,6 @@ class MCL:
                     counts_row = [counts[iSpecies] for iSpecies in speciesToUse]
                     fileWriter_counts.writerow(row[:1] + counts_row + [sum(counts_row)])
                 thisOutputWriter.writerow(row)
-        resultsFilesString = "Orthogroups have been written to tab-delimited files:\n   %s\n   %s (OrthoMCL format)\n   %s" % (outputFilename, outputFilename[:-3] + "txt", singleGeneFilename)
-        return resultsFilesString
 
 """
 scnorm
@@ -766,11 +764,8 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
         Stats_SizeTable(writer_sum, writer_sp, properOGs, allGenesCounter, iSpecies, speciesPresence)
         Stats_SpeciesOverlaps(filename_overlap, speciesNamesDict, iSpecies, speciesPresence)
 
-    statsFiles = "Orthogroup statistics:\n"
-    statsFiles += "   " + "   ".join([os.path.split(fn)[1] for fn in [filename_sp, filename_sum, filename_overlap]])
     summaryText = """OrthoFinder assigned %d genes (%0.1f%% of total) to %d orthogroups. Fifty percent of all genes were in orthogroups with %d or more genes (G50 was %d) and were contained in the largest %d orthogroups (O50 was %d). There were %d orthogroups with all species present and %d of these consisted entirely of single-copy genes.""" % (nAssigned, pAssigned, nOgs, G50, G50, O50, O50, nCompleteOGs, nSingleCopy)
-    return summaryText, statsFiles
-          
+    print(util.FlowText(summaryText))
 
 """
 OrthoFinder
@@ -1322,13 +1317,12 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo):
     MCLread.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
     
     util.PrintUnderline("Writing orthogroups to file")
-    if options.qStopAfterGroups: util.PrintCitation(scripts.files.FileHandler.GetResultsDirectory1())
     ogs = MCLread.GetPredictedOGs(clustersFilename_pairs)
     
     resultsBaseFilename = scripts.files.FileHandler.GetOrthogroupResultsFNBase()
     idsDict = MCL.WriteOrthogroupFiles(ogs, [scripts.files.FileHandler.GetSequenceIDsFN()], resultsBaseFilename, clustersFilename_pairs)
     speciesNamesDict = SpeciesNameDict(scripts.files.FileHandler.GetSpeciesIDsFN())
-    orthogroupsResultsFilesString = MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesInfoObj.speciesToUse, resultsBaseFilename)
+    MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesInfoObj.speciesToUse, resultsBaseFilename)
     
     # Write Orthogroup FASTA files    
     ogSet = scripts.orthologues.OrthoGroupsSet(scripts.files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll, options.qAddSpeciesToIDs, idExtractor = scripts.util.FirstWordExtractor)
@@ -1337,16 +1331,13 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo):
     d_seqs = scripts.files.FileHandler.GetResultsSeqsDir()
     if not os.path.exists(d_seqs): os.mkdir(d_seqs)
     treeGen.WriteFastaFiles(fastaWriter, ogSet.OGs(qInclAll=True), idsDict, False)
-    orthogroupsResultsFilesString += ("\nSequences for orthogroups:\n   %s\n" % scripts.files.FileHandler.GetResultsSeqsDir())
     
-    print(orthogroupsResultsFilesString)
-    summaryText, statsFile = Stats(ogs, speciesNamesDict, speciesInfoObj.speciesToUse, scripts.files.FileHandler.iResultsVersion)
+    Stats(ogs, speciesNamesDict, speciesInfoObj.speciesToUse, scripts.files.FileHandler.iResultsVersion)
     if options.speciesXMLInfoFN:
         MCL.WriteOrthoXML(speciesXML, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml", speciesInfoObj.speciesToUse)
+    print("")
     util.PrintTime("Done orthogroups")
     scripts.files.FileHandler.LogOGs()
-    
-    return statsFile, summaryText, orthogroupsResultsFilesString
 
 # 0
 def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
@@ -1469,32 +1460,30 @@ def RunSearch(options, speciessInfoObj, seqsInfo, program_caller):
                         shutil.rmtree(tmp_dir, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
 
 # 9
-def GetOrthologues(dirs, options, program_caller, orthogroupsResultsFilesString=None):
+def GetOrthologues(dirs, options, program_caller):
     util.PrintUnderline("Analysing Orthogroups", True)
 
-    orthologuesResultsFilesString = orthologues.OrthologuesWorkflow(speciesInfoObj.speciesToUse, 
-                                                                    speciesInfoObj.nSpAll, 
-                                                                    program_caller,
-                                                                    options.msa_program,
-                                                                    options.tree_program,
-                                                                    options.recon_method,
-                                                                    options.nBlast,
-                                                                    options.nProcessAlg,
-                                                                    options.qDoubleBlast,
-                                                                    options.qAddSpeciesToIDs,
-                                                                    options.speciesTreeFN, 
-                                                                    options.qStopAfterSeqs,
-                                                                    options.qStopAfterAlignments,
-                                                                    options.qStopAfterTrees,
-                                                                    options.qMSATrees,
-                                                                    options.qPhyldog,
-                                                                    options.name)
+    orthologues.OrthologuesWorkflow(speciesInfoObj.speciesToUse, 
+                                    speciesInfoObj.nSpAll, 
+                                    program_caller,
+                                    options.msa_program,
+                                    options.tree_program,
+                                    options.recon_method,
+                                    options.nBlast,
+                                    options.nProcessAlg,
+                                    options.qDoubleBlast,
+                                    options.qAddSpeciesToIDs,
+                                    options.speciesTreeFN, 
+                                    options.qStopAfterSeqs,
+                                    options.qStopAfterAlignments,
+                                    options.qStopAfterTrees,
+                                    options.qMSATrees,
+                                    options.qPhyldog,
+                                    options.name)
     util.PrintTime("Done orthologues")
-    if None != orthogroupsResultsFilesString: print(orthogroupsResultsFilesString)
-    print(orthologuesResultsFilesString.rstrip())    
 
 def GetOrthologues_FromTrees(options):
-    return orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.speciesTreeFN, options.qAddSpeciesToIDs)
+    orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.speciesTreeFN, options.qAddSpeciesToIDs)
  
 def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_names=[]):
     """
@@ -1631,14 +1620,10 @@ if __name__ == "__main__":
             # 7.  
             RunSearch(options, speciesInfoObj, seqsInfo, program_caller)
             # 8.
-            statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo)
+            DoOrthogroups(options, speciesInfoObj, seqsInfo)
             # 9.
             if not options.qStopAfterGroups:
-                GetOrthologues(speciesInfoObj, options, program_caller, orthogroupsResultsFilesString)
-            # 10.
-            print("\n" + statsFile + "\n\n" + summaryText) 
-            util.PrintCitation(scripts.files.FileHandler.GetResultsDirectory1())
-                
+                GetOrthologues(speciesInfoObj, options, program_caller)   
         elif options.qStartFromFasta:
             # 3. 
             speciesInfoObj = None
@@ -1656,14 +1641,10 @@ if __name__ == "__main__":
             # 7. 
             RunSearch(options, speciesInfoObj, seqsInfo, program_caller)
             # 8.  
-            statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo)    
+            DoOrthogroups(options, speciesInfoObj, seqsInfo)    
             # 9. 
             if not options.qStopAfterGroups:
-                GetOrthologues(speciesInfoObj, options, program_caller, orthogroupsResultsFilesString)
-            # 10.
-            print("\n" + statsFile + "\n\n" + summaryText) 
-            util.PrintCitation(scripts.files.FileHandler.GetResultsDirectory1())
-            
+                GetOrthologues(speciesInfoObj, options, program_caller)
         elif options.qStartFromBlast:
             # 0.
             speciesInfoObj, _ = ProcessPreviousFiles(scripts.files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast)
@@ -1676,13 +1657,10 @@ if __name__ == "__main__":
             if options.speciesXMLInfoFN:   
                 speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
             # 8        
-            statsFile, summaryText, orthogroupsResultsFilesString = DoOrthogroups(options, speciesInfoObj, seqsInfo)    
+            DoOrthogroups(options, speciesInfoObj, seqsInfo)    
             # 9
             if not options.qStopAfterGroups:
-                GetOrthologues(speciesInfoObj, options, program_caller, orthogroupsResultsFilesString)
-            # 10
-            print("\n" + statsFile + "\n\n" + summaryText) 
-            util.PrintCitation(scripts.files.FileHandler.GetResultsDirectory1()) 
+                GetOrthologues(speciesInfoObj, options, program_caller)
         elif options.qStartFromGroups:
             # 0.  
             speciesInfoObj, _ = ProcessPreviousFiles(continuationDir, options.qDoubleBlast)
@@ -1690,19 +1668,18 @@ if __name__ == "__main__":
             options = CheckOptions(options)
             # 9
             GetOrthologues(speciesInfoObj, options, program_caller)
-            # 10
-            util.PrintCitation(scripts.files.FileHandler.GetResultsDirectory1()) 
         elif options.qStartFromTrees:
             speciesInfoObj, _ = ProcessPreviousFiles(scripts.files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast)
             scripts.files.FileHandler.LogSpecies()
             options = CheckOptions(options)
-            summaryText = GetOrthologues_FromTrees(options)
-            print(summaryText)
-            util.PrintCitation(scripts.files.FileHandler.GetResultsDirectory1()) 
+            GetOrthologues_FromTrees(options)
         else:
             raise NotImplementedError
             ptm = parallel_task_manager.ParallelTaskManager_singleton()
             ptm.Stop()
+        d_results = scripts.files.FileHandler.GetResultsDirectory1()
+        print("\nResults:\n    %s" % d_results)
+        util.PrintCitation(d_results)
         scripts.files.FileHandler.WriteToLog("OrthoFinder run completed\n", True)
     except Exception as e:
         ptm = parallel_task_manager.ParallelTaskManager_singleton()
