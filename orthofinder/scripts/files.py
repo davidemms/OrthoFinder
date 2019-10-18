@@ -177,8 +177,14 @@ class __Files_new_dont_manually_create__(object):
                                                       
         elif options.qStartFromTrees:
             wd1, clustersFilename_pairs, wd_trees, speciesTreeFN = previous_files_locator.GetStartFromTrees()
-            qIsUserSpeciesTree = (options.speciesTreeFN != None)
-            speciesTreeFN = options.speciesTreeFN if options.speciesTreeFN != None else speciesTreeFN
+            if options.speciesTreeFN != None:
+                qIsUserSpeciesTree = True
+                speciesTreeFN = options.speciesTreeFN
+            elif speciesTreeFN != None:
+                qIsUserSpeciesTree = False
+            else:
+                print("ERROR: Could not find species tree")
+                util.Fail()
             self.StartFromTrees(wd1, 
                                 wd_trees,
                                 base_dir, 
