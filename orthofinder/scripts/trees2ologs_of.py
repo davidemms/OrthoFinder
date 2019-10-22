@@ -412,7 +412,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
         WriteQfO2(orthologues, directory + "_Orthologues_M3/" + os.path.split(orig_fn)[1], qAppend=False)
     return orthologues, tree, suspect_genes
 
-def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, qContainsSuspectOlogs):
+def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, ortholog_file_writers, suspect_genes_file_writers, qContainsSuspectOlogs):
     # Sort the orthologues according to speices pairs
     sp_to_index = {str(sp):i for i, sp in enumerate(iSpeciesToUse)}
     nOrtho = util.nOrtho_sp(len(iSpeciesToUse))   
@@ -427,81 +427,72 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
     for i in xrange(nSpecies):
         sp0 = str(iSpeciesToUse[i])
         if qContainsSuspectOlogs: 
-            outfile1_sus = open(dSuspect + "%s.tsv" % speciesDict[sp0], 'ab')
-            writer1_sus = csv.writer(outfile1_sus, delimiter="\t")
+            writer1_sus = suspect_genes_file_writers[i]
         strsp0 = sp0 + "_"
         isp0 = sp_to_index[sp0]
-        d0 = resultsDir + "Orthologues_" + speciesDict[sp0] + "/"
         for j in xrange(i, nSpecies):
             sp1 = str(iSpeciesToUse[j])
             if sp1 == sp0: continue
             strsp1 = sp1 + "_"
             isp1 = sp_to_index[sp1]
-            d1 = resultsDir + "Orthologues_" + speciesDict[sp1] + "/"
-            with open(d0 + '%s__v__%s.tsv' % (speciesDict[sp0], speciesDict[sp1]), 'ab') as outfile1, open(d1 + '%s__v__%s.tsv' % (speciesDict[sp1], speciesDict[sp0]), 'ab') as outfile2:
-                if qContainsSuspectOlogs:
-                    outfile2_sus = open(dSuspect + "%s.tsv" % speciesDict[sp1], 'ab')
-                    writer2_sus = csv.writer(outfile2_sus, delimiter="\t")
-                writer1 = csv.writer(outfile1, delimiter="\t")
-                writer2 = csv.writer(outfile2, delimiter="\t")
-                for iog, ortholouges_onetree in orthologues_alltrees:                   
-                    og = "OG%07d" % iog
-                    for leavesL, leavesR, leavesL_sus, leavesR_sus  in ortholouges_onetree:
-                        # suspect_genes are the genes which, for this level, the orthologues should be considered suspect as the gene appears misplaced (at this level)
-                        nL0 = len(leavesL[sp0])
-                        nR0 = len(leavesR[sp0])
-                        nL1 = len(leavesL[sp1])
-                        nR1 = len(leavesR[sp1])
-                        if nL0*nR1 + nL1*nR0 != 0: 
-                            # each species can be in only one of L and R at most: they might both be in the same half
-                            if nL0 > 0:
-                                # then nR0 == 0 so nR1 > 0 since checked (nL0*nR1 + nL1*nR0 != 0)
-                                n0 = nL0
-                                n1 = nR1
-                                text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesL[sp0]])
-                                text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesR[sp1]])
-                            else:
-                                n0 = nR0
-                                n1 = nL1
-                                text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesR[sp0]])
-                                text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]])
-                            writer1.writerow((og, text0, text1))
-                            writer2.writerow((og, text1, text0))
-                            nOrtho.n[isp0, isp1] += n0
-                            nOrtho.n[isp1, isp0] += n1
-                            if n0 == 1 and n1 == 1:
-                                nOrtho.n_121[isp0, isp1] += 1
-                                nOrtho.n_121[isp1, isp0] += 1
-                            elif n0 == 1:
-                                nOrtho.n_12m[isp0, isp1] += 1
-                                nOrtho.n_m21[isp1, isp0] += n1
-                            elif n1 == 1:
-                                nOrtho.n_m21[isp0, isp1] += n0
-                                nOrtho.n_12m[isp1, isp0] += 1
-                            else:
-                                nOrtho.n_m2m[isp0, isp1] += n0
-                                nOrtho.n_m2m[isp1, isp0] += n1
-                        # Write suspect orthologues
-                        if not qContainsSuspectOlogs: continue
-                        nL0s = len(leavesL_sus[sp0])
-                        nR0s = len(leavesR_sus[sp0])
-                        nL1s = len(leavesL_sus[sp1])
-                        nR1s = len(leavesR_sus[sp1])
-                        if nL0s*(nR1+nR1s) + (nL1+nL1s)*nR0s != 0: 
-                            # each species can be in only one of L and R at most: they might both be in the same half
-                            if nL0s > 0:
-                                # then nR0 == 0 so nR1 > 0 since checked (nL0*nR1 + nL1*nR0 != 0)
-                                text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesL_sus[sp0]])
-                                text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesR[sp1]+leavesR_sus[sp1]])
-                            else:
-                                text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesR_sus[sp0]])
-                                text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]+leavesL_sus[sp1]])
-                            writer1_sus.writerow((og, text0, text1))
-                            writer2_sus.writerow((og, text1, text0))
-                if qContainsSuspectOlogs:
-                    outfile2_sus.close()
-        if qContainsSuspectOlogs:
-            outfile1_sus.close()
+            if qContainsSuspectOlogs:
+                writer2_sus = suspect_genes_file_writers[j]
+            writer1 = ortholog_file_writers[i][j] 
+            writer2 = ortholog_file_writers[j][i] 
+            for iog, ortholouges_onetree in orthologues_alltrees:                   
+                og = "OG%07d" % iog
+                for leavesL, leavesR, leavesL_sus, leavesR_sus  in ortholouges_onetree:
+                    # suspect_genes are the genes which, for this level, the orthologues should be considered suspect as the gene appears misplaced (at this level)
+                    nL0 = len(leavesL[sp0])
+                    nR0 = len(leavesR[sp0])
+                    nL1 = len(leavesL[sp1])
+                    nR1 = len(leavesR[sp1])
+                    if nL0*nR1 + nL1*nR0 != 0: 
+                        # each species can be in only one of L and R at most: they might both be in the same half
+                        if nL0 > 0:
+                            # then nR0 == 0 so nR1 > 0 since checked (nL0*nR1 + nL1*nR0 != 0)
+                            n0 = nL0
+                            n1 = nR1
+                            text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesL[sp0]])
+                            text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesR[sp1]])
+                        else:
+                            n0 = nR0
+                            n1 = nL1
+                            text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesR[sp0]])
+                            text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]])
+                        writer1.writerow((og, text0, text1))
+                        writer2.writerow((og, text1, text0))
+                        nOrtho.n[isp0, isp1] += n0
+                        nOrtho.n[isp1, isp0] += n1
+                        if n0 == 1 and n1 == 1:
+                            nOrtho.n_121[isp0, isp1] += 1
+                            nOrtho.n_121[isp1, isp0] += 1
+                        elif n0 == 1:
+                            nOrtho.n_12m[isp0, isp1] += 1
+                            nOrtho.n_m21[isp1, isp0] += n1
+                        elif n1 == 1:
+                            nOrtho.n_m21[isp0, isp1] += n0
+                            nOrtho.n_12m[isp1, isp0] += 1
+                        else:
+                            nOrtho.n_m2m[isp0, isp1] += n0
+                            nOrtho.n_m2m[isp1, isp0] += n1
+                    # Write suspect orthologues
+                    if not qContainsSuspectOlogs: continue
+                    nL0s = len(leavesL_sus[sp0])
+                    nR0s = len(leavesR_sus[sp0])
+                    nL1s = len(leavesL_sus[sp1])
+                    nR1s = len(leavesR_sus[sp1])
+                    if nL0s*(nR1+nR1s) + (nL1+nL1s)*nR0s != 0: 
+                        # each species can be in only one of L and R at most: they might both be in the same half
+                        if nL0s > 0:
+                            # then nR0 == 0 so nR1 > 0 since checked (nL0*nR1 + nL1*nR0 != 0)
+                            text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesL_sus[sp0]])
+                            text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesR[sp1]+leavesR_sus[sp1]])
+                        else:
+                            text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesR_sus[sp0]])
+                            text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]+leavesL_sus[sp1]])
+                        writer1_sus.writerow((og, text0, text1))
+                        writer2_sus.writerow((og, text1, text0))
     return nOrtho   
                                       
 def Resolve(tree, GeneToSpecies):
@@ -568,7 +559,49 @@ def GetOrthologuesStandalone_Serial(trees_dir, species_tree_rooted_fn, GeneToSpe
         print(treeFn)
         # Now need to root the tree first
         RootAndGetOrthologues_from_tree(0, treeFn, species_tree_rooted, GeneToSpecies, neighbours, True)        
-        
+
+class OrthologsFiles(object):
+    """wrapper to open all the orthologs files as once"""
+    def __init__(self, directory, speciesDict, iSpeciesToUse, nSpecies, sp_to_index):
+        self.d = directory
+        self.speciesDict = speciesDict
+        self.iSpeciesToUse = iSpeciesToUse
+        self.nSpecies = nSpecies
+        self.sp_to_index = sp_to_index
+        self.dSuspectGenes = files.FileHandler.GetSuspectGenesDir()
+        self.ortholog_file_handles = [[None for _ in self.iSpeciesToUse] for _ in self.iSpeciesToUse]
+        self.suspect_genes_file_handles = [None for _ in self.iSpeciesToUse]
+
+    def __enter__(self):
+        ortholog_file_writers = [[None for _ in self.iSpeciesToUse] for _ in self.iSpeciesToUse]
+        suspect_genes_file_writers = [None for _ in self.iSpeciesToUse]
+        for i in xrange(self.nSpecies):
+            sp0 = str(self.iSpeciesToUse[i])
+            self.suspect_genes_file_handles[i] = open(self.dSuspectGenes + "%s.tsv" % self.speciesDict[sp0], 'wb')
+            suspect_genes_file_writers[i] = csv.writer(self.suspect_genes_file_handles[i], delimiter="\t")
+            strsp0 = sp0 + "_"
+            isp0 = self.sp_to_index[sp0]
+            d0 = self.d + "Orthologues_" + self.speciesDict[sp0] + "/"
+            for j in xrange(i, self.nSpecies):
+                sp1 = str(self.iSpeciesToUse[j])
+                if sp1 == sp0: continue
+                strsp1 = sp1 + "_"
+                isp1 = self.sp_to_index[sp1]
+                d1 = self.d + "Orthologues_" + self.speciesDict[sp1] + "/"
+                self.ortholog_file_handles[i][j] = open(d0 + '%s__v__%s.tsv' % (self.speciesDict[sp0], self.speciesDict[sp1]), 'ab')
+                self.ortholog_file_handles[j][i] = open(d1 + '%s__v__%s.tsv' % (self.speciesDict[sp1], self.speciesDict[sp0]), 'ab')
+                ortholog_file_writers[i][j] = csv.writer(self.ortholog_file_handles[i][j], delimiter="\t")
+                ortholog_file_writers[j][i] = csv.writer(self.ortholog_file_handles[j][i], delimiter="\t")
+        return ortholog_file_writers, suspect_genes_file_writers
+
+    def __exit__(self, type, value, traceback):
+        for fh in self.suspect_genes_file_handles:
+            fh.close()
+        for fh_list in self.ortholog_file_handles:
+            for fh in fh_list:
+                if fh is not None:
+                    fh.close()
+
 def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, all_stride_dup_genes, qNoRecon):   
     """
     """
@@ -603,7 +636,8 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
     species = speciesDict.keys()
     reconTreesRenamedDir = files.FileHandler.GetOGsReconTreeDir(True)
     spec_seq_dict = ogSet.Spec_SeqDict()
-    with open(files.FileHandler.GetDuplicationsFN(), 'wb') as outfile:
+    sp_to_index = {str(sp):i for i, sp in enumerate(ogSet.speciesToUse)}
+    with open(files.FileHandler.GetDuplicationsFN(), 'wb') as outfile, OrthologsFiles(dResultsOrthologues, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index) as (ortholog_file_writers, suspect_genes_file_writers):
         dupWriter = csv.writer(outfile, delimiter="\t")
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
         for iog in xrange(nOgs):
@@ -633,7 +667,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
             util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, spec_seq_dict, qSupport=False, qFixNegatives=True)
             if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
                 util.PrintTime("Done %d of %d" % (iog, nOgs))
-            nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, dResultsOrthologues, qContainsSuspectGenes)
+            nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, dResultsOrthologues, ortholog_file_writers, suspect_genes_file_writers, qContainsSuspectGenes)
     return nOrthologues_SpPair
 
 
@@ -696,19 +730,20 @@ def DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDirectory, GeneToSpecies, 
             with open(d + '%s__v__%s.tsv' % (speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]), 'wb') as outfile:
                 writer1 = csv.writer(outfile, delimiter="\t")
                 writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]))
-    nOgs = len(ogSet.OGs())
-    nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
-    with open(files.FileHandler.GetDuplicationsFN(), 'wb') as outfile:
-        dupWriter = csv.writer(outfile, delimiter="\t")
-        dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
-        for iog in xrange(nOgs):
-            recon_tree = files.FileHandler.GetPhyldogOGResultsTreeFN(iog)
-            orthologues = GetOrthologues_from_phyldog_tree(iog, recon_tree, GeneToSpecies, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict())
-            allOrthologues = [(iog, orthologues)]
-            util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qSupport=False, qFixNegatives=True, label='n') 
-            if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
-                util.PrintTime("Done %d of %d" % (iog, nOgs))
-            nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, output_dir, False)
+    with OrthologsFiles(dResultsOrthologues, speciesDict, ogSet.speciesToUse, nSpecies, sp_to_index) as ortholog_file_writers, suspect_genes_file_writers:
+        nOgs = len(ogSet.OGs())
+        nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
+        with open(files.FileHandler.GetDuplicationsFN(), 'wb') as outfile:
+            dupWriter = csv.writer(outfile, delimiter="\t")
+            dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
+            for iog in xrange(nOgs):
+                recon_tree = files.FileHandler.GetPhyldogOGResultsTreeFN(iog)
+                orthologues = GetOrthologues_from_phyldog_tree(iog, recon_tree, GeneToSpecies, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict())
+                allOrthologues = [(iog, orthologues)]
+                util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qSupport=False, qFixNegatives=True, label='n') 
+                if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
+                    util.PrintTime("Done %d of %d" % (iog, nOgs))
+                nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, output_dir, ortholog_file_writers, suspect_genes_file_writers, False)
     return nOrthologues_SpPair
     
 def RootAllTrees():
