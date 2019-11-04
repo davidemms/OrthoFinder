@@ -1566,6 +1566,7 @@ def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_na
             qHasAA = False
             with open(fastaDir + os.sep + fastaFilename, 'rb') as fastaFile:
                 for iLine, line in enumerate(fastaFile):
+                    if line.isspace(): continue
                     if len(line) > 0 and line[0] == ">":
                         newID = "%d_%d" % (iSpecies, iSeq)
                         acc = line[1:].rstrip()
