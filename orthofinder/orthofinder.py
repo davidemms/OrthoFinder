@@ -234,7 +234,7 @@ class MCL:
                         fullDict.update(idDict)
                     MCL.CreateOGs(ogs, outputFN, fullDict)   
                 except:
-                    err_text = "ERROR: %s contains a duplicate ID. The IDs for the orthogroups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename) 
+                    err_text = "ERROR: %s contains a duplicate ID. The IDs for the orthogroups in %s will not be replaced with the sequence accessions. This is probably because the same accession was used more than once in your input FASTA files. However, if %s was prepared manually then you may need to check that file instead." % (idsFilename, clustersFilename_pairs, idsFilename) 
                     scripts.files.FileHandler.LogFailAndExit(err_text)
         return fullDict
     
@@ -1249,6 +1249,19 @@ def GetXMLSpeciesInfo(seqsInfoObj, options):
         util.Fail()
     return speciesXML
 
+def IDsFileOK(filename):
+    """
+    It is best to detect any issues with input files at start, perform all required checks here
+    """
+    with open(filename, 'rb') as infile:
+        for line in infile:
+            line = line.rstrip()
+            if len(line) == 0: continue
+            tokens = line.split(": ", 1)
+            if len(tokens) !=2 or len(tokens[1]) == 0:
+                return False, line
+    return True, None
+
 def CheckDependencies(options, program_caller, dirForTempFiles):
     util.PrintUnderline("Checking required programs are installed")
     if (options.qStartFromFasta):
@@ -1361,6 +1374,9 @@ def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
     if not os.path.exists(scripts.files.FileHandler.GetSpeciesIDsFN()):
         err_text = "ERROR: %s file must be provided if using previously calculated BLAST results" % scripts.files.FileHandler.GetSpeciesIDsFN()
         scripts.files.FileHandler.LogFailAndExit(err_text)
+    file_ok, err_line = IDsFileOK(scripts.files.FileHandler.GetSpeciesIDsFN())
+    if not file_ok: 
+        scripts.files.FileHandler.LogFailAndExit("ERROR: %s file contains a blank accession. Line:\n %s" % (scripts.files.FileHandler.GetSpeciesIDsFN(), err_line))
     speciesInfo.speciesToUse, speciesInfo.nSpAll, speciesToUse_names = util.GetSpeciesToUse(scripts.files.FileHandler.GetSpeciesIDsFN())
  
     # check fasta files are present 
@@ -1403,6 +1419,10 @@ def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
     # check SequenceIDs.txt and SpeciesIDs.txt files are present
     if not os.path.exists(scripts.files.FileHandler.GetSequenceIDsFN()):
         scripts.files.FileHandler.LogFailAndExit("ERROR: %s file must be provided if using previous calculated BLAST results" % scripts.files.FileHandler.GetSequenceIDsFN())
+    
+    file_ok, err_line = IDsFileOK(scripts.files.FileHandler.GetSequenceIDsFN())
+    if not file_ok: 
+        scripts.files.FileHandler.LogFailAndExit("ERROR: %s file contains a blank accession. Line:\n %s" % (scripts.files.FileHandler.GetSequenceIDsFN(), err_line))
     return speciesInfo, speciesToUse_names
 
 # 6
@@ -1548,7 +1568,11 @@ def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_na
                 for iLine, line in enumerate(fastaFile):
                     if len(line) > 0 and line[0] == ">":
                         newID = "%d_%d" % (iSpecies, iSeq)
-                        idsFile.write("%s: %s" % (newID, line[1:]))
+                        acc = line[1:].rstrip()
+                        if len(acc) == 0:
+                            print("ERROR: %s contains a blank accession line on line %d" % (fastaDir + os.sep + fastaFilename, iLine+1))
+                            util.Fail()
+                        idsFile.write("%s: %s\n" % (newID, acc))
                         outputFasta.write(">%s\n" % newID)    
                         iSeq += 1
                     else:
