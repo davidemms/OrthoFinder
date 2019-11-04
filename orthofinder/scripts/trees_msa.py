@@ -296,6 +296,7 @@ class TreesForOrthogroups(object):
      
     def RenameAlignmentTaxa(self, idsAlignFNS, accAlignFNs, idsDict):
         for i, (alignFN, outAlignFN) in enumerate(zip(idsAlignFNS, accAlignFNs)):
+            if not os.path.exists(alignFN): continue
             with open(alignFN, 'rb') as infile, open(outAlignFN, 'wb') as outfile:
                 for line in infile:
                     if line.startswith(">"):
