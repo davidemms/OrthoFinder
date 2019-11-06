@@ -21,12 +21,16 @@
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
 
+import sys
 import time
 import glob
 import argparse
 from collections import Counter, defaultdict
 
-import tree, newick
+from . import tree, newick
+
+if sys.version_info > (3,):
+    long = int
 
 class BitVector(object):
     """

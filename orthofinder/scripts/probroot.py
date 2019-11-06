@@ -224,8 +224,8 @@ class PoissonModel_IntergrateBranchLenthsSumFP(BranchProbModel_corrected):
         la = eln(alpha)
         if toM == None:
             ln_pTot = eln(0.)
-            for s in xrange(m+1):
-                for t in xrange(n+1):
+            for s in range(m+1):
+                for t in range(n+1):
                     X = m - s + t
                     Y = n - t + s
                     integral = beta(X+1, Y+1)
@@ -304,8 +304,8 @@ class PoissonModel_WithTeminalModel(BranchProbModel_corrected):
         la = eln(alpha)
         if toM == None:
             ln_pTot = eln(0.)
-            for s in xrange(m+1):
-                for t in xrange(n+1):
+            for s in range(m+1):
+                for t in range(n+1):
                     X = m - s + t
                     Y = n - t + s
                     integral = beta(X+1, Y+1)

@@ -35,20 +35,36 @@ import subprocess
 from collections import Counter, defaultdict
 import itertools
 import multiprocessing as mp
-import Queue
 import warnings
+try: 
+    import queue
+except ImportError:
+    import Queue as queue  
 
-import util
-import tree
-import mcl as MCL
-import stride
-import trees2ologs_dlcpar
-import trees2ologs_of
-import blast_file_processor as BlastFileProcessor
-import trees_msa
-import wrapper_phyldog
-import stag
-import files
+# import util
+# import tree
+# import mcl as MCL
+# import stride
+# import trees2ologs_dlcpar
+# import trees2ologs_of
+# import blast_file_processor as BlastFileProcessor
+# import trees_msa
+# import wrapper_phyldog
+# import stag
+# import files
+
+from . import util
+from . import tree
+from . import mcl as MCL
+from . import stride
+from . import trees2ologs_dlcpar
+from . import trees2ologs_of
+from . import blast_file_processor as BlastFileProcessor
+from . import trees_msa
+from . import wrapper_phyldog
+from . import stag
+from . import files
+from . import parallel_task_manager
 
 nThreads = util.nThreadsDefault
 
@@ -70,10 +86,12 @@ class Seq(object):
         Seq object accordingly. If performance is really important then can write 
         individual an @classmethod to do that without the checks"""
         if type(seqInput) is str:
-            self.iSp, self.iSeq = map(int, seqInput.split("_"))
+            a,b = seqInput.split("_")
+            self.iSp = int(a)
+            self.iSeq = int(b)
         elif len(seqInput) == 2:
             if seqInput[0] is str:
-                self.iSp, self.iSeq = map(int, seqInput)
+                self.iSp, self.iSeq = list(map(int, seqInput))
             else:
                 self.iSp= seqInput[0]
                 self.iSeq = seqInput[1]
@@ -113,7 +131,7 @@ class OrthoGroupsSet(object):
             try:
                 self.seqIDsEx = self._extractor(files.FileHandler.GetSequenceIDsFN())
             except RuntimeError as error:
-                print(error.message)
+                print((error.message))
                 if error.message.startswith("ERROR"): 
                     files.FileHandler.LogFailAndExit()
                 else:
@@ -177,7 +195,7 @@ class OrthoGroupsSet(object):
 def lil_min(M):
     n = M.shape[0]
     mins = np.ones((n, 1), dtype = np.float64) * 9e99
-    for kRow in xrange(n):
+    for kRow in range(n):
         values=M.getrowview(kRow)
         if values.nnz == 0:
             continue
@@ -187,7 +205,7 @@ def lil_min(M):
 def lil_max(M):
     n = M.shape[0]
     maxes = np.zeros((n, 1), dtype = np.float64)
-    for kRow in xrange(n):
+    for kRow in range(n):
         values=M.getrowview(kRow)
         if values.nnz == 0:
             continue
@@ -198,7 +216,7 @@ def lil_minmax(M):
     n = M.shape[0]
     mins = np.ones((n, 1), dtype = np.float64) * 9e99
     maxes = np.zeros((n, 1), dtype = np.float64)
-    for kRow in xrange(n):
+    for kRow in range(n):
         values=M.getrowview(kRow)
         if values.nnz == 0:
             continue
@@ -253,7 +271,7 @@ def Worker_OGMatrices_ReadBLASTAndUpdateDistances(cmd_queue, worker_status_queue
                             for gj, j in og[jjSp]:
                                     m[i][j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) * maxes_inv[gi.iSeq]
                 worker_status_queue.put(("finish", iWorker, iiSp))
-            except Queue.Empty:
+            except queue.Empty:
                 worker_status_queue.put(("empty", iWorker, None))
                 return 
 
@@ -286,16 +304,16 @@ class DendroBLASTTrees(object):
             ogsPerSpecies = [[[(g, i) for i, g in enumerate(og) if g.iSp == iSp] for iSp in self.ogSet.seqsInfo.speciesToUse] for og in ogs]
             nGenes = [len(og) for og in ogs]
             nSeqs = self.ogSet.seqsInfo.nSeqsPerSpecies
-            ogMatrices = [[mp.Array('d', n, lock=False) for _ in xrange(n)] for n in nGenes]
+            ogMatrices = [[mp.Array('d', n, lock=False) for _ in range(n)] for n in nGenes]
             blastDir_list = files.FileHandler.GetBlastResultsDir()
             cmd_queue = mp.Queue()
             for iiSp, sp1 in enumerate(self.ogSet.seqsInfo.speciesToUse):
                 cmd_queue.put((iiSp, sp1, nSeqs[sp1]))
             worker_status_queue = mp.Queue()
-            runningProcesses = [mp.Process(target=Worker_OGMatrices_ReadBLASTAndUpdateDistances, args=(cmd_queue, worker_status_queue, iWorker, ogMatrices, nGenes, self.ogSet.seqsInfo, blastDir_list, ogsPerSpecies, self.qDoubleBlast)) for iWorker in xrange(self.nProcesses)]
+            runningProcesses = [mp.Process(target=Worker_OGMatrices_ReadBLASTAndUpdateDistances, args=(cmd_queue, worker_status_queue, iWorker, ogMatrices, nGenes, self.ogSet.seqsInfo, blastDir_list, ogsPerSpecies, self.qDoubleBlast)) for iWorker in range(self.nProcesses)]
             for proc in runningProcesses:
                 proc.start()
-            rota = [None for iWorker in xrange(self.nProcesses)]
+            rota = [None for iWorker in range(self.nProcesses)]
             unfinished = []
             while True:
                 # get process alive/dead
@@ -311,7 +329,7 @@ class DendroBLASTTrees(object):
                             rota[iWorker] = None
                         elif status == "empty":
                             rota[iWorker] = "empty"
-                except Queue.Empty:
+                except queue.Empty:
                     pass
                 # if worker is dead but didn't finish task, issue warning
                 for al, r in zip(alive, rota):
@@ -338,8 +356,8 @@ class DendroBLASTTrees(object):
             n = m.shape[0]
             m2 = np.zeros(m.shape)
             max_og = -9e99
-            for i in xrange(n):
-                for j in xrange(i):
+            for i in range(n):
+                for j in range(i):
                     m2[i, j] = -np.log(m[i,j] + m[j,i])  
                     m2[j, i] = m2[i, j]  
                     max_og = max(max_og, m2[i,j])
@@ -355,8 +373,8 @@ class DendroBLASTTrees(object):
             n = len(m)
             max_og = -9e99
             # Careful not to over-write a value and then attempt to try to use the old value
-            for i in xrange(n):
-                for j in xrange(i):
+            for i in range(n):
+                for j in range(i):
                     m[i][j] = -np.log(m[i][j] + m[j][i])  
                     m[j][i] = m[i][j]  
                     max_og = max(max_og, m[i][j])
@@ -373,7 +391,7 @@ class DendroBLASTTrees(object):
         with open(outFN, 'wb') as outfile:
             n = len(m)
             outfile.write("%d\n" % n)
-            for i in xrange(n):
+            for i in range(n):
                 outfile.write(names[i] + " ")
                 # values could be -inf, these are the most distantly related so replace with max_og
                 V = [0. + (m[i][j] if m[i][j] > -9e99 else max_og) for j in range(n)] # "0. +": hack to avoid printing out "-0"
@@ -412,7 +430,7 @@ class DendroBLASTTrees(object):
         sliver = 1e-6
         with open(speciesMatrixFN, 'wb') as outfile:
             outfile.write("%d\n" % n)
-            for i in xrange(n):
+            for i in range(n):
                 outfile.write(str(self.ogSet.seqsInfo.speciesToUse[i]) + " ")
                 V = [(0. + M[i,j]) for j in range(n)]  # hack to avoid printing out "-0"
                 V = [sliver if 0 < v < sliver else v for v in V]  # make sure scientific notation is not used (not accepted by fastme)
@@ -425,7 +443,7 @@ class DendroBLASTTrees(object):
     def PrepareGeneTreeCommand(self):
         cmds = []
         ogs = self.ogSet.OGs()
-        for iog in xrange(len(ogs)):
+        for iog in range(len(ogs)):
             nTaxa = len(ogs[iog])
             cmds.append([" ".join(["fastme", "-i", files.FileHandler.GetOGsDistMatFN(iog), "-o", files.FileHandler.GetOGsTreeFN(iog), "-N", "-w", "O"] + (["-s"] if nTaxa < 1000 else []))])
         return cmds
@@ -457,7 +475,7 @@ class DendroBLASTTrees(object):
                 cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs)
                 cmds_trees = [[cmd_spTree]] + cmds_trees
         util.PrintUnderline("Inferring gene and species trees" if qSpeciesTree else "Inferring gene trees")
-        util.RunParallelOrderedCommandLists(self.nProcess_std, cmds_trees)
+        parallel_task_manager.RunParallelOrderedCommandLists(self.nProcess_std, cmds_trees)
         if qSTAG:
             # Trees must have been completed
             print("")
@@ -479,7 +497,7 @@ class DendroBLASTTrees(object):
             ogMatrices = self.CompleteOGMatrices(ogs, ogMatrices_partial)
             D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
             cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs, True)
-            util.RunOrderedCommandList([cmd_spTree], True)
+            parallel_task_manager.RunOrderedCommandList([cmd_spTree], True)
         spTreeUnrootedFN = files.FileHandler.GetSpeciesTreeUnrootedFN(True) 
         util.RenameTreeTaxa(spTreeFN_ids, spTreeUnrootedFN, self.ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True)  
         return spTreeFN_ids
@@ -490,14 +508,14 @@ class DendroBLASTTrees(object):
 def CheckUserSpeciesTree(speciesTreeFN, expSpecies):
     # File exists
     if not os.path.exists(speciesTreeFN):
-        print("Species tree file does not exist: %s" % speciesTreeFN)
+        print(("Species tree file does not exist: %s" % speciesTreeFN))
         util.Fail()
     # Species in tree are unique
     try:
         t = tree.Tree(speciesTreeFN, format=1)
     except Exception as e:
         print("\nERROR: Incorrectly formated user-supplied species tree")
-        print(e.message)
+        print((e.message))
         util.Fail()
     actSpecies = (t.get_leaf_names())
     c = Counter(actSpecies)
@@ -505,14 +523,14 @@ def CheckUserSpeciesTree(speciesTreeFN, expSpecies):
         print("ERROR: Species names in species tree are not unique")
         for sp, n in c.most_common():
             if 1 != n:
-                print("Species '%s' appears %d times" % (sp, n))
+                print(("Species '%s' appears %d times" % (sp, n)))
         util.Fail()
     # All required species are present
     actSpecies = set(actSpecies)
     ok = True
     for sp in expSpecies:
         if sp not in actSpecies:
-            print("ERROR: '%s' is missing from species tree" % sp)
+            print(("ERROR: '%s' is missing from species tree" % sp))
             ok = False
     # expected species are unique
     c = Counter(expSpecies)
@@ -520,12 +538,12 @@ def CheckUserSpeciesTree(speciesTreeFN, expSpecies):
         print("ERROR: Species names are not unique")
         for sp, n in c.most_common():
             if 1 != n:
-                print("Species '%s' appears %d times" % (sp, n))
+                print(("Species '%s' appears %d times" % (sp, n)))
         util.Fail()
     expSpecies = set(expSpecies)
     for sp in actSpecies:
         if sp not in expSpecies:
-            print("ERROR: Additional species '%s' in species tree" % sp)
+            print(("ERROR: Additional species '%s' in species tree" % sp))
             ok = False
     if not ok: util.Fail()
     # Tree is rooted
@@ -553,7 +571,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
         WriteTestDistancesFile(testFN)
         outFN = workingDir + "SimpleTest.tre"
         if os.path.exists(outFN): os.remove(outFN)        
-        if not util.CanRunCommand("fastme -i %s -o %s" % (testFN, outFN), qAllowStderr=False):
+        if not parallel_task_manager.CanRunCommand("fastme -i %s -o %s" % (testFN, outFN), qAllowStderr=False):
             print("ERROR: Cannot run fastme")
             print("Please check FastME is installed and that the executables are in the system path.\n")
             return False
@@ -563,7 +581,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
         if os.path.exists(fastme_stat_fn): os.remove(fastme_stat_fn)
     # DLCPar
     if ("dlcpar" in recon_method) and not (qStopAfterTrees or qStopAfterAlignments):
-        if not util.CanRunCommand("dlcpar_search --version", qAllowStderr=False):
+        if not parallel_task_manager.CanRunCommand("dlcpar_search --version", qAllowStderr=False):
             print("ERROR: Cannot run dlcpar_search")
             print("Please check DLCpar is installed and that the executables are in the system path.\n")
             return False
@@ -571,7 +589,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
             capture = subprocess.Popen("dlcpar_search --version", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
             stdout = "".join([x for x in capture.stdout])
             version = stdout.split()[-1]
-            major, minor, release = map(int, version.split("."))
+            major, minor, release = list(map(int, version.split(".")))
             # require 1.0.1 or above            
             actual = (major, minor, release)
             required = [1,0,1]
@@ -594,23 +612,23 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
     if qMSAGeneTrees or qPhyldog:
         testFN, temp_dir = trees_msa.WriteTestFile(workingDir)
         if msa_method == "mafft":
-            if not util.CanRunCommand("mafft %s" % testFN, qAllowStderr=True):
+            if not parallel_task_manager.CanRunCommand("mafft %s" % testFN, qAllowStderr=True):
                 print("ERROR: Cannot run mafft")
                 print("Please check MAFFT is installed and that the executables are in the system path\n")
                 return False
         elif msa_method != None:
             if not program_caller.TestMSAMethod(temp_dir, msa_method):
-                print("ERROR: Cannot run user-configured MSA method '%s'" % msa_method)
+                print(("ERROR: Cannot run user-configured MSA method '%s'" % msa_method))
                 print("Please check program is installed and that it is correctly configured in the orthofinder/config.json file\n")
                 return False
         if tree_method == "fasttree":
-            if qMSAGeneTrees and (not qStopAfterAlignments) and not util.CanRunCommand("FastTree %s" % testFN, qAllowStderr=True):
+            if qMSAGeneTrees and (not qStopAfterAlignments) and not parallel_task_manager.CanRunCommand("FastTree %s" % testFN, qAllowStderr=True):
                 print("ERROR: Cannot run FastTree")
                 print("Please check FastTree is installed and that the executables are in the system path\n")
                 return False      
         elif tree_method != None:
             if not program_caller.TestTreeMethod(temp_dir, tree_method):
-                print("ERROR: Cannot run user-configured tree method '%s'" % tree_method)
+                print(("ERROR: Cannot run user-configured tree method '%s'" % tree_method))
                 print("Please check program is installed and that it is correctly configured in the orthofinder/config.json file\n")
                 return False
         try:
@@ -620,7 +638,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
             shutil.rmtree(temp_dir, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
             
     if qPhyldog:
-        if not util.CanRunCommand("mpirun -np 1 phyldog", qAllowStderr=False):
+        if not parallel_task_manager.CanRunCommand("mpirun -np 1 phyldog", qAllowStderr=False):
             print("ERROR: Cannot run mpirun -np 1 phyldog")
             print("Please check phyldog is installed and that the executable is in the system path\n")
             return False
@@ -639,9 +657,9 @@ def PrintHelp():
     print("""orthofinder_results_directory
     Generate gene trees for the orthogroups, generated rooted species tree and infer ortholgues.\n""")
     
-    print("""-t max_number_of_threads, --threads max_number_of_threads
+    print(("""-t max_number_of_threads, --threads max_number_of_threads
     The maximum number of processes to be run simultaneously. The deafult is %d but this 
-    should be increased by the user to the maximum number of cores available.\n""" % util.nThreadsDefault)
+    should be increased by the user to the maximum number of cores available.\n""" % util.nThreadsDefault))
         
     print("""-h, --help
    Print this help text""")
@@ -676,7 +694,7 @@ def WriteOrthologuesStats(ogSet, nOrtho_sp):
     if not os.path.exists(files.FileHandler.GetDuplicationsFN()): return
     with open(files.FileHandler.GetDuplicationsFN(), 'rb') as infile:
         reader = csv.reader(infile, delimiter="\t")
-        reader.next()
+        next(reader)
         for og, node, _, support, _, _, _ in reader:
             support = float(support)
             nodeCount[node] += 1
@@ -704,7 +722,7 @@ def WriteOrthologuesStats(ogSet, nOrtho_sp):
         if len(ogCount) > 0:
             max_og = max([int(s[2:]) for s in ogCount.keys()]) 
             pat = files.FileHandler.baseOgFormat 
-            for i in xrange(max_og + 1):
+            for i in range(max_og + 1):
                 og = pat % i
                 writer.writerow([og, ogCount[og], ogCount_50[og]])
 
@@ -745,7 +763,7 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
                 d1[g[2][0]].append(g[2][1])
                 orthologues.append((d0,d1, d_empty, d_empty))
             elif nSp == 2:             
-                sp0, sp1 = c.keys()
+                sp0, sp1 = list(c.keys())
                 d0 = defaultdict(list)
                 d0[str(sp0)] = [str(g.iSeq) for g in og if g.iSp == sp0]
                 d1 = defaultdict(list)
@@ -782,7 +800,7 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=No
         dlcparResultsDir, dlcparLocusTreePat = trees2ologs_dlcpar.RunDlcpar(ogSet, speciesTree_ids_fn, workingDir, nParallel, qDeepSearch)
         util.PrintTime("Done DLCpar")
         spec_seq_dict = ogSet.Spec_SeqDict()
-        for iog in xrange(len(ogSet.OGs())):
+        for iog in range(len(ogSet.OGs())):
             util.RenameTreeTaxa(dlcparResultsDir + dlcparLocusTreePat % iog, files.FileHandler.GetOGsReconTreeFN(iog), spec_seq_dict, qSupport=False, qFixNegatives=False, inFormat=8, label='n')
     
         # Orthologue lists
@@ -954,13 +972,13 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
         nFP_mp = nAll - nSupport
         n_non_trivial = sum([v for k, v in clusters_counter.items() if len(k) > 1])
         if len(roots) > 1:
-            print("Observed %d well-supported, non-terminal duplications. %d support the best roots and %d contradict them." % (n_non_trivial, n_non_trivial-nFP_mp, nFP_mp))
+            print(("Observed %d well-supported, non-terminal duplications. %d support the best roots and %d contradict them." % (n_non_trivial, n_non_trivial-nFP_mp, nFP_mp)))
             print("Best outgroups for species tree:")  
         else:
-            print("Observed %d well-supported, non-terminal duplications. %d support the best root and %d contradict it." % (n_non_trivial, n_non_trivial-nFP_mp, nFP_mp))
+            print(("Observed %d well-supported, non-terminal duplications. %d support the best root and %d contradict it." % (n_non_trivial, n_non_trivial-nFP_mp, nFP_mp)))
             print("Best outgroup for species tree:")  
         spDict = ogSet.SpeciesDict()
-        for r in roots: print("  " + (", ".join([spDict[s] for s in r]))  )
+        for r in roots: print(("  " + (", ".join([spDict[s] for s in r]))  ))
         qMultiple = len(roots) > 1
     shutil.copy(rootedSpeciesTreeFN[0], files.FileHandler.GetSpeciesTreeIDsRootedFN())
 
@@ -981,7 +999,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
             util.RenameTreeTaxa(speciesTree_fn, labeled_tree_fn, db.ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True, label='N')
         idDict = ogSet.Spec_SeqDict()
         qHaveSupport = None 
-        for iog in xrange(len(ogSet.OGs())):
+        for iog in range(len(ogSet.OGs())):
             infn = files.FileHandler.GetOGsTreeFN(iog)
             if os.path.exists(infn):
                 if qHaveSupport is None: qHaveSupport = util.HaveSupportValues(infn)
@@ -996,7 +1014,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
     util.PrintUnderline("Reconciling gene trees and species tree")         
     resultsSpeciesTrees.append(files.FileHandler.GetSpeciesTreeResultsFN(0, True))
     if (not userSpeciesTree) and (not qPhyldog) and len(ogSet.seqsInfo.speciesToUse) != 2:
-        print("Outgroup: " + (", ".join([spDict[s] for s in r])))
+        print(("Outgroup: " + (", ".join([spDict[s] for s in r]))))
     util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qSupport=qSpeciesTreeSupports, qFixNegatives=True)
     util.PrintTime("Starting Recon and orthologues")
     ReconciliationAndOrthologues(recon_method, db.ogSet, nHighParallel, i if qMultiple else None, all_stride_dup_genes=all_stride_dup_genes) 

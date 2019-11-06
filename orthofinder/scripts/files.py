@@ -43,7 +43,7 @@ import time
 import shutil
 import datetime
 
-import util
+from . import util
 
 class SpeciesInfo(object):
     def __init__(self):
@@ -595,10 +595,10 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
             for line in infile:
                 if line.startswith("Species used:"):
                     self.species_ids_lines = ""
-                    line = infile.next()
+                    line = next(infile)
                     while line.rstrip() != "":
                         self.species_ids_lines += line
-                        line = infile.next()
+                        line = next(infile)
                 wd_base_str = "WorkingDirectory_Base: "
                 wd_trees_str = "WorkingDirectory_Trees: "
                 clusters_str = "FN_Orthogroups: "

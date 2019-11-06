@@ -36,8 +36,8 @@ import itertools
 import multiprocessing as mp
 from collections import Counter, defaultdict
 
-import probroot
-import tree 
+from . import probroot
+from . import tree 
 
 def compare(exp, act):
     """exp - expected set of species
@@ -342,6 +342,7 @@ def SupportedHierachies(t, G, S, GeneToSpecies, species, dict_clades, clade_name
         for n in t.traverse():
             if n.is_root(): continue
         iExample = 0
+    range3 = list(range(3))
     for counter, n in enumerate(t.traverse()):
         if n.is_leaf(): continue
         # just get the list of putative descendant species at this point without worrying about grandchild clades
@@ -349,7 +350,7 @@ def SupportedHierachies(t, G, S, GeneToSpecies, species, dict_clades, clade_name
         if spSets == None: continue # non-binary
         clades = None
         # check each of three directions to the root
-        for i, j in itertools.combinations(range(3), 2):
+        for i, j in itertools.combinations(range3, 2):
             s1 = spSets[i]
             s2 = spSets[j]
             # check for terminal duplications
@@ -380,14 +381,14 @@ def SupportedHierachies(t, G, S, GeneToSpecies, species, dict_clades, clade_name
                         N = Node(n)
                         clades = N.get_grandrelative_clades_stored()
                         if Join(clades[0]) != spSets[0] or Join(clades[1]) != spSets[1] or Join(clades[2]) != spSets[2]:
-                            print(clades[0])
-                            print(spSets[0])
+                            print((clades[0]))
+                            print((spSets[0]))
                             print("")
-                            print(clades[1])
-                            print(spSets[1])
+                            print((clades[1]))
+                            print((spSets[1]))
                             print("")
-                            print(clades[2])
-                            print(spSets[2])
+                            print((clades[2]))
+                            print((spSets[2]))
                             print("")
                             raise Exception("Mismatch")
                         if clades == None: break   # locally non-binary in vicinity of node, skip to next node
@@ -421,9 +422,9 @@ def SupportedHierachies_wrapper(treeName, GeneToSpecies, species, dict_clades, c
     G = set(t.get_leaf_names())
     S = set(map(GeneToSpecies, G))
     if not S.issubset(species):
-        print("ERROR in %s" % treeName)
+        print(("ERROR in %s" % treeName))
         print("Some genes cannot be mapped to species in the species tree")
-        print(S.difference(species))
+        print((S.difference(species)))
         return None
     if len(S) < 3:
         return defaultdict(int), []
@@ -548,14 +549,14 @@ def PrintRootingSummary(roots, clusters_counter, nSupport):
     nAll = sum(clusters_counter.values())
     nFP_mp = nAll - nSupport
     n_non_trivial = sum([v for k, v in clusters_counter.items() if len(k) > 1])
-    if len(roots) > 1: print("Identified %d non-terminal duplications.\n%d support the best roots and %d contradict them." % (n_non_trivial, n_non_trivial-nFP_mp, nFP_mp))
-    else: print("Identified %d non-terminal duplications.\n%d support the best root and %d contradict it." % (n_non_trivial, n_non_trivial-nFP_mp, nFP_mp))
+    if len(roots) > 1: print(("Identified %d non-terminal duplications.\n%d support the best roots and %d contradict them." % (n_non_trivial, n_non_trivial-nFP_mp, nFP_mp)))
+    else: print(("Identified %d non-terminal duplications.\n%d support the best root and %d contradict it." % (n_non_trivial, n_non_trivial-nFP_mp, nFP_mp)))
     print("Most parsimonious outgroup(s) for species tree:")
     for r in roots[:5]: 
-        print("{" + ", ".join(r) + "}")
+        print(("{" + ", ".join(r) + "}"))
     if len(roots) > 5:
         print("Etc...")
-        print("%d possible roots" % len(roots))
+        print(("%d possible roots" % len(roots)))
     return nFP_mp, n_non_trivial 
     
 def GetDirectoryName(baseDirName, i):
@@ -591,7 +592,7 @@ def GetCluseterName(species_tree, S, cluster):
 def WriteResults(species_tree_fn_or_text, roots, S, clades, clusters_counter, output_dir):
 #    for c in clusters_counter:
 #        print((clusters_counter[c], c))
-    print("\nResults written to:\n" + os.path.realpath(output_dir))
+    print(("\nResults written to:\n" + os.path.realpath(output_dir)))
     # Label species tree nodes
     species_tree = tree.Tree(species_tree_fn_or_text)
     thisRoot = roots[0]
@@ -646,7 +647,7 @@ def WriteResults(species_tree_fn_or_text, roots, S, clades, clusters_counter, ou
             if name in table:
                 writer.writerow(table[name])
             else:
-                print("Skipping %s" % name)
+                print(("Skipping %s" % name))
         for sp in S:
             if sp in table:
                 if qSingle and sp in thisRoot: continue
@@ -659,7 +660,7 @@ def Main_Full(args):
 *                                                                          *
 ****************************************************************************"""
 #    text = "STRIDE: Species Tree Root Inference from Gene Duplication Events"
-    print(text[1:])
+    print((text[1:]))
 #    print(text + "\n" + "="*len(text))
     GeneToSpecies = GeneToSpecies_dash
     if args.separator and args.separator == "dot":
@@ -688,9 +689,9 @@ def Main_Full(args):
     else:
         nTrees = len(glob.glob(args.gene_trees + "/*"))
         if nTrees == 0:
-            print("No trees found in %s\nExiting" % args.gene_trees)
+            print(("No trees found in %s\nExiting" % args.gene_trees))
             sys.exit()
-        print("Analysing %d gene trees" % nTrees)
+        print(("Analysing %d gene trees" % nTrees))
 #        roots, clusters_counter, _, nSupport, clades, species = GetRoot(args.Species_tree, args.gene_trees, GeneToSpecies, nProcs, treeFmt = 1, qWriteDupTrees=args.output)
         roots, clusters_counter, _, nSupport, clades, species, all_stride_dup_genes = GetRoot(args.Species_tree, args.gene_trees, GeneToSpecies, nProcs)
         PrintRootingSummary(roots, clusters_counter, nSupport)

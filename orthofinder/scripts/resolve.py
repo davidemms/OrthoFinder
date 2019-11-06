@@ -4,15 +4,21 @@ Created on Thu Jul 27 14:15:17 2017
 
 @author: david
 """  
-import parallel_task_manager
+from . import parallel_task_manager
 
 import os
 import glob
+import numpy as np
+import itertools
 import argparse
-import tree as tree_lib
+import multiprocessing as mp
+try: 
+    import queue
+except ImportError:
+    import Queue as queue
 
-import util
-import trees2ologs_of as om1
+from . import tree as tree_lib
+from . import util
     
 def DetachAndCleanup(top, n):
     """
@@ -328,8 +334,6 @@ def resolve(n, M):
     return n.get_tree_root()
 
 def SpeciesOverlapDuplications(tree, GeneToSpecies):
-    import numpy as np
-    import itertools
     species = list(set(map(GeneToSpecies, tree.get_leaf_names())))
     genes = tree.get_leaf_names()
     gDict = {gene:i for i,gene in enumerate(genes)}
@@ -354,8 +358,6 @@ def SpeciesOverlapDuplications(tree, GeneToSpecies):
                 n.name = "S"
 
 def NumberOfOrthologues(tree, GeneToSpecies):
-    import numpy as np
-    import itertools
     species = list(set(map(GeneToSpecies, tree.get_leaf_names())))
     genes = tree.get_leaf_names()
     gDict = {gene:i for i,gene in enumerate(genes)}
@@ -406,7 +408,6 @@ class Finalise(object):
         ptm.Stop()
 
 def DoTrees(trees_queue, GeneToSpecies, out_dir, species_tree_rooted, qResolve):
-    import Queue
     # Root using species tree if provided, otherwise tree should have been rooted already
     while True:
         try:
@@ -433,7 +434,7 @@ def DoTrees(trees_queue, GeneToSpecies, out_dir, species_tree_rooted, qResolve):
             SpeciesOverlapDuplications(tree, GeneToSpecies)
             # print("Done: " + trees_fn)
             tree.write(outfile=(out_dir + "/" + os.path.basename(trees_fn) + ".rec.tre"), format=3)
-        except Queue.Empty:
+        except queue.Empty:
             return
 
 def Resolve_Main(trees_fn_or_dir, out_dir, species_tree_rooted_fn, GeneToSpecies, nThreads, qResolve=True, qTest=False):
@@ -444,7 +445,6 @@ def Resolve_Main(trees_fn_or_dir, out_dir, species_tree_rooted_fn, GeneToSpecies
         trees_fn - tree filename or directory containing trees
         species_tree_rooted_fn - species tree used to root the tree. If None then the gene tree is assumed to be rooted already
     """
-    import multiprocessing as mp
     if species_tree_rooted_fn != None:
         species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
     else:
@@ -463,20 +463,20 @@ def Resolve_Main(trees_fn_or_dir, out_dir, species_tree_rooted_fn, GeneToSpecies
 
     # for trees_fn in trees:
     #     DoTree(trees_fn, GeneToSpecies, out_dir, species_tree_rooted, qTest)
-    import Queue
     queue = mp.Queue()
     for t in trees:
         queue.put(t)
     # DoTree(trees_fn, GeneToSpecies, out_dir, species_tree_rooted, qTest)
-    runningProcesses = [mp.Process(target=DoTrees, args=(queue, GeneToSpecies, out_dir, species_tree_rooted, qResolve)) for i_ in xrange(nThreads)]
+    runningProcesses = [mp.Process(target=DoTrees, args=(queue, GeneToSpecies, out_dir, species_tree_rooted, qResolve)) for i_ in range(nThreads)]
     for proc in runningProcesses:
         proc.start()
     for proc in runningProcesses:
         proc.join()
-    # util.ManageQueue(runningProcesses, queue)
+    # parallel_task_manager.ManageQueue(runningProcesses, queue)
 
 if __name__ == "__main__":
     with Finalise():
+        from . import trees2ologs_of as om1
         parser = argparse.ArgumentParser()
         parser.add_argument("gene_tree")
         parser.add_argument("out_dir")

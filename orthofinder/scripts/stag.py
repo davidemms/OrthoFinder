@@ -30,8 +30,8 @@ import subprocess
 import numpy as np
 from itertools import combinations
 
-import tree, newick
-import consensus_tree as cons
+from . import tree, newick, util, parallel_task_manager
+from . import consensus_tree as cons
         
 def CanRunCommand(command, qAllowStderr = False, qPrint = True):
     if qPrint: sys.stdout.write("Test can run \"%s\"" % command)      
@@ -70,7 +70,7 @@ def WritePhylipMatrix(m, names, outFN, max_og=1e6):
     with open(outFN, 'wb') as outfile:
         n = len(m)
         outfile.write("%d\n" % n)
-        for i in xrange(n):
+        for i in range(n):
             outfile.write(names[i] + " ")
             # values could be -inf, these are the most distantly related so replace with max_og
             V = [0. + (m[i][j] if m[i][j] > -9e99 else max_og) for j in range(n)] # "0. +": hack to avoid printing out "-0"
@@ -84,7 +84,7 @@ class UnrecognisedGene(Exception):
 class GeneToSpecies(object):
     def __init__(self, gene_map_fn):
         if not os.path.isfile(gene_map_fn):
-            print("ERROR: Could not open %s" % gene_map_fn)
+            print(("ERROR: Could not open %s" % gene_map_fn))
             sys.exit()
         self.exact = dict()
         self.startswith = dict()
@@ -99,7 +99,7 @@ class GeneToSpecies(object):
                 for i, line in enumerate(infile):
                     t = line.rstrip().split()
                     if len(t) != 2: 
-                        print("ERROR: Invalid format in gene to species mapping file line %d" % (i+1)) 
+                        print(("ERROR: Invalid format in gene to species mapping file line %d" % (i+1))) 
                         print(line)
                         sys.exit()
                     g, sp = t
@@ -107,8 +107,8 @@ class GeneToSpecies(object):
                         self.startswith[g[:-1]] = sp
                     else:
                         self.exact[g] = sp
-        self.species = sorted(list(set(self.exact.values() + self.startswith.values())))
-        print("%d species in mapping file:" % len(self.species))
+        self.species = sorted(list(set(list(self.exact.values()) + list(self.startswith.values()))))
+        print(("%d species in mapping file:" % len(self.species)))
         for s in self.species:
             print(s)
         print("\nSTAG will infer a species tree from each gene tree with all species present") 
@@ -133,7 +133,7 @@ class GeneToSpecies_OrthoFinder(GeneToSpecies):
         # no exact conversions
         self.exact = dict()
         self.startswith = {("%d_" % sp):str(sp) for sp in speciesToUse}
-        self.species = map(str,speciesToUse)
+        self.species = list(map(str,speciesToUse))
         self.sp_to_i = {s:i for i,s in enumerate(self.species)}
             
 
@@ -170,8 +170,8 @@ def GetDistances_fast(t, nSp, g_to_i):
                 spp = {k for ch in children for k in ch.d.keys()}
                 d = {k:(min([ch.d[k] for ch in children if k in ch.d])+max(0.0, n.dist)) for k in spp}
                 n.add_feature('d', d)
-    for i in xrange(nSp):
-        for j in xrange(i):
+    for i in range(nSp):
+        for j in range(i):
             D[i,j] = D[j, i]
         D[i,i]=0.
     return D
@@ -187,14 +187,14 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=Tr
         try:
             t = tree.Tree(fn)
         except newick.NewickError:
-            print(os.path.split(fn)[1] + " - WARNING: ETE could not interpret tree file, it will be ignored")
+            print((os.path.split(fn)[1] + " - WARNING: ETE could not interpret tree file, it will be ignored"))
             nFail += 1
             continue
         try:
             genes = t.get_leaf_names()
-            species = map(GeneToSpecies.ToSpecies, genes)
-        except UnrecognisedGene, e:
-            print(os.path.split(fn)[1] + " - WARNING: unrecognised gene, %s" % e.message)
+            species = list(map(GeneToSpecies.ToSpecies, genes))
+        except UnrecognisedGene as e:
+            print((os.path.split(fn)[1] + " - WARNING: unrecognised gene, %s" % e.message))
             nFail += 1
             continue
         nThis = len(set(species))
@@ -208,25 +208,24 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=Tr
             for n in t:
                 n.name = s_to_i[GeneToSpecies.ToSpecies(n.name)]
             t.write(outfile = treeOutFN, format=5)
-            if qVerbose: print(os.path.split(fn)[1] + " - Processed")
+            if qVerbose: print((os.path.split(fn)[1] + " - Processed"))
             continue
         g_to_i = {g:s_to_i[s] for g,s in zip(genes, species)}
         D = GetDistances_fast(t, nSp, g_to_i)
-        species_names_fastme = map(str,xrange(nSp))
+        species_names_fastme = list(map(str,range(nSp)))
         matrixFN = dir_matrices + os.path.split(fn)[1] + ".dist.phylip"
         treeOutFN = dir_trees_out + os.path.split(fn)[1] + ".tre"
         WritePhylipMatrix(D, species_names_fastme, matrixFN, max_og=1e6)
         command = "fastme -i %s -o %s -w O -s -n" % (matrixFN, treeOutFN)
         if qForOF:
-            import util
-            util.RunCommand(command, True, True, True)
+            parallel_task_manager.RunCommand(command, True, True, True)
         else:
             popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             popen.communicate()
         nSuccess += 1
-        if qVerbose: print(os.path.split(fn)[1] + " - Processed")
-    if qVerbose: print("\nExamined %d trees" % (nSuccess + nNotAllPresent + nFail))
-    print("%d trees had all species present and will be used by STAG to infer the species tree" % nSuccess)
+        if qVerbose: print((os.path.split(fn)[1] + " - Processed"))
+    if qVerbose: print(("\nExamined %d trees" % (nSuccess + nNotAllPresent + nFail)))
+    print(("%d trees had all species present and will be used by STAG to infer the species tree" % nSuccess))
       
 def Astral(tree_dir, astral_jar_file, qForOF=False):
     treesFN = tree_dir + "../TreesFile.txt"
@@ -237,8 +236,7 @@ def Astral(tree_dir, astral_jar_file, qForOF=False):
     speciesTreeFN = tree_dir + "../SpeciesTree_ids.txt"
     command = " ".join(["java", "-Xmx6000M", "-jar", astral_jar_file, "-i", treesFN, "-o", speciesTreeFN])
     if qForOF:
-        import util
-        util.RunCommand(command, True, True, True)
+        parallel_task_manager.RunCommand(command, True, True, True)
     else:
         subprocess.call(command, shell=True)
     return tree.Tree(speciesTreeFN)     
@@ -278,7 +276,7 @@ def main(args):
         InferSpeciesTree(dir_trees_out, gene_to_species.species, outputFN)
     else:
         InferSpeciesTree(dir_trees_out, gene_to_species.species, outputFN, astral_jar=astral_jar)
-    print("STAG species tree: " + os.path.abspath(outputFN) + "\n")
+    print(("STAG species tree: " + os.path.abspath(outputFN) + "\n"))
 
 if __name__ == "__main__":
     text = """
@@ -287,7 +285,7 @@ if __name__ == "__main__":
 *      STAG: Species Tree inference from All Genes      *
 *                                                       *
 *********************************************************"""
-    print(text[1:] + "\n")
+    print((text[1:] + "\n"))
     parser = argparse.ArgumentParser()
     parser.add_argument("species_map", help = "Map file from gene names to species names, or SpeciesIDs.txt file from OrthoFinder")
     parser.add_argument("gene_trees", help = "Directory conaining gene trees")

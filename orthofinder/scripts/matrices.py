@@ -27,9 +27,12 @@
 import os
 import glob
 import numpy as np
-import cPickle as pic
+try:
+    import cPickle as pic
+except ImportError:
+    import pickle as pic
 
-import util, files
+from . import util, files
 
 def DumpMatrix(name, m, iSpecies, jSpecies):
     with open(files.FileHandler.GetPickleDir() + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'wb') as picFile:
@@ -46,7 +49,7 @@ def LoadMatrix(name, iSpecies, jSpecies):
         
 def LoadMatrixArray(name, seqsInfo, iSpecies, row=True):
     matrixArray = []
-    for jSpecies in xrange(seqsInfo.nSpecies):
+    for jSpecies in range(seqsInfo.nSpecies):
         if row == True:
             matrixArray.append(LoadMatrix(name, iSpecies, jSpecies))
         else:

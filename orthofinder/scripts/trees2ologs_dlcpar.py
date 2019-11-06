@@ -30,13 +30,21 @@ import csv
 import glob
 import itertools
 import numpy as np
-import cPickle as pic
+try:
+    import cPickle as pic
+except ImportError:
+    import pickle as pic
 from scipy import sparse
 from collections import defaultdict
 
-import tree
-import util
-import files
+from . import tree
+from . import util
+from . import files
+from . import parallel_task_manager
+
+# import tree
+# import util
+# import files
 
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(_nsre, s)]
@@ -53,8 +61,8 @@ def AllEqualBranchLengths(t):
     return (len(lengths) > 1 and len(set(lengths)) == 1)
 
 def RootGeneTreesArbitrarily(nOGs, outputDir):
-    filenames = [files.FileHandler.GetOGsTreeFN(i) for i in xrange(nOGs)]
-    outFilenames = [outputDir + os.path.split(files.FileHandler.GetOGsTreeFN(i))[1] for i in xrange(nOGs)]
+    filenames = [files.FileHandler.GetOGsTreeFN(i) for i in range(nOGs)]
+    outFilenames = [outputDir + os.path.split(files.FileHandler.GetOGsTreeFN(i))[1] for i in range(nOGs)]
     treeFilenames = [fn for fn in filenames if fn.endswith(".txt")]
     nErrors = 0
     with open(outputDir + 'root_errors.txt', 'wb') as errorfile:
@@ -94,7 +102,7 @@ def RootGeneTreesArbitrarily(nOGs, outputDir):
 
 def WriteGeneSpeciesMap(d, speciesDict):
     fn = d + "GeneMap.smap"
-    iSpecies = speciesDict.keys()
+    iSpecies = list(speciesDict.keys())
     with open(fn, 'wb') as outfile:
         for iSp in iSpecies:
             outfile.write("%s_*\t%s\n" % (iSp, iSp))
@@ -115,10 +123,10 @@ def RunDlcpar(ogSet, speciesTreeFN, workingDir, nParallel, qDeepSearch):
     if not os.path.exists(dlcparResultsDir): os.mkdir(dlcparResultsDir)
     RootGeneTreesArbitrarily(nOGs, dlcparResultsDir)
     spec_seq_dict = ogSet.Spec_SeqDict()
-    for iog in xrange(len(ogs)):
+    for iog in range(len(ogs)):
         util.RenameTreeTaxa(files.FileHandler.GetOGsTreeFN(iog), files.FileHandler.GetOGsTreeFN(iog, True), spec_seq_dict, qSupport=False, qFixNegatives=True, qViaCopy=False)
     geneMapFN = WriteGeneSpeciesMap(dlcparResultsDir, ogSet.SpeciesDict())
-    filenames = [dlcparResultsDir + os.path.split(files.FileHandler.GetOGsTreeFN(i))[1] for i in xrange(nOGs)]
+    filenames = [dlcparResultsDir + os.path.split(files.FileHandler.GetOGsTreeFN(i))[1] for i in range(nOGs)]
     if qDeepSearch:
         nTaxa = [len(og) for og in ogs[:nOGs]]
         nIter =     [1000 if n < 25 else 25000 if n < 200 else 50000 for n in nTaxa]
@@ -126,7 +134,7 @@ def RunDlcpar(ogSet, speciesTreeFN, workingDir, nParallel, qDeepSearch):
         dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -i %d --nprescreen 100 --nconverge %d' % (speciesTreeFN, geneMapFN, fn, i, n) for (fn, i, n) in zip(filenames, nIter, nNoImprov)]
     else:
         dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -x 1' % (speciesTreeFN, geneMapFN, fn) for fn in filenames]
-    util.RunParallelOrderedCommandLists(nParallel, [[c] for c in dlcCommands])
+    parallel_task_manager.RunParallelOrderedCommandLists(nParallel, [[c] for c in dlcCommands])
     return dlcparResultsDir, "OG%07d_tree_id.dlcpar.locus.tree"
 
 
@@ -180,9 +188,9 @@ def one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, pickle
     #Fill matrices with orthodata
     iSpecieslist = [x for x in orthodict if x.startswith('%d_' % speciesLabels[iSpecies])]
     for count, queryGene in enumerate(iSpecieslist):
-        _,iGene = map(int, queryGene.split('_'))
+        _,iGene = list(map(int, queryGene.split('_')))
         for Gene in orthodict[queryGene]:
-            jSpLabel,jGene = map(int,Gene.split('_'))
+            jSpLabel,jGene = list(map(int,Gene.split('_')))
             jSp = speciesLabelsReverse[jSpLabel]
             if iSpecies > jSp:
                 matrixlist[jSp][iGene, jGene] = 1
@@ -248,7 +256,7 @@ def find_all(matrix, orig_matrix):
     orig_matrix = orig_matrix.tolil()       # most efficient for rowaccess
     orthologues = []
     done = set()
-    for iIndex in xrange(matrix.shape[0]):
+    for iIndex in range(matrix.shape[0]):
         if matrix[iIndex, iIndex] == 0 or iIndex in done: continue
         orthologuesSp1, orthologuesSp2 = GetOrthologues(orig_matrix, orig_matrix_csc, iIndex)
         done.update(orthologuesSp1)
@@ -261,10 +269,10 @@ def species_write_all(ogSet, pickleDir, resultsDir):
     speciesIDs = ogSet.speciesToUse
     nspecies = len(speciesIDs)           
     nOrthologues_SpPair = util.nOrtho_sp(nspecies)
-    for index1 in xrange(nspecies):
+    for index1 in range(nspecies):
         d = resultsDir + "Orthologues_" + speciesDict[str(speciesIDs[index1])]
         if not os.path.exists(d): os.mkdir(d)
-    for index1, index2 in itertools.product(xrange(nspecies), xrange(nspecies)):      
+    for index1, index2 in itertools.product(range(nspecies), range(nspecies)):      
         if index1 >= index2: continue
         product, M = multiply(index1, index2, pickleDir)
         orthologues = find_all(product, M)
@@ -278,7 +286,7 @@ def create_orthologue_lists(ogSet, resultsDir, dlcparResultsDir, pickleDir):
     
     # -> dictionary
     speciesLabels, genenumbers = GetSpeciesGenesInfo()
-    for iSpecies in xrange(len(speciesLabels)):
+    for iSpecies in range(len(speciesLabels)):
         one_to_one_efficient(orthodict, genenumbers, speciesLabels, iSpecies, pickleDir)
         
     # -> csv files

@@ -30,7 +30,7 @@ import csv
 import gzip
 from scipy import sparse
 
-import util
+from . import util
               
 #def NumberOfSequences(seqsInfo, iSpecies):
 #    return (seqsInfo.seqStartingIndices[iSpecies+1] if iSpecies != seqsInfo.nSpecies-1 else seqsInfo.nSeqs) - seqsInfo.seqStartingIndices[iSpecies] 

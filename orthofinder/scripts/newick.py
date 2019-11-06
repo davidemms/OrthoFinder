@@ -39,6 +39,11 @@ __VERSION__="ete2-2.2rev1026"
 # 
 # #END_LICENSE#############################################################
 
+try:
+  basestring
+except NameError:
+  basestring = str
+
 import re
 import os
 import base64 
@@ -195,7 +200,7 @@ def read_newick(newick, root_node=None, format=0):
     """
 
     if root_node is None:
-        from tree import TreeNode
+        from .tree import TreeNode   
         root_node = TreeNode()
 
     if isinstance(newick, basestring):
@@ -208,20 +213,18 @@ def read_newick(newick, root_node=None, format=0):
             return _read_node_data(nw, root_node, "single", format)
             
         elif not nw.startswith('(') or not nw.endswith(';'):
-            raise NewickError, \
-            'Unexisting tree file or Malformed newick tree structure.'
+            raise NewickError('Unexisting tree file or Malformed newick tree structure.')
         else:
             return _read_newick_from_string(nw, root_node, format)
 
     else:
-        raise NewickError, \
-            "'newick' argument must be either a filename or a newick string."
+        raise NewickError("'newick' argument must be either a filename or a newick string.")
 
 def _read_newick_from_string(nw, root_node, format):
     """ Reads a newick string in the New Hampshire format. """
 
     if nw.count('(') != nw.count(')'):
-        raise NewickError, 'Parentheses do not match. Broken tree structure'
+        raise NewickError('Parentheses do not match. Broken tree structure')
 
     # white spaces and separators are removed
     nw = re.sub("[\n\r\t]+", "", nw)
@@ -283,9 +286,9 @@ def _parse_extra_features(node, NHX_string):
     for field in NHX_string.split(":"):
         try:
             pname, pvalue = field.split("=")
-        except ValueError, e:
-            print NHX_string, field.split("=")
-            raise ValueError, e
+        except ValueError as e:
+            print(NHX_string, field.split("="))
+            raise ValueError(e)
         node.add_feature(pname, pvalue)
 
 def _read_node_data(subnw, current_node, node_type, format):
@@ -345,7 +348,7 @@ def _read_node_data(subnw, current_node, node_type, format):
                 and data[2].startswith("[&&NHX"):
             _parse_extra_features(node, data[2])
     else:
-        raise NewickError, "Unexpected leaf node format:\n\t"+ subnw[0:50] + "[%s]" %format
+        raise NewickError("Unexpected leaf node format:\n\t"+ subnw[0:50] + "[%s]" %format)
     return
 
 # def write_newick_recursive(node, features=None, format=1, _is_root=True):

@@ -10,6 +10,7 @@ Perform directed 'reconciliation' first and then apply EggNOG method
 2 - infer orthologues
 """
 import os
+import sys
 import csv
 import glob
 import argparse
@@ -18,8 +19,11 @@ import itertools
 import multiprocessing as mp
 from collections import defaultdict
 
-import tree as tree_lib
-import resolve, util, files
+from . import tree as tree_lib
+from . import resolve, util, files, parallel_task_manager
+
+if sys.version_info > (3,):
+    xrange = range
 
 def GeneToSpecies_dash(g):
   return g.split("_", 1)[0]
@@ -532,7 +536,7 @@ def GetOrthologuesStandalone_Parallel(trees_dir, species_tree_rooted_fn, GeneToS
     args_queue = mp.Queue()
     for treeFn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")): args_queue.put((0, treeFn, species_tree_rooted, GeneToSpecies, neighbours, True))
     # Now need to root the tree first
-    util.RunMethodParallel(RootAndGetOrthologues_from_tree, args_queue, 16)
+    parallel_task_manager.RunMethodParallel(RootAndGetOrthologues_from_tree, args_queue, 16)
 
 def RootTreeStandalone_Serial(trees_dir, species_tree_rooted_fn, GeneToSpecies, output_dir, qSingleTree):
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
@@ -633,14 +637,14 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
             iNode += 1
     nOgs = len(ogSet.OGs())
     nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
-    species = speciesDict.keys()
+    species = list(speciesDict.keys())
     reconTreesRenamedDir = files.FileHandler.GetOGsReconTreeDir(True)
     spec_seq_dict = ogSet.Spec_SeqDict()
     sp_to_index = {str(sp):i for i, sp in enumerate(ogSet.speciesToUse)}
     with open(files.FileHandler.GetDuplicationsFN(), 'wb') as outfile, OrthologsFiles(dResultsOrthologues, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index) as (ortholog_file_writers, suspect_genes_file_writers):
         dupWriter = csv.writer(outfile, delimiter="\t")
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
-        for iog in xrange(nOgs):
+        for iog in range(nOgs):
             rooted_tree_ids, qHaveSupport = CheckAndRootTree(files.FileHandler.GetOGsTreeFN(iog), species_tree_rooted, GeneToSpecies) # this can be parallelised easily
             if rooted_tree_ids is None: continue
             # Write rooted tree with accessions
@@ -710,7 +714,7 @@ def GetOrthologues_from_phyldog_tree(iog, treeFN, GeneToSpecies, qWrite=False, d
                 orthologues.append((d0, d1, empty_dict, empty_dict))
         elif len(ch) > 2:
             print("Non-binary node")
-            print(n.get_leaf_names())
+            print((n.get_leaf_names()))
     if qWrite:
         directory = os.path.split(treeFN)[0]
         WriteQfO2(orthologues, directory + "/../Orthologues_M3/" + os.path.split(treeFN)[1], qAppend=False)
@@ -722,10 +726,10 @@ def DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDirectory, GeneToSpecies, 
     # Write directory and file structure
     speciesIDs = ogSet.speciesToUse
     nspecies = len(speciesIDs)      
-    for index1 in xrange(nspecies):
+    for index1 in range(nspecies):
         d = output_dir + "Orthologues_" + speciesDict[str(speciesIDs[index1])] + "/"
         if not os.path.exists(d): os.mkdir(d)     
-        for index2 in xrange(nspecies):
+        for index2 in range(nspecies):
             if index2 == index1: continue
             with open(d + '%s__v__%s.tsv' % (speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]), 'wb') as outfile:
                 writer1 = csv.writer(outfile, delimiter="\t")
@@ -736,7 +740,7 @@ def DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDirectory, GeneToSpecies, 
         with open(files.FileHandler.GetDuplicationsFN(), 'wb') as outfile:
             dupWriter = csv.writer(outfile, delimiter="\t")
             dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
-            for iog in xrange(nOgs):
+            for iog in range(nOgs):
                 recon_tree = files.FileHandler.GetPhyldogOGResultsTreeFN(iog)
                 orthologues = GetOrthologues_from_phyldog_tree(iog, recon_tree, GeneToSpecies, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict())
                 allOrthologues = [(iog, orthologues)]
@@ -747,16 +751,15 @@ def DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDirectory, GeneToSpecies, 
     return nOrthologues_SpPair
     
 def RootAllTrees():
-    import tree
     speciesIDs = util.FirstWordExtractor("SpeciesIDs.txt").GetIDToNameDict()
     species_tree_rooted = tree.Tree("SpeciesTree_ids_0_rooted_unresolved.txt")
     GeneToSpecies = GeneToSpecies_dash
     for fn in glob.glob("Trees_ids/OG*txt"):
-        print("*** " + fn + " ***")
+        print(("*** " + fn + " ***"))
         t = tree.Tree(fn)
         root = GetRoot(t, species_tree_rooted, GeneToSpecies)
         if root == None: 
-            print("Fail: " + fn)
+            print(("Fail: " + fn))
         else:
             if root != t:
                 t.set_outgroup(root)

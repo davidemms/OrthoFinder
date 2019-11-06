@@ -35,8 +35,8 @@ import glob
 import numpy as np
 from collections import Counter, defaultdict
 
-import util, program_caller as pc
-import files
+from . import util, program_caller as pc
+from . import files
 
 class FastaWriter(object):
     def __init__(self, fastaFileDir_list, speciesToUse):
@@ -73,7 +73,7 @@ class FastaWriter(object):
                     outFile.write(">%s\n" % seq)
                     outFile.write(self.SeqLists[seq])
                 else:
-                    print("ERROR: %s not found" % seq)
+                    print(("ERROR: %s not found" % seq))
                                 
     def WriteSeqsToFasta_withNewAccessions(self, seqs, outFilename, idDict):
         with open(outFilename, 'wb') as outFile:
@@ -83,7 +83,7 @@ class FastaWriter(object):
                     outFile.write(self.SeqLists[seq])
                     
     def SortSeqs(self, seqs):
-        return sorted(seqs, key=lambda x: map(int, x.split("_")))
+        return sorted(seqs, key=lambda x: list(map(int, x.split("_"))))
 
 def WriteTestFile(workingDir):
     d = workingDir + "/_dependencies_check/"
@@ -111,10 +111,10 @@ def GetMulticopyCutoff(nSpecies, factor = 0.25, pMax = 0.25):
         maxMulticopy - array, i-th element is maximum number of allowed multicopy species if ispecies are non-single copy
     """        
     allowed_multicopy = []
-    for iNonSingle in xrange(nSpecies):
+    for iNonSingle in range(nSpecies):
         nSingle = nSpecies - iNonSingle
         qFoundMax = False
-        for nMultiple in xrange(iNonSingle+1):
+        for nMultiple in range(iNonSingle+1):
             pFalse = factor*nMultiple/float(nSpecies)
             pAnyFalse = 1.-(1-pFalse)**nSingle
             if pAnyFalse > pMax:
@@ -146,11 +146,11 @@ def GetOrthogroupOccupancyInfo(m):
     f = 1./N
     fractions = []
     nOrtho = []
-    for n in xrange(N):
+    for n in range(N):
         F = 1.-n*f
         fractions.append(F)
         nOrtho.append(len(SingleCopy_WithProbabilityTest(F-1e-5, m)))
-    nOrtho = map(float, nOrtho)
+    nOrtho = list(map(float, nOrtho))
     return fractions, nOrtho
     
 def DetermineOrthogroupsForSpeciesTree(m, nOGsMin=100, nSufficient=1000, increase_required=2.):
@@ -170,7 +170,7 @@ def DetermineOrthogroupsForSpeciesTree(m, nOGsMin=100, nSufficient=1000, increas
         ogsToUse = SingleCopy_WithProbabilityTest(1.0-1e-5, m)
         return ogsToUse, 1.0
     nSpecies = m.shape[1]
-    for i in xrange(1, nSpecies):
+    for i in range(1, nSpecies):
         if nOrtho[i-1] < nOGsMin: continue
         if nOrtho[i-1] > nSufficient: break
         p = ((nOrtho[i] - nOrtho[i-1])/nOrtho[i-1]) /  (-(fractions[i] - fractions[i-1])/fractions[i-1])
@@ -186,7 +186,7 @@ def DetermineOrthogroupsForSpeciesTree(m, nOGsMin=100, nSufficient=1000, increas
 class MSA(object):
     def __init__(self, msa_dict):
         self.seqs = msa_dict
-        self.length = len(msa_dict.values()[0])
+        self.length = len(list(msa_dict.values())[0])
 
 def ReadAlignment(fn):
     msa = dict()
@@ -231,10 +231,10 @@ def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, 
         for iSp in allSpecies.difference(speciesInThisOg):
             concatentaedAlignments[iSp] += "-"*(alignment.length)
     # Trim the completed alignment: to 50% of fraction of species present
-    species_ordered = concatentaedAlignments.keys()
+    species_ordered = list(concatentaedAlignments.keys())
     trimmedAlignment = {iSp:"" for iSp in species_ordered}
     maxGap = (1.-fMaxGap*fSingleCopy)*len(allSpecies)
-    for iCol in xrange(len(concatentaedAlignments.values()[0])):
+    for iCol in range(len(list(concatentaedAlignments.values())[0])):
         col = [concatentaedAlignments[iSp][iCol] for iSp in species_ordered]
         if col.count("-") <= maxGap:
             for c, iSp in zip(col, species_ordered):
@@ -246,7 +246,7 @@ def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, 
     with open(output_filename, 'wb') as outfile:
         for name, seq in trimmedAlignment.items():
             outfile.write(">%s\n" % name)
-            for i in xrange(0, len(seq), nChar):
+            for i in range(0, len(seq), nChar):
                 outfile.write(seq[i:i+nChar] + "\n")
             
     
@@ -333,7 +333,7 @@ class TreesForOrthogroups(object):
                     for iog in iOgsForSpeciesTree: outfile.write("OG%07d\n" % iog)
             # ids -> accessions
             alignmentFilesToUse = [self.GetAlignmentFilename(i) for i, _ in enumerate(alignCommands_and_filenames)]        
-            accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in xrange(len(alignmentFilesToUse))]
+            accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in range(len(alignmentFilesToUse))]
             if qDoSpeciesTree: 
                 alignmentFilesToUse.append(concatenated_algn_fn)
                 accessionAlignmentFNs.append(files.FileHandler.GetSpeciesTreeConcatAlignFN(True))
@@ -349,7 +349,7 @@ class TreesForOrthogroups(object):
         treeCommands_and_filenames = self.GetTreeCommands(alignmentFilesToUse, ogs)
         commands_and_filenames = []
         if qDoSpeciesTree:
-            print("Species tree: Using %d orthogroups with minimum of %0.1f%% of species having single-copy genes in any orthogroup" % (len(iOgsForSpeciesTree), 100.*fSingleCopy))
+            print(("Species tree: Using %d orthogroups with minimum of %0.1f%% of species having single-copy genes in any orthogroup" % (len(iOgsForSpeciesTree), 100.*fSingleCopy)))
             util.PrintUnderline("Inferring multiple sequence alignments for species tree") 
             # Do required alignments and trees
             speciesTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
@@ -369,16 +369,16 @@ class TreesForOrthogroups(object):
 
         # Now continue as before
         iOgsForSpeciesTree = set(iOgsForSpeciesTree)                         
-        for i in xrange(len(treeCommands_and_filenames)):
+        for i in range(len(treeCommands_and_filenames)):
             if i in iOgsForSpeciesTree: continue
             commands_and_filenames.append([alignCommands_and_filenames[i], treeCommands_and_filenames[i]])
-        for i in xrange(len(treeCommands_and_filenames), len(alignCommands_and_filenames)):
+        for i in range(len(treeCommands_and_filenames), len(alignCommands_and_filenames)):
             if i in iOgsForSpeciesTree: continue
             commands_and_filenames.append([alignCommands_and_filenames[i]])
         pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
         
         # Convert ids to accessions for MSA
-        accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in xrange(len(alignmentFilesToUse))]
+        accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in range(len(alignmentFilesToUse))]
         # Add concatenated Alignment
         if qDoSpeciesTree:
             alignmentFilesToUse.append(concatenated_algn_fn)

@@ -61,8 +61,10 @@ def GetPredictedOGs(clustersFilename):
         assert(len(predictedOGs) == int(nOGsString) + 1)
     return predictedOGs
     
-def GetSingleID(speciesStartingIndices, seq, speciesToUse):    
-    iSpecies, iSeq = map(int, seq.split("_"))
+def GetSingleID(speciesStartingIndices, seq, speciesToUse): 
+    a, b = seq.split("_")
+    iSpecies = int(a)
+    iSeq = int(b)
     offset = speciesStartingIndices[speciesToUse.index(iSpecies)]
     return iSeq + offset  
 

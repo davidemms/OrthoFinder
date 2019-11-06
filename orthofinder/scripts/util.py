@@ -31,14 +31,17 @@ import time
 import numpy as np
 import subprocess
 import datetime
-import Queue
+try: 
+    import queue
+except ImportError:
+    import Queue as queue
 import multiprocessing as mp
 from collections import namedtuple
 
 nAlgDefault = 1
 nThreadsDefault = mp.cpu_count()
 
-import tree, parallel_task_manager
+from . import tree, parallel_task_manager
 
 """
 Utilities
@@ -48,203 +51,13 @@ SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStar
 
 picProtocol = 1
 version = "2.3.7"
-
-if getattr(sys, 'frozen', False):
-    __location__ = os.path.split(sys.executable)[0]
-else:
-    __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__))) + "/../"
-
-# Fix LD_LIBRARY_PATH when using pyinstaller 
-my_env = os.environ.copy()
-my_env['PATH'] = os.path.join(__location__, 'bin:') + my_env['PATH']
-if getattr(sys, 'frozen', False):
-    if 'LD_LIBRARY_PATH_ORIG' in my_env:
-        my_env['LD_LIBRARY_PATH'] = my_env['LD_LIBRARY_PATH_ORIG']  
-    else:
-        my_env['LD_LIBRARY_PATH'] = ''  
-    if 'DYLD_LIBRARY_PATH_ORIG' in my_env:
-        my_env['DYLD_LIBRARY_PATH'] = my_env['DYLD_LIBRARY_PATH_ORIG']  
-    else:
-        my_env['DYLD_LIBRARY_PATH'] = ''    
     
 def PrintNoNewLine(text):
-    sys.stdout.write(text)
+    parallel_task_manager.PrintNoNewLine(text)
 
 def PrintTime(message):
-    print(str(datetime.datetime.now()).rsplit(".", 1)[0] + " : " + message)      
-
-"""
-Command & parallel command management
--------------------------------------------------------------------------------
-"""
-
-def RunCommand(command, qShell=True, qPrintOnError=False, qPrintStderr=True):
-    """ Run a single command """
-    if qPrintOnError:
-        popen = subprocess.Popen(command, env=my_env, shell=qShell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = popen.communicate()
-        if popen.returncode != 0:
-            print("\nERROR: external program called by OrthoFinder returned an error code: %d" % popen.returncode)
-            print("\nCommand: %s" % command)
-            print("\nstdout\n------\n%s" % stdout)
-            print("stderr\n------\n%s" % stderr)
-        elif qPrintStderr and len(stderr) > 0:
-            print("\nWARNING: program called by OrthoFinder produced output to stderr")
-            print("\nCommand: %s" % command)
-            print("\nstdout\n------\n%s" % stdout)
-            print("stderr\n------\n%s" % stderr)
-        return popen.returncode
-    else:
-        popen = subprocess.Popen(command, env=my_env, shell=qShell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        popen.communicate()
-        return popen.returncode
-
-def RunOrderedCommandList(commandList, qShell=True):
-    """ Run a list of commands """
-    FNULL = open(os.devnull, 'w')
-    for cmd in commandList:
-        popen = subprocess.Popen(cmd, shell=qShell, stdout=subprocess.PIPE, stderr=FNULL, close_fds=True, env=my_env)
-        popen.communicate()
-    
-def CanRunCommand(command, qAllowStderr = False, qPrint = True):
-    if qPrint: PrintNoNewLine("Test can run \"%s\"" % command)       # print without newline
-    capture = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
-    stdout = [x for x in capture.stdout]
-    stderr = [x for x in capture.stderr]
-    if len(stdout) > 0 and (qAllowStderr or len(stderr) == 0):
-        if qPrint: print(" - ok")
-        return True
-    else:
-        if qPrint: print(" - failed")
-        print("\nstdout:")        
-        for l in stdout: print(l)
-        print("\nstderr:")        
-        for l in stderr: print(l)
-        return False
-        
-def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qShell=True, qPrintOnError=False, qPrintStderr=True):
-    """ Run commands from queue until the queue is empty """
-    while True:
-        try:
-            i, command = cmd_queue.get(True, 1)
-            nDone = i - nProcesses + 1
-            if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
-                PrintTime("Done %d of %d" % (nDone, nToDo))
-            RunCommand(command, qShell, qPrintOnError, qPrintStderr)
-        except Queue.Empty:
-            return   
-            
-def Worker_RunCommands_And_Move(cmd_and_filename_queue, nProcesses, nToDo, qListOfLists):
-    """
-    Continuously takes commands that need to be run from the cmd_and_filename_queue until the queue is empty. If required, moves 
-    the output filename produced by the cmd to a specified filename. The elements of the queue can be single cmd_filename tuples
-    or an ordered list of tuples that must be run in the provided order.
-  
-    Args:
-        cmd_and_filename_queue - queue containing (cmd, actual_target_fn) tuples (if qListOfLists is False) of a list of such 
-            tuples (if qListOfLists is True).
-        nProcesses - the number of processes that are working on the queue.
-        nToDo - The total number of elements in the original queue
-        qListOfLists - Boolean, whether each element of the queue corresponds to a single command or a list of ordered commands
-        qShell - Boolean, should a shell be used to run the command.
-        
-    Implementation:
-        nProcesses and nToDo are used to print out the progress.
-    """
-    while True:
-        try:
-            i, command_fns_list = cmd_and_filename_queue.get(True, 1)
-            nDone = i - nProcesses + 1
-            if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
-                PrintTime("Done %d of %d" % (nDone, nToDo))
-            if not qListOfLists:
-                command_fns_list = [command_fns_list]
-            for command, fns in command_fns_list:
-                popen = subprocess.Popen(command, env=my_env, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                popen.communicate()
-                if fns != None:
-                    actual, target = fns
-                    if os.path.exists(actual):
-                        os.rename(actual, target)
-        except Queue.Empty:
-            return               
-                            
-def Worker_RunOrderedCommandList(cmd_queue, nProcesses, nToDo, qShell=True):
-    """ repeatedly takes items to process from the queue until it is empty at which point it returns. Does not take a new task
-        if it can't acquire queueLock as this indicates the queue is being rearranged.
-        
-        Writes each commands output and stderr to a file
-    """
-    while True:
-        try:
-            i, commandSet = cmd_queue.get(True, 1)
-            nDone = i - nProcesses + 1
-            if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
-                PrintTime("Done %d of %d" % (nDone, nToDo))
-            RunOrderedCommandList(commandSet, qShell)
-        except Queue.Empty:
-            return   
-        
-def RunParallelOrderedCommandLists(nProcesses, commands):
-    """nProcesss - the number of processes to run in parallel
-    commands - list of lists of commands where the commands in the inner list are completed in order (the i_th won't run until
-    the i-1_th has finished).
-    """
-    ptm = parallel_task_manager.ParallelTaskManager_singleton()
-    ptm.RunParallel(commands, True, nProcesses, qShell=True)              
-    
-def ManageQueue(runningProcesses, cmd_queue):
-    """Manage a set of runningProcesses working through cmd_queue.
-    If there is an error the exit all processes as quickly as possible and 
-    exit via Fail() methods. Otherwise return when all work is complete
-    """            
-    # set all completed processes to None
-    qError = False
-#    dones = [False for _ in runningProcesses]
-    nProcesses = len(runningProcesses)
-    while True:
-        if runningProcesses.count(None) == len(runningProcesses): break
-        time.sleep(.1)
-#        for proc in runningProcesses:
-        for i in xrange(nProcesses):
-            proc = runningProcesses[i]
-            if proc == None: continue
-            if not proc.is_alive():
-                if proc.exitcode != 0:
-                    qError = True
-                    while True:
-                        try:
-                            cmd_queue.get(True, .1)
-                        except Queue.Empty:
-                            break
-                runningProcesses[i] = None
-    if qError:
-        Fail()
-
-""" 
-Run a method in parallel
-"""      
-              
-def Worker_RunMethod(Function, args_queue):
-    while True:
-        try:
-            args = args_queue.get(True, .1)
-            Function(*args)
-        except Queue.Empty:
-            return 
-
-def RunMethodParallel(Function, args_queue, nProcesses):
-    runningProcesses = [mp.Process(target=Worker_RunMethod, args=(Function, args_queue)) for i_ in xrange(nProcesses)]
-    for proc in runningProcesses:
-        proc.start()
-    ManageQueue(runningProcesses, args_queue)
-    
-def ExampleRunMethodParallel():
-    F = lambda x, y: x**2
-    args_queue = mp.Queue()
-    for i in xrange(100): args_queue.put((3,i))
-    RunMethodParallel(F, args_queue, 16)
-       
+    parallel_task_manager.PrintTime(message)   
+      
 """
 Directory and file management
 -------------------------------------------------------------------------------
@@ -299,7 +112,7 @@ def GetSeqsInfo(inputDirectory_list, speciesToUse, nSpAll):
     seqStartingIndices = [0]
     nSeqs = 0
     nSeqsPerSpecies = dict()
-    for iFasta in xrange(nSpAll):
+    for iFasta in range(nSpAll):
         for d in inputDirectory_list:
             fastaFilename = d + "Species%d.fa" % iFasta
             if os.path.exists(fastaFilename): break
@@ -350,7 +163,7 @@ IDExtractor
 """
 
 def GetIDPairFromString(line):
-    return map(int, line.split("_"))
+    return list(map(int, line.split("_")))
 
 class IDExtractor(object):
     """IDExtractor deals with the fact that for different datasets a user will
@@ -492,7 +305,7 @@ If you use the species tree in your work then please also cite:
 OrthoFinder also depends on a number of tools which make its analysis possible.
 These tools are cited in the OrthoFinder paper, but are also being used in any
 analysis that uses OrthoFinder. In order to recognise the contributions that these 
-authors have made, please also consider citing the following: 
+authors have made, please also consider citing the following as you feel is appropriate: 
 
 DIAMOND protein alignment:
   Buchfink B., Xie C. & Huson D.H. Fast and sensitive protein alignment using
@@ -546,10 +359,10 @@ def PrintCitation(d=None):
     print (" Emms D.M. & Kelly S. (2018), bioRxiv https://doi.org/10.1101/267914")
 
 def PrintUnderline(text, qHeavy=False):
-    print("\n" + text)
+    print(("\n" + text))
     n = len(text)
     if text.startswith("\n"): n -= 1
-    print(("=" if qHeavy else "-") * n)
+    print((("=" if qHeavy else "-") * n))
 
 def FlowText(text, n=60):
     """Split text onto lines of no more that n characters long
@@ -601,22 +414,4 @@ class Finalise(object):
     def __exit__(self, type, value, traceback):
         ptm = parallel_task_manager.ParallelTaskManager_singleton()
         ptm.Stop()
-        
-
-""" TEMP """        
-def RunParallelCommands(nProcesses, commands, qShell):
-    """nProcesss - the number of processes to run in parallel
-    commands - list of commands to be run in parallel
-    """
-    # Setup the workers and run
-    cmd_queue = mp.Queue()
-    for i, cmd in enumerate(commands):
-        cmd_queue.put((i, cmd))
-    runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, nProcesses, i+1, qShell)) for i_ in xrange(nProcesses)]
-    for proc in runningProcesses:
-        proc.start()
-    
-    for proc in runningProcesses:
-        while proc.is_alive():
-            proc.join(10.)
-            time.sleep(2)        
+              

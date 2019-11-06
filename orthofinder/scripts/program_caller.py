@@ -32,7 +32,7 @@ import shutil
 import subprocess
 import multiprocessing as mp
 
-import util
+from . import util, parallel_task_manager
 
 class InvalidEntryException(Exception):
     pass
@@ -42,7 +42,7 @@ class Method(object):
         if 'cmd_line' in config_dict:
             self.cmd = config_dict['cmd_line']
         else:
-            print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
+            print(("WARNING: Incorrecty formatted configuration file entry: %s" % name))
             print("'cmd_line' entry is missing")
             raise InvalidEntryException
         if 'ouput_filename' in config_dict:
@@ -69,52 +69,52 @@ class ProgramCaller(object):
         if configure_file == None:
             return
         if not os.path.exists(configure_file):
-            print("WARNING: Configuration file, '%s', does not exist. No user-confgurable multiple sequence alignment or tree inference methods have been added.\n" % configure_file)
+            print(("WARNING: Configuration file, '%s', does not exist. No user-confgurable multiple sequence alignment or tree inference methods have been added.\n" % configure_file))
             return
         with open(configure_file, 'rb') as infile:
             try:
                 d = json.load(infile)
             except ValueError:
-                print("WARNING: Incorrecty formatted configuration file %s" % configure_file)
+                print(("WARNING: Incorrecty formatted configuration file %s" % configure_file))
                 print("File is not in .json format. No user-confgurable multiple sequence alignment or tree inference methods have been added.\n")
                 return
             for name, v in d.items():
                 if name == "__comment": continue
                 if " " in name:
-                    print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
-                    print("No space is allowed in name: '%s'" % name)
+                    print(("WARNING: Incorrecty formatted configuration file entry: %s" % name))
+                    print(("No space is allowed in name: '%s'" % name))
                     continue
                     
                 if 'program_type' not in v:
-                    print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
+                    print(("WARNING: Incorrecty formatted configuration file entry: %s" % name))
                     print("'program_type' entry is missing")
                 try:
                     if v['program_type'] == 'msa':
                         if name in self.msa:
-                            print("Multiple sequence alignment method '%s' has already been defined, skipping config file entry." % name)
+                            print(("Multiple sequence alignment method '%s' has already been defined, skipping config file entry." % name))
                         else:
                             self.msa[name] = Method(name, v)
                     elif v['program_type'] == 'tree':
                         if name in self.tree:
-                            print("Tree inference method '%s' has already been defined, skipping config file entry." % name)
+                            print(("Tree inference method '%s' has already been defined, skipping config file entry." % name))
                         else:
                             self.tree[name] = Method(name, v)
                     elif v['program_type'] == 'search':
                         if ('db_cmd' not in v) or ('search_cmd' not in v):
-                            print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
+                            print(("WARNING: Incorrecty formatted configuration file entry: %s" % name))
                             print("'cmd_line' entry is missing")
                             raise InvalidEntryException
                         if name in self.search_db:
-                            print("Sequence search method '%s' has already been defined, skipping config file entry." % name)
+                            print(("Sequence search method '%s' has already been defined, skipping config file entry." % name))
                         else:
                             self.search_db[name] = Method(name, {'cmd_line':v['db_cmd']})
                             self.search_search[name] = Method(name, {'cmd_line':v['search_cmd']})
                             if 'ouput_filename' in v:
-                                print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
+                                print(("WARNING: Incorrecty formatted configuration file entry: %s" % name))
                                 print("'ouput_filename' option is not supported for 'program_type' 'search'")
                     else:
-                        print("WARNING: Incorrecty formatted configuration file entry: %s" % name)
-                        print("'program_type' should be 'msa' or 'tree', got '%s'" % v['program_type'])
+                        print(("WARNING: Incorrecty formatted configuration file entry: %s" % name))
+                        print(("'program_type' should be 'msa' or 'tree', got '%s'" % v['program_type']))
                 except InvalidEntryException:
                     pass
     
@@ -200,7 +200,7 @@ class ProgramCaller(object):
     
     def _CallMethod(self, method_type, method_name, infilename, outfilename, identifier=None, dbname=None, nSeqs=None):
         cmd, actual_target_fns = self._GetCommand(method_type, method_name, infilename, outfilename, identifier, dbname, nSeqs)
-        capture = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=util.my_env)
+        capture = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=parallel_task_manager.my_env)
         stdout = [x for x in capture.stdout]
         stderr = [x for x in capture.stderr]
         capture.communicate()
@@ -226,8 +226,8 @@ class ProgramCaller(object):
         if success: print(" - ok")
         else:
             print(" - failed")
-            print("".join(stdout))
-            print("".join(stderr))
+            print(("".join(stdout)))
+            print(("".join(stderr)))
         return success
 
     def _ReplaceVariables(self, instring, infilename, outfilename, identifier=None, dbname=None):
@@ -336,7 +336,7 @@ def RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, qL
     i = -1
     for i, cmd in enumerate(commands_and_filenames):
         cmd_queue.put((i, cmd))
-    runningProcesses = [mp.Process(target=util.Worker_RunCommands_And_Move, args=(cmd_queue, nProcesses, i+1, qListOfList)) for _ in xrange(nProcesses)]
+    runningProcesses = [mp.Process(target=parallel_task_manager.Worker_RunCommands_And_Move, args=(cmd_queue, nProcesses, i+1, qListOfList)) for _ in range(nProcesses)]
     for proc in runningProcesses:
         proc.start()
     

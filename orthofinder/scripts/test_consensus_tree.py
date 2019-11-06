@@ -7,8 +7,8 @@ Created on Wed Jan 10 18:01:40 2018
 
 import unittest
 
-import tree
-import consensus_tree as ct
+from . import tree
+from . import consensus_tree as ct
 
 import sys
 sys.path.append("/home/david/workspace/p4/OrthoFinder/orthofinder/scripts/")
@@ -65,7 +65,7 @@ class TestConsensusTree(unittest.TestCase):
         taxa_index = {t:i for i, t in enumerate(taxa)}
         ct.UpdateSplits(all_splits, t, taxa_index)
         self.assertEqual(len(all_splits), 5)
-        s = map(bin, all_splits)
+        s = list(map(bin, all_splits))
         self.assertTrue("0b1110" in s) # a
         self.assertTrue("0b10" in s)   # b
         self.assertTrue("0b1100" in s) #ab
