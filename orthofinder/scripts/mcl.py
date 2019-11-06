@@ -28,7 +28,7 @@ def GetPredictedOGs(clustersFilename):
     predictedOGs = []
     nOGsString = ""
     qContainsProfiles = False
-    with open(clustersFilename, 'rb') as clusterFile:
+    with open(clustersFilename, 'r') as clusterFile:
         header = True
         og = set()
         for line in clusterFile:
@@ -75,7 +75,7 @@ def GetIDPair(speciesStartingIndices, singleID, speciesToUse):
     return "%d_%d" % (speciesToUse[-1], singleID - speciesStartingIndices[len(speciesStartingIndices)-1]) 
 
 def ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, newFilename):
-    with open(clustersFilename, 'rb') as clusterFile, open(newFilename, "wb") as output:
+    with open(clustersFilename, 'r') as clusterFile, open(newFilename, "w") as output:
         header = True
         for line in clusterFile:
             appendDollar = False

@@ -98,7 +98,7 @@ class __Files_new_dont_manually_create__(object):
             # Log the first wd in list, this can then be followed back to previous ones
             # Log file - point to WD at start of chain which contains the new species
             # wd_base_list - should contain current directory and then previous linked directories
-            with open(self.wd_current + "previous_wd.txt", 'wb') as outfile: outfile.write(old_wd_base_list[0] + "\n")
+            with open(self.wd_current + "previous_wd.txt", 'w') as outfile: outfile.write(old_wd_base_list[0] + "\n")
             self.wd_base.extend(old_wd_base_list)
         self.wd_trees = self.wd_current
         self.StartLog()
@@ -120,7 +120,7 @@ class __Files_new_dont_manually_create__(object):
             self.rd1 = util.CreateNewWorkingDirectory(base + "Results_" + user_name, qDate=False)
         self.wd_current = self.rd1 + "WorkingDirectory/"
         os.mkdir(self.wd_current)
-        with open(self.rd1 + "Log.txt", 'wb'):
+        with open(self.rd1 + "Log.txt", 'w'):
             pass
         self.wd_trees = self.wd_current
         self.StartLog()
@@ -198,7 +198,7 @@ class __Files_new_dont_manually_create__(object):
 
     def CreateCorrectedSpeciesIDsFile(self, species_ids_lines):
         self.species_ids_corrected = self.wd_current + "SpeciesIDs.txt"
-        with open(self.species_ids_corrected, 'wb') as outfile:
+        with open(self.species_ids_corrected, 'w') as outfile:
             outfile.write(species_ids_lines)
                                                       
     """ ========================================================================================== """
@@ -221,7 +221,7 @@ class __Files_new_dont_manually_create__(object):
     def LogSpecies(self):
         text = "\nSpecies used: \n"
         fn = self.GetSpeciesIDsFN()
-        with open(fn, 'rb') as infile:
+        with open(fn, 'r') as infile:
             text += "".join(infile.readlines())
         self.WriteToLog(text + "\n")
         
@@ -474,7 +474,7 @@ class __Files_new_dont_manually_create__(object):
         prepend = ""
         if qWithTime:
             prepend = str(datetime.datetime.now()).rsplit(".", 1)[0] + " : "
-        with open(self.rd1 + "Log.txt", 'ab') as outfile:
+        with open(self.rd1 + "Log.txt", 'a') as outfile:
             outfile.write(prepend + text)
     
     def StartLog(self):
@@ -591,7 +591,7 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
         Should work with relevant paths to allow directory to move
         Other methods can then check that the data required for a particualr run is available
         """
-        with open(logFN, 'rb') as infile:
+        with open(logFN, 'r') as infile:
             for line in infile:
                 if line.startswith("Species used:"):
                     self.species_ids_lines = ""
@@ -641,7 +641,7 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
     def GetWDBaseChain(self, wd_base_anchor):
         chain = [wd_base_anchor]
         while os.path.exists(chain[-1] + "previous_wd.txt"):
-            with open(chain[-1] + "previous_wd.txt", 'rb') as infile:
+            with open(chain[-1] + "previous_wd.txt", 'r') as infile:
                 chain.append(infile.next().rstrip())
         return chain
                 

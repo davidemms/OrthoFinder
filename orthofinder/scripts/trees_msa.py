@@ -52,7 +52,7 @@ class FastaWriter(object):
         for d in fastaFileDir_list:
             for fn in glob.glob(d + "Species*.fa"):
                 if os.path.basename(fn) not in required_files: continue
-                with open(fn, 'rb') as fastaFile:
+                with open(fn, 'r') as fastaFile:
                     for line in fastaFile:
                         if line[0] == ">":
                             # deal with old sequence
@@ -67,7 +67,7 @@ class FastaWriter(object):
                     self.SeqLists[accession] = sequence
     
     def WriteSeqsToFasta(self, seqs, outFilename):
-        with open(outFilename, 'wb') as outFile:
+        with open(outFilename, 'w') as outFile:
             for seq in self.SortSeqs([s.ToString() for s in seqs]):
                 if seq in self.SeqLists:
                     outFile.write(">%s\n" % seq)
@@ -76,7 +76,7 @@ class FastaWriter(object):
                     print(("ERROR: %s not found" % seq))
                                 
     def WriteSeqsToFasta_withNewAccessions(self, seqs, outFilename, idDict):
-        with open(outFilename, 'wb') as outFile:
+        with open(outFilename, 'w') as outFile:
             for seq in self.SortSeqs([s.ToString() for s in seqs]):
                 if seq in self.SeqLists:
                     outFile.write(">%s\n" % idDict[seq])
@@ -90,7 +90,7 @@ def WriteTestFile(workingDir):
     if not os.path.exists(d):
         os.mkdir(d)
     testFN = d + "SimpleTest.fa"
-    with open(testFN, 'wb') as outfile:
+    with open(testFN, 'w') as outfile:
         outfile.write(">a\nA\n>b\nA")
     return testFN, d
  
@@ -193,7 +193,7 @@ def ReadAlignment(fn):
     accession = None
     length = None
     seq = ""
-    with open(fn, 'rb') as infile:
+    with open(fn, 'r') as infile:
         for line in infile:
             line = line.rstrip()
             if line.startswith(">"):
@@ -243,7 +243,7 @@ def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, 
 #    print("Original length %d" % len(concatentaedAlignments.values()[0]))
 #    print("Trimmed length %d" % len(trimmedAlignment.values()[0]))
     nChar = 80
-    with open(output_filename, 'wb') as outfile:
+    with open(output_filename, 'w') as outfile:
         for name, seq in trimmedAlignment.items():
             outfile.write(">%s\n" % name)
             for i in range(0, len(seq), nChar):
@@ -297,7 +297,7 @@ class TreesForOrthogroups(object):
     def RenameAlignmentTaxa(self, idsAlignFNS, accAlignFNs, idsDict):
         for i, (alignFN, outAlignFN) in enumerate(zip(idsAlignFNS, accAlignFNs)):
             if not os.path.exists(alignFN): continue
-            with open(alignFN, 'rb') as infile, open(outAlignFN, 'wb') as outfile:
+            with open(alignFN, 'r') as infile, open(outAlignFN, 'w') as outfile:
                 for line in infile:
                     if line.startswith(">"):
                         outfile.write(">" + idsDict[line[1:].rstrip()] + "\n")
@@ -329,7 +329,7 @@ class TreesForOrthogroups(object):
                 CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn, fSingleCopy)
                 # write OGs used to file
                 dSpeciesTree = os.path.split(files.FileHandler.GetSpeciesTreeResultsFN(0, True))[0] + "/"
-                with open(dSpeciesTree + "Orthogroups_for_concatenated_alignment.txt", 'wb') as outfile:
+                with open(dSpeciesTree + "Orthogroups_for_concatenated_alignment.txt", 'w') as outfile:
                     for iog in iOgsForSpeciesTree: outfile.write("OG%07d\n" % iog)
             # ids -> accessions
             alignmentFilesToUse = [self.GetAlignmentFilename(i) for i, _ in enumerate(alignCommands_and_filenames)]        
@@ -359,7 +359,7 @@ class TreesForOrthogroups(object):
             CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn, fSingleCopy)
             # write OGs used to file
             dSpeciesTree = os.path.split(files.FileHandler.GetSpeciesTreeResultsFN(0, True))[0] + "/"
-            with open(dSpeciesTree + "Orthogroups_for_concatenated_alignment.txt", 'wb') as outfile:
+            with open(dSpeciesTree + "Orthogroups_for_concatenated_alignment.txt", 'w') as outfile:
                 for iog in iOgsForSpeciesTree: outfile.write("OG%07d\n" % iog)
             # Add species tree to list of commands to run
             commands_and_filenames = [self.program_caller.GetTreeCommands(self.tree_program, [concatenated_algn_fn], [speciesTreeFN_ids], ["SpeciesTree"])]

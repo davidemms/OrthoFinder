@@ -39,6 +39,9 @@ from collections import Counter, defaultdict
 from . import probroot
 from . import tree 
 
+PY2 = sys.version_info <= (3,)
+csv_write_mode = 'wb' if PY2 else 'wt'
+
 def compare(exp, act):
     """exp - expected set of species
     act - actual set of species
@@ -636,7 +639,7 @@ def WriteResults(species_tree_fn_or_text, roots, S, clades, clusters_counter, ou
         else:
             p = 0.
         table[node.name] = [node.name, "X" if (clade in roots or anticlade in roots) else "", "%0.1f%%" % (100.*p) , X, clusters_counter[y]]
-    with open(output_dir + "Duplication_counts.tsv", 'wb') as outfile:
+    with open(output_dir + "Duplication_counts.tsv", csv_write_mode) as outfile:
         writer = csv.writer(outfile, delimiter="\t")
         writer.writerow(["Branch", "MP Root", "Probability", "Duplications supporting clade", "Duplications supporting opposite clade"])
         qSingle = len(thisRoot) == 1
@@ -703,7 +706,7 @@ def Main_Full(args):
 #        d['species'] = species
 #        d['nSupport'] = nSupport
 #        d['SpeciesTreeFN'] = os.path.abspath(args.Species_tree)
-#        with open(args.Species_tree, 'rb') as infile:
+#        with open(args.Species_tree, 'r') as infile:
 #            tree_text = "".join([l.rstrip() for l in infile.readlines()])
 #        d['SpeciesTreeText'] = tree_text
 #        d['TreesDir'] = os.path.abspath(args.gene_trees)

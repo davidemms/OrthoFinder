@@ -71,7 +71,7 @@ class ProgramCaller(object):
         if not os.path.exists(configure_file):
             print(("WARNING: Configuration file, '%s', does not exist. No user-confgurable multiple sequence alignment or tree inference methods have been added.\n" % configure_file))
             return
-        with open(configure_file, 'rb') as infile:
+        with open(configure_file, 'r') as infile:
             try:
                 d = json.load(infile)
             except ValueError:
@@ -190,7 +190,7 @@ class ProgramCaller(object):
             resultsfn = d + "test_search_results.txt"
             self.CallSearchMethod_Search(method_name, fasta, dbname, resultsfn)
             success = os.path.exists(resultsfn) or os.path.exists(resultsfn + ".gz")
-#            with open(resultsfn, 'rb') as f:
+#            with open(resultsfn, 'r') as f:
 #                print("".join(f))
         except:
             shutil.rmtree(d)
@@ -285,7 +285,7 @@ class ProgramCaller(object):
         
     def _WriteTestSequence(self, working_dir):
         fn = working_dir + "Species0.fa"
-        with open(fn, 'wb') as outfile:
+        with open(fn, 'w') as outfile:
             outfile.write(""">A
 MSKVIELKGIYAKYNKKSDYILEDLNLNVESGEFIAIIGPSGVGKSTLFKVIVNALEISKGSVRLFGQNI
 >B
@@ -298,7 +298,7 @@ MIKVTDLMFKYPSAQANAIEKLNLEIESGKYVAILGHNGSGKSTFSKLLVALYKPADGKIELDGTTISKE""")
         
     def _WriteTestSequence_Longer(self, working_dir):
         fn = working_dir + "Species0.fa"
-        with open(fn, 'wb') as outfile:
+        with open(fn, 'w') as outfile:
             outfile.write(""">0_0
 MNINSPNDKEIALKSYTETFLDILRQELGDQMLYKNFFANFEIKDVSKIGHITIGTTNVTPNSQYVIRAY
 ESSIQKSLDETFERKCTFSFVLLDSAVKKKVKRERKEAAIENIELSNREVDKTKTFENYVEGNFNKEAIR

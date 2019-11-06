@@ -69,6 +69,7 @@ import random
 import copy
 from collections import deque 
 import itertools
+import functools
 from .newick import read_newick, write_newick
 
 TREEVIEW = False
@@ -491,7 +492,7 @@ class TreeNode(object):
                 visitor_key = frozenset(visitors)
                 visitors2nodes.setdefault(visitor_key, set()).add(node)
         for visitors, nodes in visitors2nodes.items():
-            s = sorted(nodes, cmp_nodes)
+            s = sorted(nodes, key=functools.cmp_to_key(cmp_nodes))
             to_keep.add(s[0])
 
         # Detach unvisited branches

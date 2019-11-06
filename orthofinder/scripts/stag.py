@@ -48,7 +48,7 @@ def CanRunCommand(command, qAllowStderr = False, qPrint = True):
         
 def CheckFastME(workingDir):
     testFN = workingDir + "SimpleTest.phy"
-    with open(testFN, 'wb') as outfile:
+    with open(testFN, 'w') as outfile:
         outfile.write("4\n1_1 0 0 0.2 0.25\n0_2 0 0 0.21 0.28\n3_1 0.2 0.21 0 0\n4_1 0.25 0.28 0 0")
     outFN = workingDir + "SimpleTest.tre"
     if os.path.exists(outFN): os.remove(outFN)  
@@ -67,7 +67,7 @@ def WritePhylipMatrix(m, names, outFN, max_og=1e6):
     m - list of mp.Array  (so that each represents an nSeq x nSeq matrix
     """
     sliver = 1e-6
-    with open(outFN, 'wb') as outfile:
+    with open(outFN, 'w') as outfile:
         n = len(m)
         outfile.write("%d\n" % n)
         for i in range(n):
@@ -89,13 +89,13 @@ class GeneToSpecies(object):
         self.exact = dict()
         self.startswith = dict()
         if gene_map_fn.endswith("SpeciesIDs.txt"):
-            with open(gene_map_fn, 'rb') as infile:
+            with open(gene_map_fn, 'r') as infile:
                 for line in infile:
                     _, sp = line.rstrip().rsplit(".", 1)[0].split()
                     sp = sp.replace(".", "_")
                     self.startswith[sp] = sp
         else:
-            with open(gene_map_fn, 'rb') as infile:
+            with open(gene_map_fn, 'r') as infile:
                 for i, line in enumerate(infile):
                     t = line.rstrip().split()
                     if len(t) != 2: 
@@ -229,7 +229,7 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=Tr
       
 def Astral(tree_dir, astral_jar_file, qForOF=False):
     treesFN = tree_dir + "../TreesFile.txt"
-    with open(treesFN, 'wb') as outfile:
+    with open(treesFN, 'w') as outfile:
         for fn in glob.glob(tree_dir + "/*"):
             t = tree.Tree(fn)    
             outfile.write(t.write(format=9) + "\n")

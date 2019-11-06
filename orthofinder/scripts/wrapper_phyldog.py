@@ -59,10 +59,10 @@ use.quality.filters=false""" % baseDir
             base, ext = os.path.splitext(filename)
             og = "OG%07d" % i
             outFN = base + "_" + og + ext
-            with open(outFN, 'wb') as outfile:
+            with open(outFN, 'w') as outfile:
                 outfile.write(x.replace("ListGenes", "ListGenes_" + og).replace("mrp", "user"))
     else:
-        with open(filename, 'wb') as outfile: outfile.write(x)
+        with open(filename, 'w') as outfile: outfile.write(x)
 
 def WriteOGOptions(phyldogDir, nOGs, exclude):
     basedir = phyldogDir + "../"
@@ -108,11 +108,11 @@ optimization.reparametrization=no"""
     for i in range(nOGs):
         if i in exclude: continue
         ogName = "OG%07d" % i
-        with open(phyldogDir + ogName + ".opt", 'wb') as outfile: 
+        with open(phyldogDir + ogName + ".opt", 'w') as outfile: 
             outfile.write(x % (basedir, ogName))
     
 def WriteListSpecies(filename, speciesToUse):
-    with open(filename, 'wb') as outfile:
+    with open(filename, 'w') as outfile:
         for i in speciesToUse:
             outfile.write("%d\n" % i)
 
@@ -124,7 +124,7 @@ def WriteGeneMaps(outputDir, ogs, exclude):
         for seq in og:
             name = seq.ToString()
             genesForSpecies[name.split("_")[0]].append(name)
-        with open(outputDir + "OG%07d.map.txt" % i, 'wb') as outfile:
+        with open(outputDir + "OG%07d.map.txt" % i, 'w') as outfile:
             for species, genes in genesForSpecies.items():
                 outfile.write("%s:%s\n" % (species, ";".join(genes)))
 
@@ -146,7 +146,7 @@ def CleanAlignmentsForPhyldog(phyldogDir, ogs):
     # 2. Remove any orthogroups composed entierly of identical sequences
     exclude = []
     for i, og in enumerate(ogs):
-        with open(phyldogDir + "../Alignments_ids/OG%07d.fa" % i, 'rb') as infile:
+        with open(phyldogDir + "../Alignments_ids/OG%07d.fa" % i, 'r') as infile:
             seqs = []
             for line in infile:
                 if line.startswith(">"):
@@ -180,18 +180,18 @@ def ProcessSpeciesTree(phyldogDir):
     
 def WriteStandardFiles(phyldogDir, speciesToUse, qRunSingley, nOGs):
     WriteGeneralOptions(phyldogDir + "GeneralOptions.opt", phyldogDir + "../", qRunSingley, nOGs)
-#    with open(phyldogDir + "listGenes_generic.txt", 'wb') as outfile: outfile.write(phyldogDir + "OG_generic.opt:1")
+#    with open(phyldogDir + "listGenes_generic.txt", 'w') as outfile: outfile.write(phyldogDir + "OG_generic.opt:1")
     WriteListSpecies(phyldogDir + "ListSpecies.txt", speciesToUse)
 
 def WriteListGenes(phyldogDir, nOGs, exclude, qRunSingley):
     if qRunSingley:
         for i in range(nOGs):
             if i in exclude: continue
-            with open(phyldogDir + "ListGenes_OG%07d.opt" % i, 'wb') as outfile:
+            with open(phyldogDir + "ListGenes_OG%07d.opt" % i, 'w') as outfile:
                     outfile.write(phyldogDir + "OG%07d.opt:%s\n" % (i, str(os.stat( phyldogDir + "../Alignments_ids/OG%07d.fa" % i )[6])))   # phyldog prepareData.py method
     
     else:
-        with open(phyldogDir + "ListGenes.opt", 'wb') as outfile:
+        with open(phyldogDir + "ListGenes.opt", 'w') as outfile:
             for i in range(nOGs):
                 if i in exclude: continue
                 outfile.write(phyldogDir + "OG%07d.opt:%s\n" % (i, str(os.stat( phyldogDir + "../Alignments_ids/OG%07d.fa" % i )[6])))   # phyldog prepareData.py method

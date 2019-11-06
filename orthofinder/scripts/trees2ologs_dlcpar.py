@@ -26,6 +26,7 @@
 
 import re
 import os
+import sys
 import csv
 import glob
 import itertools
@@ -42,9 +43,8 @@ from . import util
 from . import files
 from . import parallel_task_manager
 
-# import tree
-# import util
-# import files
+PY2 = sys.version_info <= (3,)
+csv_write_mode = 'wb' if PY2 else 'wt'
 
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(_nsre, s)]
@@ -65,7 +65,7 @@ def RootGeneTreesArbitrarily(nOGs, outputDir):
     outFilenames = [outputDir + os.path.split(files.FileHandler.GetOGsTreeFN(i))[1] for i in range(nOGs)]
     treeFilenames = [fn for fn in filenames if fn.endswith(".txt")]
     nErrors = 0
-    with open(outputDir + 'root_errors.txt', 'wb') as errorfile:
+    with open(outputDir + 'root_errors.txt', 'w') as errorfile:
         for treeFN, outFN in zip(treeFilenames, outFilenames):
             try:    
                 t = tree.Tree(treeFN)
@@ -103,7 +103,7 @@ def RootGeneTreesArbitrarily(nOGs, outputDir):
 def WriteGeneSpeciesMap(d, speciesDict):
     fn = d + "GeneMap.smap"
     iSpecies = list(speciesDict.keys())
-    with open(fn, 'wb') as outfile:
+    with open(fn, 'w') as outfile:
         for iSp in iSpecies:
             outfile.write("%s_*\t%s\n" % (iSp, iSp))
     return fn
@@ -218,7 +218,7 @@ def WriteOrthologues(resultsDir, spec1, spec2, orthologues, ogSet, nOrtho_sp, i,
     sequenceDict = ogSet.SequenceDict()
     d1 = resultsDir + "Orthologues_" + speciesDict[str(spec1)] + "/"
     d2 = resultsDir + "Orthologues_" + speciesDict[str(spec2)] + "/"
-    with open(d1 + '%s__v__%s.tsv' % (speciesDict[str(spec1)], speciesDict[str(spec2)]), 'wb') as outfile1, open(d2 + '%s__v__%s.tsv' % (speciesDict[str(spec2)], speciesDict[str(spec1)]), 'wb') as outfile2:
+    with open(d1 + '%s__v__%s.tsv' % (speciesDict[str(spec1)], speciesDict[str(spec2)]), csv_write_mode) as outfile1, open(d2 + '%s__v__%s.tsv' % (speciesDict[str(spec2)], speciesDict[str(spec1)]), csv_write_mode) as outfile2:
         writer1 = csv.writer(outfile1, delimiter="\t")
         writer2 = csv.writer(outfile2, delimiter="\t")
         writer1.writerow(("Orthogroup", speciesDict[str(spec1)], speciesDict[str(spec2)]))

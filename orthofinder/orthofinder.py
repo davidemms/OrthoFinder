@@ -55,21 +55,14 @@ except ImportError:
 import warnings                                 # Y
 
 PY2 = sys.version_info <= (3,)
+csv_write_mode = 'wb' if PY2 else 'wt'
 
-# if PY2:
 from scripts import mcl 
 from scripts import blast_file_processor
 from scripts import util, matrices, orthologues, trees_msa
 from scripts import program_caller
 from scripts import files
 from scripts import parallel_task_manager
-# else:
-#     from .scripts import mcl
-#     from .scripts import blast_file_processor
-#     from .scripts import util, matrices, orthologues, trees_msa
-#     from .scripts import program_caller
-#     from .scripts import files
-#     from .scripts import parallel_task_manager
 
 # Get directory containing script/bundle
 if getattr(sys, 'frozen', False):
@@ -125,7 +118,7 @@ def RunBlastDBCommand(command):
             
 def SpeciesNameDict(speciesIDsFN):
     speciesNamesDict = dict()
-    with open(speciesIDsFN, 'rb') as speciesNamesFile:
+    with open(speciesIDsFN, 'r') as speciesNamesFile:
         for line in speciesNamesFile:
             if line.startswith("#"): continue
             line = line.rstrip()
@@ -141,7 +134,7 @@ MCL
 class MCL:
     @staticmethod
     def CreateOGs(predictedOGs, outputFilename, idDict):
-        with open(outputFilename, 'wb') as outputFile:
+        with open(outputFilename, 'w') as outputFile:
             for iOg, og in enumerate(predictedOGs):
                 outputFile.write("OG%07d: " % iOg)
                 accessions = sorted([idDict[seq] for seq in og])
@@ -210,7 +203,7 @@ class MCL:
                 geneNode = SubElement(groupNode, 'geneRef')
                 geneNode.set('id', str(mcl.GetSingleID(speciesStartingIndices, seq, speciesToUse)))
     #                    SubElement(geneNode, 'score')                  # skip
-        with open(orthoxmlFilename, 'wb') as orthoxmlFile:
+        with open(orthoxmlFilename, 'w') as orthoxmlFile:
     #            ET.ElementTree(root).write(orthoxmlFile)
             orthoxmlFile.write(MCL.prettify(root))
         print("Orthogroups have been written to orthoxml file:\n   %s" % orthoxmlFilename)
@@ -270,7 +263,7 @@ class MCL:
         outputFilename = resultsBaseFilename + ".tsv"
         outputFilename_counts = resultsBaseFilename + ".GeneCount.tsv"
         singleGeneFilename = resultsBaseFilename + "_UnassignedGenes.tsv"
-        with open(outputFilename, 'wb') as outputFile, open(singleGeneFilename, 'wb') as singleGeneFile, open(outputFilename_counts, 'wb') as outFile_counts:
+        with open(outputFilename, csv_write_mode) as outputFile, open(singleGeneFilename, csv_write_mode) as singleGeneFile, open(outputFilename_counts, csv_write_mode) as outFile_counts:
             fileWriter = csv.writer(outputFile, delimiter="\t")
             fileWriter_counts = csv.writer(outFile_counts, delimiter="\t")
             singleGeneWriter = csv.writer(singleGeneFile, delimiter="\t")
@@ -461,7 +454,7 @@ WaterfallMethod
 def WriteGraph_perSpecies(args):
     seqsInfo, graphFN, iSpec = args            
     # calculate the 2-way connections for one query species
-    with open(graphFN + "_%d" % iSpec, 'wb') as graphFile:
+    with open(graphFN + "_%d" % iSpec, 'w') as graphFile:
         connect2 = []
         for jSpec in range(seqsInfo.nSpecies):
             m1 = matrices.LoadMatrix("connect", iSpec, jSpec)
@@ -546,7 +539,7 @@ class WaterfallMethod:
     def WriteGraphParallel(seqsInfo, nProcess):
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
-            with open(files.FileHandler.GetGraphFilename(), 'wb') as graphFile:
+            with open(files.FileHandler.GetGraphFilename(), 'w') as graphFile:
                 graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (seqsInfo.nSeqs, seqsInfo.nSeqs)) 
                 graphFile.write("\n(mclmatrix\nbegin\n\n") 
             pool = mp.Pool(nProcess)
@@ -619,7 +612,7 @@ def OrthogroupsMatrix(iSpecies, properOGs):
   
 def Stats_SpeciesOverlaps(fn, speciesNamesDict, iSpecies, speciesPresence):
     """ Number of orthogroups in which each species-pair is present. Called by Stats"""
-    with open(fn, 'wb') as outfile:
+    with open(fn, csv_write_mode) as outfile:
         writer = csv.writer(outfile, delimiter="\t")
         writer.writerow([""] + [speciesNamesDict[index] for index in iSpecies])
         for iSp in iSpecies:
@@ -686,7 +679,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
     filename_overlap = ogStatsResultsDir +  "Orthogroups_SpeciesOverlaps" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".tsv"
     filename_single_copy = files.FileHandler.GetOrthogroupResultsFNBase() + "_SingleCopyOrthologues.txt"
     percentFormat = "%0.1f"
-    with open(filename_sp, 'wb') as outfile_species, open(filename_sum, 'wb') as outfile_sum:
+    with open(filename_sp, csv_write_mode) as outfile_species, open(filename_sum, csv_write_mode) as outfile_sum:
         writer_sp = csv.writer(outfile_species, delimiter="\t")
         writer_sum = csv.writer(outfile_sum, delimiter="\t")
         # header
@@ -734,13 +727,13 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
         writer_sum.writerow(["Percentage of genes in species-specific orthogroups", percentFormat % (100.*sum(iSpSpecificOGsGeneCounts)/nGenes)])
         
         # 'averages'
-        l = list(reversed(map(len, properOGs)))
+        l = list(reversed(list(map(len, properOGs))))
         writer_sum.writerow(["Mean orthogroup size", "%0.1f" % np.mean(l)])
         writer_sum.writerow(["Median orthogroup size", np.median(l)])
         L = np.cumsum(l)
         j, _ = next((i, x) for i, x in enumerate(L) if x > nAssigned/2)
         writer_sum.writerow(["G50 (assigned genes)",l[j]])
-        l2 = list(reversed(map(len, ogs)))
+        l2 = list(reversed(list(map(len, ogs))))
         L2 = np.cumsum(l2)
         j2, _ = next((i, x) for i, x in enumerate(L2) if x > nGenes/2)
         G50 = l2[j2]
@@ -758,7 +751,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
         nSingleCopy = len(singleCopyOGs)
         writer_sum.writerow(["Number of orthogroups with all species present", nCompleteOGs])
         writer_sum.writerow(["Number of single-copy orthogroups", nSingleCopy])
-        with open(filename_single_copy, 'wb') as outfile_singlecopy:
+        with open(filename_single_copy, 'w') as outfile_singlecopy:
             outfile_singlecopy.write("\n".join(["OG%07d" % i_ for i_ in singleCopyOGs]))
         # Link single-copy orthologues
         f =  files.FileHandler.GetOGsSeqFN
@@ -1230,7 +1223,7 @@ def GetXMLSpeciesInfo(seqsInfoObj, options):
     speciesNamesDict = SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN())
     speciesRevDict = {v:k for k,v in speciesNamesDict.items()}
     userFastaFilenames = [os.path.split(speciesNamesDict[i])[1] for i in seqsInfoObj.speciesToUse]
-    with open(options.speciesXMLInfoFN, 'rb') as speciesInfoFile:
+    with open(options.speciesXMLInfoFN, 'r') as speciesInfoFile:
         reader = csv.reader(speciesInfoFile, delimiter = "\t")
         for iLine, line in enumerate(reader):
             if len(line) != 5:
@@ -1269,7 +1262,7 @@ def IDsFileOK(filename):
     """
     It is best to detect any issues with input files at start, perform all required checks here
     """
-    with open(filename, 'rb') as infile:
+    with open(filename, 'r') as infile:
         for line in infile:
             line = line.rstrip()
             if len(line) == 0: continue
@@ -1565,22 +1558,22 @@ def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_na
     iSpecies = 0
     # If it's a previous analysis:
     if len(speciesToUse_prev_names) != 0:
-        with open(files.FileHandler.GetSpeciesIDsFN(), 'rb') as infile:
+        with open(files.FileHandler.GetSpeciesIDsFN(), 'r') as infile:
             for line in infile: pass
         if line.startswith("#"): line = line[1:]
         iSpecies = int(line.split(":")[0]) + 1
     speciesInfoObj.iFirstNewSpecies = iSpecies
     newSpeciesIDs = []
-    with open(files.FileHandler.GetSequenceIDsFN(), 'ab') as idsFile, open(files.FileHandler.GetSpeciesIDsFN(), 'ab') as speciesFile:
+    with open(files.FileHandler.GetSequenceIDsFN(), 'a') as idsFile, open(files.FileHandler.GetSpeciesIDsFN(), 'a') as speciesFile:
         for fastaFilename in originalFastaFilenames:
             newSpeciesIDs.append(iSpecies)
-            outputFasta = open(files.FileHandler.GetSpeciesFastaFN(iSpecies, qForCreation=True), 'wb')
+            outputFasta = open(files.FileHandler.GetSpeciesFastaFN(iSpecies, qForCreation=True), 'w')
             fastaFilename = fastaFilename.rstrip()
             speciesFile.write("%d: %s\n" % (iSpecies, fastaFilename))
             baseFilename, extension = os.path.splitext(fastaFilename)
             mLinesToCheck = 100
             qHasAA = False
-            with open(fastaDir + os.sep + fastaFilename, 'rb') as fastaFile:
+            with open(fastaDir + os.sep + fastaFilename, 'r') as fastaFile:
                 for iLine, line in enumerate(fastaFile):
                     if line.isspace(): continue
                     if len(line) > 0 and line[0] == ">":

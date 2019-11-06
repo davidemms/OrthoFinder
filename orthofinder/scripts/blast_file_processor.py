@@ -31,10 +31,10 @@ import gzip
 from scipy import sparse
 
 from . import util
-              
-#def NumberOfSequences(seqsInfo, iSpecies):
-#    return (seqsInfo.seqStartingIndices[iSpecies+1] if iSpecies != seqsInfo.nSpecies-1 else seqsInfo.nSeqs) - seqsInfo.seqStartingIndices[iSpecies] 
-                         
+
+PY2 = sys.version_info <= (3,)       
+file_read_mode = 'rb' if PY2 else 'rt'
+
 def GetBLAST6Scores(seqsInfo, blastDir_list, iSpecies, jSpecies, qExcludeSelfHits = True, sep = "_", qDoubleBlast=True): 
     qSameSpecies = iSpecies==jSpecies
     qCheckForSelfHits = qExcludeSelfHits and qSameSpecies
@@ -60,7 +60,7 @@ def GetBLAST6Scores(seqsInfo, blastDir_list, iSpecies, jSpecies, qExcludeSelfHit
         fn = d + "Blast%d_%d.txt" % (iSpeciesOpen, jSpeciesOpen)
         if os.path.exists(fn) or os.path.exists(fn + ".gz"): break
     try:
-        with (gzip.open(fn + ".gz", 'rb') if os.path.exists(fn + ".gz") else open(fn, 'rb')) as blastfile:
+        with (gzip.open(fn + ".gz", file_read_mode) if os.path.exists(fn + ".gz") else open(fn, file_read_mode)) as blastfile:
             blastreader = csv.reader(blastfile, delimiter='\t')
             for row in blastreader:    
                 # Get hit and query IDs

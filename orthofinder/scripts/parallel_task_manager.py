@@ -64,7 +64,7 @@ def PrintTime(message):
 
 def PrintNoNewLine(text):
     sys.stdout.write(text)
-    
+
 def ManageQueue(runningProcesses, cmd_queue):
     """Manage a set of runningProcesses working through cmd_queue.
     If there is an error the exit all processes as quickly as possible and 
@@ -329,6 +329,18 @@ class ParallelTaskManager_singleton:
         self.instance.message_to_spawner.put(None)
         self.instance.manager_process.join()
         
+
+def Success():
+    ptm = ParallelTaskManager_singleton()
+    ptm.Stop()  
+    sys.exit()        
+
+def Fail():
+    sys.stderr.flush()
+    ptm = ParallelTaskManager_singleton()
+    ptm.Stop()
+    print("ERROR: An error occurred, please review error messages for more information.")
+    sys.exit(1)
 
 # Create PTM right at start
 ptm_initialised = ParallelTaskManager_singleton()

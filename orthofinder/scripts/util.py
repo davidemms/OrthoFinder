@@ -134,7 +134,7 @@ def GetSpeciesToUse(speciesIDsFN):
     speciesToUse = []
     speciesToUse_names = []
     nSkipped = 0
-    with open(speciesIDsFN, 'rb') as speciesF:
+    with open(speciesIDsFN, 'r') as speciesF:
         for line in speciesF:
             line = line.rstrip()
             if not line: continue
@@ -146,16 +146,10 @@ def GetSpeciesToUse(speciesIDsFN):
     return speciesToUse, len(speciesToUse) + nSkipped, speciesToUse_names
  
 def Success():
-    ptm = parallel_task_manager.ParallelTaskManager_singleton()
-    ptm.Stop()  
-    sys.exit()
+    parallel_task_manager.Success()
    
 def Fail():
-    sys.stderr.flush()
-    ptm = parallel_task_manager.ParallelTaskManager_singleton()
-    ptm.Stop()
-    print("ERROR: An error occurred, please review error messages for more information.")
-    sys.exit(1)
+    parallel_task_manager.Fail()
     
 """
 IDExtractor
@@ -179,7 +173,7 @@ class FullAccession(IDExtractor):
         # only want the first part and nothing else (easy!)
         self.idToNameDict = dict()
         self.nameToIDDict = dict()
-        with open(idsFilename, 'rb') as idsFile:
+        with open(idsFilename, 'r') as idsFile:
             for line in idsFile:
                 line = line.rstrip()
                 if not line: continue
@@ -204,7 +198,7 @@ class FirstWordExtractor(IDExtractor):
         # only want the first part and nothing else (easy!)
         self.idToNameDict = dict()
         self.nameToIDDict = dict()
-        with open(idsFilename, 'rb') as idsFile:
+        with open(idsFilename, 'r') as idsFile:
             for line in idsFile:
                 id, rest = line.split(": ", 1)
                 accession = rest.split(None, 1)[0]
@@ -267,10 +261,10 @@ def RenameTreeTaxa(treeFN_or_tree, newTreeFilename, idsMap, qSupport, qFixNegati
                     n.name = label + ("%d" % iNode)
                     iNode += 1
         if label != None:
-            with open(newTreeFilename, 'wb') as outfile:
+            with open(newTreeFilename, 'w') as outfile:
                 outfile.write(t.write(format=3)[:-1] + label + "0;")  # internal + terminal branch lengths, leaf names, node names. (tree library won't label root node)
         elif t.name == "N0" or t.name == "n0":
-            with open(newTreeFilename, 'wb') as outfile:
+            with open(newTreeFilename, 'w') as outfile:
                 outfile.write(t.write(format=3)[:-1] + t.name + ";")  # internal + terminal branch lengths, leaf names, node names. (tree library won't label root node)
         else:
             if qSupport or qHaveSupport:
@@ -345,7 +339,7 @@ BLAST protein alignment:
   alignment search tool (1990) J. Mol. Biol. 215:403-410
 """    
 
-    with open(d + "Citation.txt", 'wb') as outfile:
+    with open(d + "Citation.txt", 'w') as outfile:
         outfile.write(t)
 
 def PrintCitation(d=None):
