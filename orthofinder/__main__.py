@@ -929,7 +929,7 @@ class Options(object):#
             if v == True:
                 print(k)
                                  
-def ProcessArgs(prog_caller):
+def ProcessArgs(prog_caller, args):
     """ 
     Workflow
     | 1. Fasta Files | 2.  Prepare files    | 3.   Blast    | 4. Orthogroups    | 5.   Gene Trees     | 6.   Reconciliations/Orthologues   |
@@ -944,7 +944,7 @@ def ProcessArgs(prog_caller):
     -op: 2           (only prepare, --only-prepare)
     -og: 4           (orthogroups, --only-groups)
     """
-    if len(sys.argv) == 1 or sys.argv[1] == "--help" or sys.argv[1] == "help" or sys.argv[1] == "-h":
+    if len(args) == 0 or args[0] == "--help" or args[0] == "help" or args[0] == "-h":
         PrintHelp(prog_caller)
         util.Success() 
 
@@ -962,7 +962,6 @@ def ProcessArgs(prog_caller):
     + xml: speciesXMLInfoFN
     """    
     
-    args = sys.argv[1:]
     while len(args) > 0:
         arg = args.pop(0)    
         if arg == "-f" or arg == "--fasta":
@@ -1622,13 +1621,13 @@ def CheckOptions(options):
     
     return options
 
-if __name__ == "__main__":    
+def main(args):    
     try:
         print("")
         print(("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version))
         prog_caller = GetProgramCaller()
         
-        options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault = ProcessArgs(prog_caller)  
+        options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault = ProcessArgs(prog_caller, args)  
         
         files.InitialiseFileHandler(options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault)     
                     

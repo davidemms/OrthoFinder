@@ -1,6 +1,6 @@
 # OrthoFinder — Accurate inference of orthologs, orthogroups, the rooted species, gene trees and gene duplication events made easy!
 
-![OrthoFinder workflow](orthofinder/workflow.png)
+![OrthoFinder workflow](assets/workflow.png)
 *Figure 1: Automatic OrthoFinder analysis*
 
 ## What does OrthoFinder do?
@@ -117,7 +117,7 @@ The example Figure 2 contains an orthogroup from three species, human, mouse and
 
 The two chicken genes arose from a gene duplication event after the lineage leading to chicken split from the lineage leading to human and mouse. As gene duplication events give rise to paralogs, ChA1 and ChA2 are paralogs of each other. However, both chicken genes are descended from a single gene in the last common ancestor of the three species. Therefore, both chicken genes are orthologs of the human gene and the mouse gene. Although they are orthologs, sometimes these complex relationships are referred to as co-orthologs (e.g. ChA1 and ChA2 are co-orthologs of HuA). In this case there is a many-to-one orthology relationship between the chicken genes and the human gene. There are only three kinds of orthology relationships one-to-one, many-to-one, and many-to-many. All of these relationships are identified by OrthoFinder.
 
-![Orthologues, Orthogroups & Paralogues](orthofinder/Orthogroups_Orthologues_Paralogues.png)
+![Orthologues, Orthogroups & Paralogues](assets/Orthogroups_Orthologues_Paralogues.png)
 *Figure 2: Orthologues, Orthogroups & Paralogues*
 
 ## Why Orthogroups

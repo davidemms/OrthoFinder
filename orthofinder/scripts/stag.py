@@ -32,6 +32,9 @@ from itertools import combinations
 
 from . import tree, newick, util, parallel_task_manager
 from . import consensus_tree as cons
+
+# import tree, newick, util, parallel_task_manager
+# import consensus_tree as cons
         
 def CanRunCommand(command, qAllowStderr = False, qPrint = True):
     if qPrint: sys.stdout.write("Test can run \"%s\"" % command)      
