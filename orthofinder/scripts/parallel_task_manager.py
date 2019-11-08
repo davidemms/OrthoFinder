@@ -342,5 +342,4 @@ def Fail():
     print("ERROR: An error occurred, please review error messages for more information.")
     sys.exit(1)
 
-# Create PTM right at start
-ptm_initialised = ParallelTaskManager_singleton()
+

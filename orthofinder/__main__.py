@@ -1621,8 +1621,12 @@ def CheckOptions(options):
     
     return options
 
-def main(args):    
+def main(args==None):    
     try:
+        if args is None:
+            args = sys.argv
+        # Create PTM right at start
+        ptm_initialised = ParallelTaskManager_singleton()
         print("")
         print(("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version))
         prog_caller = GetProgramCaller()
