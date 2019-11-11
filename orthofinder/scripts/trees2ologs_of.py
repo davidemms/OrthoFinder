@@ -305,7 +305,7 @@ def CheckAndRootTree(treeFN, species_tree_rooted, GeneToSpecies):
     Root tree
     Returns None if this fails, i.e. checks: exists, has more than one gene, can be rooted
     """
-    if (not os.path.exists(treeFN)) or os.stat(treeFN).st_size == 0: return
+    if (not os.path.exists(treeFN)) or os.stat(treeFN).st_size == 0: return None, False
     qHaveSupport = False
     try:
         tree = tree_lib.Tree(treeFN, format=2)
@@ -315,9 +315,9 @@ def CheckAndRootTree(treeFN, species_tree_rooted, GeneToSpecies):
             tree = tree_lib.Tree(treeFN)
         except:
             tree = tree_lib.Tree(treeFN, format=3)
-    if len(tree) == 1: return 
+    if len(tree) == 1: return None, False
     root = GetRoot(tree, species_tree_rooted, GeneToSpecies)
-    if root == None: return 
+    if root == None: return None, False
     # Pick the first root for now
     if root != tree:
         tree.set_outgroup(root)
