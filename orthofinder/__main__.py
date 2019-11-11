@@ -26,7 +26,7 @@
 # david_emms@hotmail.com
 
 # first import parallel task manager to minimise RAM overhead for small processes
-from scripts import parallel_task_manager
+from .scripts import parallel_task_manager
 
 import sys                                      # Y
 import subprocess                               # Y
@@ -1621,12 +1621,12 @@ def CheckOptions(options):
     
     return options
 
-def main(args==None):    
+def main(args=None):    
     try:
         if args is None:
-            args = sys.argv
+            args = sys.argv[1:]
         # Create PTM right at start
-        ptm_initialised = ParallelTaskManager_singleton()
+        ptm_initialised = parallel_task_manager.ParallelTaskManager_singleton()
         print("")
         print(("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version))
         prog_caller = GetProgramCaller()
