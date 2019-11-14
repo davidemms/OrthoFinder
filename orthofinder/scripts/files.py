@@ -587,9 +587,9 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
     def _ProcessLog(self, logFN):
         """
         Get all relevant data from log file. 
-        Checks the paths ssaved do exist still
+        Checks the paths saved do exist still
         Should work with relevant paths to allow directory to move
-        Other methods can then check that the data required for a particualr run is available
+        Other methods can then check that the data required for a particular run is available
         """
         with open(logFN, 'rb') as infile:
             for line in infile:
@@ -628,7 +628,6 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
 #                    self._GetOGsFile(wd_ogs_path)
                 if line.startswith(wd_trees_str): 
                     self.wd_trees = line.rstrip()[len(wd_trees_str):]
-                    self.speciesTreeRootedIDsFN = self.wd_trees + "SpeciesTree_rooted_ids.txt" 
                     if not os.path.exists(self.wd_trees):
                         # try to see if it's a relative directory to current one
                         path, d_wd = os.path.split(self.wd_trees[:-1])
@@ -637,6 +636,7 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
                         if not os.path.exists(self.wd_trees):
                             print("ERROR: Missing directory: %s" % self.wd_trees)
                             util.Fail()
+                    self.speciesTreeRootedIDsFN = self.wd_trees + "SpeciesTree_rooted_ids.txt" 
                             
     def GetWDBaseChain(self, wd_base_anchor):
         chain = [wd_base_anchor]
