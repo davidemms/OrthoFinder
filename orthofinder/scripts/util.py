@@ -285,6 +285,9 @@ def GetSpeciesDirectory():
 
 def WriteCitation(d):
     t="""When publishing work that uses OrthoFinder please cite:
+  Emms D.M. & Kelly S. OrthoFinder: phylogenetic orthology inference for comparative 
+  genomics (2019), Genome Biology 20:238
+
   Emms D.M. & Kelly S. OrthoFinder: solving fundamental biases in whole genome
   comparisons dramatically improves orthogroup inference accuracy (2015), Genome
   Biology 16:157
@@ -346,7 +349,7 @@ def PrintCitation(d=None):
     if d is not None: WriteCitation(d)  
     print ("\nCITATION:")  
     print (" When publishing work that uses OrthoFinder please cite:")
-    print (" Emms D.M. & Kelly S. (2015), Genome Biology 16:157\n")   
+    print (" Emms D.M. & Kelly S. (2019), Genome Biology 20:238\n")   
 
     print (" If you use the species tree in your work then please also cite:")
     print (" Emms D.M. & Kelly S. (2017), MBE 34(12): 3267-3278")
