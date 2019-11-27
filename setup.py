@@ -73,15 +73,15 @@ setup(
     # If there are data files included in your packages that need to be
     # installed, specify them here.  If using Python 2.6 or less, then these
     # have to be included in MANIFEST.in as well.
-    # package_data={
-    #      'orthofinder': ['config.json'],
-    # },
+     package_data={
+          'orthofinder': ['config.json'],
+     },
 
     # Although 'package_data' is the preferred approach, in some case you may
     # need to place data files outside of your packages. See:
     # http://docs.python.org/3.4/distutils/setupscript.html#installing-additional-files # noqa
     # In this case, 'data_file' will be installed into '<sys.prefix>/my_data'
-    data_files=[('orthofinder', ['orthofinder/config.json'])],
+    # data_files=[('orthofinder', ['orthofinder/config.json'])],
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
@@ -89,6 +89,9 @@ setup(
     entry_points={
         'console_scripts': [
             'orthofinder=orthofinder.__main__:main',
+            'primary_transcript=tools.primary_transcript:main',
+            'make_ultrametric=tools.make_ultrametric:main',
+            'convert_orthofinder_tree_ids=tools.convert_orthofinder_tree_ids:main'
         ],
     },
 )

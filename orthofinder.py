@@ -1,5 +1,5 @@
 import sys
-from .__main__ import main
+from orthofinder.__main__ import main
 
 args = sys.argv[1:]
 

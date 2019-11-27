@@ -26,7 +26,7 @@
 # david_emms@hotmail.com
 
 # first import parallel task manager to minimise RAM overhead for small processes
-from .scripts import parallel_task_manager
+from orthofinder.scripts import parallel_task_manager
 
 import sys                                      # Y
 import subprocess                               # Y
@@ -57,12 +57,12 @@ import warnings                                 # Y
 PY2 = sys.version_info <= (3,)
 csv_write_mode = 'wb' if PY2 else 'wt'
 
-from scripts import mcl 
-from scripts import blast_file_processor
-from scripts import util, matrices, orthologues, trees_msa
-from scripts import program_caller
-from scripts import files
-from scripts import parallel_task_manager
+from orthofinder.scripts import mcl 
+from orthofinder.scripts import blast_file_processor
+from orthofinder.scripts import util, matrices, orthologues, trees_msa
+from orthofinder.scripts import program_caller
+from orthofinder.scripts import files
+from orthofinder.scripts import parallel_task_manager
 
 # Get directory containing script/bundle
 if getattr(sys, 'frozen', False):
@@ -1488,7 +1488,7 @@ def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller):
                         shutil.rmtree(tmp_dir, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
 
 # 9
-def GetOrthologues(dirs, options, prog_caller):
+def GetOrthologues(speciesInfoObj, options, prog_caller):
     util.PrintUnderline("Analysing Orthogroups", True)
 
     orthologues.OrthologuesWorkflow(speciesInfoObj.speciesToUse, 

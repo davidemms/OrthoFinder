@@ -9,7 +9,7 @@ import numpy as np
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts import tree
+from orthofinder.scripts import tree
 
 def AveDist(node):
     return np.average([node.get_distance(l) for l in node.get_leaf_names()]) 
@@ -23,7 +23,13 @@ def CheckTree(t):
         print("Input tree must be rooted")
         Fail()
 
-def main(tree_fn, r=None):
+def main():
+    parser = argparse.ArgumentParser(description="Modify branch lengths on a rooted tree so that it is ultrametric")
+    parser.add_argument("tree_fn", help="File containing a rooted tree in newick format")
+    parser.add_argument("-r", "--root_age", type=float, help="Rescale branch lengths by a multiplicative factor to achieve requested root age")
+    args = parser.parse_args()
+    tree_fn = args.tree_fn
+    r = args.root_age
     if not os.path.exists(tree_fn):
         print("Input tree file does not exist: %s" % tree_fn)
     t = tree.Tree(tree_fn, format=1)
@@ -63,8 +69,4 @@ def main(tree_fn, r=None):
     print("\nUltrametric tree written to: %s\n" % outfn)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Modify branch lengths on a rooted tree so that it is ultrametric")
-    parser.add_argument("tree_fn", help="File containing a rooted tree in newick format")
-    parser.add_argument("-r", "--root_age", type=float, help="Rescale branch lengths by a multiplicative factor to achieve requested root age")
-    args = parser.parse_args()
-    main(args.tree_fn, args.root_age)
+    main()

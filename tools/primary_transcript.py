@@ -124,9 +124,10 @@ def space(text):
 
 function_dict = {"last_dot":last_dot, "space":space}
 
-
-if __name__ == "__main__":
-    fn = sys.argv[1]
+def main(args=None):
+    if args is None:
+        args = sys.argv[1:]
+    fn = args[0]
     dout = os.path.dirname(os.path.abspath(fn)) + "/primary_transcripts/"
     if not os.path.exists(dout):
         os.mkdir(dout)
@@ -140,3 +141,7 @@ if __name__ == "__main__":
         # ScanTags_second_dot(fn)
 
         CreatePrimaryTranscriptsFile(fn, dout)
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    main(args)

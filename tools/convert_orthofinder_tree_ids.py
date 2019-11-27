@@ -9,7 +9,7 @@ import argparse
 if __name__ == "__main__" and __package__ is None:   
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts import tree, util
+from orthofinder.scripts import tree, util
         
 def ReplaceFileWithNewIDs(idsMap, treeFilename, newTreeFilename):     
     qHaveSupport = False
@@ -49,8 +49,8 @@ def GetSpeciesSequenceIDsDict(sequenceIDsFilename, speciesIDsFN = None):
         speciesDict = {k:v.rsplit(".",1)[0].replace(".", "_").replace(" ", "_") for k,v in speciesDict.items()}
         idsDict = {seqID:speciesDict[seqID.split("_")[0]] + "_" + name for seqID, name in idsDict.items()}
     return idsDict
-          
-if __name__ == "__main__":
+
+def main():
     with util.Finalise():
         parser = argparse.ArgumentParser(description="Takes a tree with OrthoFinder IDs and outputs a tree with gene accessions")
         parser.add_argument("TreeInput", help="Tree filename or directory")
@@ -74,3 +74,6 @@ if __name__ == "__main__":
             except:
                 sys.stdout.write(" - skipped")
             print("")
+
+if __name__ == "__main__":
+    main()
