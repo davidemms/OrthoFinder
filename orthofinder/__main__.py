@@ -26,6 +26,7 @@
 # david_emms@hotmail.com
 
 # first import parallel task manager to minimise RAM overhead for small processes
+from __future__ import absolute_import
 from orthofinder.scripts import parallel_task_manager
 
 import sys                                      # Y
