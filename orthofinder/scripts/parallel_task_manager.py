@@ -58,6 +58,14 @@ if getattr(sys, 'frozen', False):
     else:
         my_env['DYLD_LIBRARY_PATH'] = ''    
 
+def stderr_exempt(stderr):
+    ok_line_starts = {"diamond v", "Licensed under the GNU GPL", "Check http://github.com/"}
+    lines = stderr.split("\n")
+    for line in lines:
+        if line.rstrip() == "": continue
+        if any(line.startswith(x) for x in ok_line_starts): continue
+        return False
+    return True
 
 def PrintTime(message):
     print((str(datetime.datetime.now()).rsplit(".", 1)[0] + " : " + message))      
@@ -104,7 +112,7 @@ def RunCommand(command, qShell=True, qPrintOnError=False, qPrintStderr=True):
             print(("\nCommand: %s" % command))
             print(("\nstdout\n------\n%s" % stdout))
             print(("stderr\n------\n%s" % stderr))
-        elif qPrintStderr and len(stderr) > 0:
+        elif qPrintStderr and len(stderr) > 0 and not stderr_exempt(stderr):
             print("\nWARNING: program called by OrthoFinder produced output to stderr")
             print(("\nCommand: %s" % command))
             print(("\nstdout\n------\n%s" % stdout))
