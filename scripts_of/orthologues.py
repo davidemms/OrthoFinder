@@ -386,7 +386,7 @@ class DendroBLASTTrees(object):
             for i in range(n):
                 outfile.write(names[i] + " ")
                 # values could be -inf, these are the most distantly related so replace with max_og
-                V = [0. + (m[i][j] if m[i][j] > -9e99 else max_og) for j in range(n)] # "0. +": hack to avoid printing out "-0"
+                V = [0. + (0. if i==j else m[i][j] if m[i][j] > -9e99 else max_og) for j in range(n)] # "0. +": hack to avoid printing out "-0"
                 V = [sliver if 0 < v < sliver  else v for v in V]  # make sure scientific notation is not used (not accepted by fastme)
                 values = " ".join(["%.6f" % v for v in V])   
                 outfile.write(values + "\n")
