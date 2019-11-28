@@ -20,8 +20,8 @@ setup(
     name='orthofinder',
     version=version,
 
-    description='phylogenetic orthology inference for comparative genomics',
-    long_description='phylogenetic orthology inference for comparative genomics',
+    description='Phylogenetic orthology inference for comparative genomics',
+    long_description='Phylogenetic orthology inference for comparative genomics',
 
     # The project's main homepage.
     url='https://github.com/davidemms/OrthoFinder',
