@@ -43,11 +43,12 @@ if sys.platform.startswith("linux"):
 if getattr(sys, 'frozen', False):
     __location__ = os.path.split(sys.executable)[0]
 else:
-    __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__))) + "/../"
+    __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-# Fix LD_LIBRARY_PATH when using pyinstaller 
+# use orthofinder supplied executables by preference
 my_env = os.environ.copy()
 my_env['PATH'] = os.path.join(__location__, 'bin:') + my_env['PATH']
+# Fix LD_LIBRARY_PATH when using pyinstaller 
 if getattr(sys, 'frozen', False):
     if 'LD_LIBRARY_PATH_ORIG' in my_env:
         my_env['LD_LIBRARY_PATH'] = my_env['LD_LIBRARY_PATH_ORIG']  

@@ -13,11 +13,11 @@ from setuptools import setup, find_packages
 from codecs import open
 import sys
 from os import path
-from orthofinder.scripts.util import version
+from scripts_of.util import version
 
 
 setup(
-    name='OrthoFinder',
+    name='orthofinder',
     version=version,
 
     description='phylogenetic orthology inference for comparative genomics',
@@ -74,7 +74,7 @@ setup(
     # installed, specify them here.  If using Python 2.6 or less, then these
     # have to be included in MANIFEST.in as well.
      package_data={
-          'orthofinder': ['config.json'],
+          '': ['config.json'],
         #   'ExampleDataset': ['ExampleDataset/Mycoplasma_hyopneumoniae.faa', 'ExampleDataset/Mycoplasma_agalactiae.faa', 'ExampleDataset/Mycoplasma_gallisepticum.faa', 'ExampleDataset/Mycoplasma_genitalium.faa']
      },
 
@@ -89,7 +89,7 @@ setup(
     # pip to create the appropriate form of executable for the target platform.
     entry_points={
         'console_scripts': [
-            'orthofinder=orthofinder.__main__:main',
+            'orthofinder=scripts_of.__main__:main',
             'primary_transcript=tools.primary_transcript:main',
             'make_ultrametric=tools.make_ultrametric:main',
             'convert_orthofinder_tree_ids=tools.convert_orthofinder_tree_ids:main'

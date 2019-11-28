@@ -27,7 +27,7 @@
 
 # first import parallel task manager to minimise RAM overhead for small processes
 from __future__ import absolute_import
-from orthofinder.scripts import parallel_task_manager
+from . import parallel_task_manager
 
 import sys                                      # Y
 import subprocess                               # Y
@@ -58,12 +58,7 @@ import warnings                                 # Y
 PY2 = sys.version_info <= (3,)
 csv_write_mode = 'wb' if PY2 else 'wt'
 
-from orthofinder.scripts import mcl 
-from orthofinder.scripts import blast_file_processor
-from orthofinder.scripts import util, matrices, orthologues, trees_msa
-from orthofinder.scripts import program_caller
-from orthofinder.scripts import files
-from orthofinder.scripts import parallel_task_manager
+from . import blast_file_processor, files, mcl, util, matrices, orthologues, program_caller, trees_msa 
 
 # Get directory containing script/bundle
 if getattr(sys, 'frozen', False):
@@ -85,9 +80,10 @@ if sys.platform.startswith("linux"):
     with open(os.devnull, "w") as f:
         subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f) # get round problem with python multiprocessing library that can set all cpu affinities to a single cpu
 
-# Fix LD_LIBRARY_PATH when using pyinstaller 
 my_env = os.environ.copy()
+# use orthofinder supplied executables by preference
 my_env['PATH'] = os.path.join(__location__, 'bin:') + my_env['PATH']
+# Fix LD_LIBRARY_PATH when using pyinstaller 
 if getattr(sys, 'frozen', False):
     if 'LD_LIBRARY_PATH_ORIG' in my_env:
         my_env['LD_LIBRARY_PATH'] = my_env['LD_LIBRARY_PATH_ORIG']  
