@@ -138,6 +138,7 @@ class OrthoGroupsSet(object):
         if self._Spec_SeqIDs != None:
             return self._Spec_SeqIDs
         seqs = self.SequenceDict()
+        seqs = {k:v for k,v in seqs.items() if int(k.split("_")[0]) in self.speciesToUse}
         if not self.qAddSpeciesToIDs:
             self._Spec_SeqIDs = seqs
             return seqs
