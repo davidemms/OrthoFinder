@@ -1,6 +1,6 @@
 # OrthoFinder — Accurate inference of orthologs, orthogroups, the rooted species, gene trees and gene duplication events made easy!
 
-![OrthoFinder workflow](assets/workflow.png)
+![OrthoFinder workflow](assets/Workflow.png)
 *Figure 1: Automatic OrthoFinder analysis*
 
 ## What does OrthoFinder do?
