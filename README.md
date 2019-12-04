@@ -1,4 +1,12 @@
-<span style="color:red">Check out the new OrthoFinder tutorials: https://davidemms.github.io/</span>
+# Check out the new OrthoFinder tutorials: https://davidemms.github.io/
+
+ 1. Downloading and checking OrthoFinder
+
+2. Running an example OrthoFinder analysis
+
+3. Diving into the results
+
+4. Getting the most from your OrthoFinder analysis
 
 ---
 
