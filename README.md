@@ -1,6 +1,10 @@
+<span style="color:red">Check out the new OrthoFinder tutorials: https://davidemms.github.io/</span>
+
+---
+
 # OrthoFinder: phylogenetic orthology inference for comparative genomics
 
-![OrthoFinder workflow](assets/workflow.png?)
+![OrthoFinder workflow](assets/workflow.png)
 *Figure 1: Automatic OrthoFinder analysis*
 
 ## What does OrthoFinder do?
