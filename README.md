@@ -1,4 +1,8 @@
-# OrthoFinder — Accurate inference of orthologs, orthogroups, the rooted species, gene trees and gene duplication events made easy!
+<span style="color:red">Check out the new OrthoFinder tutorials: https://davidemms.github.io/</span>
+
+---
+
+# OrthoFinder: phylogenetic orthology inference for comparative genomics
 
 ![OrthoFinder workflow](assets/Workflow.png)
 *Figure 1: Automatic OrthoFinder analysis*
@@ -8,9 +12,9 @@ OrthoFinder is a fast, accurate and comprehensive platform for comparative genom
 
 For more details see the OrthoFinder papers below.
 
-[Emms, D.M. and Kelly, S. **(2015)** _OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy._ **Genome Biology** 16:157](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2)
+[Emms, D.M. and Kelly, S. **(2019)** _OrthoFinder: phylogenetic orthology inference for comparative genomics._ **Genome Biology** 20:238](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1832-y)
 
-[Emms, D.M. and Kelly, S. **(2018)** _OrthoFinder2: fast and accurate phylogenomic orthology analysis from gene sequences._  **bioRxiv**](https://www.biorxiv.org/content/early/2018/11/08/466201)
+[Emms, D.M. and Kelly, S. **(2015)** _OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy._ **Genome Biology** 16:157](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2)
 
 ### Installing OrthoFinder
 1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases (for this example we will assume it is OrthoFinder-2.2.7.tar.gz, change this as appropriate.)
