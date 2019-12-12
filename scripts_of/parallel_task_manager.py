@@ -61,6 +61,10 @@ if getattr(sys, 'frozen', False):
 
 def stderr_exempt(stderr):
     ok_line_starts = {"diamond v", "Licensed under the GNU GPL", "Check http://github.com/"}
+    try:
+        stderr = stderr.decode()
+    except (UnicodeDecodeError, AttributeError):
+        stderr = stderr.encode()
     lines = stderr.split("\n")
     for line in lines:
         if line.rstrip() == "": continue
