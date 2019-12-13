@@ -642,7 +642,7 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
         chain = [wd_base_anchor]
         while os.path.exists(chain[-1] + "previous_wd.txt"):
             with open(chain[-1] + "previous_wd.txt", 'r') as infile:
-                chain.append(infile.next().rstrip())
+                chain.append(infile.readline().rstrip())
         return chain
                 
             
