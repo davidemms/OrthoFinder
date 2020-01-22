@@ -165,14 +165,11 @@ class IDExtractor(object):
     ways."""
     def GetIDToNameDict(self):
         raise NotImplementedError("Should not be implemented")
-    def GetNameToIDDict(self):
-        raise NotImplementedError("Should not be implemented")
 
 class FullAccession(IDExtractor):
     def __init__(self, idsFilename):
         # only want the first part and nothing else (easy!)
         self.idToNameDict = dict()
-        self.nameToIDDict = dict()
         with open(idsFilename, 'r') as idsFile:
             for line in idsFile:
                 line = line.rstrip()
@@ -184,38 +181,35 @@ class FullAccession(IDExtractor):
                 accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_") #.replace(".", "_")
                 if id in self.idToNameDict:
                     raise RuntimeError("ERROR: A duplicate id was found in the fasta files: % s" % id)
-                self.idToNameDict[id] = accession                
-                self.nameToIDDict[accession] = id 
+                self.idToNameDict[id] = accession 
                 
     def GetIDToNameDict(self):
         return self.idToNameDict
-        
-    def GetNameToIDDict(self):
-        return self.nameToIDDict
                 
 class FirstWordExtractor(IDExtractor):
     def __init__(self, idsFilename):
         # only want the first part and nothing else (easy!)
         self.idToNameDict = dict()
-        self.nameToIDDict = dict()
+        accs_in_species = []
         with open(idsFilename, 'r') as idsFile:
             for line in idsFile:
                 id, rest = line.split(": ", 1)
                 accession = rest.split(None, 1)[0]
+                iSp = int(id.split("_")[0])
+                while len(accs_in_species) < iSp + 1:
+                    accs_in_species.append(set())
                 # Replace problematic characters
                 accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_") #.replace(".", "_")
-                if accession in self.nameToIDDict:
+                # Only ensure the accessions are unique within the species, there's no need to ensure global uniqueness
+                if accession in accs_in_species[iSp]:
                     raise RuntimeError("A duplicate accession was found using just first part: % s" % accession)
+                accs_in_species[iSp].add(accession)
                 if id in self.idToNameDict:
                     raise RuntimeError("ERROR: A duplicate id was found in the fasta files: % s" % id)
-                self.idToNameDict[id] = accession                
-                self.nameToIDDict[accession] = id   
+                self.idToNameDict[id] = accession     
                 
     def GetIDToNameDict(self):
         return self.idToNameDict
-        
-    def GetNameToIDDict(self):
-        return self.nameToIDDict    
 
 def HaveSupportValues(speciesTreeFN_ids):
     qHaveSupport = False
