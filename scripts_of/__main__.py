@@ -97,6 +97,14 @@ if getattr(sys, 'frozen', False):
 def RunBlastDBCommand(command):
     capture = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
     stdout, stderr = capture.communicate()
+    try:
+       stderr = stderr.decode()
+    except (UnicodeDecodeError, AttributeError):
+       stderr = stderr.encode()
+    try:
+       stdout = stdout.decode()
+    except (UnicodeDecodeError, AttributeError):
+       stdout = stdout.encode()
     n_stdout_lines = stdout.count("\n")
     n_stderr_lines = stderr.count("\n")
     nLines_success= 10
