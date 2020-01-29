@@ -97,9 +97,15 @@ if getattr(sys, 'frozen', False):
 def RunBlastDBCommand(command):
     capture = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
     stdout, stderr = capture.communicate()
+    try:
+        stdout = stdout.decode()
+        stderr = stderr.decode()
+    except (UnicodeDecodeError, AttributeError):
+        stdout = stdout.encode()
+        stderr = stderr.encode()
     n_stdout_lines = stdout.count("\n")
     n_stderr_lines = stderr.count("\n")
-    nLines_success= 10
+    nLines_success= 12
     if n_stdout_lines > nLines_success or n_stderr_lines > 0 or capture.returncode != 0:
         print("\nWARNING: Likely problem with input FASTA files")
         if capture.returncode != 0:
