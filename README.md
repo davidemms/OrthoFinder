@@ -42,6 +42,19 @@ You can find the **OrthoFinder tutorial here**: <https://davidemms.github.io>
 
 OrthoFinder is written in python, but the version you are downloading here is a package that doesn't require python to be installed on your computer. It also contains the programs it needs in order to run (in OrthoFinder/bin), it will use these versions in preference to any of the same programs in your system path. You can delete the individual executables if you would prefer it not to do ths. 
 
+#### Alternative ways of installing OrthoFinder
+
+OrthoFinder is also available:
+
+via bioconda: `conda install orthofinder`
+
+and Docker, [davidemms/orthofinder](https://hub.docker.com/repository/docker/davidemms/orthofinder): 
+
+```
+docker run -it --rm davidemms/orthofinder orthofinder -h
+docker run --ulimit nofile=1000000:1000000 -it --rm -v /full/path/to/fastas:/input:Z davidemms/orthofinder orthofinder -f /input
+```
+
 ## Running OrthoFinder
 To Run OrthoFinder on the Example Data type
 
