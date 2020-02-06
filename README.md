@@ -24,23 +24,28 @@ For more details see the OrthoFinder papers below.
 
 [Emms, D.M. and Kelly, S. **(2015)** _OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy._ **Genome Biology** 16:157](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2)
 
+## Getting started with OrthoFinder
+Below are the basic steps for downloading and running OrthoFinder. There is also a step-by-step tutorial, which guides you through running your first analysis and exploring the results. 
+
+You can find the **OrthoFinder tutorial here**: <https://davidemms.github.io>
+
 ### Installing OrthoFinder
-1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases (for this example we will assume it is OrthoFinder-2.2.7.tar.gz, change this as appropriate.)
+1. Download the latest OrthoFinder.tar.gz release from github: https://github.com/davidemms/OrthoFinder/releases (or use wget from the command line: `wget https://github.com/davidemms/OrthoFinder/releases/latest/download/OrthoFinder.tar.gz`)
 
 2. In a terminal, 'cd' to where you downloaded the package 
 
-3. Extract the files: `tar xzf OrthoFinder-2.2.7.tar.gz`
+3. Extract the files: `tar xzf OrthoFinder.tar.gz`
 
-4. Install dependencies: MCL, FastME and DIAMOND (see below)
+4. Test you can run OrthoFinder: `./OrthoFinder/orthofinder -h`. OrthoFinder should print its 'help' text. 
 
-5. Test you can run OrthoFinder: `OrthoFinder-2.2.7/orthofinder -h`. OrthoFinder should print its 'help' text. 
+5. If you want to move the orthofinder executable to another location then you must also place the accompanying config.json file and bin/ directory in the same directory as the orthofinder executable.
 
-6. If you want to move the orthofinder executable to another location then you must also place the accompanying config.json file in the same directory.
+OrthoFinder is written in python, but the version you are downloading here is a package that doesn't require python to be installed on your computer. It also contains the programs it needs in order to run (in OrthoFinder/bin), it will use these versions in preference to any of the same programs in your system path. You can delete the individual executables if you would prefer it not to do ths. 
 
 ## Running OrthoFinder
 To Run OrthoFinder on the Example Data type
 
-`OrthoFinder-2.2.7/orthofinder -f ExampleDataset -S diamond`
+`OrthoFinder/orthofinder -f OrthoFinder/ExampleDataset`
 
 ## What OrthoFinder provides
 A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplication events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
