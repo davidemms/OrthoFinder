@@ -8,8 +8,9 @@ import argparse
 
 if __name__ == "__main__" and __package__ is None:   
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    print(sys.path[-1])
 
-from orthofinder.scripts import tree, util
+from scripts_of import tree, util
         
 def ReplaceFileWithNewIDs(idsMap, treeFilename, newTreeFilename):     
     qHaveSupport = False
@@ -50,7 +51,7 @@ def GetSpeciesSequenceIDsDict(sequenceIDsFilename, speciesIDsFN = None):
         idsDict = {seqID:speciesDict[seqID.split("_")[0]] + "_" + name for seqID, name in idsDict.items()}
     return idsDict
 
-def main():
+def main_convert():
     with util.Finalise():
         parser = argparse.ArgumentParser(description="Takes a tree with OrthoFinder IDs and outputs a tree with gene accessions")
         parser.add_argument("TreeInput", help="Tree filename or directory")
@@ -76,4 +77,4 @@ def main():
             print("")
 
 if __name__ == "__main__":
-    main()
+    main_convert()
