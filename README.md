@@ -24,25 +24,45 @@ For more details see the OrthoFinder papers below.
 
 [Emms, D.M. and Kelly, S. **(2015)** _OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy._ **Genome Biology** 16:157](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2)
 
+## Getting started with OrthoFinder
+Below are the basic steps for downloading and running OrthoFinder. There is also a step-by-step tutorial, which guides you through running your first analysis and exploring the results. 
+
+You can find the **OrthoFinder tutorial here**: <https://davidemms.github.io>
+
 ### Installing OrthoFinder
-1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases (for this example we will assume it is OrthoFinder-2.2.7.tar.gz, change this as appropriate.)
+1. Download the latest OrthoFinder.tar.gz release from github: https://github.com/davidemms/OrthoFinder/releases (or use wget from the command line: `wget https://github.com/davidemms/OrthoFinder/releases/latest/download/OrthoFinder.tar.gz`)
 
 2. In a terminal, 'cd' to where you downloaded the package 
 
-3. Extract the files: `tar xzf OrthoFinder-2.2.7.tar.gz`
+3. Extract the files: `tar xzf OrthoFinder.tar.gz`
 
-4. Install dependencies: MCL, FastME and DIAMOND (see below)
+4. Test you can run OrthoFinder: `./OrthoFinder/orthofinder -h`. OrthoFinder should print its 'help' text. 
 
-5. Test you can run OrthoFinder: `OrthoFinder-2.2.7/orthofinder -h`. OrthoFinder should print its 'help' text. 
+5. If you want to move the orthofinder executable to another location then you must also place the accompanying config.json file and bin/ directory in the same directory as the orthofinder executable.
 
-6. If you want to move the orthofinder executable to another location then you must also place the accompanying config.json file in the same directory.
+OrthoFinder is written in python, but the version you are downloading here is a package that doesn't require python to be installed on your computer. It also contains the programs it needs in order to run (in OrthoFinder/bin), it will use these versions in preference to any of the same programs in your system path. You can delete the individual executables if you would prefer it not to do this. 
+
+#### Alternative ways of installing OrthoFinder
+
+OrthoFinder is also available:
+
+via bioconda: `conda install orthofinder`
+
+and Docker, [davidemms/orthofinder](https://hub.docker.com/repository/docker/davidemms/orthofinder): 
+
+```
+docker run -it --rm davidemms/orthofinder orthofinder -h
+docker run --ulimit nofile=1000000:1000000 -it --rm -v /full/path/to/fastas:/input:Z davidemms/orthofinder orthofinder -f /input
+```
 
 ## Running OrthoFinder
 To Run OrthoFinder on the Example Data type
 
-`OrthoFinder-2.2.7/orthofinder -f ExampleDataset -S diamond`
+`OrthoFinder/orthofinder -f OrthoFinder/ExampleDataset`
 
 ## What OrthoFinder provides
+**There is a tutorial that provides a guided tour of the main results files here: <https://davidemms.github.io/orthofinder_tutorials/exploring-orthofinders-results.html>**
+
 A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplication events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
 
 ### Results Files: Orthogroups Directory
@@ -143,7 +163,11 @@ It is important to note that with orthogroups you choose where to define the lim
 Orthology is defined by phylogeny. It is not definable by amino acid content, codon bias, GC content or other measures of sequence similarity. Methods that use such scores to define orthologs in the absence of phylogeny can only provide guesses. The only way to be sure that the orthology assignment is correct is by conducting a phylogenetic reconstruction of all genes descended from a single gene the last common ancestor of the species under consideration. This set of genes is an orthogroup. Thus, the only way to define orthology is by analysing orthogroups.   
 
 ### Installing Dependencies
-To perform an analysis OrthoFinder requires some dependencies to be installed and in the system path (only the first two are needed to infer orthogroups and all four are needed to infer orthologues and gene trees as well):
+To perform an analysis OrthoFinder requires some dependencies. The OrthoFinder release package now contains these so you should just be able to download it and run. 
+
+Here are some brief instructions if you do need to download them manually. They will need to be in the system path, which you can check by using the 'which' command, e.g. `which diamond`. Each of these packages also contains more detailed installation instructions on their websites if you need them.
+
+**Standard workflow:**
 
 1. DIAMOND **or** MMseqs2 (recommended, although BLAST+ can be used instead) 
 
@@ -151,7 +175,13 @@ To perform an analysis OrthoFinder requires some dependencies to be installed an
 
 3. FastME (The appropriate version for your system, e.g. 'fastme-2.1.5-linux64', should be renamed `fastme', see instructions below.) 
 
-Brief instructions are given below although users can refer to the installation notes provided with these packages for more detailed instructions. 
+**MSA workflow:**
+
+4. Multiple sequence alignment program: MAFFT recommended
+
+5. Tree inference program: FastTree* recommended
+
+* FastTree is highly recommended, especially for a first analysis. Note that even a program as fast as IQTREE will take a very large amount of time to run on a reasonable sized dataset. If you intend to do this, it is recommended to try a faster method first (e.g. the standard workflow). Once you've confirmed everything is ok, you can restart the previous analysis from the point where these workflows diverge using the `-M msa` option.
 
 #### DIAMOND
 Available here: https://github.com/bbuchfink/diamond/releases
@@ -179,7 +209,7 @@ FastME can be obtained from http://www.atgc-montpellier.fr/fastme/binaries.php. 
 - `sudo cp fastme-2.1.5-linux64 /usr/local/bin/fastme`
 
 #### Optional: BLAST+ 
-NCBI BLAST+ is available in the repositories from most Linux distributions and so can be installed in the same way as any other package. For example, on Ubuntu, Debian, Linux Mint:
+BLAST may give 1-2% accuracy increase over DIAMOND, but with a runtime of approximately 20x longer. NCBI BLAST+ is available in the repositories from most Linux distributions and so can be installed in the same way as any other package. For example, on Ubuntu, Debian, Linux Mint:
 - `sudo apt-get install ncbi-blast+`
 
 Alternatively, instructions are provided for installing BLAST+ on Mac and various flavours of Linux on the "Standalone BLAST Setup for Unix" page of the BLAST+ Help manual currently at http://www.ncbi.nlm.nih.gov/books/NBK1762/. Follow the instructions under "Configuration" in the BLAST+ help manual to add BLAST+ to the PATH environment variable.
