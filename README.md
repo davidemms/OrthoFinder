@@ -61,6 +61,8 @@ To Run OrthoFinder on the Example Data type
 `OrthoFinder/orthofinder -f OrthoFinder/ExampleDataset`
 
 ## What OrthoFinder provides
+**There is a tutorial that provides a guided tour of the main results files here: <https://davidemms.github.io/orthofinder_tutorials/exploring-orthofinders-results.html>**
+
 A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplication events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
 
 ### Results Files: Orthogroups Directory
