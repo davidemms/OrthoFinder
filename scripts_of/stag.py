@@ -221,7 +221,7 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=Tr
         WritePhylipMatrix(D, species_names_fastme, matrixFN, max_og=1e6)
         command = "fastme -i %s -o %s -w O -s -n" % (matrixFN, treeOutFN)
         if qForOF:
-            parallel_task_manager.RunCommand(command, True, True, True)
+            parallel_task_manager.RunCommand(command, qPrintOnError=True, qPrintStderr=True)
         else:
             popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             popen.communicate()
@@ -239,7 +239,7 @@ def Astral(tree_dir, astral_jar_file, qForOF=False):
     speciesTreeFN = tree_dir + "../SpeciesTree_ids.txt"
     command = " ".join(["java", "-Xmx6000M", "-jar", astral_jar_file, "-i", treesFN, "-o", speciesTreeFN])
     if qForOF:
-        parallel_task_manager.RunCommand(command, True, True, True)
+        parallel_task_manager.RunCommand(command, qPrintOnError=True, qPrintStderr=True)
     else:
         subprocess.call(command, shell=True)
     return tree.Tree(speciesTreeFN)     

@@ -95,7 +95,7 @@ if getattr(sys, 'frozen', False):
         my_env['DYLD_LIBRARY_PATH'] = ''      
          
 def RunBlastDBCommand(command):
-    capture = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
+    capture = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env, shell=True)
     stdout, stderr = capture.communicate()
     try:
         stdout = stdout.decode()
@@ -213,8 +213,8 @@ class MCL:
             
     @staticmethod               
     def RunMCL(graphFilename, clustersFilename, nProcesses, inflation):
-        command = ["mcl", graphFilename, "-I", str(inflation), "-o", clustersFilename, "-te", str(nProcesses), "-V", "all"]
-        parallel_task_manager.RunCommand(command, qShell=False, qPrintOnError=True)
+        command = " ".join(["mcl", graphFilename, "-I", str(inflation), "-o", clustersFilename, "-te", str(nProcesses), "-V", "all"])
+        parallel_task_manager.RunCommand(command, qPrintOnError=True)
         util.PrintTime("Ran MCL")  
     
     @staticmethod
@@ -1441,7 +1441,7 @@ def CreateSearchDatabases(seqsInfoObj, options, prog_caller):
     nDB = max(seqsInfoObj.speciesToUse) + 1
     for iSp in range(nDB):
         if options.search_program == "blast":
-            command = ["makeblastdb", "-dbtype", "prot", "-in", files.FileHandler.GetSpeciesFastaFN(iSp), "-out", files.FileHandler.GetSpeciesDatabaseN(iSp)]
+            command = " ".join(["makeblastdb", "-dbtype", "prot", "-in", files.FileHandler.GetSpeciesFastaFN(iSp), "-out", files.FileHandler.GetSpeciesDatabaseN(iSp)])
             util.PrintTime("Creating Blast database %d of %d" % (iSp + 1, nDB))
             RunBlastDBCommand(command) 
         else:
@@ -1468,7 +1468,7 @@ def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller):
     cmd_queue = mp.Queue()
     for iCmd, cmd in enumerate(commands):
         cmd_queue.put((iCmd+1, cmd))           
-    runningProcesses = [mp.Process(target=parallel_task_manager.Worker_RunCommand, args=(cmd_queue, options.nBlast, len(commands), True, True)) for i_ in range(options.nBlast)]
+    runningProcesses = [mp.Process(target=parallel_task_manager.Worker_RunCommand, args=(cmd_queue, options.nBlast, len(commands), True)) for i_ in range(options.nBlast)]
     for proc in runningProcesses:
         proc.start()#
     for proc in runningProcesses:

@@ -107,10 +107,10 @@ def ManageQueue(runningProcesses, cmd_queue):
     if qError:
         Fail()
 
-def RunCommand(command, qShell=True, qPrintOnError=False, qPrintStderr=True):
+def RunCommand(command, qPrintOnError=False, qPrintStderr=True):
     """ Run a single command """
     if qPrintOnError:
-        popen = subprocess.Popen(command, env=my_env, shell=qShell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        popen = subprocess.Popen(command, env=my_env, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = popen.communicate()
         if popen.returncode != 0:
             print(("\nERROR: external program called by OrthoFinder returned an error code: %d" % popen.returncode))
@@ -124,15 +124,15 @@ def RunCommand(command, qShell=True, qPrintOnError=False, qPrintStderr=True):
             print(("stderr\n------\n%s" % stderr))
         return popen.returncode
     else:
-        popen = subprocess.Popen(command, env=my_env, shell=qShell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        popen = subprocess.Popen(command, env=my_env, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         popen.communicate()
         return popen.returncode
 
-def RunOrderedCommandList(commandList, qShell=True):
+def RunOrderedCommandList(commandList):
     """ Run a list of commands """
     FNULL = open(os.devnull, 'w')
     for cmd in commandList:
-        popen = subprocess.Popen(cmd, shell=qShell, stdout=subprocess.PIPE, stderr=FNULL, close_fds=True, env=my_env)
+        popen = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=FNULL, close_fds=True, env=my_env)
         popen.communicate()
     
 def CanRunCommand(command, qAllowStderr = False, qPrint = True):
@@ -151,7 +151,7 @@ def CanRunCommand(command, qAllowStderr = False, qPrint = True):
         for l in stderr: print(l)
         return False
         
-def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qShell=True, qPrintOnError=False, qPrintStderr=True):
+def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qPrintOnError=False, qPrintStderr=True):
     """ Run commands from queue until the queue is empty """
     while True:
         try:
@@ -159,7 +159,7 @@ def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qShell=True, qPrintOnError=F
             nDone = i - nProcesses + 1
             if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
                 PrintTime("Done %d of %d" % (nDone, nToDo))
-            RunCommand(command, qShell, qPrintOnError, qPrintStderr)
+            RunCommand(command, qPrintOnError=qPrintOnError, qPrintStderr=qPrintStderr)
         except queue.Empty:
             return   
             
@@ -198,7 +198,7 @@ def Worker_RunCommands_And_Move(cmd_and_filename_queue, nProcesses, nToDo, qList
         except queue.Empty:
             return               
                             
-def Worker_RunOrderedCommandList(cmd_queue, nProcesses, nToDo, qShell=True):
+def Worker_RunOrderedCommandList(cmd_queue, nProcesses, nToDo):
     """ repeatedly takes items to process from the queue until it is empty at which point it returns. Does not take a new task
         if it can't acquire queueLock as this indicates the queue is being rearranged.
         
@@ -210,7 +210,7 @@ def Worker_RunOrderedCommandList(cmd_queue, nProcesses, nToDo, qShell=True):
             nDone = i - nProcesses + 1
             if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
                 PrintTime("Done %d of %d" % (nDone, nToDo))
-            RunOrderedCommandList(commandSet, qShell)
+            RunOrderedCommandList(commandSet)
         except queue.Empty:
             return   
         
@@ -220,7 +220,7 @@ def RunParallelOrderedCommandLists(nProcesses, commands):
     the i-1_th has finished).
     """
     ptm = ParallelTaskManager_singleton()
-    ptm.RunParallel(commands, True, nProcesses, qShell=True)     
+    ptm.RunParallel(commands, True, nProcesses)     
        
 def Worker_RunMethod(Function, args_queue):
     while True:
@@ -237,7 +237,7 @@ def RunMethodParallel(Function, args_queue, nProcesses):
     ManageQueue(runningProcesses, args_queue)
 
 """ TEMP """        
-def RunParallelCommands(nProcesses, commands, qShell):
+def RunParallelCommands(nProcesses, commands):
     """nProcesss - the number of processes to run in parallel
     commands - list of commands to be run in parallel
     """
@@ -245,7 +245,7 @@ def RunParallelCommands(nProcesses, commands, qShell):
     cmd_queue = mp.Queue()
     for i, cmd in enumerate(commands):
         cmd_queue.put((i, cmd))
-    runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, nProcesses, i+1, qShell)) for i_ in range(nProcesses)]
+    runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, nProcesses, i+1)) for i_ in range(nProcesses)]
     for proc in runningProcesses:
         proc.start()
     
@@ -274,11 +274,11 @@ def _I_Spawn_Processes(message_to_spawner, message_to_PTM, cmds_queue):
             if message == None: 
                 return
             # In which case, thread has been informed that there are tasks in the queue.
-            nParallel, nTasks, qShell, qListOfLists = message
+            nParallel, nTasks, qListOfLists = message
             if qListOfLists:
-                runningProcesses = [mp.Process(target=Worker_RunOrderedCommandList, args = (cmds_queue, nParallel, nTasks, qShell)) for i_ in range(nParallel)]           
+                runningProcesses = [mp.Process(target=Worker_RunOrderedCommandList, args = (cmds_queue, nParallel, nTasks)) for i_ in range(nParallel)]           
             else:
-                runningProcesses = [mp.Process(target=Worker_RunCommand, args = (cmds_queue, nParallel, nTasks, qShell)) for i_ in range(nParallel)] 
+                runningProcesses = [mp.Process(target=Worker_RunCommand, args = (cmds_queue, nParallel, nTasks)) for i_ in range(nParallel)] 
             for proc in runningProcesses:
                 proc.start()
             for proc in runningProcesses:
@@ -316,10 +316,10 @@ class ParallelTaskManager_singleton:
         if not ParallelTaskManager_singleton.instance:
             ParallelTaskManager_singleton.instance = ParallelTaskManager_singleton.__Singleton()
         
-    def RunParallel(self, cmd_list, qListOfLists, nParallel, qShell):
+    def RunParallel(self, cmd_list, qListOfLists, nParallel):
         """
         Args:
-            cmd_list - list of commands or list of lists of commands (in which elelments in inner list must be run in order)
+            cmd_list - list of commands or list of lists of commands (in which elements in inner list must be run in order)
             qListOfLists - is cmd_lists a list of lists
             nParallel - number of parallel threads to use
             qShell - should the tasks be run in a shell
@@ -327,7 +327,7 @@ class ParallelTaskManager_singleton:
         nTasks = len(cmd_list)
         for i, x in enumerate(cmd_list):
             self.instance.cmds_queue.put((i, x))
-        self.instance.message_to_spawner.put((nParallel, nTasks, qShell, qListOfLists))
+        self.instance.message_to_spawner.put((nParallel, nTasks, qListOfLists))
         while True:
             try:
                 signal = self.instance.message_to_PTM.get()
