@@ -25,11 +25,9 @@ For more details see the OrthoFinder papers below.
 [Emms, D.M. and Kelly, S. **(2015)** _OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy._ **Genome Biology** 16:157](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2)
 
 ## Getting started with OrthoFinder
-Below are the basic steps for downloading and running OrthoFinder. There is also a step-by-step tutorial, which guides you through running your first analysis and exploring the results. 
+You can find a step-by-step tutorial here: [Downloading and checking OrthoFinder](https://davidemms.github.io/orthofinder_tutorials/downloading-and-checking-orthofinder.html) including **instructions for Mac**, for which Bioconda is very easy option and is therefore recommended. There are also tutorials on that site which guide you through running your first analysis and exploring the results files. 
 
-You can find the **OrthoFinder tutorial here**: <https://davidemms.github.io>
-
-### Installing OrthoFinder
+### Installing OrthoFinder on Linux
 1. Download the latest OrthoFinder.tar.gz release from github: https://github.com/davidemms/OrthoFinder/releases (or use wget from the command line: `wget https://github.com/davidemms/OrthoFinder/releases/latest/download/OrthoFinder.tar.gz`)
 
 2. In a terminal, 'cd' to where you downloaded the package 
