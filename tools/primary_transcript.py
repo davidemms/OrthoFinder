@@ -12,7 +12,7 @@ def ScanTags(fn):
     """
     tags = set()
     tokens = []
-    with open(fn, 'rb') as infile:
+    with open(fn, 'r') as infile:
         for line in infile:
             if not line.startswith(">"): continue
             tokens.append([t.split(":", 1) for t in line.rstrip().split() if ":" in t])
@@ -26,7 +26,7 @@ def ScanTags(fn):
 
 def ScanTags_NCBI(fn):
     genes = []
-    with open(fn, 'rb') as infile:
+    with open(fn, 'r') as infile:
         for line in infile:
             if not line.startswith(">"): continue
             genes.append(line[1:].split(".", 1)[0])
@@ -34,7 +34,7 @@ def ScanTags_NCBI(fn):
 
 def ScanTags_with_fn(fn, gene_name_fn):
     genes = []
-    with open(fn, 'rb') as infile:
+    with open(fn, 'r') as infile:
         for line in infile:
             if not line.startswith(">"): continue
             genes.append(gene_name_fn(line))
@@ -50,7 +50,7 @@ def GetGeneName(acc_line):
 def CreatePrimaryTranscriptsFile(fn, dout, gene_name_fn=GetGeneName):
     # Get genes and lengths
     max_gene_lens = defaultdict(int)
-    with open(fn, 'rb') as infile:
+    with open(fn, 'r') as infile:
         lines = [l.rstrip() for l in infile]
     N = len(lines) - 1
     nAcc = 0
@@ -88,7 +88,7 @@ def CreatePrimaryTranscriptsFile(fn, dout, gene_name_fn=GetGeneName):
     # Parse file second time and only write out sequences that are longest variant
     nGenesWriten = 0
     outfn = dout + os.path.basename(fn)
-    with open(outfn, 'wb') as outfile:
+    with open(outfn, 'w') as outfile:
         iLine = -1
         while iLine < N:
             iLine += 1
