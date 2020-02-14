@@ -231,23 +231,21 @@ def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, 
         for iSp in allSpecies.difference(speciesInThisOg):
             concatentaedAlignments[iSp] += "-"*(alignment.length)
     # Trim the completed alignment: to 50% of fraction of species present
-    species_ordered = list(concatentaedAlignments.keys())
-    trimmedAlignment = {iSp:"" for iSp in species_ordered}
     maxGap = (1.-fMaxGap*fSingleCopy)*len(allSpecies)
-    for iCol in range(len(list(concatentaedAlignments.values())[0])):
-        col = [concatentaedAlignments[iSp][iCol] for iSp in species_ordered]
-        if col.count("-") <= maxGap:
-            for c, iSp in zip(col, species_ordered):
-                trimmedAlignment[iSp] += c
-    # Write to file
-#    print("Original length %d" % len(concatentaedAlignments.values()[0]))
-#    print("Trimmed length %d" % len(trimmedAlignment.values()[0]))
+    # vectorise this as the for-loop method took too long (45mins on 3M length alignment vs 1.5s)
+    # The write method doesn't require further optimisation. Took 0.15s on the same alignment
+    names = list(concatentaedAlignments.keys())
+    M = np.array([list(concatentaedAlignments[name]) for name in names])
+    gap_counts = sum(M == "-")
+    i_keep = np.where(gap_counts <= maxGap)
+    M = M[:, i_keep]
     nChar = 80
     with open(output_filename, 'w') as outfile:
-        for name, seq in trimmedAlignment.items():
+        for iSeq, name in enumerate(names):
             outfile.write(">%s\n" % name)
+            seq = M[iSeq,:].tolist()[0]
             for i in range(0, len(seq), nChar):
-                outfile.write(seq[i:i+nChar] + "\n")
+                outfile.write("".join(seq[i:i+nChar]) + "\n")
             
     
 """ 
