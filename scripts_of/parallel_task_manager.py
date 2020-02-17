@@ -283,7 +283,10 @@ def _I_Spawn_Processes(message_to_spawner, message_to_PTM, cmds_queue):
                 proc.start()
             for proc in runningProcesses:
                 while proc.is_alive():
-                    proc.join() 
+                    try:
+                        proc.join() 
+                    except RuntimeError:
+                        pass
             message_to_PTM.put("Done")
             time.sleep(1)
         except queue.Empty:
