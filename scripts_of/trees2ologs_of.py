@@ -331,9 +331,26 @@ def CheckAndRootTree(treeFN, species_tree_rooted, GeneToSpecies):
         tree.set_outgroup(root)
     return tree, qHaveSupport
 
-    if not qNoRecon: tree = Resolve(tree, GeneToSpecies)
-    if qPrune: tree.prune(tree.get_leaf_names())
-    if len(tree) == 1: return set(orthologues), tree, set()
+def Orthologs_and_Suspect(ch, suspect_genes, misplaced_genes, SpeciesAndGene):
+    """
+    ch - the two child nodes that are orthologous
+    suspect_genes - genes already identified as misplaced at lower levels
+    misplaced_genes - genes identified as misplaced at this level
+
+    Returns the tuple (o_0, o_1, os_0, os_1) where each element is a dictionary from species to genes from that species,
+    the o are orthologs, the os are 'suspect' orthologs because the gene was previously identified as suspect
+    """
+    d = [defaultdict(list) for _ in range(2)]
+    d_sus = [defaultdict(list) for _ in range(2)] 
+    for node, di, d_susi in zip(ch, d, d_sus):
+        for g in [g for g in node.get_leaf_names() if g not in misplaced_genes]:
+            sp, seq = SpeciesAndGene(g)
+            if g in suspect_genes:
+                d_susi[sp].append(seq)
+            else:
+                di[sp].append(seq)
+    return d[0], d[1], d_sus[0], d_sus[1]
+
 
 def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False):
     """ if dupsWriter != None then seqIDs and spIDs must also be provided"""
@@ -374,50 +391,17 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
             else:
                 # sort out bad genes - no orthology for all the misplaced genes at this level (misplaced_genes). 
                 # For previous levels, (suspect_genes) have their orthologues written to suspect orthologues file
-                d0 = defaultdict(list)
-                d0_sus = defaultdict(list)
-                for g in [g for g in ch[0].get_leaf_names() if g not in misplaced_genes]:
-                    sp, seq = SpeciesAndGene(g)
-                    if g in suspect_genes:
-                        d0_sus[sp].append(seq)
-                    else:
-                        d0[sp].append(seq)
-#                if len(d0_sus) > 0: print(d0_sus)
-                d1 = defaultdict(list)
-                d1_sus = defaultdict(list)
-                for g in [g for g in ch[1].get_leaf_names() if g not in misplaced_genes]:
-                    sp, seq = SpeciesAndGene(g)
-                    if g in suspect_genes:
-                        d1_sus[sp].append(seq)
-                    else:
-                        d1[sp].append(seq)
-                orthologues.append((d0, d1, d0_sus, d1_sus))
+                orthologues.append(Orthologs_and_Suspect(ch, suspect_genes, misplaced_genes, SpeciesAndGene))
                 suspect_genes.update(misplaced_genes)
         elif len(ch) > 2:
             species = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in ch]
             for (n0, s0), (n1, s1) in itertools.combinations(zip(ch, species), 2):
                 if len(s0.intersection(s1)) == 0:
-                    d0 = defaultdict(list)
-                    d0_sus = defaultdict(list)
-                    for g in n0.get_leaf_names():
-                        sp, seq = SpeciesAndGene(g)
-                        if g in suspect_genes:
-                            d0_sus[sp].append(seq)
-                        else:
-                            d0[sp].append(seq)
-                    d1 = defaultdict(list)
-                    d1_sus = defaultdict(list)
-                    for g in n1.get_leaf_names():
-                        sp, seq = SpeciesAndGene(g)
-                        if g in suspect_genes:
-                            d1_sus[sp].append(seq)
-                        else:
-                            d1[sp].append(seq)
-                    orthologues.append((d0, d1, d0_sus, d1_sus))
+                    orthologues.append(Orthologs_and_Suspect((n0, n1), suspect_genes, empty_set, SpeciesAndGene))
     return orthologues, tree, suspect_genes
 
 def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, ortholog_file_writers, suspect_genes_file_writers, qContainsSuspectOlogs):
-    # Sort the orthologues according to speices pairs
+    # Sort the orthologues according to species pairs
     sp_to_index = {str(sp):i for i, sp in enumerate(iSpeciesToUse)}
     nOrtho = util.nOrtho_sp(len(iSpeciesToUse))   
 #    print(speciesDict)
