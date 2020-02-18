@@ -109,6 +109,8 @@ def StoreSpeciesSets(t, GeneMap, tag="sp_"):
                 node.add_feature(tag_up, parent.__getattribute__(tag_up).union(sp_downs))
     t.add_feature(tag_down, set.union(*[ch.__getattribute__(tag_down) for ch in t.get_children()]))
 
+def MRCA_node(t_rooted, taxa):
+    return (t_rooted & next(taxon for taxon in taxa)) if len(taxa) == 1 else t_rooted.get_common_ancestor(taxa)
 
 class HogWriter(object):
     def __init__(self, species_tree_node_names, seq_ids, sp_ids):
@@ -134,6 +136,7 @@ class HogWriter(object):
             self.writers[name].writerow(["HOG", "OG"] + species_names)
 
     def write_hog(self, node, sp_node_name_list, og_name):
+        if len(sp_node_name_list) == 0: return
         i_hogs = [self.iHOG[sp_node_name] for sp_node_name in sp_node_name_list]
         for sp_node_name in sp_node_name_list: self.iHOG[sp_node_name] += 1
         genes_per_species = defaultdict(list)
@@ -143,6 +146,24 @@ class HogWriter(object):
         row_genes = [". ".join(genes_per_species[isp]) for isp in self.iSps] 
         for i_hog, sp_node_name in zip(i_hogs, sp_node_name_list):
             self.writers[sp_node_name].writerow(["%s.HOG%07d" % (sp_node_name, i_hog),  og_name] + row_genes)
+
+    @staticmethod
+    def get_skipped_nodes(species_tree_rooted, n_written_species, n_above):
+        """
+        Write HOGs for the series of of skipped species tree nodes
+        Args:
+            species_tree_rooted - ete3 tree
+            n_written_species - the species present for child node at the root of the HOG, already written for its MRCA node
+            n_above - MRCA species tree node for parent of n_written, for which a HOG should not be written (its descended gene 
+                      set will include further genes). Can be None to indicate one above root (i.e. go up to and including the root)
+        """
+        n = MRCA_node(species_tree_rooted, n_written_species)
+        missed_sp_node_names = []
+        n = n.up
+        while n != n_above and n is not None:
+            missed_sp_node_names.append(n.name)
+            n = n.up
+        return missed_sp_node_names
 
     def close_files(self):
         for fh in self.fhs.values():
@@ -155,9 +176,6 @@ def OutgroupIngroupSeparationScore(sp_up, sp_down, sett1, sett2, N_recip, n1, n2
     choice = (f_dup, f_a, f_b)
 #    print(choice)
     return max(choice)
-
-def LCA_node(t_rooted, taxa):
-    return (t_rooted & next(taxon for taxon in taxa)) if len(taxa) == 1 else t_rooted.get_common_ancestor(taxa)
 
 def GetRoots(tree, species_tree_rooted, GeneToSpecies):
     """
@@ -419,7 +437,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
         if len(ch) == 2: 
             oSize, overlap, sp0, sp1 = OverlapSize(n, GeneToSpecies)
             sp_present = sp0.union(sp1)
-            stNode = LCA_node(species_tree_rooted, sp_present)
+            stNode = MRCA_node(species_tree_rooted, sp_present)
             if oSize != 0:
                 qResolved, misplaced_genes = ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, GeneToSpecies)
             else:
@@ -437,15 +455,11 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                 orthologues.append(Orthologs_and_Suspect(ch, suspect_genes, misplaced_genes, SpeciesAndGene))
                 suspect_genes.update(misplaced_genes)
                 if (hog_writer is not None) and (not stNode.is_leaf()):
-                    # Are there any missing species tree nodes:
+                    # Are there any missing species tree nodes on the path to either of the child nodes?
                     for ch_x, sp_x in zip(ch, (sp0, sp1)):
-                        stNode_x = LCA_node(species_tree_rooted, sp_x)
-                        missed_sp_node_names = []
-                        stNode_x = stNode_x.up
-                        while stNode_x != stNode and stNode_x is not None:
-                            missed_sp_node_names.append(stNode_x.name)
-                            stNode_x = stNode_x.up
-                        if len(missed_sp_node_names) != 0: hog_writer.write_hog(ch_x, missed_sp_node_names, og_name)
+                        missed_sp_node_names = hog_writer.get_skipped_nodes(species_tree_rooted, sp_x, stNode)
+                        hog_writer.write_hog(ch_x, missed_sp_node_names, og_name)
+                    # And, write this HOG
                     hog_writer.write_hog(n, (stNode.name, ), og_name)
         elif len(ch) > 2:
             species = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in ch]
@@ -455,12 +469,8 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
         # Is this the root? Missing HOGs:
         if n.is_root():
             sp_present = sp_present if sp_present is not None else set.union(*species)
-            st_node = LCA_node(species_tree_rooted, sp_present)
-            missed_sp_node_names = []
-            while not st_node.is_root():
-                st_node = st_node.up
-                missed_sp_node_names.append(st_node.name)
-            if len(missed_sp_node_names) != 0: hog_writer.write_hog(n, missed_sp_node_names, og_name)
+            missed_sp_node_names = hog_writer.get_skipped_nodes(species_tree_rooted, sp_present, None)  # None is one above root
+            hog_writer.write_hog(n, missed_sp_node_names, og_name)
     return orthologues, tree, suspect_genes
 
 def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, ortholog_file_writers, suspect_genes_file_writers, qContainsSuspectOlogs):
