@@ -414,6 +414,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
         if not n.is_root():
             n.name = "n%d" % iNode
             iNode += 1
+        sp_present = None
         ch = n.get_children()
         if len(ch) == 2: 
             oSize, overlap, sp0, sp1 = OverlapSize(n, GeneToSpecies)
@@ -444,13 +445,22 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                         while stNode_x != stNode and stNode_x is not None:
                             missed_sp_node_names.append(stNode_x.name)
                             stNode_x = stNode_x.up
-                        hog_writer.write_hog(ch_x, missed_sp_node_names, og_name)
+                        if len(missed_sp_node_names) != 0: hog_writer.write_hog(ch_x, missed_sp_node_names, og_name)
                     hog_writer.write_hog(n, (stNode.name, ), og_name)
         elif len(ch) > 2:
             species = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in ch]
             for (n0, s0), (n1, s1) in itertools.combinations(zip(ch, species), 2):
                 if len(s0.intersection(s1)) == 0:
                     orthologues.append(Orthologs_and_Suspect((n0, n1), suspect_genes, empty_set, SpeciesAndGene))
+        # Is this the root? Missing HOGs:
+        if n.is_root():
+            sp_present = sp_present if sp_present is not None else set.union(*species)
+            st_node = LCA_node(species_tree_rooted, sp_present)
+            missed_sp_node_names = []
+            while not st_node.is_root():
+                st_node = st_node.up
+                missed_sp_node_names.append(st_node.name)
+            if len(missed_sp_node_names) != 0: hog_writer.write_hog(n, missed_sp_node_names, og_name)
     return orthologues, tree, suspect_genes
 
 def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, ortholog_file_writers, suspect_genes_file_writers, qContainsSuspectOlogs):
