@@ -133,15 +133,16 @@ class HogWriter(object):
             self.writers[name] = csv.writer(self.fhs[name], delimiter="\t")
             self.writers[name].writerow(["HOG", "OG"] + species_names)
 
-    def write_hog(self, node, sp_node_name, og_name):
-        i_hog = self.iHOG[sp_node_name]
-        self.iHOG[sp_node_name] += 1
+    def write_hog(self, node, sp_node_name_list, og_name):
+        i_hogs = [self.iHOG[sp_node_name] for sp_node_name in sp_node_name_list]
+        for sp_node_name in sp_node_name_list: self.iHOG[sp_node_name] += 1
         genes_per_species = defaultdict(list)
         for g in node.get_leaf_names():
             isp, iseq = g.split("_")
             genes_per_species[isp].append(self.seq_ids[g])
-        row = ["%s.HOG%07d" % (sp_node_name, i_hog),  og_name] + [". ".join(genes_per_species[isp]) for isp in self.iSps] 
-        self.writers[sp_node_name].writerow(row)
+        row_genes = [". ".join(genes_per_species[isp]) for isp in self.iSps] 
+        for i_hog, sp_node_name in zip(i_hogs, sp_node_name_list):
+            self.writers[sp_node_name].writerow(["%s.HOG%07d" % (sp_node_name, i_hog),  og_name] + row_genes)
 
     def close_files(self):
         for fh in self.fhs.values():
@@ -154,7 +155,10 @@ def OutgroupIngroupSeparationScore(sp_up, sp_down, sett1, sett2, N_recip, n1, n2
     choice = (f_dup, f_a, f_b)
 #    print(choice)
     return max(choice)
-    
+
+def LCA_node(t_rooted, taxa):
+    return (t_rooted & next(taxon for taxon in taxa)) if len(taxa) == 1 else t_rooted.get_common_ancestor(taxa)
+
 def GetRoots(tree, species_tree_rooted, GeneToSpecies):
     """
     Allow non-binary gene or species trees.
@@ -414,7 +418,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
         if len(ch) == 2: 
             oSize, overlap, sp0, sp1 = OverlapSize(n, GeneToSpecies)
             sp_present = sp0.union(sp1)
-            stNode = (species_tree_rooted & next(sp for sp in sp_present)) if len(sp_present) == 1 else species_tree_rooted.get_common_ancestor(sp_present)
+            stNode = LCA_node(species_tree_rooted, sp_present)
             if oSize != 0:
                 qResolved, misplaced_genes = ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, GeneToSpecies)
             else:
@@ -432,7 +436,16 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                 orthologues.append(Orthologs_and_Suspect(ch, suspect_genes, misplaced_genes, SpeciesAndGene))
                 suspect_genes.update(misplaced_genes)
                 if (hog_writer is not None) and (not stNode.is_leaf()):
-                    hog_writer.write_hog(n, stNode.name, og_name)
+                    # Are there any missing species tree nodes:
+                    for ch_x, sp_x in zip(ch, (sp0, sp1)):
+                        stNode_x = LCA_node(species_tree_rooted, sp_x)
+                        missed_sp_node_names = []
+                        stNode_x = stNode_x.up
+                        while stNode_x != stNode and stNode_x is not None:
+                            missed_sp_node_names.append(stNode_x.name)
+                            stNode_x = stNode_x.up
+                        hog_writer.write_hog(ch_x, missed_sp_node_names, og_name)
+                    hog_writer.write_hog(n, (stNode.name, ), og_name)
         elif len(ch) > 2:
             species = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in ch]
             for (n0, s0), (n1, s1) in itertools.combinations(zip(ch, species), 2):
