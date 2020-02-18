@@ -147,6 +147,10 @@ class HogWriter(object):
         for i_hog, sp_node_name in zip(i_hogs, sp_node_name_list):
             self.writers[sp_node_name].writerow(["%s.HOG%07d" % (sp_node_name, i_hog),  og_name] + row_genes)
 
+    def close_files(self):
+        for fh in self.fhs.values():
+            fh.close()
+
     @staticmethod
     def get_skipped_nodes(species_tree_rooted, n_written_species, n_above):
         """
@@ -164,10 +168,6 @@ class HogWriter(object):
             missed_sp_node_names.append(n.name)
             n = n.up
         return missed_sp_node_names
-
-    def close_files(self):
-        for fh in self.fhs.values():
-            fh.close()
 
 def OutgroupIngroupSeparationScore(sp_up, sp_down, sett1, sett2, N_recip, n1, n2):
     f_dup = len(sp_up.intersection(sett1)) * len(sp_up.intersection(sett2)) * len(sp_down.intersection(sett1)) * len(sp_down.intersection(sett2)) * N_recip
@@ -454,13 +454,17 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                 # For previous levels, (suspect_genes) have their orthologues written to suspect orthologues file
                 orthologues.append(Orthologs_and_Suspect(ch, suspect_genes, misplaced_genes, SpeciesAndGene))
                 suspect_genes.update(misplaced_genes)
+                # Write this HOG
                 if (hog_writer is not None) and (not stNode.is_leaf()):
-                    # Are there any missing species tree nodes on the path to either of the child nodes?
-                    for ch_x, sp_x in zip(ch, (sp0, sp1)):
-                        missed_sp_node_names = hog_writer.get_skipped_nodes(species_tree_rooted, sp_x, stNode)
-                        hog_writer.write_hog(ch_x, missed_sp_node_names, og_name)
-                    # And, write this HOG
                     hog_writer.write_hog(n, (stNode.name, ), og_name)
+            # Whether or not a duplication, write any skipped HOGs
+            if (hog_writer is not None) and (not stNode.is_leaf()):
+                # Are there any missing species tree nodes on the path to either of the child nodes?
+                for ch_x, sp_x in zip(ch, (sp0, sp1)):
+                    # Duplication Node: if MRCA of n is higher than MRCA of ch_x then this is an n-orthogroup which won't have been written yet and should be written now (code fine if root too)
+                    node_above = stNode.up if oSize != 0 and not qResolved else stNode
+                    missed_sp_node_names = hog_writer.get_skipped_nodes(species_tree_rooted, sp_x, node_above)  
+                    hog_writer.write_hog(ch_x, missed_sp_node_names, og_name)
         elif len(ch) > 2:
             species = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in ch]
             for (n0, s0), (n1, s1) in itertools.combinations(zip(ch, species), 2):
