@@ -109,6 +109,44 @@ def StoreSpeciesSets(t, GeneMap, tag="sp_"):
                 node.add_feature(tag_up, parent.__getattribute__(tag_up).union(sp_downs))
     t.add_feature(tag_down, set.union(*[ch.__getattribute__(tag_down) for ch in t.get_children()]))
 
+
+class HogWriter(object):
+    def __init__(self, species_tree_node_names, seq_ids, sp_ids):
+        """
+        Prepare files, get ready to write.
+        species_tree_node_names - list of species tree nodes
+        seq_ids - dict of sequence ids
+        sp_ids - dict of species ids
+        """
+        self.seq_ids = seq_ids
+        d = os.path.dirname(files.FileHandler.GetHierarchicalOrthogroupsFN("N0"))
+        if not os.path.exists(d):
+            os.mkdir(d)
+        self.fhs = dict()
+        self.writers = dict()
+        self.iSps = list(sp_ids.keys())
+        self.iHOG = defaultdict(int)
+        species_names = [sp_ids[i] for i in self.iSps]
+        for name in species_tree_node_names:
+            fn = files.FileHandler.GetHierarchicalOrthogroupsFN(name)
+            self.fhs[name] = open(fn, csv_write_mode)
+            self.writers[name] = csv.writer(self.fhs[name], delimiter="\t")
+            self.writers[name].writerow(["HOG", "OG"] + species_names)
+
+    def write_hog(self, node, sp_node_name, og_name):
+        i_hog = self.iHOG[sp_node_name]
+        self.iHOG[sp_node_name] += 1
+        genes_per_species = defaultdict(list)
+        for g in node.get_leaf_names():
+            isp, iseq = g.split("_")
+            genes_per_species[isp].append(self.seq_ids[g])
+        row = ["%s.HOG%07d" % (sp_node_name, i_hog),  og_name] + [". ".join(genes_per_species[isp]) for isp in self.iSps] 
+        self.writers[sp_node_name].writerow(row)
+
+    def close_files(self):
+        for fh in self.fhs.values():
+            fh.close()
+
 def OutgroupIngroupSeparationScore(sp_up, sp_down, sett1, sett2, N_recip, n1, n2):
     f_dup = len(sp_up.intersection(sett1)) * len(sp_up.intersection(sett2)) * len(sp_down.intersection(sett1)) * len(sp_down.intersection(sett2)) * N_recip
     f_a = len(sp_up.intersection(sett1)) * (n2-len(sp_up.intersection(sett2))) * (n1-len(sp_down.intersection(sett1))) * len(sp_down.intersection(sett2)) * N_recip
@@ -352,8 +390,9 @@ def Orthologs_and_Suspect(ch, suspect_genes, misplaced_genes, SpeciesAndGene):
     return d[0], d[1], d_sus[0], d_sus[1]
 
 
-def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False):
+def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=None, hog_writer=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False):
     """ if dupsWriter != None then seqIDs and spIDs must also be provided"""
+    og_name = "OG%07d" % iog
     qPrune=True
     SpeciesAndGene = SpeciesAndGene_lookup[GeneToSpecies]
     orthologues = []
@@ -374,18 +413,17 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
         ch = n.get_children()
         if len(ch) == 2: 
             oSize, overlap, sp0, sp1 = OverlapSize(n, GeneToSpecies)
+            sp_present = sp0.union(sp1)
+            stNode = (species_tree_rooted & next(sp for sp in sp_present)) if len(sp_present) == 1 else species_tree_rooted.get_common_ancestor(sp_present)
             if oSize != 0:
                 qResolved, misplaced_genes = ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, GeneToSpecies)
             else:
                 misplaced_genes = empty_set
             if oSize != 0 and not qResolved:
                 if dupsWriter != None:
-                    sp_present = sp0.union(sp1)
                     if len(sp_present) == 1:
-                        stNode = species_tree_rooted & next(sp for sp in sp_present)
                         isSTRIDE = "Terminal"
                     else:
-                        stNode = species_tree_rooted.get_common_ancestor(sp_present)
                         isSTRIDE = "Non-Terminal" if all_stride_dup_genes == None else "Non-Terminal: STRIDE" if frozenset(n.get_leaf_names()) in all_stride_dup_genes else "Non-Terminal"
                     dupsWriter.writerow(["OG%07d" % iog, spIDs[stNode.name] if len(stNode) == 1 else stNode.name, n.name, float(oSize)/(len(stNode)), isSTRIDE, ", ".join([seqIDs[g] for g in ch[0].get_leaf_names()]), ", ".join([seqIDs[g] for g in ch[1].get_leaf_names()])]) 
             else:
@@ -393,6 +431,8 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                 # For previous levels, (suspect_genes) have their orthologues written to suspect orthologues file
                 orthologues.append(Orthologs_and_Suspect(ch, suspect_genes, misplaced_genes, SpeciesAndGene))
                 suspect_genes.update(misplaced_genes)
+                if (hog_writer is not None) and (not stNode.is_leaf()):
+                    hog_writer.write_hog(n, stNode.name, og_name)
         elif len(ch) > 2:
             species = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in ch]
             for (n0, s0), (n1, s1) in itertools.combinations(zip(ch, species), 2):
@@ -618,10 +658,14 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
     # Label nodes of species tree
     species_tree_rooted.name = "N0"    
     iNode = 1
+    node_names = [species_tree_rooted.name]
     for n in species_tree_rooted.traverse():
         if (not n.is_leaf()) and (not n.is_root()):
             n.name = "N%d" % iNode
+            node_names.append(n.name)
             iNode += 1
+    # HOG Writer
+    hog_writer = HogWriter(node_names, SequenceDict, speciesDict)
     nOgs = len(ogSet.OGs())
     nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
     species = list(speciesDict.keys())
@@ -636,7 +680,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
             if rooted_tree_ids is None: continue
             # Write rooted tree with accessions
             util.RenameTreeTaxa(rooted_tree_ids, files.FileHandler.GetOGsTreeFN(iog, True), spec_seq_dict, qSupport=qHaveSupport, qFixNegatives=True, qViaCopy=True)
-            orthologues, recon_tree, suspect_genes = GetOrthologues_from_tree(iog, rooted_tree_ids, species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=dupWriter, seqIDs=spec_seq_dict, spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes, qNoRecon=qNoRecon)
+            orthologues, recon_tree, suspect_genes = GetOrthologues_from_tree(iog, rooted_tree_ids, species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=dupWriter, hog_writer=hog_writer, seqIDs=spec_seq_dict, spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes, qNoRecon=qNoRecon)
             qContainsSuspectGenes = len(suspect_genes) > 0
             if (not qInitialisedSuspectGenesDirs) and qContainsSuspectGenes:
                 qInitialisedSuspectGenesDirs = True
@@ -659,6 +703,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
             if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
                 util.PrintTime("Done %d of %d" % (iog, nOgs))
             nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, dResultsOrthologues, ortholog_file_writers, suspect_genes_file_writers, qContainsSuspectGenes)
+    hog_writer.close_files()
     return nOrthologues_SpPair
 
 

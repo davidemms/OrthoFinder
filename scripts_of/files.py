@@ -225,7 +225,7 @@ class __Files_new_dont_manually_create__(object):
             text += "".join(infile.readlines())
         self.WriteToLog(text + "\n")
         
-    """ Standard Dirctories
+    """ Standard Directories
         ========================================================================================== """
     
     def GetWorkingDirectory1_Read(self):
@@ -420,6 +420,9 @@ class __Files_new_dont_manually_create__(object):
     def GetSpeciesDict(self):
         d = util.FullAccession(self.GetSpeciesIDsFN()).GetIDToNameDict()
         return {k:v.rsplit(".",1)[0] for k,v in d.items()}
+
+    def GetHierarchicalOrthogroupsFN(self, sp_node_name):
+        return self.rd1 + "Phylogenetic_Hierarchical_Orthogroups/%s.tsv" % sp_node_name
         
     """ ========================================================================================== """
             
