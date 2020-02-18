@@ -718,6 +718,21 @@ def WriteOrthologuesStats(ogSet, nOrtho_sp):
                 og = pat % i
                 writer.writerow([og, ogCount[og], ogCount_50[og]])
 
+def TwoAndThreeGeneHOGs(ogSet, st_rooted_labelled, hog_writer):
+    ogs = ogSet.OGs(qInclAll=True)
+    for iog, og in enumerate(ogs):
+        n = len(og) 
+        if n < 2 or n > 3: continue
+        og_name = "OG%07d" % iog
+        sp_present = set([str(g.iSp) for g in og])
+        hogs_to_write = hog_writer.get_skipped_nodes(st_rooted_labelled, sp_present, None)  
+        if len(sp_present) > 1:
+            # We don't create files for 'species specific HOGs'
+            st_node = trees2ologs_of.MRCA_node(st_rooted_labelled, sp_present)
+            hogs_to_write = hogs_to_write + [st_node.name]
+        genes = [g.ToString() for g in og] # Inefficient as will convert back again, but trivial cost I think
+        hog_writer.write_hog_genes(genes, hogs_to_write, og_name)
+
 def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
     speciesDict = ogSet.SpeciesDict()
     sequenceDict = ogSet.SequenceDict()
@@ -807,8 +822,11 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=No
     else:
         util.PrintTime("Starting OF Orthologues")
         qNoRecon = ("only_overlap" == recon_method)
-        nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, speciesTree_ids_fn, trees2ologs_of.GeneToSpecies_dash, all_stride_dup_genes, qNoRecon)
+        # The next function should not create the HOG writer and label the species tree. This should be done here and passed as arguments
+        nOrthologues_SpPair, hog_writer, species_tree_rooted_labelled = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, speciesTree_ids_fn, trees2ologs_of.GeneToSpecies_dash, all_stride_dup_genes, qNoRecon)
         util.PrintTime("Done OF Orthologues")
+        TwoAndThreeGeneHOGs(ogSet, species_tree_rooted_labelled, hog_writer)
+        hog_writer.close_files()
     nOrthologues_SpPair += TwoAndThreeGeneOrthogroups(ogSet, resultsDir_ologs)
     WriteOrthologuesStats(ogSet, nOrthologues_SpPair)
 #    print("Identified %d orthologues" % nOrthologues)

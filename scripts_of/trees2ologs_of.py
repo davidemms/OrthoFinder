@@ -136,13 +136,16 @@ class HogWriter(object):
             self.writers[name].writerow(["HOG", "OG"] + species_names)
 
     def write_hog(self, node, sp_node_name_list, og_name):
+        self.write_hog_genes(node.get_leaf_names(), sp_node_name_list, og_name)
+
+    def write_hog_genes(self, genes, sp_node_name_list, og_name):
         if len(sp_node_name_list) == 0: return
+        genes_per_species = defaultdict(list)
+        for g in genes:
+            isp, _ = g.split("_")
+            genes_per_species[isp].append(self.seq_ids[g])
         i_hogs = [self.iHOG[sp_node_name] for sp_node_name in sp_node_name_list]
         for sp_node_name in sp_node_name_list: self.iHOG[sp_node_name] += 1
-        genes_per_species = defaultdict(list)
-        for g in node.get_leaf_names():
-            isp, iseq = g.split("_")
-            genes_per_species[isp].append(self.seq_ids[g])
         row_genes = [". ".join(genes_per_species[isp]) for isp in self.iSps] 
         for i_hog, sp_node_name in zip(i_hogs, sp_node_name_list):
             self.writers[sp_node_name].writerow(["%s.HOG%07d" % (sp_node_name, i_hog),  og_name] + row_genes)
@@ -152,16 +155,16 @@ class HogWriter(object):
             fh.close()
 
     @staticmethod
-    def get_skipped_nodes(species_tree_rooted, n_written_species, n_above):
+    def get_skipped_nodes(species_tree_rooted, written_species, n_above):
         """
         Write HOGs for the series of of skipped species tree nodes
         Args:
             species_tree_rooted - ete3 tree
-            n_written_species - the species present for child node at the root of the HOG, already written for its MRCA node
+            written_species - the species present for child node at the root of the HOG, already written for its MRCA node
             n_above - MRCA species tree node for parent of n_written, for which a HOG should not be written (its descended gene 
                       set will include further genes). Can be None to indicate one above root (i.e. go up to and including the root)
         """
-        n = MRCA_node(species_tree_rooted, n_written_species)
+        n = MRCA_node(species_tree_rooted, written_species)
         missed_sp_node_names = []
         n = n.up
         while n != n_above and n is not None:
@@ -740,8 +743,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_fn, GeneToSpecies, al
             if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
                 util.PrintTime("Done %d of %d" % (iog, nOgs))
             nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, dResultsOrthologues, ortholog_file_writers, suspect_genes_file_writers, qContainsSuspectGenes)
-    hog_writer.close_files()
-    return nOrthologues_SpPair
+    return nOrthologues_SpPair, hog_writer, species_tree_rooted
 
 
 def GetOrthologues_from_phyldog_tree(iog, treeFN, GeneToSpecies, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None):
