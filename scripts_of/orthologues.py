@@ -823,7 +823,21 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=No
         util.PrintTime("Starting OF Orthologues")
         qNoRecon = ("only_overlap" == recon_method)
         # The next function should not create the HOG writer and label the species tree. This should be done here and passed as arguments
-        nOrthologues_SpPair, hog_writer, species_tree_rooted_labelled = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, speciesTree_ids_fn, trees2ologs_of.GeneToSpecies_dash, all_stride_dup_genes, qNoRecon)
+        species_tree_rooted_labelled = tree.Tree(speciesTree_ids_fn)
+        # Label nodes of species tree
+        species_tree_rooted_labelled.name = "N0"    
+        iNode = 1
+        node_names = [species_tree_rooted_labelled.name]
+        for n in species_tree_rooted_labelled.traverse():
+            if (not n.is_leaf()) and (not n.is_root()):
+                n.name = "N%d" % iNode
+                node_names.append(n.name)
+                iNode += 1
+        # HOG Writer
+        speciesDict = ogSet.SpeciesDict()
+        SequenceDict = ogSet.SequenceDict()
+        hog_writer = trees2ologs_of.HogWriter(node_names, SequenceDict, speciesDict)
+        nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, trees2ologs_of.GeneToSpecies_dash, all_stride_dup_genes, qNoRecon, hog_writer)
         util.PrintTime("Done OF Orthologues")
         TwoAndThreeGeneHOGs(ogSet, species_tree_rooted_labelled, hog_writer)
         hog_writer.close_files()
