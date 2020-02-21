@@ -139,11 +139,11 @@ Most of the terms in the files 'Statistics_Overall.csv' and 'Statistics_PerSpeci
 This contains all the files necessary for orthofinder to run. You can ignore this.
 
 ## Additional Information
-* [What are orthogroups, orthologs & paralogs?](#orthogroups-orthologs-paralogs)
+* [What are orthogroups, orthologs & paralogs?](#orthogroups-orthologs--paralogs)
 * [Why use orthogroups in your analysis](#why-orthogroups)
 * [Installing Dependencies](#setting-up-orthofinder)
 * [Adding and removing species from a completed OrthoFinder run](#advanced-usage)
-* [Preparing and using separately run BLAST files](#running-blast-searches-separately)
+* [Preparing and using separately run BLAST files](#running-blast-searches-separately--op-option)
 
 ## Orthogroups, Orthologs & Paralogs
 Orthologs are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Figure 2A & B). An orthogroup is the extension of the concept of orthology to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). 
