@@ -139,11 +139,11 @@ Most of the terms in the files 'Statistics_Overall.csv' and 'Statistics_PerSpeci
 This contains all the files necessary for orthofinder to run. You can ignore this.
 
 ## Additional Information
-* [What are orthogroups, orthologs & paralogs?](#orthogroups-orthologues--paralogues)
+* [What are orthogroups, orthologs & paralogs?](#orthogroups-orthologs--paralogs)
 * [Why use orthogroups in your analysis](#why-orthogroups)
 * [Installing Dependencies](#setting-up-orthofinder)
 * [Adding and removing species from a completed OrthoFinder run](#advanced-usage)
-* [Preparing and using separately run BLAST files](#running-blast-searches-separately--p-option)
+* [Preparing and using separately run BLAST files](#running-blast-searches-separately--op-option)
 
 ## Orthogroups, Orthologs & Paralogs
 Orthologs are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Figure 2A & B). An orthogroup is the extension of the concept of orthology to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). 
@@ -165,6 +165,7 @@ It is important to note that with orthogroups you choose where to define the lim
 ### Orthogroups are the only way to identify orthologs
 Orthology is defined by phylogeny. It is not definable by amino acid content, codon bias, GC content or other measures of sequence similarity. Methods that use such scores to define orthologs in the absence of phylogeny can only provide guesses. The only way to be sure that the orthology assignment is correct is by conducting a phylogenetic reconstruction of all genes descended from a single gene the last common ancestor of the species under consideration. This set of genes is an orthogroup. Thus, the only way to define orthology is by analysing orthogroups.   
 
+## Setting up OrthoFinder
 ### Installing Dependencies
 To perform an analysis OrthoFinder requires some dependencies. The OrthoFinder release package now contains these so you should just be able to download it and run. 
 
@@ -246,6 +247,7 @@ For example, to you muscle and iqtree, the command like arguments you need to ad
 #### Python Source Code Version
 It is recommended that you use the standalone binaries for OrthoFinder which do not require python or scipy to be installed. However, the python source code version is available from the github 'releases' page (e.g. 'OrthoFinder-1.0.6_source.tar.gz' and requires python 2.7 and scipy to be installed. Up-to-date and clear instructions are provided here: http://www.scipy.org/install.html, be sure to choose a version using python 2.7. As websites can change, an alternative is to search online for "install scipy". 
 
+## Advanced usage
 ### Adding Extra Species
 OrthoFinder allows you to add extra species without re-running the previously computed BLAST searches:
 
