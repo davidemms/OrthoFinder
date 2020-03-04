@@ -133,12 +133,17 @@ class HogWriter(object):
             fn = files.FileHandler.GetHierarchicalOrthogroupsFN(name)
             self.fhs[name] = open(fn, csv_write_mode)
             self.writers[name] = csv.writer(self.fhs[name], delimiter="\t")
-            self.writers[name].writerow(["HOG", "OG"] + species_names)
+            self.writers[name].writerow(["HOG", "OG", "Gene Tree Node"] + species_names)
 
     def write_hog(self, node, sp_node_name_list, og_name):
-        self.write_hog_genes(node.get_leaf_names(), sp_node_name_list, og_name)
+        nup = node.up
+        # we could have a clade of single-copy genes that doesn't exactly match the species
+        # tree topology. Going down a node may not change the MRCA node in this case, this
+        # is not a new orthogroup.
+        if nup is not None and not nup.dup and node.sp_node == nup.sp_node: return
+        self.write_hog_genes(node.get_leaf_names(), node.name, sp_node_name_list, og_name)
 
-    def write_hog_genes(self, genes, sp_node_name_list, og_name):
+    def write_hog_genes(self, genes, gt_node_name, sp_node_name_list, og_name):
         if len(sp_node_name_list) == 0: return
         genes_per_species = defaultdict(list)
         for g in genes:
@@ -148,28 +153,26 @@ class HogWriter(object):
         for sp_node_name in sp_node_name_list: self.iHOG[sp_node_name] += 1
         row_genes = [", ".join(genes_per_species[isp]) for isp in self.iSps] 
         for i_hog, sp_node_name in zip(i_hogs, sp_node_name_list):
-            self.writers[sp_node_name].writerow(["%s.HOG%07d" % (sp_node_name, i_hog),  og_name] + row_genes)
+            self.writers[sp_node_name].writerow(["%s.HOG%07d" % (sp_node_name, i_hog),  og_name, gt_node_name] + row_genes)
 
     def close_files(self):
         for fh in self.fhs.values():
             fh.close()
 
     @staticmethod
-    def get_skipped_nodes(species_tree_rooted, written_species, n_above):
+    def get_skipped_nodes(n_this, n_above_name):
         """
         Write HOGs for the series of of skipped species tree nodes
         Args:
-            species_tree_rooted - ete3 tree
-            written_species - the species present for child node at the root of the HOG, already written for its MRCA node
-            n_above - MRCA species tree node for parent of n_written, for which a HOG should not be written (its descended gene 
-                      set will include further genes). Can be None to indicate one above root (i.e. go up to and including the root)
+            n_this - ete3 node from species tree 
+            n_above - MRCA species tree node for the gene tree node above
         """
-        n = MRCA_node(species_tree_rooted, written_species)
+        n = n_this
         missed_sp_node_names = []
-        if n == n_above:
+        if n.name == n_above_name:
             return missed_sp_node_names
         n = n.up
-        while n != n_above and n is not None:
+        while n is not None and n.name != n_above_name:
             missed_sp_node_names.append(n.name)
             n = n.up
         return missed_sp_node_names
@@ -418,8 +421,37 @@ def Orthologs_and_Suspect(ch, suspect_genes, misplaced_genes, SpeciesAndGene):
 
 
 def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=None, hog_writer=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False):
-    """ if dupsWriter != None then seqIDs and spIDs must also be provided"""
+    """ if dupsWriter != None then seqIDs and spIDs must also be provided
+
+    Implementation:
+    Algorithm for writing HOGs
+    if #genes == #species: write all now, using the species tree as a guide. Need to do this as no guarantee topology will follow species tree toplogy. Mark all nodes as 'done'
+    elif speciation: 
+        if (done or MRCA == up.MRCA): continue   # could occur if this clade gives same MRCA as next up while also sister clade to this had a duplication preventing the #genes==#species short cut
+        write this one orthogroup (mark as done, although doesn't really matter)
+    elif duplication: continue
+
+    For all nodes, check if any skipped that need writing now. 
+    if done: continue  # Node will only be marked as done if this node and at least its parent were taken care of by 
+                       # the #genes==#species short cut in which none have been skipped and can continue
+    O/W:
+
+    Outstanding questions: what if topology doesn't match species tree topology but there are (e.g. terminal) duplications in it?
+        - The rule above is not enough, need to apply it more generally even if duplications.
+
+    New algorithm
+    - In orthologs pass, mark all duplication events (this could probably be done at the resolve step saving some time)
+    - In the HOGs pass, each duplication node is a stopping point, it is treated as an indivisible unit
+    - Traverse from the root, to all duplication nodes. Each duplication node is mapped to it's place on the species tree
+        *** What if this conflicts with the topology of the species tree. I think it can't come strictly above a sister node 
+            without a duplication node being involved, which stops us from doing anything incorrect.
+    - At each iteration of the traverse, use the species tree to write out all the applicable HOGs, treating each leaf and
+      each duplication event as an indivisible unit
+
+    """
     og_name = "OG%07d" % iog
+    # if iog == 354:
+    #     print(species_tree_rooted)
     qPrune=True
     SpeciesAndGene = SpeciesAndGene_lookup[GeneToSpecies]
     orthologues = []
@@ -431,7 +463,8 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
     tree.name = "n0"
     suspect_genes = set()
     empty_set = set()
-    # preorder traverse so that suspect genes can be identified first, before their closer ortholgoues are proposed
+    # preorder traverse so that suspect genes can be identified first, before their closer ortholgoues are proposed.
+    # Tree resolution has already been performed using a postorder traversal
     for n in tree.traverse('preorder'):
         if n.is_leaf(): continue
         if not n.is_root():
@@ -443,11 +476,14 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
             oSize, overlap, sp0, sp1 = OverlapSize(n, GeneToSpecies)
             sp_present = sp0.union(sp1)
             stNode = MRCA_node(species_tree_rooted, sp_present)
+            n.add_feature("sp_node", stNode.name)
             if oSize != 0:
                 qResolved, misplaced_genes = ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, GeneToSpecies)
             else:
                 misplaced_genes = empty_set
-            if oSize != 0 and not qResolved:
+            dup = oSize != 0 and not qResolved
+            n.add_feature("dup", dup)
+            if dup:
                 if dupsWriter != None:
                     if len(sp_present) == 1:
                         isSTRIDE = "Terminal"
@@ -461,25 +497,37 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                 suspect_genes.update(misplaced_genes)
                 # Write this HOG
                 if (hog_writer is not None) and (not stNode.is_leaf()):
-                    hog_writer.write_hog(n, (stNode.name, ), og_name)
+                    # if iog == 354: print(stNode.name, "P1")
+                    # if iog == 354: print(n)
+                    hog_writer.write_hog(n, (stNode.name, ), og_name) # and skip if already done above (MRCA same or all marked as done)
             # Whether or not a duplication, write any skipped HOGs
             if (hog_writer is not None) and (not stNode.is_leaf()):
-                # Are there any missing species tree nodes on the path to either of the child nodes?
-                for ch_x, sp_x in zip(ch, (sp0, sp1)):
-                    # Duplication Node: if MRCA of n is higher than MRCA of ch_x then this is an n-orthogroup which won't have been written yet and should be written now (code fine if root too)
-                    node_above = stNode.up if oSize != 0 and not qResolved else stNode
-                    missed_sp_node_names = hog_writer.get_skipped_nodes(species_tree_rooted, sp_x, node_above)
-                    hog_writer.write_hog(ch_x, missed_sp_node_names, og_name)
+                # Are there any missing species tree nodes on the path to this node
+                # Duplication Node: if MRCA of n is higher than MRCA of ch_x then this is an n-orthogroup which won't have been written yet and should be written now (code fine if root too)
+                st_node_above_name = n.up.sp_node if not n.is_root() else None
+                missed_sp_node_names = hog_writer.get_skipped_nodes(stNode, st_node_above_name)  
+                # print(n)
+                # print(missed_sp_node_names)
+                # print(stNode.name, stNode.up.name if stNode.up is not None else None, st_node_above_name)
+                # if iog == 354 and len(missed_sp_node_names) > 0: 
+                #     print(missed_sp_node_names, "P2", sp_x, node_above.name)
+                # if iog == 354 and len(missed_sp_node_names) > 0: print(ch_x)
+                hog_writer.write_hog(n, missed_sp_node_names, og_name)
         elif len(ch) > 2:
             species = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in ch]
+            stNode = MRCA_node(species_tree_rooted, set.union(species))
+            n.add_feature("sp_node", stNode.name)
             for (n0, s0), (n1, s1) in itertools.combinations(zip(ch, species), 2):
                 if len(s0.intersection(s1)) == 0:
                     orthologues.append(Orthologs_and_Suspect((n0, n1), suspect_genes, empty_set, SpeciesAndGene))
-        # Is this the root? Missing HOGs:
-        if n.is_root():
-            sp_present = sp_present if sp_present is not None else set.union(*species)
-            missed_sp_node_names = hog_writer.get_skipped_nodes(species_tree_rooted, sp_present, None)  # None is one above root
-            hog_writer.write_hog(n, missed_sp_node_names, og_name)
+        # # Is this the root? Missing HOGs:
+        # if n.is_root():
+        #     sp_present = sp_present if sp_present is not None else set.union(*species)
+        #     missed_sp_node_names = hog_writer.get_skipped_nodes(species_tree_rooted, sp_present, None)  # None is one above root
+        #     # if iog == 354 and len(missed_sp_node_names) > 0: print(missed_sp_node_names, "P3")
+        #     # if iog == 354 and len(missed_sp_node_names) > 0: print(n)
+        #     hog_writer.write_hog(n, missed_sp_node_names, og_name)
+    # if iog == 354: util.Fail()
     return orthologues, tree, suspect_genes
 
 def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, ortholog_file_writers, suspect_genes_file_writers, qContainsSuspectOlogs):
@@ -706,6 +754,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
         dupWriter = csv.writer(outfile, delimiter="\t")
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
         for iog in range(nOgs):
+            # if iog != 5728: continue
             rooted_tree_ids, qHaveSupport = CheckAndRootTree(files.FileHandler.GetOGsTreeFN(iog), species_tree_rooted_labelled, GeneToSpecies) # this can be parallelised easily
             if rooted_tree_ids is None: continue
             # Write rooted tree with accessions

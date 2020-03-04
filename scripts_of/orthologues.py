@@ -725,13 +725,14 @@ def TwoAndThreeGeneHOGs(ogSet, st_rooted_labelled, hog_writer):
         if n < 2 or n > 3: continue
         og_name = "OG%07d" % iog
         sp_present = set([str(g.iSp) for g in og])
-        hogs_to_write = hog_writer.get_skipped_nodes(st_rooted_labelled, sp_present, None)  
+        stNode = trees2ologs_of.MRCA_node(st_rooted_labelled, sp_present)
+        hogs_to_write = hog_writer.get_skipped_nodes(stNode, None)  
         if len(sp_present) > 1:
             # We don't create files for 'species specific HOGs'
             st_node = trees2ologs_of.MRCA_node(st_rooted_labelled, sp_present)
             hogs_to_write = hogs_to_write + [st_node.name]
         genes = [g.ToString() for g in og] # Inefficient as will convert back again, but trivial cost I think
-        hog_writer.write_hog_genes(genes, hogs_to_write, og_name)
+        hog_writer.write_hog_genes(genes, "-", hogs_to_write, og_name)
 
 def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
     speciesDict = ogSet.SpeciesDict()
