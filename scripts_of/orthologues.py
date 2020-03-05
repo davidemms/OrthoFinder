@@ -732,7 +732,7 @@ def TwoAndThreeGeneHOGs(ogSet, st_rooted_labelled, hog_writer):
             st_node = trees2ologs_of.MRCA_node(st_rooted_labelled, sp_present)
             hogs_to_write = hogs_to_write + [st_node.name]
         genes = [g.ToString() for g in og] # Inefficient as will convert back again, but trivial cost I think
-        hog_writer.write_hog_genes(genes, "-", hogs_to_write, og_name)
+        hog_writer.write_hog_genes(genes, hogs_to_write, og_name)
 
 def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
     speciesDict = ogSet.SpeciesDict()
@@ -837,7 +837,7 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=No
         # HOG Writer
         speciesDict = ogSet.SpeciesDict()
         SequenceDict = ogSet.SequenceDict()
-        hog_writer = trees2ologs_of.HogWriter(node_names, SequenceDict, speciesDict)
+        hog_writer = trees2ologs_of.HogWriter(species_tree_rooted_labelled, node_names, SequenceDict, speciesDict)
         nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, trees2ologs_of.GeneToSpecies_dash, all_stride_dup_genes, qNoRecon, hog_writer)
         util.PrintTime("Done OF Orthologues")
         TwoAndThreeGeneHOGs(ogSet, species_tree_rooted_labelled, hog_writer)
