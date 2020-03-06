@@ -171,18 +171,23 @@ class HogWriter(object):
         for unit in scl:
             # get all the genes from under here and sort them into a text string per species
             genes_per_species = defaultdict(list) # iCol (before 'name' columns) -> text string of genes
-            genes = unit.get_leaf_names()
+            genes = unit.get_leaves()
+            q_have_legitimate_gene = False # may be misplaced genes
             for g in genes:
-                isp = g.split("_")[0]
-                genes_per_species[self.i_sp_to_index[isp]].append(self.seq_ids[g])
-            scl_units[unit.name.split("_")[0] if unit.is_leaf() else unit.sp_node] = {k:", ".join(v) for k,v in genes_per_species.items()}
+                if "X" in g.features: continue
+                q_have_legitimate_gene = True
+                isp = g.name.split("_")[0]
+                genes_per_species[self.i_sp_to_index[isp]].append(self.seq_ids[g.name])
+            if q_have_legitimate_gene:
+                scl_units[unit.name.split("_")[0] if unit.is_leaf() else unit.sp_node] = {k:", ".join(v) for k,v in genes_per_species.items()}
+                r = unit.name.split("_")[0] if unit.is_leaf() else unit.sp_node
         # 1. Get HOGs to write
         scl_mrca = {nn.sp_node for nn in scl if not nn.is_leaf()}
         sp_node_name = n.sp_node
         sp_node = self.species_tree & sp_node_name
         stop_at_dups = lambda nn : nn.name in scl_mrca
         hogs_to_write = [nn.name for nn in sp_node.traverse('preorder', is_leaf_fn = stop_at_dups) if not nn.is_leaf()] 
-        hogs_to_write += self.get_skipped_nodes(sp_node, n.up.sp_node if n.up is not None else None)
+        hogs_to_write += self.get_skipped_nodes(sp_node, n.up.sp_node if n.up is not None else None, n)
         for h in hogs_to_write:
             q_empty = True
             # 2. We know the scl, these are the 'taxonomic units' available (clades or individual species in species tree for this node of the gene tree)
@@ -195,19 +200,20 @@ class HogWriter(object):
                     genes_row[isp] = genes_text
                     q_empty = False
             if not q_empty: 
-                self.writers[h].writerow(["%s.HOG%07d" % (sp_node_name, self.get_hog_index(h)),  og_name, n.name] + genes_row)
+                self.writers[h].writerow(["%s.HOG%07d" % (h, self.get_hog_index(h)),  og_name, n.name] + genes_row)
 
     def close_files(self):
         for fh in self.fhs.values():
             fh.close()
 
     @staticmethod
-    def get_skipped_nodes(n_this, n_above_name):
+    def get_skipped_nodes(n_this, n_above_name, n_gene=None):
         """
         Write HOGs for the series of skipped species tree nodes
         Args:
             n_this - ete3 node from species tree 
             n_above - MRCA species tree node for the gene tree node above
+            n_gene - ete3 node from the species tree
         """
         n = n_this
         missed_sp_node_names = []
@@ -217,6 +223,10 @@ class HogWriter(object):
         while n is not None and n.name != n_above_name:
             missed_sp_node_names.append(n.name)
             n = n.up
+        # if above node is a duplication then we won't have written out a HOG for that, pass the next node 
+        if n_gene is not None and n_gene.up is not None and n_gene.up.dup and n is not None:
+            # then we also need to write the HOG above
+            missed_sp_node_names.append(n.name)
         return missed_sp_node_names
 
     @staticmethod
@@ -344,14 +354,14 @@ def GetGeneToSpeciesMap(args):
         GeneToSpecies = GeneToSpecies_hyphen  
     return GeneToSpecies
   
-def OverlapSize(node, GeneToSpecies):  
-    descendents = [{GeneToSpecies(l) for l in n.get_leaf_names()} for n in node.get_children()]
+def OverlapSize(node, GeneToSpecies, suspect_genes):  
+    descendents = [{GeneToSpecies(l) for l in n.get_leaf_names()}.difference(suspect_genes) for n in node.get_children()]
     intersection = descendents[0].intersection(descendents[1])
     return len(intersection), intersection, descendents[0], descendents[1]
 
 def ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, GeneToSpecies, relOverlapCutoff=4):
     """
-    Is an overlap suspicious and if so can ift be resolved by identifying genes that are out of place?
+    Is an overlap suspicious and if so can it be resolved by identifying genes that are out of place?
     Args:
         overlap - the species with genes in both clades
         sp0 - the species below ch[0]
@@ -364,12 +374,15 @@ def ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, GeneToSpecies, relOv
         genes_removed - the out-of-place genes that have been removed so as to resolve the overlap
     
     Implementation:
-        - The number of species in the overlap must be a 5th or less of the number of species in each clade
+        - The number of species in the overlap must be a 5th or less of the number of species in each clade - What if it's a single gene that's out of place? Won't make a difference then to the orthologs!
         - for each species with genes in both clades: the genes in one clade must all be more out of place (according to the 
           species tree) than all the gene from that species in the other tree
     """
     oSize = len(overlap)
-    if relOverlapCutoff*oSize >= len(sp0) and relOverlapCutoff*oSize >= len(sp1): return False, []
+    lsp0 = len(sp0)
+    lsp1 = len(sp1)
+    if (oSize == lsp0 or oSize == lsp1) or (relOverlapCutoff*oSize >= lsp0 and relOverlapCutoff*oSize >= lsp1): 
+        return False, []
     # The overlap looks suspect, misplaced genes?
     # for each species, we'd need to be able to determine that all genes from A or all genes from B are misplaced
     genes_removed = []
@@ -386,18 +399,18 @@ def ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, GeneToSpecies, relOv
                 gene_node = tree & g
                 r = gene_node.up
                 nextSpecies = set([GeneToSpecies(gg) for gg in r.get_leaf_names()])
+                # having a gene from the same species isn't enough?? No, but we add to the count I think.
                 while len(nextSpecies) == 1:
                     r = r.up
                     nextSpecies = set([GeneToSpecies(gg) for gg in r.get_leaf_names()])
-#                print((g, sp,nextSpecies))
                 nextSpecies.remove(sp)
                 # get the level
-                # the sum of the closest and furthest expected distance toplological distance for the closest genes in the gene tree (based on species tree topology)
+                # the sum of the closest and furthest expected distance topological distance for the closest genes in the gene tree (based on species tree topology)
                 neigh = neighbours[sp]
                 observed = [neigh[nSp] for nSp in nextSpecies]
                 level.append(min(observed) + max(observed))
-        qRemoveA = max(B_levels) < min(A_levels)                           
-        qRemoveB = max(A_levels) < min(B_levels)                            
+        qRemoveA = max(B_levels) + 2 < min(A_levels)   # if the clade is one step up the tree further way (min=max) then this gives +2. There's no way this is a problem                        
+        qRemoveB = max(A_levels) + 2 < min(B_levels)                           
         if qRemoveA and relOverlapCutoff*oSize < len(sp0):
             nA_removed += len(A_levels)
             genes_removed.extend(A)
@@ -480,7 +493,7 @@ def GetHOGs_from_tree(iog, tree, hog_writer):
     """
     og_name = "OG%07d" % iog
     # First process the root (it will be processed below if it's a dup)
-    if not tree.dup:
+    if not (tree.dup and tree.sp_node == "N0"): 
         hog_writer.write_clade(tree, og_name)
     for n in tree.iter_search_nodes(dup=True):
         nodes_to_process = n.get_children()
@@ -515,13 +528,17 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
         sp_present = None
         ch = n.get_children()
         if len(ch) == 2: 
-            oSize, overlap, sp0, sp1 = OverlapSize(n, GeneToSpecies)
+            oSize, overlap, sp0, sp1 = OverlapSize(n, GeneToSpecies, suspect_genes)
             sp_present = sp0.union(sp1)
             stNode = MRCA_node(species_tree_rooted, sp_present)
             n.add_feature("sp_node", stNode.name)
             if oSize != 0:
                 # this should be moved to the tree resolution step. Except that doesn't use the species tree, so can't
                 qResolved, misplaced_genes = ResolveOverlap(overlap, sp0, sp1, ch, tree, neighbours, GeneToSpecies) 
+                # label the removed genes
+                for g in misplaced_genes:
+                    nn = tree & g
+                    nn.add_feature("X", True)
             else:
                 misplaced_genes = empty_set
             dup = oSize != 0 and not qResolved
@@ -533,7 +550,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                         isSTRIDE = "Terminal"
                     else:
                         isSTRIDE = "Non-Terminal" if all_stride_dup_genes == None else "Non-Terminal: STRIDE" if frozenset(n.get_leaf_names()) in all_stride_dup_genes else "Non-Terminal"
-                    dupsWriter.writerow(["OG%07d" % iog, spIDs[stNode.name] if len(stNode) == 1 else stNode.name, n.name, float(oSize)/(len(stNode)), isSTRIDE, ", ".join([seqIDs[g] for g in ch[0].get_leaf_names()]), ", ".join([seqIDs[g] for g in ch[1].get_leaf_names()])]) 
+                    dupsWriter.writerow([og_name, spIDs[stNode.name] if len(stNode) == 1 else stNode.name, n.name, float(oSize)/(len(stNode)), isSTRIDE, ", ".join([seqIDs[g] for g in ch[0].get_leaf_names()]), ", ".join([seqIDs[g] for g in ch[1].get_leaf_names()])]) 
             else:
                 # sort out bad genes - no orthology for all the misplaced genes at this level (misplaced_genes). 
                 # For previous levels, (suspect_genes) have their orthologues written to suspect orthologues file
@@ -705,7 +722,7 @@ class OrthologsFiles(object):
         self.iSpeciesToUse = iSpeciesToUse
         self.nSpecies = nSpecies
         self.sp_to_index = sp_to_index
-        self.dSuspectGenes = files.FileHandler.GetSuspectGenesDir()
+        self.dPutativeXenologs = files.FileHandler.GetPutativeXenelogsDir()
         self.ortholog_file_handles = [[None for _ in self.iSpeciesToUse] for _ in self.iSpeciesToUse]
         self.suspect_genes_file_handles = [None for _ in self.iSpeciesToUse]
 
@@ -714,7 +731,7 @@ class OrthologsFiles(object):
         suspect_genes_file_writers = [None for _ in self.iSpeciesToUse]
         for i in xrange(self.nSpecies):
             sp0 = str(self.iSpeciesToUse[i])
-            self.suspect_genes_file_handles[i] = open(self.dSuspectGenes + "%s.tsv" % self.speciesDict[sp0], csv_write_mode)
+            self.suspect_genes_file_handles[i] = open(self.dPutativeXenologs + "%s.tsv" % self.speciesDict[sp0], csv_write_mode)
             suspect_genes_file_writers[i] = csv.writer(self.suspect_genes_file_handles[i], delimiter="\t")
             strsp0 = sp0 + "_"
             isp0 = self.sp_to_index[sp0]
@@ -770,7 +787,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
         dupWriter = csv.writer(outfile, delimiter="\t")
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
         for iog in range(nOgs):
-            # if iog != 5728: continue
+            # if iog != 3672: continue
             rooted_tree_ids, qHaveSupport = CheckAndRootTree(files.FileHandler.GetOGsTreeFN(iog), species_tree_rooted_labelled, GeneToSpecies) # this can be parallelised easily
             if rooted_tree_ids is None: continue
             # Write rooted tree with accessions
@@ -804,6 +821,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
 
 def GetOrthologues_from_phyldog_tree(iog, treeFN, GeneToSpecies, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None):
     """ if dupsWriter != None then seqIDs and spIDs must also be provided"""
+    empty = set()
     orthologues = []
     if (not os.path.exists(treeFN)) or os.stat(treeFN).st_size == 0: return set(orthologues)
     tree = tree_lib.Tree(treeFN)
@@ -819,7 +837,7 @@ def GetOrthologues_from_phyldog_tree(iog, treeFN, GeneToSpecies, qWrite=False, d
             n.name = "n" + n.ND
         ch = n.get_children()
         if len(ch) == 2:       
-            oSize, overlap, sp0, sp1 = OverlapSize(n, GeneToSpecies)
+            oSize, overlap, sp0, sp1 = OverlapSize(n, GeneToSpecies, empty)
             if n.Ev == "D":
                 if dupsWriter != None:
                     sp_present = sp0.union(sp1)
