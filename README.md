@@ -331,9 +331,11 @@ The MSA species tree method is also described in the STAG paper: <https://www.bi
  * If n >= 100 and the proportional increase in the number of orthogroups, n, is less than two times the proportional decrease in s then stop here and use the n orthogroups. Reducing the minimum threshold for single-copy species is not giving a large amount of extra data and so it's not worth reducing this threshold further. if s<0.5xS then require a 4 times proportional increase in the number of orthogroups to for each decrement in s to avoid lowering s too far.
 3. Create a concatenated species MSA from the single-copy genes in the selected orthogroups.
 4. Trim the MSA of any column that has more than (S - 0.5s) gaps. (I.e. S-s species could be gaps anyway because of the inclusion threshold that was determined and then at most 50% gaps in a particular column for the s genes represented for that column).
+5. When it is run, OrthoFinder outputs how many orthogroups it has identified and with what minimum threshold percentage of species single-copy in each orthogroup (100*s/S). E.g. for the example dataset: 
+> Species tree: Using 246 orthogroups with minimum of 100.0% of species having single-copy genes in any orthogroup
 
-
-
+#### Falback species tree method
+In most datasets there will be thousands of genes present in all species and so the default species tree inference method can be used. In some extreme cases there may not be any such orthogroups. In these cases, instead of the default method, the pairwise distances are calculated in each tree for each species pair that is present in that tree. A single distance matrix is then calculated for the species tree rather than one distance matrix per orthogroup. The distance between each species pair is this matrix is the median of all the closest distances across all the orthogroup gene trees. The species trees is inferred from this distance matrix.
 
 
 
