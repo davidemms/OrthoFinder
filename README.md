@@ -297,3 +297,43 @@ If you are running the BLAST searches yourself it is strongly recommended that y
 
 ### Regression Tests
 A set of regression tests are included in the directory 'Tests' available from the github repository. They can be run by calling the script 'test_orthofinder.py'. They currently require version 2.2.28 of NCBI BLAST and the script will exit with an error message if this is not the case.
+
+## Methods
+The orthogroup inference stage of OrthoFinder is described in the first paper: https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2
+
+The second stage from orthogroups to gene trees, the rooted species tree, orthologs, gene duplication events etc. is described in the second paper: https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1832-y
+
+The workflow figure at the top of this page summarises this.
+
+The rooting of the unrooted species tree is described in the STRIDE paper: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5850722/
+
+Species tree inference is described in the second OrthoFinder paper and in the STAG paper: <https://www.biorxiv.org/content/10.1101/267914v1>. A summary is provided below.
+
+### Species Tree Inference
+OrthoFinder infers orthologs from rooted gene trees. Since tree inference methods return unrooted gene trees, OrthoFinder requires a rooted species tree in order to root the gene trees before ortholog inference can take place. There are two methods that can be used for unrooted species tree inference (plus a fallback method that is employed in rare circumstances when there is insufficient data for the other methods). Additionally, if the user knows the topology of the rooted species tree they can provide it to OrthoFinder (the branch lenghts aren't required). The rooted species tree is only required in the final step of the OrthoFinder analysis, the rooting of the gene trees and the inference of orthologs and gene duplication events. This step is comparitively fast and so it is easy to run just this last step using the '-ft' option and a corrected species tree if you want to use a different species tree to the one OrthoFinder used.
+
+#### Default species tree method
+The default species tree method is STAG, described here: <https://www.biorxiv.org/content/10.1101/267914v1>
+1. The set of all orthogroups with all species present (regardless of gene copy number) is identified: X
+2. For each orthogroup x in X, a matrix of pairwise species distances is calculated. For x, the distance between each species pair is the tree distance for the closest pair of genes from that species pair in the gene tree for x.
+3. For each orthogroup x in X, a species tree is inferred from the distance matrix.
+4. A consensus tree of all these individual species trees is calculated as the final species tree
+5. The support value for each bipartition is the number of individual  species trees that contained that bipartition. 
+6. When it is run, OrthoFinder outputs how many orthogroups it has identified with all species present. E.g. for the example dataset: 
+> 269 trees had all species present and will be used by STAG to infer the species tree
+
+#### Multiple Sequence Alignment species tree method (-M msa)
+The MSA species tree method is also described in the STAG paper: <https://www.biorxiv.org/content/10.1101/267914v1>, it is used whenever the MSA method is used for tree inference using the '-M msa' option. It infers the species tree from a concatenated MSA of single-copy genes. For many datasets there will not be many orthogroups that have exactly one gene in every species since gene duplication and loss events make such orthogroups rare. For this reason, OrthoFinder will identify orthogroups that are single-copy in a proportion (p%) of species and use the single-copy genes from these orthogroups as additional data to infer the species tree. This is standard practice in most papers in which a species tree is inferred. OrthoFinder provides a formalised procedure for determining a suitable value of p. Let S be the number of species.
+1. Identify n, the number of orthogroups with exactly one gene in s species, where s is initially equal to S, the number of species in the analysis. If n >= 1000 stop here and use these orthogroups
+2. While n < 1000
+ * set s = s-1
+ * recalculate n, number of orthogroups with at least s species single-copy
+ * If n >= 100 and the proportional increase in the number of orthogroups, n, is less than two times the proportional decrease in s then stop here and use the n orthogroups. Reducing the minimum threshold for single-copy species is not giving a large amount of extra data and so it's not worth reducing this threshold further. if s<0.5xS then require a 4 times proportional increase in the number of orthogroups to for each decrement in s to avoid lowering s too far.
+3. Create a concatenated species MSA from the single-copy genes in the selected orthogroups.
+4. Trim the MSA of any column that has more than (S - 0.5s) gaps. (I.e. S-s species could be gaps anyway because of the inclusion threshold that was determined and then at most 50% gaps in a particular column for the s genes represented for that column).
+
+
+
+
+
+
