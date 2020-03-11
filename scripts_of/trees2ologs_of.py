@@ -169,6 +169,8 @@ class HogWriter(object):
         scl = n.get_leaves(is_leaf_fn=self.scl_fn) # single-copy 'leaf'
         scl_units = dict()
         for unit in scl:
+            # we can have more than one unit corresponding to the same place if the tree is non-binary. In this case the 'dup' test has
+            # already been passed in the previous (orthologs) traverse of the tree and so the genes can be concatenated
             # get all the genes from under here and sort them into a text string per species
             genes_per_species = defaultdict(list) # iCol (before 'name' columns) -> text string of genes
             genes = unit.get_leaves()
@@ -179,7 +181,17 @@ class HogWriter(object):
                 isp = g.name.split("_")[0]
                 genes_per_species[self.i_sp_to_index[isp]].append(self.seq_ids[g.name])
             if q_have_legitimate_gene:
-                scl_units[unit.name.split("_")[0] if unit.is_leaf() else unit.sp_node] = {k:", ".join(v) for k,v in genes_per_species.items()}
+                unit_name = unit.name.split("_")[0] if unit.is_leaf() else unit.sp_node
+                d_new = {k:", ".join(v) for k,v in genes_per_species.items()}
+                if unit_name in scl_units:
+                    d_orig = scl_units[unit_name]
+                    for k, v in d_new.items():
+                        if k in d_orig:
+                            d_orig[k] = d_orig[k] + ", " + d_new[k]
+                        else:
+                            d_orig[k] = v
+                else:
+                    scl_units[unit_name] = d_new
                 r = unit.name.split("_")[0] if unit.is_leaf() else unit.sp_node
         # 1. Get HOGs to write
         scl_mrca = {nn.sp_node for nn in scl if not nn.is_leaf()}
@@ -517,7 +529,6 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
     tree.name = "n0"
     suspect_genes = set()
     empty_set = set()
-    ilab = 0
     # preorder traverse so that suspect genes can be identified first, before their closer ortholgoues are proposed.
     # Tree resolution has already been performed using a postorder traversal
     for n in tree.traverse('preorder'):
@@ -543,7 +554,6 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                 misplaced_genes = empty_set
             dup = oSize != 0 and not qResolved
             n.add_feature("dup", dup)
-            ilab += 1
             if dup:
                 if dupsWriter != None:
                     if len(sp_present) == 1:
@@ -558,12 +568,27 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                 suspect_genes.update(misplaced_genes)
         elif len(ch) > 2:
             species = [{GeneToSpecies(l) for l in n_.get_leaf_names()} for n_ in ch]
-            stNode = MRCA_node(species_tree_rooted, set.union(species))
+            all_species = set.union(*species)
+            stNode = MRCA_node(species_tree_rooted, all_species)
             n.add_feature("sp_node", stNode.name)
-            n.add_feature("dup", False)
-            for (n0, s0), (n1, s1) in itertools.combinations(zip(ch, species), 2):
-                if len(s0.intersection(s1)) == 0:
-                    orthologues.append(Orthologs_and_Suspect((n0, n1), suspect_genes, empty_set, SpeciesAndGene))
+            # should skip if everything below this is a single species, but should write out the duplications
+            if len(all_species) == 1:
+                dupsWriter.writerow([og_name, spIDs[stNode.name], n.name, 1., "Terminal", ", ".join([seqIDs[g] for g in n.get_leaf_names()]), " "]) 
+                n.add_feature("dup", True)  
+            else:
+                dups = []
+                for (n0, s0), (n1, s1) in itertools.combinations(zip(ch, species), 2):
+                    if len(s0.intersection(s1)) == 0:
+                        orthologues.append(Orthologs_and_Suspect((n0, n1), suspect_genes, empty_set, SpeciesAndGene))
+                        dups.append(False)
+                    else:
+                        dups.append(True)
+                if all(dups):
+                    dupsWriter.writerow([og_name, stNode.name, n.name, 1., "Non-Terminal", ", ".join([seqIDs[g] for g in n.get_leaf_names()]), " "])
+                # if there are nodes below with same MRCA then dup (no HOGs) otherwise not dup (=> HOGS at this level)
+                descendant_nodes = [MRCA_node(species_tree_rooted, sp) for sp in species]
+                dup = any(down_sp_node == stNode for down_sp_node in descendant_nodes)
+                n.add_feature("dup", dup)  
     return orthologues, tree, suspect_genes
 
 def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, ortholog_file_writers, suspect_genes_file_writers, qContainsSuspectOlogs):
@@ -787,7 +812,6 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
         dupWriter = csv.writer(outfile, delimiter="\t")
         dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
         for iog in range(nOgs):
-            # if iog != 3672: continue
             rooted_tree_ids, qHaveSupport = CheckAndRootTree(files.FileHandler.GetOGsTreeFN(iog), species_tree_rooted_labelled, GeneToSpecies) # this can be parallelised easily
             if rooted_tree_ids is None: continue
             # Write rooted tree with accessions
