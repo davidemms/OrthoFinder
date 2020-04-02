@@ -61,7 +61,7 @@ A more complete guide can be found here: <https://davidemms.github.io/orthofinde
 ## Running OrthoFinder
 To Run OrthoFinder on the Example Data type
 
-`OrthoFinder/orthofinder -f OrthoFinder/ExampleDataset`
+`OrthoFinder/orthofinder -f OrthoFinder/ExampleData`
 
 ## What OrthoFinder provides
 **There is a tutorial that provides a guided tour of the main results files here: <https://davidemms.github.io/orthofinder_tutorials/exploring-orthofinders-results.html>**
@@ -139,11 +139,11 @@ Most of the terms in the files 'Statistics_Overall.csv' and 'Statistics_PerSpeci
 This contains all the files necessary for orthofinder to run. You can ignore this.
 
 ## Additional Information
-* [What are orthogroups, orthologs & paralogs?](#orthogroups-orthologues--paralogues)
+* [What are orthogroups, orthologs & paralogs?](#orthogroups-orthologs--paralogs)
 * [Why use orthogroups in your analysis](#why-orthogroups)
 * [Installing Dependencies](#setting-up-orthofinder)
 * [Adding and removing species from a completed OrthoFinder run](#advanced-usage)
-* [Preparing and using separately run BLAST files](#running-blast-searches-separately--p-option)
+* [Preparing and using separately run BLAST files](#running-blast-searches-separately--op-option)
 
 ## Orthogroups, Orthologs & Paralogs
 Orthologs are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Figure 2A & B). An orthogroup is the extension of the concept of orthology to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). 
@@ -165,6 +165,7 @@ It is important to note that with orthogroups you choose where to define the lim
 ### Orthogroups are the only way to identify orthologs
 Orthology is defined by phylogeny. It is not definable by amino acid content, codon bias, GC content or other measures of sequence similarity. Methods that use such scores to define orthologs in the absence of phylogeny can only provide guesses. The only way to be sure that the orthology assignment is correct is by conducting a phylogenetic reconstruction of all genes descended from a single gene the last common ancestor of the species under consideration. This set of genes is an orthogroup. Thus, the only way to define orthology is by analysing orthogroups.   
 
+## Setting up OrthoFinder
 ### Installing Dependencies
 To perform an analysis OrthoFinder requires some dependencies. The OrthoFinder release package now contains these so you should just be able to download it and run. 
 
@@ -246,6 +247,7 @@ For example, to you muscle and iqtree, the command like arguments you need to ad
 #### Python Source Code Version
 It is recommended that you use the standalone binaries for OrthoFinder which do not require python or scipy to be installed. However, the python source code version is available from the github 'releases' page (e.g. 'OrthoFinder-1.0.6_source.tar.gz' and requires python 2.7 and scipy to be installed. Up-to-date and clear instructions are provided here: http://www.scipy.org/install.html, be sure to choose a version using python 2.7. As websites can change, an alternative is to search online for "install scipy". 
 
+## Advanced usage
 ### Adding Extra Species
 OrthoFinder allows you to add extra species without re-running the previously computed BLAST searches:
 
@@ -295,3 +297,45 @@ If you are running the BLAST searches yourself it is strongly recommended that y
 
 ### Regression Tests
 A set of regression tests are included in the directory 'Tests' available from the github repository. They can be run by calling the script 'test_orthofinder.py'. They currently require version 2.2.28 of NCBI BLAST and the script will exit with an error message if this is not the case.
+
+## Methods
+The orthogroup inference stage of OrthoFinder is described in the first paper: https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2
+
+The second stage from orthogroups to gene trees, the rooted species tree, orthologs, gene duplication events etc. is described in the second paper: https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1832-y
+
+The workflow figure at the top of this page summarises this.
+
+The rooting of the unrooted species tree is described in the STRIDE paper: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5850722/
+
+Species tree inference is described in the second OrthoFinder paper and in the STAG paper: <https://www.biorxiv.org/content/10.1101/267914v1>. A summary is provided below.
+
+### Species Tree Inference
+OrthoFinder infers orthologs from rooted gene trees. Since tree inference methods return unrooted gene trees, OrthoFinder requires a rooted species tree in order to root the gene trees before ortholog inference can take place. There are two methods that can be used for unrooted species tree inference (plus a fallback method that is employed in rare circumstances when there is insufficient data for the other methods). Additionally, if the user knows the topology of the rooted species tree they can provide it to OrthoFinder (the branch lenghts aren't required). The rooted species tree is only required in the final step of the OrthoFinder analysis, the rooting of the gene trees and the inference of orthologs and gene duplication events. This step is comparitively fast and so it is easy to run just this last step using the '-ft' option and a corrected species tree if you want to use a different species tree to the one OrthoFinder used.
+
+#### Default species tree method
+The default species tree method is STAG, described here: <https://www.biorxiv.org/content/10.1101/267914v1>
+1. The set of all orthogroups with all species present (regardless of gene copy number) is identified: X
+2. For each orthogroup x in X, a matrix of pairwise species distances is calculated. For x, the distance between each species pair is the tree distance for the closest pair of genes from that species pair in the gene tree for x.
+3. For each orthogroup x in X, a species tree is inferred from the distance matrix.
+4. A consensus tree of all these individual species trees is calculated as the final species tree
+5. The support value for each bipartition is the number of individual  species trees that contained that bipartition. 
+6. When it is run, OrthoFinder outputs how many orthogroups it has identified with all species present. E.g. for the example dataset: 
+> 269 trees had all species present and will be used by STAG to infer the species tree
+
+#### Multiple Sequence Alignment species tree method (-M msa)
+The MSA species tree method is also described in the STAG paper: <https://www.biorxiv.org/content/10.1101/267914v1>, it is used whenever the MSA method is used for tree inference using the '-M msa' option. It infers the species tree from a concatenated MSA of single-copy genes. For many datasets there will not be many orthogroups that have exactly one gene in every species since gene duplication and loss events make such orthogroups rare. For this reason, OrthoFinder will identify orthogroups that are single-copy in a proportion (p%) of species and use the single-copy genes from these orthogroups as additional data to infer the species tree. This is standard practice in most papers in which a species tree is inferred. OrthoFinder provides a formalised procedure for determining a suitable value of p. Let S be the number of species.
+1. Identify n, the number of orthogroups with exactly one gene in s species, where s is initially equal to S, the number of species in the analysis. If n >= 1000 stop here and use these orthogroups
+2. While n < 1000
+ * set s = s-1
+ * recalculate n, number of orthogroups with at least s species single-copy
+ * If n >= 100 and the proportional increase in the number of orthogroups, n, is less than two times the proportional decrease in s then stop here and use the n orthogroups. Reducing the minimum threshold for single-copy species is not giving a large amount of extra data and so it's not worth reducing this threshold further. if s<0.5xS then require a 4 times proportional increase in the number of orthogroups to for each decrement in s to avoid lowering s too far.
+3. Create a concatenated species MSA from the single-copy genes in the selected orthogroups.
+4. Trim the MSA of any column that has more than (S - 0.5s) gaps. (I.e. S-s species could be gaps anyway because of the inclusion threshold that was determined and then at most 50% gaps in a particular column for the s genes represented for that column).
+5. When it is run, OrthoFinder outputs how many orthogroups it has identified and with what minimum threshold percentage of species single-copy in each orthogroup (100*s/S). E.g. for the example dataset: 
+> Species tree: Using 246 orthogroups with minimum of 100.0% of species having single-copy genes in any orthogroup
+
+#### Falback species tree method
+In most datasets there will be thousands of genes present in all species and so the default species tree inference method can be used. In some extreme cases there may not be any such orthogroups. In these cases, instead of the default method, the pairwise distances are calculated in each tree for each species pair that is present in that tree. A single distance matrix is then calculated for the species tree rather than one distance matrix per orthogroup. The distance between each species pair is this matrix is the median of all the closest distances across all the orthogroup gene trees. The species trees is inferred from this distance matrix.
+
+
+
