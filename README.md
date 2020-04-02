@@ -61,7 +61,7 @@ A more complete guide can be found here: <https://davidemms.github.io/orthofinde
 ## Running OrthoFinder
 To Run OrthoFinder on the Example Data type
 
-`OrthoFinder/orthofinder -f OrthoFinder/ExampleDataset`
+`OrthoFinder/orthofinder -f OrthoFinder/ExampleData`
 
 ## What OrthoFinder provides
 **There is a tutorial that provides a guided tour of the main results files here: <https://davidemms.github.io/orthofinder_tutorials/exploring-orthofinders-results.html>**
