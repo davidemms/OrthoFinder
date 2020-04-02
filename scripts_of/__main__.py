@@ -29,9 +29,11 @@
 from __future__ import absolute_import
 from . import parallel_task_manager
 
+import os                                       # Y
+os.environ["OPENBLAS_NUM_THREADS"] = "1"    # fix issue with numpy/openblas. Will mean that single threaded options aren't automatically parallelised 
+
 import sys                                      # Y
 import subprocess                               # Y
-import os                                       # Y
 import glob                                     # Y
 import shutil                                   # Y
 import time                                     # Y
