@@ -919,8 +919,8 @@ class Options(object):#
         self.qMSATrees = False
         self.qAddSpeciesToIDs = True
         self.search_program = "diamond"
-        self.msa_program = None
-        self.tree_program = None
+        self.msa_program = "mafft"
+        self.tree_program = "fasttree"
         self.recon_method = "of_recon"
         self.name = None   # name to identify this set of results
         self.qDoubleBlast = True
@@ -958,6 +958,7 @@ def ProcessArgs(prog_caller, args):
     continuationDir = None
     resultsDir_nonDefault = None
     pickleDir_nonDefault = None
+    q_selected_msa_options = False
     
     """
     -f: store fastaDir
@@ -1099,13 +1100,10 @@ def ProcessArgs(prog_caller, args):
             arg = args.pop(0)
             if arg == "msa": 
                 options.qMSATrees = True
-                options.msa_program = "mafft"
-                options.tree_program = "fasttree"
             elif arg == "phyldog": 
                 options.qPhyldog = True
                 options.recon_method = "phyldog"
                 options.qMSATrees = False
-                options.msa_program = "mafft"
             elif arg == "dendroblast": options.qMSATrees = False    
             else:
                 print("Invalid argument for option %s: %s" % (arg_M_or_msa, arg))
@@ -1120,6 +1118,7 @@ def ProcessArgs(prog_caller, args):
             arg = args.pop(0)
             if arg in choices:
                 options.msa_program = arg
+                q_selected_msa_options = True
             else:
                 print("Invalid argument for option %s: %s" % (switch_used, arg))
                 print("Valid options are: {%s}\n" % (", ".join(choices)))
@@ -1133,6 +1132,7 @@ def ProcessArgs(prog_caller, args):
             arg = args.pop(0)
             if arg in choices:
                 options.tree_program = arg
+                q_selected_msa_options = True
             else:
                 print("Invalid argument for option %s: %s" % (switch_used, arg))
                 print("Valid options are: {%s}\n" % (", ".join(choices)))
@@ -1192,14 +1192,10 @@ def ProcessArgs(prog_caller, args):
 
     if options.qStopAfterAlignments and (not options.qMSATrees):
         print("ERROR: Argument '-oa' (stop after alignments) also requires option '-M msa'")
-        util.Fail()    
+        util.Fail()     
 
-    if options.tree_program != None and (not options.qMSATrees):
-        print("ERROR: Argument '-T' (tree inference program) also requires option '-M msa'")
-        util.Fail()  
-
-    if options.msa_program != None and (not options.qMSATrees and not options.qPhyldog):
-        print("ERROR: Argument '-A' (multiple sequence alignment inference program) also requires option '-M msa'")
+    if q_selected_msa_options and (not options.qMSATrees and not options.qPhyldog):
+        print("ERROR: Argument '-A' or '-T' (multiple sequence alignment/tree inference program) also requires option '-M msa'")
         util.Fail()       
         
     if options.qPhyldog and (not options.speciesTreeFN):
