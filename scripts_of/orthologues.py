@@ -579,7 +579,11 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
             return False
         if recon_method == "dlcpar_convergedsearch":
             capture = subprocess.Popen("dlcpar_search --version", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
-            stdout = "".join([x for x in capture.stdout])
+            stdout = [x for x in capture.stdout]
+            try:
+                stdout = "".join([x.decode() for x in capture.stdout])
+            except (UnicodeDecodeError, AttributeError):
+                stdout = "".join([x.encode() for x in capture.stdout])
             version = stdout.split()[-1]
             major, minor, release = list(map(int, version.split(".")))
             # require 1.0.1 or above            

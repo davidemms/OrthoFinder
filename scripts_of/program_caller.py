@@ -203,6 +203,12 @@ class ProgramCaller(object):
         capture = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=parallel_task_manager.my_env)
         stdout = [x for x in capture.stdout]
         stderr = [x for x in capture.stderr]
+        try:
+            stdout = [x.decode() for x in stdout]
+            stderr = [x.decode() for x in stderr]
+        except (UnicodeDecodeError, AttributeError):
+            stdout = [x.encode() for x in stdout]
+            stderr = [x.encode() for x in stderr]
         capture.communicate()
         if actual_target_fns != None:
             actual, target = actual_target_fns
@@ -223,7 +229,8 @@ class ProgramCaller(object):
             shutil.rmtree(d)
             raise
         shutil.rmtree(d)
-        if success: print(" - ok")
+        if success: 
+            print(" - ok")
         else:
             print(" - failed")
             print(("".join(stdout)))
