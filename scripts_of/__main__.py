@@ -234,8 +234,8 @@ class MCL:
             sys.stderr.write(str(e) + "\n")
             files.FileHandler.LogFailAndExit(("ERROR: Sequence ID not found in %s\n" % idsFilename) + str(e) + "\n")        
         except RuntimeError as error:
-            print(error.message)
-            if error.message.startswith("ERROR"):
+            print(str(error))
+            if str(error).startswith("ERROR"):
                 err_text = "ERROR: %s contains a duplicate ID. The IDs for the orthogroups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename)
                 files.FileHandler.LogFailAndExit(err_text)
             else:
