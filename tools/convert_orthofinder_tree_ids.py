@@ -8,7 +8,6 @@ import argparse
 
 if __name__ == "__main__" and __package__ is None:   
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    print(sys.path[-1])
 
 from scripts_of import tree, util
         
@@ -68,9 +67,9 @@ def main_convert():
             
         for treeFilename in filesToDo:
             try:
-                sys.stdout.write(treeFilename)
                 pathfilename, ext = os.path.splitext(treeFilename)
                 newFilename = pathfilename + "_accessions" + ext
+                sys.stdout.write(newFilename)
                 ReplaceFileWithNewIDs(idsDict, treeFilename, newFilename)
             except:
                 sys.stdout.write(" - skipped")
