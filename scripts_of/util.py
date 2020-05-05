@@ -177,6 +177,7 @@ class FullAccession(IDExtractor):
 #                if line.startswith("#"): continue
                 id, accession = line.split(": ", 1)
                 id = id.replace("#", "")
+                id = id.strip()
                 # Replace problematic characters
                 accession = accession.replace(":", "_").replace(",", "_").replace("(", "_").replace(")", "_") #.replace(".", "_")
                 if id in self.idToNameDict:
