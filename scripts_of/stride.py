@@ -506,7 +506,7 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, qWriteDupTre
         speciesTree = tree.Tree(speciesTreeFN, format=2)
         qHaveBranchSupport = True
     except:
-        speciesTree = tree.Tree(speciesTreeFN, format=1)                    
+        speciesTree = tree.Tree(speciesTreeFN, format=1)
     species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
     pool = mp.Pool(nProcessors, maxtasksperchild=1)       
     list_of_dicts = pool.map(SupportedHierachies_wrapper2, [(fn, GeneToSpeciesMap, species, dict_clades, clade_names, qWriteDupTrees) for fn in glob.glob(treesDir + "/*")])
@@ -544,7 +544,7 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, qWriteDupTre
             speciesTree = RootAtClade(speciesTree, r) 
             speciesTree_rootedFN = os.path.splitext(speciesTreeFN)[0] + "_%d_rooted.txt" % i 
     #    speciesTree = LabelNodes()
-            speciesTree.write(outfile=speciesTree_rootedFN, format = 2 if qHaveBranchSupport else 1)
+            speciesTree.write(outfile=speciesTree_rootedFN, format = 2 if qHaveBranchSupport else 5)   # 5 With all branch lengths. No support or node names. 1 has node names
             speciesTrees_rootedFNs.append(speciesTree_rootedFN)
     return roots, clusters, speciesTrees_rootedFNs, nSupport, list(dict_clades.keys()), species, all_stride_dup_genes
 

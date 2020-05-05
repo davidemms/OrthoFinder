@@ -447,6 +447,10 @@ class DendroBLASTTrees(object):
         return (nSp_perOG.count(nSp) >= 100)
     
     def RunAnalysis(self, qSpeciesTree=True):
+        """
+        Args:
+            qSpeciesTree - Bool: infer the species tree
+        """
         util.PrintUnderline("Calculating gene distances")
         ogs, ogMatrices_partial = self.GetOGMatrices_FullParallel()
         ogMatrices = self.CompleteAndWriteOGMatrices(ogs, ogMatrices_partial)
