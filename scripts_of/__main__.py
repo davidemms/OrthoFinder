@@ -1604,8 +1604,16 @@ def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_na
     speciesInfoObj.speciesToUse = speciesInfoObj.speciesToUse + newSpeciesIDs
     speciesInfoObj.nSpAll = max(speciesInfoObj.speciesToUse) + 1      # will be one of the new species
     return speciesInfoObj
-            
-def CheckOptions(options):
+
+def DeleteDirectoryTree(d):
+    if os.path.exists(d): 
+        try:
+            shutil.rmtree(d)
+        except OSError:
+            time.sleep(1)
+            shutil.rmtree(d, True)   
+
+def CheckOptions(options, speciesToUse):
     """Check any optional arguments are valid once we know what species are in the analysis
     - user supplied species tree
     """
@@ -1619,7 +1627,45 @@ def CheckOptions(options):
     if options.qStopAfterAlignments and (not options.qMSATrees):
         print("ERROR: Must use '-M msa' option to generate sequence files and infer multiple sequence alignments for orthogroups")
         util.Fail()
-    
+
+    # check can open enough files
+    n_extra = 50
+    q_do_orthologs = not any((options.qStopAfterPrepare, options.qStopAfterGroups, options.qStopAfterSeqs, options.qStopAfterAlignments, options.qStopAfterTrees))
+    if q_do_orthologs and not options.qStartFromTrees:
+        n_sp = len(speciesToUse)
+        wd = files.FileHandler.GetWorkingDirectory_Write()
+        wd_files_test = wd + "Files_test/"
+        fh = []
+        try:
+            if not os.path.exists(wd_files_test):
+                os.mkdir(wd_files_test)
+            for i_sp in range(n_sp):
+                di = wd_files_test + "Sp%d/" % i_sp
+                if not os.path.exists(di):
+                    os.mkdir(di)
+                for j_sp in range(n_sp):
+                    fnij = di + "Sp%d.txt" % j_sp
+                    fh.append(open(fnij, 'w'))
+            # create a few extra files to be safe
+            for i_extra in range(n_extra):
+                fh.append(open(wd_files_test + "Extra%d.txt" % i_extra, 'w'))
+            # close the files again and delete
+            for fhh in fh:
+                fhh.close()
+            DeleteDirectoryTree(wd_files_test)
+        except IOError as e:
+            if str(e).startswith("[Errno 24] Too many open files"):
+                util.number_open_files_exception_advice(len(speciesToUse), False)
+                for fhh in fh:
+                    fhh.close()
+                DeleteDirectoryTree(wd_files_test)
+                util.Fail()
+            else:
+                for fhh in fh:
+                    fhh.close()
+                DeleteDirectoryTree(wd_files_test)
+                print("ERROR: Attempted to open required files for OrthoFinder run but an unexpected error occurred. \n\nStacktrace:")
+                raise
     return options
 
 def main(args=None):    
@@ -1646,7 +1692,7 @@ def main(args=None):
             # 3. 
             speciesInfoObj = ProcessesNewFasta(fastaDir, speciesInfoObj, speciesToUse_names)
             files.FileHandler.LogSpecies()
-            options = CheckOptions(options)
+            options = CheckOptions(options, speciesInfoObj.speciesToUse)
             # 4.
             seqsInfo = util.GetSeqsInfo(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # 5.
@@ -1667,7 +1713,7 @@ def main(args=None):
             speciesInfoObj = None
             speciesInfoObj = ProcessesNewFasta(fastaDir)
             files.FileHandler.LogSpecies()
-            options = CheckOptions(options)
+            options = CheckOptions(options, speciesInfoObj.speciesToUse)
             # 4
             seqsInfo = util.GetSeqsInfo(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # 5.
@@ -1688,7 +1734,7 @@ def main(args=None):
             speciesInfoObj, _ = ProcessPreviousFiles(files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast)
             files.FileHandler.LogSpecies()
             print("Using previously calculated BLAST results in %s" % (files.FileHandler.GetWorkingDirectory1_Read()[0]))
-            options = CheckOptions(options)
+            options = CheckOptions(options, speciesInfoObj.speciesToUse)
             # 4.
             seqsInfo = util.GetSeqsInfo(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # 5.
@@ -1703,13 +1749,13 @@ def main(args=None):
             # 0.  
             speciesInfoObj, _ = ProcessPreviousFiles(continuationDir, options.qDoubleBlast)
             files.FileHandler.LogSpecies()
-            options = CheckOptions(options)
+            options = CheckOptions(options, speciesInfoObj.speciesToUse)
             # 9
             GetOrthologues(speciesInfoObj, options, prog_caller)
         elif options.qStartFromTrees:
             speciesInfoObj, _ = ProcessPreviousFiles(files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast)
             files.FileHandler.LogSpecies()
-            options = CheckOptions(options)
+            options = CheckOptions(options, speciesInfoObj.speciesToUse)
             GetOrthologues_FromTrees(options)
         else:
             raise NotImplementedError

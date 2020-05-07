@@ -378,7 +378,37 @@ def FlowText(text, n=60):
             lines += text
             text = ""
     return lines
-    
+
+def number_open_files_exception_advice(n_species, q_at_trees):
+    """
+    Prints advice for user on "IOError: [Errno 24] Too many open files" exception
+    Args:
+        n_species - the number of species in the analysis
+        q_at_trees - has this error occurred at the orthologs from trees stage
+    """
+    # parallel_task_manager.RunCommand("ulimit -Hn")    
+    n_req = n_species*n_species + 100
+    msg="\nERROR: The system limits on the number of files a process can open is too low. For %d species \
+OrthoFinder needs to be able to open at least r=%d files. Please increase the limit and restart OrthoFinder\n\
+1. Check the hard and soft limits on the number of open files for your system:\n\
+    $ ulimit -Hn\n\
+    $ ulimit -Sn\n\
+2. If hard limit, h > r already, then you just need to increase the soft limit:\n\
+    $ ulimit -n %d\n\
+3. Alternatively, if h < r then you need to edit the file '/etc/security/limits.conf', this requires root privileges. \
+To increase the limit to %d for user  called 'emms' add the lines:\n\
+    emms hard nofile %d\n\
+    emms soft nofile %d\n" % (n_species, n_req, n_req, n_req, n_req, n_req)   
+    msg +="    (edit these lines to match your username)\n\
+4. Check the limit has now been updated (if you changed the hard limit you'll need to open a new session and confirm it's updated):\n\
+    $ ulimit -Sn" 
+
+    if q_at_trees:
+        msg_part_2 = "5. Once the limit is updated restart OrthoFinder 'from trees' using the '-ft' command"
+    else:
+        msg_part_2 = "5. Once the limit is updated restart OrthoFinder with the original command"
+    msg_part_3 = "\nFor full details see: https://github.com/davidemms/OrthoFinder/issues/384"
+    print(msg + "\n" + msg_part_2 + "\n" + msg_part_3 + "\n")
 """
 -------------------------------------------------------------------------------
 """
