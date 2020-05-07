@@ -792,7 +792,7 @@ def InitialiseFileHandler(options, fastaDir=None, continuationDir=None, resultsD
     
     Implementation
     1. Working out if an old directory structure is being used
-    2. Construct and apporpriate PreviousFilesLocator if necessary - this locates all required files
+    2. Construct and appropriate PreviousFilesLocator if necessary - this locates all required files
     3. Pass this to FileHandler - this creates the directory structure required for this run
     4. if error: print and exit
     5. Return FileHandler

@@ -355,7 +355,7 @@ def Fail():
     sys.stderr.flush()
     ptm = ParallelTaskManager_singleton()
     ptm.Stop()
-    print("ERROR: An error occurred, please review error messages for more information.")
+    print("ERROR: An error occurred, ***please review the error messages*** they may contain useful information about the problem.")
     sys.exit(1)
 
 
