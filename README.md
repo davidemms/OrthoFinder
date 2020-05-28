@@ -191,7 +191,7 @@ Here are some brief instructions if you do need to download them manually. They 
 Available here: https://github.com/bbuchfink/diamond/releases
 
 Download the latest release, extract it and copy the executable to a directory in your system path, e.g.:
-- `wget https://github.com/bbuchfink/diamond/releases/download/v0.9.22/diamond-linux64.tar.gz`
+- `wget https://github.com/bbuchfink/diamond/releases/latest/download/diamond-linux64.tar.gz`
 - `tar xzf diamond-linux64.tar.gz`
 - `sudo cp diamond /usr/local/bin`
 
