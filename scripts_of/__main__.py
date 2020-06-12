@@ -674,7 +674,7 @@ def Stats_SizeTable(writer_sum, writer_sp, properOGs, allGenesCounter, iSpecies,
         writer_sum.writerow([i, n.count(i)])
 
 def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
-    """ Top-level method for calcualtion of stats for the orthogroups"""
+    """ Top-level method for calculation of stats for the orthogroups"""
     allOgs = [[list(map(int, g.split("_"))) for g in og] for og in ogs]
     properOGs = [og for og in allOgs if len(og) > 1]
     allGenes = [g for og in allOgs for g in og]

@@ -527,9 +527,13 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, qWriteDupTre
     if len(clusters) > 0 and len(roots) > 1:
         # Evaluate which is the best one
         for r in roots:
+            # 1. Root at potential outgroup
             speciesTree = RootAtClade(speciesTree, r)
+            # 2. Get minimum topological distance to any clade with gene duplication evidence
             topDist.append(min([speciesTree.get_distance(n, topology_only=True) for n in speciesTree.traverse('preorder') if frozenset(n.get_leaf_names()) in clusters]))
+            # 3. Get minimum branch length to outgroups that are also the minimum topological distance
             branchDist.append(min([speciesTree.get_distance(n) for n in speciesTree.traverse('preorder') if (frozenset(n.get_leaf_names()) in clusters and speciesTree.get_distance(n, topology_only=True) == topDist[-1])]))        
+        # 4. Get the distance for the root which is furthest from its closest outgroup
         maxTopDist = max(topDist)
         bestDist = -1
         for i, (t, d) in enumerate(zip(topDist, branchDist)):
