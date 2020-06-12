@@ -1068,7 +1068,7 @@ def ProcessArgs(prog_caller, args):
             while checkDirName.endswith("/"):
                 checkDirName = checkDirName[:-1]
             path, newDir = os.path.split(checkDirName)
-            if not os.path.exists(path):
+            if path != "" and not os.path.exists(path):
                 print("ERROR: location '%s' for results directory '%s' does not exist.\n" % (path, newDir))
                 util.Fail()
         elif arg == "-s" or arg == "--speciestree":  
