@@ -559,7 +559,7 @@ class OrthologsFiles(object):
         self.iSpeciesToUse = iSpeciesToUse
         self.nSpecies = nSpecies
         self.sp_to_index = sp_to_index
-        self.dSuspectGenes = files.FileHandler.GetSuspectGenesDir()
+        self.dPutativeXenologs = files.FileHandler.GetPutativeXenelogsDir()
         self.ortholog_file_handles = [[None for _ in self.iSpeciesToUse] for _ in self.iSpeciesToUse]
         self.suspect_genes_file_handles = [None for _ in self.iSpeciesToUse]
 
@@ -568,7 +568,7 @@ class OrthologsFiles(object):
         suspect_genes_file_writers = [None for _ in self.iSpeciesToUse]
         for i in xrange(self.nSpecies):
             sp0 = str(self.iSpeciesToUse[i])
-            self.suspect_genes_file_handles[i] = open(self.dSuspectGenes + "%s.tsv" % self.speciesDict[sp0], csv_write_mode)
+            self.suspect_genes_file_handles[i] = open(self.dPutativeXenologs + "%s.tsv" % self.speciesDict[sp0], csv_write_mode)
             suspect_genes_file_writers[i] = csv.writer(self.suspect_genes_file_handles[i], delimiter="\t")
             strsp0 = sp0 + "_"
             isp0 = self.sp_to_index[sp0]
