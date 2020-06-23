@@ -217,19 +217,25 @@ def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, 
     allSpecies = {str(gene.iSp) for og in ogs for gene in og}
     concatentaedAlignments = defaultdict(str)
     for iOg in ogsToUse_ids:
-        speciesCounts = Counter([gene.iSp for gene in ogs[iOg]])
-        selectedSeqs = {gene.ToString() for gene in ogs[iOg] if speciesCounts[gene.iSp] == 1}
-        alignment = ReadAlignment(alignment_filename_function(iOg))
-        speciesInThisOg = set()
-        for name, al in alignment.seqs.items():
-            if name.split()[0] in selectedSeqs:
-                iSp = name.split("_")[0]
-                speciesInThisOg.add(iSp)  # this allows for the MSA method to have failed to put the sequence in the MSA
-                al = al.replace('*', '-')
-                concatentaedAlignments[iSp] += al
-        # now put blanks for the missing species
-        for iSp in allSpecies.difference(speciesInThisOg):
-            concatentaedAlignments[iSp] += "-"*(alignment.length)
+        try:
+            speciesCounts = Counter([gene.iSp for gene in ogs[iOg]])
+            selectedSeqs = {gene.ToString() for gene in ogs[iOg] if speciesCounts[gene.iSp] == 1}
+            alignment = ReadAlignment(alignment_filename_function(iOg))
+            speciesInThisOg = set()
+            for name, al in alignment.seqs.items():
+                if name.split()[0] in selectedSeqs:
+                    iSp = name.split("_")[0]
+                    speciesInThisOg.add(iSp)  # this allows for the MSA method to have failed to put the sequence in the MSA
+                    al = al.replace('*', '-')
+                    concatentaedAlignments[iSp] += al
+            # now put blanks for the missing species
+            for iSp in allSpecies.difference(speciesInThisOg):
+                concatentaedAlignments[iSp] += "-"*(alignment.length)
+        except IndexError:
+            # allow empty MSA (could fail for unknown reason)
+            print("WARNING: An MSA failed for an unknown reason: %s" % alignment_filename_function(iOg))
+            print("No tree or orthologs will be inferred for this orthogroup. To correct the issue, identify & correct the problematic gene sequence and rerun.")
+            pass
     # Trim the completed alignment: to 50% of fraction of species present
     maxGap = (1.-fMaxGap*fSingleCopy)*len(allSpecies)
     # vectorise this as the for-loop method took too long (45mins on 3M length alignment vs 1.5s)
