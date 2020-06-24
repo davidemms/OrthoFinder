@@ -122,8 +122,8 @@ class OrthoGroupsSet(object):
             try:
                 self.seqIDsEx = self._extractor(files.FileHandler.GetSequenceIDsFN())
             except RuntimeError as error:
-                print((error.message))
-                if error.message.startswith("ERROR"): 
+                print(str(error))
+                if str(error).startswith("ERROR"): 
                     files.FileHandler.LogFailAndExit()
                 else:
                     print("Tried to use only the first part of the accession in order to list the sequences in each orthogroup\nmore concisely but these were not unique. The full accession line will be used instead.\n")     
@@ -511,7 +511,7 @@ def CheckUserSpeciesTree(speciesTreeFN, expSpecies):
         t = tree.Tree(speciesTreeFN, format=1)
     except Exception as e:
         print("\nERROR: Incorrectly formated user-supplied species tree")
-        print((e.message))
+        print(str(e))
         util.Fail()
     actSpecies = (t.get_leaf_names())
     c = Counter(actSpecies)

@@ -197,7 +197,7 @@ def ProcessTrees(dir_in, dir_matrices, dir_trees_out, GeneToSpecies, qVerbose=Tr
             genes = t.get_leaf_names()
             species = list(map(GeneToSpecies.ToSpecies, genes))
         except UnrecognisedGene as e:
-            print((os.path.split(fn)[1] + " - WARNING: unrecognised gene, %s" % e.message))
+            print((os.path.split(fn)[1] + " - WARNING: unrecognised gene, %s" % str(e)))
             nFail += 1
             continue
         nThis = len(set(species))
