@@ -34,10 +34,11 @@ try:
 except ImportError:
     import Queue as queue     
 
-
-if sys.platform.startswith("linux"):
-    with open(os.devnull, "w") as f:
-        subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f)
+# uncomment to get round problem with python multiprocessing library that can set all cpu affinities to a single cpu
+# This can cause use of only a limited number of cpus in other cases so it has been commented out
+# if sys.platform.startswith("linux"):
+#     with open(os.devnull, "w") as f:
+#         subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f)
 
 
 if getattr(sys, 'frozen', False):

@@ -78,9 +78,11 @@ while not ok:
         max_int = int(max_int/10)
     
 fastaExtensions = {"fa", "faa", "fasta", "fas", "pep"}
-if sys.platform.startswith("linux"):
-    with open(os.devnull, "w") as f:
-        subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f) # get round problem with python multiprocessing library that can set all cpu affinities to a single cpu
+# uncomment to get round problem with python multiprocessing library that can set all cpu affinities to a single cpu
+# This can cause use of only a limited number of cpus in other cases so it has been commented out
+# if sys.platform.startswith("linux"):
+#     with open(os.devnull, "w") as f:
+#         subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f) 
 
 my_env = os.environ.copy()
 # use orthofinder supplied executables by preference
