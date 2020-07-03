@@ -75,13 +75,13 @@ class ProgramCaller(object):
             try:
                 d = json.load(infile)
             except ValueError:
-                print(("WARNING: Incorrecty formatted configuration file %s" % configure_file))
+                print(("WARNING: Incorrectly formatted configuration file %s" % configure_file))
                 print("File is not in .json format. No user-confgurable multiple sequence alignment or tree inference methods have been added.\n")
                 return
             for name, v in d.items():
                 if name == "__comment": continue
                 if " " in name:
-                    print(("WARNING: Incorrecty formatted configuration file entry: %s" % name))
+                    print(("WARNING: Incorrectly formatted configuration file entry: %s" % name))
                     print(("No space is allowed in name: '%s'" % name))
                     continue
                     

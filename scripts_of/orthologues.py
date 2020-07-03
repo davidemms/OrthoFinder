@@ -585,11 +585,13 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
             capture = subprocess.Popen("dlcpar_search --version", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
             stdout = [x for x in capture.stdout]
             try:
-                stdout = "".join([x.decode() for x in capture.stdout])
+                stdout = "".join([x.decode() for x in stdout])
             except (UnicodeDecodeError, AttributeError):
-                stdout = "".join([x.encode() for x in capture.stdout])
+                stdout = "".join([x.encode() for x in stdout])
             version = stdout.split()[-1]
-            major, minor, release = list(map(int, version.split(".")))
+            tokens = list(map(int, version.split(".")))
+            major, minor = tokens[:2]
+            release = tokens[2] if len(tokens) > 2 else 0
             # require 1.0.1 or above            
             actual = (major, minor, release)
             required = [1,0,1]
