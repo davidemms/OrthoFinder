@@ -1393,7 +1393,7 @@ def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
     # check fasta files are present 
     previousFastaFiles = files.FileHandler.GetSortedSpeciesFastaFiles()
     if len(previousFastaFiles) == 0:
-        err_text = "ERROR: No processed fasta files in the supplied previous working directory:\n" + workingDir_list + "\n"
+        err_text = "ERROR: No processed fasta files in the supplied previous working directories:\n" + "\n".join(workingDir_list) + "\n"
         files.FileHandler.LogFailAndExit(err_text)
     tokens = previousFastaFiles[-1][:-3].split("Species")
     lastFastaNumberString = tokens[-1]
