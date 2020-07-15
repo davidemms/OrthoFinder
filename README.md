@@ -68,6 +68,12 @@ To Run OrthoFinder on the Example Data type
 
 A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplication events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
 
+### Results Files: Phylogenetic Hierarchical Orthogroups Directory
+From version 2.4.0 OrthoFinder now infers orthogroups from the gene trees at each hierarchical level for your species (i.e. at each node in the species tree). 
+1. **N0.tsv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species. Additional columns give the HOG (Hierarchical Orthogroup) ID and the node in the gene tree from which the HOG descended. **This file effectively replaces the orthogroups from Orthogroups.tsv. Because they are calculated from trees, the orthogroups from N0.tsv are more accurate (approximately 20% relative increase on the Orthobench benchmarks compared to OrthoFinder version 2).**
+
+2. **N1.txt, N2.tsv, ...**: Orthogroups inferred from the gene trees corresponding to the clades of species in the species tree N1, N2, etc. Because OrthoFinder now infers orthogroups at every hierarchical level within the species tree, it is now possible to include outgroup species within the analysis but use the files to get orthogroups defined for your chosen clade within the species tree. The use of an outgroup gives even higher accuracy (approximately 30% relative increase on the Orthobench benchmarks compared to OrthoFinder version 2).
+
 ### Results Files: Orthogroups Directory
 1. **Orthogroups.tsv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species.
 
