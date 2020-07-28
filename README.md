@@ -89,10 +89,10 @@ From version 2.4.0 OrthoFinder now infers orthogroups from the gene trees at eac
 The Orthologues directory contains one sub-directory for each species that in turn contains a file for each pairwise species comparison, listing the orthologs between that species pair. Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologs diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each row in a file contains the gene(s) in one species that are orthologues of the gene(s) in the other species and each row is cross-referenced to the orthogroup that contains those genes. 
 
 ### Results Files: Gene Trees Directory
-1. A phylogenetic tree inferred for each orthogroup
+1. A rooted phylogenetic tree inferred for each orthogroup with 4 or more sequences (4 sequences is the mimimum number required for tree inference with most tree inference programs).
 
 ### Results Files: Resolved Gene Trees Directory
-1. A rooted phylogenetic tree inferred for each orthogroup and resolved using the OrthoFinder duplication-loss coalescent model.
+1. A rooted phylogenetic tree inferred for each orthogroup with 4 or more sequences and resolved using the OrthoFinder hybrid species-overlap/duplication-loss coalescent model.
 
 ### Results Files: Species Tree Directory
 1. **SpeciesTree_rooted.txt** A STAG species tree inferred from all orthogroups, containing STAG support values at internal nodes and rooted using STRIDE.
