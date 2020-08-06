@@ -83,7 +83,7 @@ class ProgramCaller(object):
                     continue
                     
                 if 'program_type' not in v:
-                    print(("WARNING: Incorrecty formatted configuration file entry: %s" % name))
+                    print(("WARNING: Incorrectly formatted configuration file entry: %s" % name))
                     print("'program_type' entry is missing")
                 try:
                     if v['program_type'] == 'msa':
@@ -98,7 +98,7 @@ class ProgramCaller(object):
                             self.tree[name] = Method(name, v)
                     elif v['program_type'] == 'search':
                         if ('db_cmd' not in v) or ('search_cmd' not in v):
-                            print(("WARNING: Incorrecty formatted configuration file entry: %s" % name))
+                            print(("WARNING: Incorrectly formatted configuration file entry: %s" % name))
                             print("'cmd_line' entry is missing")
                             raise InvalidEntryException
                         if name in self.search_db:
@@ -107,10 +107,10 @@ class ProgramCaller(object):
                             self.search_db[name] = Method(name, {'cmd_line':v['db_cmd']})
                             self.search_search[name] = Method(name, {'cmd_line':v['search_cmd']})
                             if 'ouput_filename' in v:
-                                print(("WARNING: Incorrecty formatted configuration file entry: %s" % name))
+                                print(("WARNING: Incorrectly formatted configuration file entry: %s" % name))
                                 print("'ouput_filename' option is not supported for 'program_type' 'search'")
                     else:
-                        print(("WARNING: Incorrecty formatted configuration file entry: %s" % name))
+                        print(("WARNING: Incorrectly formatted configuration file entry: %s" % name))
                         print(("'program_type' should be 'msa' or 'tree', got '%s'" % v['program_type']))
                 except InvalidEntryException:
                     pass
