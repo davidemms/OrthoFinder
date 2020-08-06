@@ -63,9 +63,6 @@ class ProgramCaller(object):
         self.tree = dict()
         self.search_db = dict()
         self.search_search = dict()
-        # Add default methods
-        self.msa['mafft'] = Method('mafft', {"cmd_line": "mafft --localpair --maxiterate 1000 --anysymbol INPUT > OUTPUT 2> /dev/null", "cmd_line_fast": "mafft --anysymbol INPUT > OUTPUT 2> /dev/null", "n_seqs_use_fast" : "500"})
-        self.tree['fasttree'] = Method('fasttree', {"cmd_line": "FastTree INPUT > OUTPUT 2> /dev/null"})
         if configure_file == None:
             return
         if not os.path.exists(configure_file):
