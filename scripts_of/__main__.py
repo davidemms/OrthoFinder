@@ -809,7 +809,7 @@ def CanRunMCL():
 def GetProgramCaller():
     config_file = os.path.join(__location__, 'config.json') 
     pc = program_caller.ProgramCaller(config_file if os.path.exists(config_file) else None)
-    config_file_user = os.path.join(__location__, 'config_user.json') 
+    config_file_user = os.path.expanduser("~/config_orthofinder_user.json")
     if os.path.exists(config_file_user):
         pc_user = program_caller.ProgramCaller(config_file_user)
         pc.Add(pc_user)
