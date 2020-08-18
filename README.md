@@ -70,9 +70,9 @@ A standard OrthoFinder run produces a set of files describing the orthogroups, o
 
 ### Results Files: Phylogenetic Hierarchical Orthogroups Directory
 From version 2.4.0 OrthoFinder now infers orthogroups from the gene trees at each hierarchical level for your species (i.e. at each node in the species tree). 
-1. **N0.tsv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species. Additional columns give the HOG (Hierarchical Orthogroup) ID and the node in the gene tree from which the HOG descended. **This file effectively replaces the orthogroups from Orthogroups.tsv. Because they are calculated from trees, the orthogroups from N0.tsv are more accurate (approximately 20% relative increase on the Orthobench benchmarks compared to OrthoFinder version 2).**
+1. **N0.tsv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species. Additional columns give the HOG (Hierarchical Orthogroup) ID and the node in the gene tree from which the HOG descended. **This file effectively replaces the orthogroups from Orthogroups.tsv. Because they are calculated from trees, the orthogroups from N0.tsv are more accurate (approximately 10% relative increase on the Orthobench benchmarks compared to OrthoFinder version 2).**
 
-2. **N1.txt, N2.tsv, ...**: Orthogroups inferred from the gene trees corresponding to the clades of species in the species tree N1, N2, etc. Because OrthoFinder now infers orthogroups at every hierarchical level within the species tree, it is now possible to include outgroup species within the analysis but use the files to get orthogroups defined for your chosen clade within the species tree. The use of an outgroup gives even higher accuracy (approximately 30% relative increase on the Orthobench benchmarks compared to OrthoFinder version 2).
+2. **N1.txt, N2.tsv, ...**: Orthogroups inferred from the gene trees corresponding to the clades of species in the species tree N1, N2, etc. Because OrthoFinder now infers orthogroups at every hierarchical level within the species tree, it is now possible to include outgroup species within the analysis but use the files to get orthogroups defined for your chosen clade within the species tree. The use of an outgroup gives even higher accuracy (approximately 13% relative increase on the Orthobench benchmarks compared to OrthoFinder version 2).
 
 ### Results Files: Orthogroups Directory
 1. **Orthogroups.tsv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species.
@@ -89,10 +89,10 @@ From version 2.4.0 OrthoFinder now infers orthogroups from the gene trees at eac
 The Orthologues directory contains one sub-directory for each species that in turn contains a file for each pairwise species comparison, listing the orthologs between that species pair. Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologs diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each row in a file contains the gene(s) in one species that are orthologues of the gene(s) in the other species and each row is cross-referenced to the orthogroup that contains those genes. 
 
 ### Results Files: Gene Trees Directory
-1. A phylogenetic tree inferred for each orthogroup
+1. A rooted phylogenetic tree inferred for each orthogroup with 4 or more sequences (4 sequences is the mimimum number required for tree inference with most tree inference programs).
 
 ### Results Files: Resolved Gene Trees Directory
-1. A rooted phylogenetic tree inferred for each orthogroup and resolved using the OrthoFinder duplication-loss coalescent model.
+1. A rooted phylogenetic tree inferred for each orthogroup with 4 or more sequences and resolved using the OrthoFinder hybrid species-overlap/duplication-loss coalescent model.
 
 ### Results Files: Species Tree Directory
 1. **SpeciesTree_rooted.txt** A STAG species tree inferred from all orthogroups, containing STAG support values at internal nodes and rooted using STRIDE.
