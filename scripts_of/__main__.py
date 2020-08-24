@@ -520,6 +520,11 @@ class WaterfallMethod:
                 WaterfallMethod.ProcessBlastHits(*args, qDoubleBlast=qDoubleBlast)
             except queue.Empty:
                 return 
+            except Exception:
+                seqsInfo, _, _, iSpecies = args
+                i = seqsInfo.speciesToUse[iSpecies]
+                print("ERROR: Error processing files Blast%d_*" % i)
+                raise
 
     @staticmethod
     def ConnectCognates(seqsInfo, iSpecies): 
@@ -1212,7 +1217,7 @@ def ProcessArgs(prog_caller, args):
         print("ERROR: Search program (%s) not configured in config.json file" % options.search_program)
         util.Fail()
         
-    util.PrintTime("Starting OrthoFinder")    
+    util.PrintTime("Starting OrthoFinder %s" % util.version)    
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
     print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
     return options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault            
