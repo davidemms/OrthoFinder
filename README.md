@@ -59,9 +59,16 @@ docker run --ulimit nofile=1000000:1000000 -it --rm -v /full/path/to/fastas:/inp
 A more complete guide can be found here: <https://davidemms.github.io/orthofinder_tutorials/alternative-ways-of-getting-OrthoFinder.html>. Note that running OrthoFinder on Windows in a docker containner will not be as fast as running it natively.
 
 ## Running OrthoFinder
-To Run OrthoFinder on the Example Data type
+To run OrthoFinder on the Example Data type:
 
 `OrthoFinder/orthofinder -f OrthoFinder/ExampleData`
+
+To run on your own dataset, replace "OrthoFinder/ExampleData" with the directory containing your input fasta files, with one file per species. OrthoFinder will look for input fasta files with any of the following filename extensions:
+* .fa
+* .faa
+* .fasta
+* .fas
+* .pep
 
 ## What OrthoFinder provides
 **There is a tutorial that provides a guided tour of the main results files here: <https://davidemms.github.io/orthofinder_tutorials/exploring-orthofinders-results.html>**
