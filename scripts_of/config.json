@@ -47,5 +47,11 @@
     "program_type": "search",
     "db_cmd": "mmseqs createdb INPUT OUTPUT.fa ; mmseqs createindex OUTPUT.fa /tmp",
     "search_cmd": "mmseqs search PATH/mmseqsDBBASENAME DATABASE.fa OUTPUT.db /tmp/tmpBASEOUTNAME  --threads 1 ; mmseqs convertalis --threads 1 PATH/mmseqsDBBASENAME DATABASE.fa OUTPUT.db OUTPUT"
+    },
+        
+    "blast_nucl":{ 
+    "program_type": "search",
+    "db_cmd": "makeblastdb -dbtype nucl -in INPUT -out OUTPUT",
+    "search_cmd": "blastn -outfmt 6 -evalue 0.001 -query INPUT -db DATABASE | gzip > OUTPUT.gz"
     }
 }

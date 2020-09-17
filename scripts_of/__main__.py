@@ -836,6 +836,7 @@ def PrintHelp(prog_caller):
     print("OPTIONS:")
     print(" -t <int>          Number of parallel sequence search threads [Default = %d]" % util.nThreadsDefault)
     print(" -a <int>          Number of parallel analysis threads [Default = %d]" % util.nAlgDefault)
+    print(" -d                Input is DNA sequences")
     print(" -M <txt>          Method for gene tree inference. Options 'dendroblast' & 'msa'")
     print("                   [Default = dendroblast]")
     print(" -S <txt>          Sequence search program [Default = diamond]")
@@ -850,7 +851,7 @@ def PrintHelp(prog_caller):
     print(" -I <int>          MCL inflation parameter [Default = %0.1f]" % g_mclInflation)
     print(" -x <file>         Info for outputting results in OrthoXML format")
     print(" -p <dir>          Write the temporary pickle files to <dir>")
-    print(" -1                Only perform one-way sequence search ")
+    print(" -1                Only perform one-way sequence search")
     print(" -X                Don't add species names to sequence IDs")
     print(" -n <txt>          Name to append to the results directory")  
     print(" -o <txt>          Non-default results directory")  
@@ -935,6 +936,7 @@ class Options(object):#
         self.speciesXMLInfoFN = None
         self.speciesTreeFN = None
         self.mclInflation = g_mclInflation
+        self.dna = False
     
     def what(self):
         for k, v in self.__dict__.items():
@@ -966,6 +968,7 @@ def ProcessArgs(prog_caller, args):
     resultsDir_nonDefault = None
     pickleDir_nonDefault = None
     q_selected_msa_options = False
+    q_selected_search_option = False
     
     """
     -f: store fastaDir
@@ -1023,6 +1026,10 @@ def ProcessArgs(prog_caller, args):
                 util.Fail()   
         elif arg == "-1":
             options.qDoubleBlast = False
+        elif arg == "-d" or arg == "--dna":
+            options.dna = True
+            if not q_selected_search_option:
+                options.search_program = "blast_nucl"
         elif arg == "-X":
             options.qAddSpeciesToIDs = False
         elif arg == "-I" or arg == "--inflation":
@@ -1521,7 +1528,7 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
 def GetOrthologues_FromTrees(options):
     orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.speciesTreeFN, options.qAddSpeciesToIDs)
  
-def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_names=[]):
+def ProcessesNewFasta(fastaDir, q_dna, speciesInfoObj_prev = None, speciesToUse_prev_names=[]):
     """
     Process fasta files and return a Directory object with all paths completed.
     """
@@ -1599,9 +1606,9 @@ def ProcessesNewFasta(fastaDir, speciesInfoObj_prev = None, speciesToUse_prev_na
                             qHasAA = qHasAA or any([c in line for c in ['E','F','I','L','P','Q']]) # AAs minus nucleotide ambiguity codes
                         outputFasta.write(line)
                 outputFasta.write("\n")
-            if not qHasAA:
+            if (not qHasAA) and (not q_dna):
                 qOk = False
-                print("ERROR: %s appears to contain nucleotide sequences instead of amino acid sequences." % fastaFilename)
+                print("ERROR: %s appears to contain nucleotide sequences instead of amino acid sequences. Use '-d' option" % fastaFilename)
             iSpecies += 1
             iSeq = 0
             outputFasta.close()
@@ -1697,7 +1704,7 @@ def main(args=None):
             speciesInfoObj, speciesToUse_names = ProcessPreviousFiles(files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast)
             print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, continuationDir))
             # 3. 
-            speciesInfoObj = ProcessesNewFasta(fastaDir, speciesInfoObj, speciesToUse_names)
+            speciesInfoObj = ProcessesNewFasta(fastaDir, options.dna, speciesInfoObj, speciesToUse_names)
             files.FileHandler.LogSpecies()
             options = CheckOptions(options, speciesInfoObj.speciesToUse)
             # 4.
@@ -1718,7 +1725,7 @@ def main(args=None):
         elif options.qStartFromFasta:
             # 3. 
             speciesInfoObj = None
-            speciesInfoObj = ProcessesNewFasta(fastaDir)
+            speciesInfoObj = ProcessesNewFasta(fastaDir, options.dna)
             files.FileHandler.LogSpecies()
             options = CheckOptions(options, speciesInfoObj.speciesToUse)
             # 4
