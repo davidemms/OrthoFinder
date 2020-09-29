@@ -1330,6 +1330,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo):
     blastDir_list = files.FileHandler.GetBlastResultsDir()
     for iSpecies in range(seqsInfo.nSpecies):
         cmd_queue.put((seqsInfo, blastDir_list, Lengths, iSpecies))
+    files.FileHandler.GetPickleDir()     # create the pickle directory before the parallel processing to prevent a race condition
     runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, options.qDoubleBlast)) for i_ in range(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
