@@ -17,7 +17,7 @@ import argparse
 import operator
 import itertools
 import multiprocessing as mp
-from collections import defaultdict
+from collections import defaultdict, deque
 
 from . import tree as tree_lib
 from . import resolve, util, files, parallel_task_manager
@@ -158,15 +158,61 @@ class HogWriter(object):
         for i_hog, sp_node_name in zip(i_hogs, sp_node_name_list):
             self.writers[sp_node_name].writerow(["%s.HOG%07d" % (sp_node_name, i_hog),  og_name, "-"] + row_genes)
 
-    def write_clade(self, n, og_name):
+    def write_clade(self, n, og_name, exc_hog=None):
         """
-        Write all the relevant HOGs for all the genes in the clade down to, but not beyond, the duplication nodes
-        sp_node - the MRCA species tree node of the genes in the clade
-        scl - List of 'Single-copy leaves', i.e. leaf or duplication nodes. They will each have the features 'dup' and 'sp_node'
+        Write all the relevant HOGs for all the genes in the clade down to, but 
+        not beyond, the duplication nodes.
+        Args:
+            sp_node - the MRCA species tree node of the genes in the clade
+            scl - List of 'Single-copy leaves', i.e. leaf or duplication nodes. 
+                  They will each have the features 'dup' and 'sp_node'
+            exc_hog - if specified this HOG shouldn't be written. It will be the 
+                      same as n.sp_node and will have already been done.
         """
+        if n.is_leaf(): return []
+        # print("\nTree node: %s" % n.name)
+
         # 0. Get the scl units below this node in the gene tree
-        if n.is_leaf(): return
+        # I.e. get genes (indexed by species) below each scl (the relevant gene tree nodes)
         scl = n.get_leaves(is_leaf_fn=self.scl_fn) # single-copy 'leaf'
+        scl_units = self.get_scl_units(scl)
+        # print(scl)
+        # print(scl_units)
+
+        # 1. Get HOGs to write
+        hogs_to_write = self.get_hogs_to_write(n, scl)
+        if exc_hog != None and len(hogs_to_write) > 0 and hogs_to_write[0] == exc_hog:
+            hogs_to_write = hogs_to_write[1:]
+
+        # 2. Write HOGs
+        self.write_hogs(hogs_to_write, scl_units, og_name, n.name)
+
+        # 3. Identify if any of the lower level HOGs below either of the child nodes 
+        # will be skipped because i) it isn't a duplication ii) the lower level 
+        # HOGs haven't been processed at this level because the other child node 
+        # is same MRCA as current AND a dup. 
+        # For such a skipped child, must not write a HOG for n.sp_node level as 
+        # have done that here
+        exc_hog = n.sp_node     # excluded_HOG
+        extra_to_do = []
+        if any((not child.is_leaf()) and (child.sp_node == n.sp_node) and child.dup for child in n.get_children()):
+            for child in n.get_children():
+                if (not child.is_leaf() and not child.dup): 
+                    # print((n.sp_node, child.name, child.sp_node))
+                    extra_to_do.append((child, exc_hog))
+        # if len(extra_requiring_procesing) != 0: print("Extra %d clades. First contains %d genes" % (len(extra_requiring_procesing), len(extra_requiring_procesing[0])))
+        return extra_to_do
+
+    def get_scl_units(self, scl):
+        """
+        Get a dictionary which gives, for each species tree node, a dictionary of 
+        the gene lists for each species. Note, the species are by their index not 
+        their original ID.
+        Args:
+            scl - list of 'single-copy leaf' ete3 nodes. Each scl is a leaf or a duplication node
+        Returns:
+            scl_units - dict:st_node_name->(dict:sp_index->string of genes, comma separated)
+        """
         scl_units = dict()
         for unit in scl:
             # we can have more than one unit corresponding to the same place if the tree is non-binary. In this case the 'dup' test has
@@ -192,19 +238,49 @@ class HogWriter(object):
                             d_orig[k] = v
                 else:
                     scl_units[unit_name] = d_new
-                r = unit.name.split("_")[0] if unit.is_leaf() else unit.sp_node
-        # 1. Get HOGs to write
+                # r = unit.name.split("_")[0] if unit.is_leaf() else unit.sp_node
+        return scl_units
+
+    def get_hogs_to_write(self, n, scl):
+        """
+        Get the list of HOGs that should be written while at this node in the gene
+        tree. These are the HOGs down to, but not including the MRCA of any duplication 
+        nodes.
+        Args:
+            n - gene tree node
+            scl - the list of ete3 scl nodes
+        Returns:
+            hogs_to_write - list of HOG names e.g. N1, N2, ...
+        """
         scl_mrca = {nn.sp_node for nn in scl if not nn.is_leaf()}
-        sp_node_name = n.sp_node
-        sp_node = self.species_tree & sp_node_name
+        # if n.name == "n0":
+            # print([nnnnnn.name for nnnnnn in scl])
+            # print(scl_mrca)
+            # print([nn.sp_node for nn in scl if not nn.is_leaf()])
+        sp_node = self.species_tree & (n.sp_node)
         stop_at_dups = lambda nn : nn.name in scl_mrca
         hogs_to_write = [nn.name for nn in sp_node.traverse('preorder', is_leaf_fn = stop_at_dups) if not nn.is_leaf()] 
+        # print(hogs_to_write)
         hogs_to_write += self.get_skipped_nodes(sp_node, n.up.sp_node if n.up is not None else None, n)
+        return hogs_to_write
+
+    def write_hogs(self, hogs_to_write, scl_units, og_name, gt_node_name):
+        """
+        Write the HOGs that can be determined from this gene tree node
+        Args:
+            hogs_to_write - list of HOG names
+            scl_units - dict:st_node_name->(dict:sp_index->genes string for HOGs file)   
+                        e.g. st_node_name is N5 for internal node, 11 for leaf
+            og_name - OG name
+            gt_node_name - gene tree node name
+        """
         for h in hogs_to_write:
+            # print("HOG: " + h)
             q_empty = True
             # 2. We know the scl, these are the 'taxonomic units' available (clades or individual species in species tree for this node of the gene tree)
             # Note there can be at most one of each. Only a subset of these will fall under this HOG.
             units = self.hog_contents[h].intersection(scl_units.keys())
+            # print("Units: " + str(units))
             genes_row = ["" for _ in self.iSps]
             # put the units into the row
             for u in units:
@@ -212,7 +288,8 @@ class HogWriter(object):
                     genes_row[isp] = genes_text
                     q_empty = False
             if not q_empty: 
-                self.writers[h].writerow(["%s.HOG%07d" % (h, self.get_hog_index(h)),  og_name, n.name] + genes_row)
+                # print(genes_row)
+                self.writers[h].writerow(["%s.HOG%07d" % (h, self.get_hog_index(h)),  og_name, gt_node_name] + genes_row)
 
     def close_files(self):
         for fh in self.fhs.values():
@@ -495,7 +572,7 @@ def GetHOGs_from_tree(iog, tree, hog_writer):
     Implementation:
     - In orthologs pass, mark all duplication events (this could probably be done at the resolve step saving some time, but the tree nodes are being shifted around at this point so potentially hazardous)
     - In the HOGs pass, each duplication node is a stopping point, it is treated as an indivisible unit
-    - Traverse from the root, to all duplication nodes- we look at the cldaes for the children of duplication nodes. Each duplication node is mapped to it's place on the species tree
+    - Traverse from the root, to all duplication nodes- we look at the clades for the children of duplication nodes. Each duplication node is mapped to it's place on the species tree
         *** What if this conflicts with the topology of the species tree. I think it can't come strictly above a sister node 
             without a duplication node being involved, which stops us from doing anything incorrect.
     - At each iteration of the traverse, use the species tree to write out all the applicable HOGs, treating each leaf and
@@ -504,13 +581,35 @@ def GetHOGs_from_tree(iog, tree, hog_writer):
       - See latex doc.
     """
     og_name = "OG%07d" % iog
-    # First process the root (it will be processed below if it's a dup)
+    # print("\n===== %s =====" % og_name)
+    # Any node that is not a duplication needs to be processed (i.e. passed to 'write_clade')
+    # If the root node is a duplication but MRCA != N0 it also needs to be processed
+    # Also, if a child of a node, n, will be skipped if n.sp_node is the same as one of it's children
+    # this occurs for cases when n isn't a duplication according to overlap method due to interleaved species
+    # So...
+    # First process the root (it will be processed below if it's a dup)    
+    extras = deque()
     if not (tree.dup and tree.sp_node == "N0"): 
-        hog_writer.write_clade(tree, og_name)
+        extras.extend(hog_writer.write_clade(tree, og_name))
+    if tree.dup:
+        # these child clades will be processed anyway
+        extras.clear()
+    while len(extras) > 0:
+        n, exc_hog = extras.popleft()
+        extras.extend(hog_writer.write_clade(n, og_name, exc_hog))
+    # print("---- Now Duplications ----")
     for n in tree.iter_search_nodes(dup=True):
         nodes_to_process = n.get_children()
         for n in nodes_to_process:
-            hog_writer.write_clade(n, og_name)
+            # what if this is also a duplication?
+            if (not n.is_leaf() and n.dup):
+                continue
+            # print(n.name)
+            extras = deque()
+            extras.extend(hog_writer.write_clade(n, og_name))
+            while len(extras) > 0:
+                n, exc_hog = extras.popleft()
+                extras.extend(hog_writer.write_clade(n, og_name, exc_hog))
 
 def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False):
     """ if dupsWriter != None then seqIDs and spIDs must also be provided
