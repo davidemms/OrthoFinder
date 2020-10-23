@@ -590,6 +590,34 @@ def GetHOGs_from_tree(iog, tree, hog_writer):
             without a duplication node being involved, which stops us from doing anything incorrect.
     - At each iteration of the traverse, use the species tree to write out all the applicable HOGs, treating each leaf and
       each duplication event as an indivisible unit
+    - Mark all implied duplications (a duplication is implied if it has a descendant node with the same MRCA and which is marked as a duplication).
+      The effect of this is as follows.
+      Consider: 
+                          /----
+                    /-----N1
+            /-----N1      \----
+        --N0       |
+           |        \----N1 (Dup)
+            \----- e
+        In the initial implementation, N0 would not write any HOGs lower than N0
+        because there is an N1 (Dup) that should be responsible for writing the 
+        two or more separate N1 HOGs below that node, and all the descendant HOGs 
+        too. There are two solutions I can see. 
+          * i) Postpone writing all N1 HOGs until N1 (Dup) and also all the sister
+               nodes passed on the way from N0 down to N1 (Dup). This is the option
+               taken, and is achieved simply by marking implied duplications.
+           ii) Use a more liberal approach, trialed but not used. Write a large
+               N1 HOG while at N0 but excluding the N1 (Dup) genes. Then write the 
+               separate N1 and descendant HOGs for N1 (Dup) and the descendant HOGs
+               for each of the N1 that would otherwise be missed in the first implementation.
+               The argument for doing this is that trees are often messed up, if 
+               two N1 clades have found their way into the tree and yet *still* don't
+               overlap with any of the species in the N1 (non-dup) clades then this
+               is a strong argument for gene tree messiness rather than multiple 
+               gene duplication events and multiple orthogroups. In this case, write
+               the most complete N1 orthogroup and just deal with the N1 (Dup) clade
+               separately. In support of this, for the 12+3 orthobench dataset, I
+               found no cases where 
 
       - See latex doc.
     """
@@ -600,6 +628,8 @@ def GetHOGs_from_tree(iog, tree, hog_writer):
     # Also, if a child of a node, n, will be skipped if n.sp_node is the same as one of it's children
     # this occurs for cases when n isn't a duplication according to overlap method due to interleaved species
     # So...
+    tree = mark_implied_duplications(tree)
+
     # First process the root (it will be processed below if it's a dup)    
     extras = deque()
     if not (tree.dup and tree.sp_node == "N0"): 
@@ -607,9 +637,9 @@ def GetHOGs_from_tree(iog, tree, hog_writer):
     if tree.dup:
         # these child clades will be processed anyway
         extras.clear()
-    while len(extras) > 0:
-        n, exc_hog = extras.popleft()
-        extras.extend(hog_writer.write_clade(n, og_name, exc_hog))
+    # while len(extras) > 0:
+    #     n, exc_hog = extras.popleft()
+    #     extras.extend(hog_writer.write_clade(n, og_name, exc_hog))
     # print("---- Now Duplications ----")
     for n in tree.iter_search_nodes(dup=True):
         nodes_to_process = n.get_children()
@@ -620,9 +650,35 @@ def GetHOGs_from_tree(iog, tree, hog_writer):
             # print(n.name)
             extras = deque()
             extras.extend(hog_writer.write_clade(n, og_name))
-            while len(extras) > 0:
-                n, exc_hog = extras.popleft()
-                extras.extend(hog_writer.write_clade(n, og_name, exc_hog))
+            # while len(extras) > 0:
+            #     n, exc_hog = extras.popleft()
+            #     extras.extend(hog_writer.write_clade(n, og_name, exc_hog))
+
+
+def mark_implied_duplications(tree):
+    """
+    Implementation:
+    - A node with a terminal duplication is already marked as a dup, it's the nodes
+      above which would need to record having that duplication below them so can 
+      skip the child nodes that are leaves.
+    """
+    for n in tree.traverse('postorder'):
+        if n.is_leaf():
+            continue
+        dups_below = set()
+        for ch in n.get_children():
+            if ch.is_leaf():
+                continue
+            else:
+                dups_below.update(ch.dups_below)
+                if ch.dup:
+                    dups_below.add(ch.sp_node)
+        n.add_feature('dups_below', dups_below)
+        if n.sp_node in n.dups_below:
+            n.dup = True
+            # print("Implied dup: " + n.name)
+    return tree
+
 
 def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False):
     """ if dupsWriter != None then seqIDs and spIDs must also be provided
