@@ -71,6 +71,29 @@ class TestHOGWriter(unittest.TestCase):
 
         self.assertEqual(0, len(sp_node_list))
 
+    def test_get_hogs_to_write2(self):
+        """
+        How do we handle processing the root of a gene tree that is a duplication?
+        """
+        seq_ids = defaultdict(str)
+        sp_ids = defaultdict(str)
+        sp_tree, sp_tree_node_names = species_tree()
+        hogw = t2o.HogWriter(sp_tree, sp_tree_node_names, seq_ids, sp_ids)
+        gt = gene_tree_dup_at_root_N12()
+
+        n = gt
+        scl = [gt, ]     # just this node itself since it is a dup
+        print("\n1...")
+        hogs = hogw.get_hogs_to_write(n, scl)
+        self.assertEqual(set(hogs), {'N0', 'N1', 'N2', 'N3', 'N5', 'N6', 'N8', 'N9', 'N10'})
+
+        n = gt.get_children()[0]
+        scl = n.get_children()     # the two leaves below
+        print("\n2...")
+        hogs = hogw.get_hogs_to_write(n, scl)
+        self.assertEqual(hogs, ['N12'])
+        
+
     def test_get_hogs_to_write_root_duplication_not_N0(self):
         """
         How do we handle processing the root of a gene tree that is a duplication?
@@ -82,7 +105,7 @@ class TestHOGWriter(unittest.TestCase):
         gt = gene_tree_dup_at_root_N12()
 
         n = gt
-        scl = n.get_leaves(is_leaf_fn=hogw.scl_fn)
+        # scl = n.get_leaves(is_leaf_fn=hogw.scl_fn)
         scl = [gt, ]     # just this node itself since it is a dup
         hogs = hogw.get_hogs_to_write(n, scl)
 
@@ -96,6 +119,48 @@ class TestHOGWriter(unittest.TestCase):
         self.assertTrue('N0' in hogs)  # last of these
         self.assertTrue('N12' not in hogs)  # not N12
         self.assertTrue('N11' not in hogs)  # N11 is a different part of the tree
+
+    def test_get_comparable_nodes(self):
+        sp_tree, sp_tree_node_names = species_tree()
+
+        cn = t2o.get_comparable_nodes(sp_tree)
+
+        # All are below N0
+        self.assertEqual(0, len(cn['N0'][0]))
+        self.assertEqual(13, len(cn['N0'][1]))
+        # N0 higher than all
+        all_nodes = ["N%d" % i for i in range(14)]
+        self.assertTrue(all(['N0' in cn[node][0] for node in all_nodes[1:]]))
+        self.assertTrue(all(['N0' not in cn[node][1] for node in all_nodes[1:]]))
+        # A node is not higher or lower than itself
+        self.assertTrue('N2' not in cn['N2'][0])
+        self.assertTrue('N2' not in cn['N2'][1])
+        # N2 is higher than N3
+        self.assertTrue('N2' in cn['N3'][0])
+        self.assertTrue('N2' not in cn['N3'][1])
+        self.assertTrue('N3' not in cn['N2'][0])
+        self.assertTrue('N3' in cn['N2'][1])
+        # incomparable nodes
+        self.assertTrue('N12' not in cn['N13'][0])
+        self.assertTrue('N12' not in cn['N13'][1])
+        self.assertTrue('N7' not in cn['N11'][0])
+        self.assertTrue('N7' not in cn['N11'][1])
+
+    def test_get_highest_nodes(self):
+        sp_tree, sp_tree_node_names = species_tree()
+        cn = t2o.get_comparable_nodes(sp_tree)
+
+        # single node returns itself
+        self.assertEqual({'N3'}, t2o.get_highest_nodes({'N3'}, cn))
+        self.assertEqual({'N12'}, t2o.get_highest_nodes({'N12'}, cn))
+
+        # higher of two nodes
+        self.assertEqual({'N0'}, t2o.get_highest_nodes({'N0', 'N1'}, cn))
+        self.assertEqual({'N1'}, t2o.get_highest_nodes({'N1', 'N3', 'N4'}, cn))
+
+        # multiple incomparable nodes
+        self.assertEqual({'N7', 'N11'}, t2o.get_highest_nodes({'N11', 'N13', 'N7'}, cn))
+
 
 
 if __name__ == "__main__":
