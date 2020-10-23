@@ -175,7 +175,7 @@ class HogWriter(object):
         # 0. Get the scl units below this node in the gene tree
         # I.e. get genes (indexed by species) below each scl (the relevant gene tree nodes)
         scl = n.get_leaves(is_leaf_fn=self.scl_fn) # single-copy 'leaf'
-        scl_units = self.get_scl_units(scl)
+        scl_units = self.get_scl_units(scl)        # the genes below each of these scl
         # print(scl)
         # print(scl_units)
 
@@ -200,7 +200,7 @@ class HogWriter(object):
                 if (not child.is_leaf() and not child.dup): 
                     # print((n.sp_node, child.name, child.sp_node))
                     extra_to_do.append((child, exc_hog))
-        # if len(extra_requiring_procesing) != 0: print("Extra %d clades. First contains %d genes" % (len(extra_requiring_procesing), len(extra_requiring_procesing[0])))
+        # if len(extra_requiring_procesing) != 0: print("Extra %d clades. First contains %d genes" % (len(extra_requiring_processing), len(extra_requiring_processing[0])))
         return extra_to_do
 
     def get_scl_units(self, scl):
@@ -244,8 +244,9 @@ class HogWriter(object):
     def get_hogs_to_write(self, n, scl):
         """
         Get the list of HOGs that should be written while at this node in the gene
-        tree. These are the HOGs down to, but not including the MRCA of any duplication 
-        nodes.
+        tree. These are i) the HOGs down to, but not including the MRCA of any duplication 
+        nodes or none of these if it is a dup. ii) the nodes up from here stopping
+        before hitting the MRCA of the gene tree node above. 
         Args:
             n - gene tree node
             scl - the list of ete3 scl nodes
@@ -259,20 +260,27 @@ class HogWriter(object):
             # print([nn.sp_node for nn in scl if not nn.is_leaf()])
         sp_node = self.species_tree & (n.sp_node)
         stop_at_dups = lambda nn : nn.name in scl_mrca
-        hogs_to_write = [nn.name for nn in sp_node.traverse('preorder', is_leaf_fn = stop_at_dups) if not nn.is_leaf()] 
+        if n.dup:
+            hogs_to_write = [] 
+        else:
+            hogs_to_write = [nn.name for nn in sp_node.traverse('preorder', is_leaf_fn = stop_at_dups) if not nn.is_leaf()] 
         # print(hogs_to_write)
         hogs_to_write += self.get_skipped_nodes(sp_node, n.up.sp_node if n.up is not None else None, n)
         return hogs_to_write
 
     def write_hogs(self, hogs_to_write, scl_units, og_name, gt_node_name):
         """
-        Write the HOGs that can be determined from this gene tree node
+        Write the HOGs that can be determined from this gene tree node.
         Args:
             hogs_to_write - list of HOG names
             scl_units - dict:st_node_name->(dict:sp_index->genes string for HOGs file)   
                         e.g. st_node_name is N5 for internal node, 11 for leaf
             og_name - OG name
             gt_node_name - gene tree node name
+        Implementation:
+            - We have the HOGs that need writing plus knowledge of what scl units 
+              each HOG should contain. For each hog take the intersection of what 
+              we have with what the hog should contain.
         """
         for h in hogs_to_write:
             # print("HOG: " + h)
@@ -296,15 +304,20 @@ class HogWriter(object):
             fh.close()
 
     @staticmethod
-    def get_skipped_nodes(n_this, n_above_name, n_gene=None):
+    def get_skipped_nodes(n_sp_this, n_above_name, n_gene=None):
         """
-        Write HOGs for the series of skipped species tree nodes
+        Get the HOGs for the series of skipped species tree nodes above the current 
+        node. 
         Args:
-            n_this - ete3 node from species tree 
-            n_above - MRCA species tree node for the gene tree node above
-            n_gene - ete3 node from the species tree
+            n_sp_this - ete3 node from species tree 
+            n_above_name - MRCA species tree node name for the gene tree node above
+            n_gene - ete3 node from the gene tree
+        Implementation/Questions:
+            - What if the node above the same MRCA, the root, a duplication and 
+              not N0? Then we don't write the higher HOGs? No, the root node itself
+              is processed for this.
         """
-        n = n_this
+        n = n_sp_this
         missed_sp_node_names = []
         if n.name == n_above_name:
             return missed_sp_node_names

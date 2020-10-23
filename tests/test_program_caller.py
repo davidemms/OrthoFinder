@@ -9,7 +9,7 @@ Created on Mon Feb 13 11:44:11 2017
 
 import os
 import sys
-import ete2
+import ete3
 import shutil
 import filecmp
 import argparse
