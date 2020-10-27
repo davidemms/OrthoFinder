@@ -161,52 +161,6 @@ class HogWriter(object):
         for i_hog, sp_node_name in zip(i_hogs, sp_node_name_list):
             self.writers[sp_node_name].writerow(["%s.HOG%07d" % (sp_node_name, i_hog),  og_name, "-"] + row_genes)
 
-    def write_clade(self, n, og_name, exc_hog=None):
-        """
-        Write all the relevant HOGs for all the genes in the clade down to, but 
-        not beyond, the duplication nodes.
-        Args:
-            sp_node - the MRCA species tree node of the genes in the clade
-            scl - List of 'Single-copy leaves', i.e. leaf or duplication nodes. 
-                  They will each have the features 'dup' and 'sp_node'
-            exc_hog - if specified this HOG shouldn't be written. It will be the 
-                      same as n.sp_node and will have already been done.
-        """
-        if debug: print("\nTree node: %s" % n.name)
-        if n.is_leaf(): return []
-
-        # 0. Get the scl units below this node in the gene tree
-        # I.e. get genes (indexed by species) below each scl (the relevant gene tree nodes)
-        scl = n.get_leaves(is_leaf_fn=self.scl_fn) # single-copy 'leaf'
-        scl_units = self.get_scl_units(scl)        # the genes below each of these scl
-        # print(scl)
-        # print(scl_units)
-
-        # 1. Get HOGs to write
-        hogs_to_write = self.get_hogs_to_write(n, scl, n.restart if 'restart' in n.features else None)
-        # if exc_hog != None and len(hogs_to_write) > 0 and hogs_to_write[0] == exc_hog:
-        #     hogs_to_write = hogs_to_write[1:]
-
-        # 2. Write HOGs
-        # if debug: print(hogs_to_write)
-        self.write_hogs(hogs_to_write, scl_units, og_name, n.name)
-
-        # 3. Identify if any of the lower level HOGs below either of the child nodes 
-        # will be skipped because i) it isn't a duplication ii) the lower level 
-        # HOGs haven't been processed at this level because the other child node 
-        # is same MRCA as current AND a dup. 
-        # For such a skipped child, must not write a HOG for n.sp_node level as 
-        # have done that here
-        exc_hog = n.sp_node     # excluded_HOG
-        extra_to_do = []
-        if any((not child.is_leaf()) and (child.sp_node == n.sp_node) and child.dup for child in n.get_children()):
-            for child in n.get_children():
-                if (not child.is_leaf() and not child.dup): 
-                    # print((n.sp_node, child.name, child.sp_node))
-                    extra_to_do.append((child, exc_hog))
-        # if len(extra_requiring_procesing) != 0: print("Extra %d clades. First contains %d genes" % (len(extra_requiring_processing), len(extra_requiring_processing[0])))
-        return extra_to_do
-
 
     def write_clade_v2(self, n, og_name):
         """
@@ -227,6 +181,12 @@ class HogWriter(object):
         # self.comp_nodes[n.sp_node] is the set of HOGs relevant to this node
         hogs_to_write = self.comp_nodes[n.sp_node][0].copy()
         
+        # This node can be skipped immediately if there are no HOGs above to do 
+        # and if there is a duplication below with MRCA = n.sp_node
+        if (not n.is_root()) and (len(hogs_to_write.difference(n.up.done)) == 0) and (n.sp_node in n.dups_below):
+            n.add_feature("done", n.up.done)
+            return
+
         # get scl & remove HOGs that can't be written yet due to duplications
         # 0. Get the scl units below this node in the gene tree
         # I.e. get genes (indexed by species) below each scl (the relevant gene tree nodes)
@@ -288,55 +248,6 @@ class HogWriter(object):
                 # r = unit.name.split("_")[0] if unit.is_leaf() else unit.sp_node
         return scl_units
 
-    def get_hogs_to_write(self, n, scl, restarts=None):
-        """
-        Get the list of HOGs that should be written while at this node in the gene
-        tree. These are i) the HOGs down to, but not including the MRCA of any duplication 
-        nodes or none of these if it is a dup. ii) the nodes up from here stopping
-        before hitting the MRCA of the gene tree node above. 
-        Args:
-            n - gene tree node
-            scl - the list of ete3 scl nodes
-        Returns:
-            hogs_to_write - list of HOG names e.g. N1, N2, ...
-        Implementation:
-            - There can potentially be one restart above or multiple below
-        """
-        # Check for limits imposed by restarts
-        q_higher = False   # is there an upper start point given by the restarts
-        q_lower = False    # are there lower start points imposed by the restarts
-        if not restarts is None:
-            if restarts[0] in self.comp_nodes[n.sp_node][0]:
-                q_higher = True
-                # passed true on a complete set of trees but I don't want the very small
-                # chance of it failing for an unknown reason out in the wild
-                # assert(len(restarts) == 1)   
-            else:
-                q_lower = True
-        if debug: print((q_higher, q_lower))
-        # get HOGs below
-        scl_mrca = {nn.sp_node for nn in scl if not nn.is_leaf()}
-        sp_node = self.species_tree & (n.sp_node)
-        if q_lower:
-            sp_nodes = [self.species_tree & (node_name) for node_name in restarts]
-        else:
-            sp_nodes = [sp_node,]
-        stop_at_dups = lambda nn : nn.name in scl_mrca
-        hogs_to_write = []
-        if debug: print((n.sp_node, restarts, sp_nodes))
-        if not n.dup:
-            for sp_node_x in sp_nodes:
-                hogs_to_write.extend([nn.name for nn in sp_node_x.traverse('preorder', is_leaf_fn = stop_at_dups) if (not nn.is_leaf()) and (not nn.name in scl_mrca)])
-            # hogs_to_write = [nn.name for nn in sp_node.traverse('preorder', is_leaf_fn = stop_at_dups) if (not nn.is_leaf())] 
-        if debug: print(hogs_to_write)
-        # get HOGs above
-        if not q_lower:
-            # hogs_to_write += self.get_skipped_nodes(sp_node, n.up.sp_node if n.up is not None else None, restarts[0] if q_higher else None, n)
-            one_beyond = None if q_higher else (n.up.sp_node if n.up is not None else None)
-            hogs_to_write += self.get_skipped_nodes(sp_node, one_beyond, restarts[0] if q_higher else None, n)
-        if debug: print(hogs_to_write)
-        return hogs_to_write
-
     def write_hogs(self, hogs_to_write, scl_units, og_name, gt_node_name):
         """
         Write the HOGs that can be determined from this gene tree node.
@@ -383,9 +294,8 @@ class HogWriter(object):
             n_stop - a HOG name above the MRCA that should be the last one added
             n_gene - ete3 node from the gene tree
         Implementation/Questions:
-            - What if the node above the same MRCA, the root, a duplication and 
-              not N0? Then we don't write the higher HOGs? No, the root node itself
-              is processed for this.
+            - This is only used by the OGs with fewer than 4 taxa (and therefore 
+              no tree) now
         """
         n = n_sp_this
         missed_sp_node_names = []
@@ -404,43 +314,15 @@ class HogWriter(object):
                 missed_sp_node_names.append(n.name)
         return missed_sp_node_names
 
-    
-    def mark_restart_nodes(self, tree):
+    def mark_dups_below(self, tree):
         """
-        Marks nodes, n, that require a restart of the HOG analysis because of a blocking 
-        duplication in another part of a tree for which the MRCA for the duplication 
-        node not being incomparable with n (i.e. one of them lies on the path to the 
-        species tree root of the other).
-        Such nodes are marked with the attribute n.restart=NX, where NX is the highest
-        level HOG which should be written from that node.
+        Marks duplications below each node 
         Args:
             tree - ete3 gene tree with attributes 'dup' 'sp_node' for all non-terminals
         Returns
-            tree - ete3 gene tree with 'restart=[NX, NY,..]' attribute on required nodes 
-
-        Background:
-        Any node is an implied duplication and and the required child nodes should be marked for 
-        restart if child node with MRCA=NX and another child node that is comparable with NX i.e.
-        it is equal to NX or comes above or below it in the species tree, rather than
-        being from a different part of the tree. Already this would suggest a duplication
-        given the reconciliation of the gene tree with the species tree, and the operation
-        of the HOG writer algorithm is such that its two child nodes will need to be
-        analysed. If the duplication was not marked then the child node that was not 
-        a duplication would not be analysed.
-        - Note, if NY>NX then all the HOGS > NX would be correctly analysed higher up 
-        in the tree, it is only the ones <=NX that wouldn't be analysed correctly at
-        the other node.
-        - So instead, we want to mark these other nodes as requiring analysis for HOGs
-        <=NX (or < NX, whatever decision is taken.)
-        - A duplication can still be a restart node for the HOGs above it
-
-        Implementation:
-        - A node with a terminal duplication is already marked as a dup, it's the nodes
-        above which would need to record having that duplication below them so can 
-        skip the child nodes that are leaves.
+            tree - with attribute 'dups_below' on each node that is not a leaf or
+                   a species-specific node
         """
-        # If one child has a duplication that is comparable with the MRCA of a second
-        # child then the second child should be marked for restart
         for n in tree.traverse('postorder'):
             if n.is_leaf():
                 continue
@@ -450,36 +332,9 @@ class HogWriter(object):
                     continue
                 dups_below.update(ch.dups_below)
                 # don't care about terminal duplications
-                # print((ch.dup, ch.sp_node))
                 if ch.dup and ch.sp_node.startswith('N'):
                     dups_below.add(ch.sp_node)
             n.add_feature('dups_below', dups_below)
-            if n.dup:
-                # these will be processed anyway
-                continue
-            # need to get the highest dup_below
-            # print(dups_below)
-            highest_dups = get_highest_nodes(dups_below, self.comp_nodes)
-            # print((n.name, highest_dups, dups_below))
-            # if a child node, ch, of n is comparable with one of highest_dups, NX, 
-            # (or dups_below, but it's only necessary to check the highest) and yet 
-            # is not a dup and does not have a dup equal or higher than NX, then need 
-            # to restart ch from NX
-            for ch in n.get_children():
-                if ch.is_leaf() or (not ch.sp_node.startswith('N')):
-                    continue
-                restart = []
-                comps = self.comp_nodes[ch.sp_node]
-                for h in highest_dups:
-                    if (h not in ch.dups_below) and h in comps[0]:
-                        # even if it's a dup, can still have missing HOGs above
-                        restart.append(h)
-                    elif (h not in ch.dups_below) and (h in comps[1]) and (not ch.dup):
-                        # If it's a lower HOG there's nothing to do here if a dup
-                        restart.append(h)
-                if len(restart) > 0:
-                    if debug: print(("Restart: " + ch.name, restart))
-                    ch.add_feature('restart', restart)
         return tree
 
     @staticmethod
@@ -732,112 +587,12 @@ def Orthologs_and_Suspect(ch, suspect_genes, misplaced_genes, SpeciesAndGene):
     return d[0], d[1], d_sus[0], d_sus[1]
 
 def GetHOGs_from_tree(iog, tree, hog_writer):
-    """
-    Implementation:
-    - In orthologs pass, mark all duplication events (this could probably be done at the resolve step saving some time, but the tree nodes are being shifted around at this point so potentially hazardous)
-    - In the HOGs pass, each duplication node is a stopping point, it is treated as an indivisible unit
-    - Traverse from the root, to all duplication nodes- we look at the clades for the children of duplication nodes. Each duplication node is mapped to it's place on the species tree
-        *** What if this conflicts with the topology of the species tree. I think it can't come strictly above a sister node 
-            without a duplication node being involved, which stops us from doing anything incorrect.
-    - At each iteration of the traverse, use the species tree to write out all the applicable HOGs, treating each leaf and
-      each duplication event as an indivisible unit
-    - Mark all implied duplications (a duplication is implied if it has a descendant node with the same MRCA and which is marked as a duplication).
-      The effect of this is as follows.
-      Consider: 
-                          /----
-                    /-----N1
-            /-----N1      \----
-        --N0       |
-           |        \----N1 (Dup)
-            \----- e
-        In the initial implementation, N0 would not write any HOGs lower than N0
-        because there is an N1 (Dup) that should be responsible for writing the 
-        two or more separate N1 HOGs below that node, and all the descendant HOGs 
-        too. There are two solutions I can see. 
-          * i) Postpone writing all N1 HOGs until N1 (Dup) and also all the sister
-               nodes passed on the way from N0 down to N1 (Dup). This is the option
-               taken, and is achieved simply by marking implied duplications.
-           ii) Use a more liberal approach, trialed but not used. Write a large
-               N1 HOG while at N0 but excluding the N1 (Dup) genes. Then write the 
-               separate N1 and descendant HOGs for N1 (Dup) and the descendant HOGs
-               for each of the N1 that would otherwise be missed in the first implementation.
-               The argument for doing this is that trees are often messed up, if 
-               two N1 clades have found their way into the tree and yet *still* don't
-               overlap with any of the species in the N1 (non-dup) clades then this
-               is a strong argument for gene tree messiness rather than multiple 
-               gene duplication events and multiple orthogroups. In this case, write
-               the most complete N1 orthogroup and just deal with the N1 (Dup) clade
-               separately. In support of this, for the 12+3 orthobench dataset, I
-               found no cases where 
-
-      - See latex doc.
-    """
-    tree = hog_writer.mark_restart_nodes(tree)
-    hogs_version_2(iog, tree, hog_writer)
-
-def hogs_version_1(iog, tree, hog_writer):
-    """
-    The (iteratively improved) first version:
-    - Wrote the HOGs that could be written from the root node down to any duplications
-    - Picked up after these duplication to write HOGs for the descendant clades
-    - Iteratively improved fixes to try to resolve issues with 'blocked' HOGs due
-      to duplications not in a direct line with the node affected.
-    This approach proved tricksy to fix up & ultimately a simpler solution appeared
-    like it would work better and this first version was abandoned.
-    Args
-        - tree *** with restarts and dups_below marked
-    """
-    og_name = "OG%07d" % iog
-    if debug: print("\n===== %s =====" % og_name)
-
-    # Any node that is not a duplication needs to be processed (i.e. passed to 'write_clade')
-    # If the root node is a duplication but MRCA != N0 it also needs to be processed
-    # Also, if a child of a node, n, will be skipped if n.sp_node is the same as one of it's children
-    # this occurs for cases when n isn't a duplication according to overlap method due to interleaved species
-    # So...
-
-    # root
-    if debug: print("\nroot")
-    processed_as_root = set()
-    if not (tree.dup and tree.sp_node == "N0"): 
-        hog_writer.write_clade(tree, og_name)
-        processed_as_root.add(tree.name)
-    else:
-        stop_at_N0_HOGs = lambda n : n.is_leaf() or not ((n.dup and n.sp_node == "N0") or 'N0' in n.dups_below)
-        # there could be individual leaves, but it's guaranteed to find a HOG root for each clade too
-        for n in tree.get_leaves(is_leaf_fn=stop_at_N0_HOGs):
-            if n.is_leaf(): 
-                continue
-            if debug: print("'Root' node: " + n.name)
-            hog_writer.write_clade(n, og_name)
-            # this could also be a post-duplication node
-            processed_as_root.add(n.name)   
-    # duplications
-    if debug: print("\nduplications")
-    for n in tree.iter_search_nodes(dup=True):
-        if debug: print("Dup node: " + n.name)
-        nodes_to_process = n.get_children()
-        for n in nodes_to_process:
-            # what if this is also a duplication?
-            if (not n.is_leaf() and n.dup) or n.name in processed_as_root:
-                continue
-            # print(n.name)
-            hog_writer.write_clade(n, og_name)
-    # implicit duplications, 'restarts'
-    if debug: print("\nrestarts")
-    for n in tree.traverse():
-        if 'restart' in n.features and n.name not in processed_as_root:
-            hog_writer.write_clade(n, og_name)
-
-
-def hogs_version_2(iog, tree, hog_writer):
-    """
-    Traverse the whole tree & write HOGs at the point they can be written
-    """
+    tree = hog_writer.mark_dups_below(tree)
     og_name = "OG%07d" % iog
     if debug: print("\n===== %s =====" % og_name)
     for n in tree.traverse("preorder"):
         hog_writer.write_clade_v2(n, og_name)
+
 
 def get_highest_nodes(nodes, comp_nodes):
     """
