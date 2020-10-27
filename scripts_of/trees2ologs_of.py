@@ -172,8 +172,8 @@ class HogWriter(object):
             exc_hog - if specified this HOG shouldn't be written. It will be the 
                       same as n.sp_node and will have already been done.
         """
-        if n.is_leaf(): return []
         if debug: print("\nTree node: %s" % n.name)
+        if n.is_leaf(): return []
 
         # 0. Get the scl units below this node in the gene tree
         # I.e. get genes (indexed by species) below each scl (the relevant gene tree nodes)
@@ -206,6 +206,49 @@ class HogWriter(object):
                     extra_to_do.append((child, exc_hog))
         # if len(extra_requiring_procesing) != 0: print("Extra %d clades. First contains %d genes" % (len(extra_requiring_processing), len(extra_requiring_processing[0])))
         return extra_to_do
+
+
+    def write_clade_v2(self, n, og_name):
+        """
+        Look at parent node to know when to start, look at dups below to know when 
+        to stop.
+        - Current MRCA could be excluded either because it's already been done or
+          because of a duplication below
+
+        - Species-specific clades could still be HOGs if they are all that remain
+          of that clade 
+        """
+        if debug: print("\nTree node: %s" % n.name)
+        if n.is_leaf():
+            return 
+        if debug: print(n.sp_node)
+        if (n.dup and n.sp_node == "N0"): 
+            n.add_feature("done", set())
+        # self.comp_nodes[n.sp_node] is the set of HOGs relevant to this node
+        hogs_to_write = self.comp_nodes[n.sp_node][0].copy()
+        
+        # get scl & remove HOGs that can't be written yet due to duplications
+        # 0. Get the scl units below this node in the gene tree
+        # I.e. get genes (indexed by species) below each scl (the relevant gene tree nodes)
+        scl = n.get_leaves(is_leaf_fn=self.scl_fn) # single-copy 'leaf'
+        scl_units = self.get_scl_units(scl)        # the genes below each of these scl
+
+        scl_mrca = {nn.sp_node for nn in scl if not nn.is_leaf()}
+        stop_at_dups = lambda nn : nn.name in scl_mrca
+        sp_node = self.species_tree & (n.sp_node)
+        if not n.dup:
+            hogs_to_write.update({nn.name for nn in sp_node.traverse('preorder', is_leaf_fn = stop_at_dups) if (not nn.is_leaf()) and (not nn.name in scl_mrca)})
+        
+        if not n.is_root():
+            hogs_to_write.difference_update(n.up.done)
+
+        # 2. Write HOGs
+        n.add_feature("done", hogs_to_write if n.is_root() else n.up.done.union(hogs_to_write))
+        if len(hogs_to_write) == 0:
+            return
+
+        if debug: print(hogs_to_write)
+        self.write_hogs(hogs_to_write, scl_units, og_name, n.name)
 
     def get_scl_units(self, scl):
         """
@@ -435,7 +478,7 @@ class HogWriter(object):
                         # If it's a lower HOG there's nothing to do here if a dup
                         restart.append(h)
                 if len(restart) > 0:
-                    # print(("Restart: " + ch.name, restart))
+                    if debug: print(("Restart: " + ch.name, restart))
                     ch.add_feature('restart', restart)
         return tree
 
@@ -729,59 +772,72 @@ def GetHOGs_from_tree(iog, tree, hog_writer):
 
       - See latex doc.
     """
+    tree = hog_writer.mark_restart_nodes(tree)
+    hogs_version_2(iog, tree, hog_writer)
+
+def hogs_version_1(iog, tree, hog_writer):
+    """
+    The (iteratively improved) first version:
+    - Wrote the HOGs that could be written from the root node down to any duplications
+    - Picked up after these duplication to write HOGs for the descendant clades
+    - Iteratively improved fixes to try to resolve issues with 'blocked' HOGs due
+      to duplications not in a direct line with the node affected.
+    This approach proved tricksy to fix up & ultimately a simpler solution appeared
+    like it would work better and this first version was abandoned.
+    Args
+        - tree *** with restarts and dups_below marked
+    """
     og_name = "OG%07d" % iog
     if debug: print("\n===== %s =====" % og_name)
+
     # Any node that is not a duplication needs to be processed (i.e. passed to 'write_clade')
     # If the root node is a duplication but MRCA != N0 it also needs to be processed
     # Also, if a child of a node, n, will be skipped if n.sp_node is the same as one of it's children
     # this occurs for cases when n isn't a duplication according to overlap method due to interleaved species
     # So...
-    tree = hog_writer.mark_restart_nodes(tree)
+
     # root
     if debug: print("\nroot")
+    processed_as_root = set()
     if not (tree.dup and tree.sp_node == "N0"): 
         hog_writer.write_clade(tree, og_name)
+        processed_as_root.add(tree.name)
+    else:
+        stop_at_N0_HOGs = lambda n : n.is_leaf() or not ((n.dup and n.sp_node == "N0") or 'N0' in n.dups_below)
+        # there could be individual leaves, but it's guaranteed to find a HOG root for each clade too
+        for n in tree.get_leaves(is_leaf_fn=stop_at_N0_HOGs):
+            if n.is_leaf(): 
+                continue
+            if debug: print("'Root' node: " + n.name)
+            hog_writer.write_clade(n, og_name)
+            # this could also be a post-duplication node
+            processed_as_root.add(n.name)   
     # duplications
     if debug: print("\nduplications")
     for n in tree.iter_search_nodes(dup=True):
+        if debug: print("Dup node: " + n.name)
         nodes_to_process = n.get_children()
         for n in nodes_to_process:
             # what if this is also a duplication?
-            if (not n.is_leaf() and n.dup):
+            if (not n.is_leaf() and n.dup) or n.name in processed_as_root:
                 continue
             # print(n.name)
             hog_writer.write_clade(n, og_name)
     # implicit duplications, 'restarts'
     if debug: print("\nrestarts")
     for n in tree.traverse():
-        if 'restart' in n.features:
+        if 'restart' in n.features and n.name not in processed_as_root:
             hog_writer.write_clade(n, og_name)
 
 
-    # # First process the root (it will be processed below if it's a dup)    
-    # extras = deque()
-    # if not (tree.dup and tree.sp_node == "N0"): 
-    #     extras.extend(hog_writer.write_clade(tree, og_name))
-    # if tree.dup:
-    #     # these child clades will be processed anyway
-    #     extras.clear()
-    # # while len(extras) > 0:
-    # #     n, exc_hog = extras.popleft()
-    # #     extras.extend(hog_writer.write_clade(n, og_name, exc_hog))
-    # # print("---- Now Duplications ----")
-    # for n in tree.iter_search_nodes(dup=True):
-    #     nodes_to_process = n.get_children()
-    #     for n in nodes_to_process:
-    #         # what if this is also a duplication?
-    #         if (not n.is_leaf() and n.dup):
-    #             continue
-    #         # print(n.name)
-    #         extras = deque()
-    #         extras.extend(hog_writer.write_clade(n, og_name))
-    #         # while len(extras) > 0:
-    #         #     n, exc_hog = extras.popleft()
-    #         #     extras.extend(hog_writer.write_clade(n, og_name, exc_hog))
-
+def hogs_version_2(iog, tree, hog_writer):
+    """
+    Traverse the whole tree & write HOGs at the point they can be written
+    """
+    og_name = "OG%07d" % iog
+    if debug: print("\n===== %s =====" % og_name)
+    for n in tree.traverse("preorder"):
+        hog_writer.write_clade_v2(n, og_name)
 
 def get_highest_nodes(nodes, comp_nodes):
     """
@@ -805,18 +861,17 @@ def get_comparable_nodes(sp_tree):
     """
     comp_nodes = dict()
     for n in sp_tree.traverse('postorder'):
-        if n.is_leaf():
-            continue
         nodes_below = set()
-        for ch in n.get_children():
-            if ch.is_leaf():
-                continue
-            else:
-                nodes_below.update(ch.nodes_below)
-                nodes_below.add(ch.name)
+        if not n.is_leaf():
+            for ch in n.get_children():
+                if ch.is_leaf():
+                    continue
+                else:
+                    nodes_below.update(ch.nodes_below)
+                    nodes_below.add(ch.name)
         above = set([nn.name for nn in n.get_ancestors()])
         n.add_feature('nodes_below', nodes_below)
-        comp_nodes[n.name] = (above, nodes_below)
+        comp_nodes[n.name] = (above, nodes_below, above.union(nodes_below.union(set(n.name))))
     return comp_nodes
 
 
