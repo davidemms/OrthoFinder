@@ -111,6 +111,11 @@ def StoreSpeciesSets(t, GeneMap, tag="sp_"):
                 node.add_feature(tag_up, parent.__getattribute__(tag_up).union(sp_downs))
     t.add_feature(tag_down, set.union(*[ch.__getattribute__(tag_down) for ch in t.get_children()]))
 
+"""
+HOGs
+-------------------------------------------------------------------------------
+""" 
+
 def MRCA_node(t_rooted, taxa):
     return (t_rooted & next(taxon for taxon in taxa)) if len(taxa) == 1 else t_rooted.get_common_ancestor(taxa)
 
@@ -142,7 +147,7 @@ class HogWriter(object):
         self.hog_contents = dict()  # sp_node_name = hog_name-> list of contents fo hog (internal nodes and leaves)
         for n in species_tree.traverse():
             desc = n.get_descendants()
-            self.hog_contents[n.name] = set([nn.name for nn in desc])
+            self.hog_contents[n.name] = set([int(nn.name) if nn.is_leaf() else nn.name for nn in desc])
         self.comp_nodes = get_comparable_nodes(self.species_tree)
 
     def get_hog_index(self, hog_name):
@@ -183,21 +188,21 @@ class HogWriter(object):
         
         # This node can be skipped immediately if there are no HOGs above to do 
         # and if there is a duplication below with MRCA = n.sp_node
-        if (not n.is_root()) and (len(hogs_to_write.difference(n.up.done)) == 0) and (n.sp_node in n.dups_below):
-            n.add_feature("done", n.up.done)
-            return
+        # this next segment only affects performance, not the results. It's optional
+        # if (not n.is_root()) and (len(hogs_to_write.difference(n.up.done)) == 0) and (n.sp_node in n.dups_below):
+        #     n.add_feature("done", n.up.done)
+        #     return
 
         # get scl & remove HOGs that can't be written yet due to duplications
         # 0. Get the scl units below this node in the gene tree
         # I.e. get genes (indexed by species) below each scl (the relevant gene tree nodes)
-        scl = n.get_leaves(is_leaf_fn=self.scl_fn) # single-copy 'leaf'
-        scl_units = self.get_scl_units(scl)        # the genes below each of these scl
+        genes_per_species_index = self.get_descendant_genes(n)
 
-        scl_mrca = {nn.sp_node for nn in scl if not nn.is_leaf()}
-        stop_at_dups = lambda nn : nn.name in scl_mrca
+        # scl_mrca = {nn.sp_node for nn in scl if not nn.is_leaf()}
+        stop_at_dups = lambda nn : nn.name in n.dups_below
         sp_node = self.species_tree & (n.sp_node)
         if not n.dup:
-            hogs_to_write.update({nn.name for nn in sp_node.traverse('preorder', is_leaf_fn = stop_at_dups) if (not nn.is_leaf()) and (not nn.name in scl_mrca)})
+            hogs_to_write.update({nn.name for nn in sp_node.traverse('preorder', is_leaf_fn = stop_at_dups) if (not nn.is_leaf()) and (not nn.name in n.dups_below)})
         
         if not n.is_root():
             hogs_to_write.difference_update(n.up.done)
@@ -208,47 +213,30 @@ class HogWriter(object):
             return
 
         if debug: print(hogs_to_write)
-        self.write_hogs(hogs_to_write, scl_units, og_name, n.name)
+        self.write_hogs(hogs_to_write, genes_per_species_index, og_name, n.name)
 
-    def get_scl_units(self, scl):
+    def get_descendant_genes(self, n):
         """
-        Get a dictionary which gives, for each species tree node, a dictionary of 
-        the gene lists for each species. Note, the species are by their index not 
-        their original ID.
+        Attempt at a simplified replacement to get_scl_units as shouldn't need to 
+        care about which scl a gene belongs to.
         Args:
-            scl - list of 'single-copy leaf' ete3 nodes. Each scl is a leaf or a duplication node
+            n - node under consideration
         Returns:
-            scl_units - dict:st_node_name->(dict:sp_index->string of genes, comma separated)
+            dict:sp_index->string of genes, comma separated
         """
-        scl_units = dict()
-        for unit in scl:
-            # we can have more than one unit corresponding to the same place if the tree is non-binary. In this case the 'dup' test has
-            # already been passed in the previous (orthologs) traverse of the tree and so the genes can be concatenated
-            # get all the genes from under here and sort them into a text string per species
-            genes_per_species = defaultdict(list) # iCol (before 'name' columns) -> text string of genes
-            genes = unit.get_leaves()
-            q_have_legitimate_gene = False # may be misplaced genes
-            for g in genes:
-                if "X" in g.features: continue
-                q_have_legitimate_gene = True
-                isp = g.name.split("_")[0]
-                genes_per_species[self.i_sp_to_index[isp]].append(self.seq_ids[g.name])
-            if q_have_legitimate_gene:
-                unit_name = unit.name.split("_")[0] if unit.is_leaf() else unit.sp_node
-                d_new = {k:", ".join(v) for k,v in genes_per_species.items()}
-                if unit_name in scl_units:
-                    d_orig = scl_units[unit_name]
-                    for k, v in d_new.items():
-                        if k in d_orig:
-                            d_orig[k] = d_orig[k] + ", " + d_new[k]
-                        else:
-                            d_orig[k] = v
-                else:
-                    scl_units[unit_name] = d_new
-                # r = unit.name.split("_")[0] if unit.is_leaf() else unit.sp_node
-        return scl_units
+        genes_per_species = defaultdict(list) # iCol (before 'name' columns) -> text string of genes
+        genes = n.get_leaves()
+        q_have_legitimate_gene = False # may be misplaced genes
+        for g in genes:
+            if "X" in g.features: continue
+            q_have_legitimate_gene = True
+            isp = g.name.split("_")[0]
+            genes_per_species[self.i_sp_to_index[isp]].append(self.seq_ids[g.name])
+        for k, v in genes_per_species.items():
+            genes_per_species[k] = ", ".join(v)
+        return genes_per_species
 
-    def write_hogs(self, hogs_to_write, scl_units, og_name, gt_node_name):
+    def write_hogs(self, hogs_to_write, genes_per_species_index, og_name, gt_node_name):
         """
         Write the HOGs that can be determined from this gene tree node.
         Args:
@@ -267,14 +255,13 @@ class HogWriter(object):
             q_empty = True
             # 2. We know the scl, these are the 'taxonomic units' available (clades or individual species in species tree for this node of the gene tree)
             # Note there can be at most one of each. Only a subset of these will fall under this HOG.
-            units = self.hog_contents[h].intersection(scl_units.keys())
+            units = self.hog_contents[h].intersection(genes_per_species_index.keys())
             # print("Units: " + str(units))
             genes_row = ["" for _ in self.iSps]
             # put the units into the row
-            for u in units:
-                for isp, genes_text in scl_units[u].items():
-                    genes_row[isp] = genes_text
-                    q_empty = False
+            for isp in units:
+                genes_row[isp] = genes_per_species_index[isp]
+                q_empty = False
             if not q_empty: 
                 # print((h, genes_row))
                 self.writers[h].writerow(["%s.HOG%07d" % (h, self.get_hog_index(h)),  og_name, gt_node_name] + genes_row)
@@ -326,6 +313,14 @@ class HogWriter(object):
         for n in tree.traverse('postorder'):
             if n.is_leaf():
                 continue
+            if n.dup:
+                # get the MRCA level at which there is evidence of a duplication
+                mrcas = [ch.name.split("_")[0] if ch.is_leaf() else ch.sp_node for ch in n.get_children()]
+                if len(mrcas) == 1:
+                    n.add_feature('dup_level', mrcas[0])
+                else:
+                    # need two child nodes attesting to that level
+                    n.add_feature('dup_level', self.get_evidenced_dup_level(mrcas))
             dups_below = set()
             for ch in n.get_children():
                 if ch.is_leaf():
@@ -333,13 +328,85 @@ class HogWriter(object):
                 dups_below.update(ch.dups_below)
                 # don't care about terminal duplications
                 if ch.dup and ch.sp_node.startswith('N'):
-                    dups_below.add(ch.sp_node)
+                    dups_below.add(ch.dup_level)
             n.add_feature('dups_below', dups_below)
         return tree
+    
+    def get_evidenced_dup_level(self, mrcas):
+        # try each in turn
+        attested = set()
+        for l1, l2 in itertools.combinations(mrcas, 2):
+            if l1 == l2:
+                attested.add(l1)
+            elif l2 in self.comp_nodes[l1][1]:
+                attested.add(l2)
+            elif l1 in self.comp_nodes[l2][1]:
+                attested.add(l1)
+        if len(attested) == 1:
+            return attested.pop()
+        elif len(attested) == 0:
+            print(mrcas)
+            raise Exception()
+        else:
+            # get the highest in the tree
+            attested = list(attested)
+            ancestor_lists = [(self.species_tree & a).get_ancestors() for a in attested]
+            x = len(attested)
+            for i in range(x):
+                if all(attested[i] in ancestors[j] for j in range(x) if j!=i):
+                    return attested[i]
+        raise Exception()
 
     @staticmethod
     def scl_fn(n):
         return n.is_leaf() or n.dup
+
+
+def GetHOGs_from_tree(iog, tree, hog_writer):
+    tree = hog_writer.mark_dups_below(tree)
+    og_name = "OG%07d" % iog
+    if debug: print("\n===== %s =====" % og_name)
+    for n in tree.traverse("preorder"):
+        hog_writer.write_clade_v2(n, og_name)
+
+
+def get_highest_nodes(nodes, comp_nodes):
+    """
+    Returns the nodes closest to the root
+    Args:
+        nodes - the list of nodes to examine
+        comp_nodes - dict:NX -> ( {closer to root}, {further from root} )
+    """
+    return  {n for n in nodes if not any(n in comp_nodes[n2][1] for n2 in nodes)}
+
+
+def get_comparable_nodes(sp_tree):
+    """
+    Return a dictionary of comaprable nodes
+    Node NX < NY if NX is on the path between NY and the root.
+    If a node is not <, =, > another then they are incomparable
+    Args:
+        sp_tree - sp_tree with labelled nodes
+    Returns:
+        comp_nodes - dict:NX -> ( {n|n<NX}, {n|n>NX} ) i.e. (higher_nodes, lower_nodes)
+    """
+    comp_nodes = dict()
+    for n in sp_tree.traverse('postorder'):
+        nodes_below = set()
+        if not n.is_leaf():
+            for ch in n.get_children():
+                if not ch.is_leaf():
+                    nodes_below.update(ch.nodes_below)
+                nodes_below.add(ch.name)
+        above = set([nn.name for nn in n.get_ancestors()])
+        n.add_feature('nodes_below', nodes_below)
+        comp_nodes[n.name] = (above, nodes_below, above.union(nodes_below.union(set(n.name))))
+    return comp_nodes
+
+"""
+Orthologs
+-------------------------------------------------------------------------------
+""" 
 
 def OutgroupIngroupSeparationScore(sp_up, sp_down, sett1, sett2, N_recip, n1, n2):
     f_dup = len(sp_up.intersection(sett1)) * len(sp_up.intersection(sett2)) * len(sp_down.intersection(sett1)) * len(sp_down.intersection(sett2)) * N_recip
@@ -585,49 +652,6 @@ def Orthologs_and_Suspect(ch, suspect_genes, misplaced_genes, SpeciesAndGene):
             else:
                 di[sp].append(seq)
     return d[0], d[1], d_sus[0], d_sus[1]
-
-def GetHOGs_from_tree(iog, tree, hog_writer):
-    tree = hog_writer.mark_dups_below(tree)
-    og_name = "OG%07d" % iog
-    if debug: print("\n===== %s =====" % og_name)
-    for n in tree.traverse("preorder"):
-        hog_writer.write_clade_v2(n, og_name)
-
-
-def get_highest_nodes(nodes, comp_nodes):
-    """
-    Returns the nodes closest to the root
-    Args:
-        nodes - the list of nodes to examine
-        comp_nodes - dict:NX -> ( {closer to root}, {further from root} )
-    """
-    return  {n for n in nodes if not any(n in comp_nodes[n2][1] for n2 in nodes)}
-
-
-def get_comparable_nodes(sp_tree):
-    """
-    Return a dictionary of comaprable nodes
-    Node NX < NY if NX is on the path between NY and the root.
-    If a node is not <, =, > another then they are incomparable
-    Args:
-        sp_tree - sp_tree with labelled nodes
-    Returns:
-        comp_nodes - dict:NX -> ( {n|n<NX}, {n|n>NX} ) i.e. (higher_nodes, lower_nodes)
-    """
-    comp_nodes = dict()
-    for n in sp_tree.traverse('postorder'):
-        nodes_below = set()
-        if not n.is_leaf():
-            for ch in n.get_children():
-                if ch.is_leaf():
-                    continue
-                else:
-                    nodes_below.update(ch.nodes_below)
-                    nodes_below.add(ch.name)
-        above = set([nn.name for nn in n.get_ancestors()])
-        n.add_feature('nodes_below', nodes_below)
-        comp_nodes[n.name] = (above, nodes_below, above.union(nodes_below.union(set(n.name))))
-    return comp_nodes
 
 
 def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False):
