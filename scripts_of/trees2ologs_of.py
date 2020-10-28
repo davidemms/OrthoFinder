@@ -199,10 +199,12 @@ class HogWriter(object):
         genes_per_species_index = self.get_descendant_genes(n)
 
         # scl_mrca = {nn.sp_node for nn in scl if not nn.is_leaf()}
+        if debug: print("Dups below: " + str(n.dups_below))
         stop_at_dups = lambda nn : nn.name in n.dups_below
         sp_node = self.species_tree & (n.sp_node)
-        if not n.dup:
-            hogs_to_write.update({nn.name for nn in sp_node.traverse('preorder', is_leaf_fn = stop_at_dups) if (not nn.is_leaf()) and (not nn.name in n.dups_below)})
+        # don't need skip for dups, that's recorded in dups_below
+        # traverse the species tree from the current node and record all nodes before hitting a duplication node from the gene tree
+        hogs_to_write.update({nn.name for nn in sp_node.traverse('preorder', is_leaf_fn = stop_at_dups) if (not nn.is_leaf()) and (not nn.name in n.dups_below)})
         
         if not n.is_root():
             hogs_to_write.difference_update(n.up.done)
@@ -303,12 +305,12 @@ class HogWriter(object):
 
     def mark_dups_below(self, tree):
         """
-        Marks duplications below each node 
+        Marks duplications below and at each node in feature 'dups_below'
         Args:
             tree - ete3 gene tree with attributes 'dup' 'sp_node' for all non-terminals
         Returns
             tree - with attribute 'dups_below' on each node that is not a leaf or
-                   a species-specific node
+                   a species-specific node and 'dup_level' on each node where n.dup=True
         """
         for n in tree.traverse('postorder'):
             if n.is_leaf():
@@ -326,9 +328,11 @@ class HogWriter(object):
                 if ch.is_leaf():
                     continue
                 dups_below.update(ch.dups_below)
-                # don't care about terminal duplications
-                if ch.dup and ch.sp_node.startswith('N'):
-                    dups_below.add(ch.dup_level)
+                # # don't care about terminal duplications
+                # if ch.dup and ch.sp_node.startswith('N'):
+                #     dups_below.add(ch.dup_level)
+                if n.dup and n.dup_level.startswith('N'):
+                    dups_below.add(n.dup_level)   # dups_below now includes current node too
             n.add_feature('dups_below', dups_below)
         return tree
     
