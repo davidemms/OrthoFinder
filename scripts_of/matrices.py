@@ -34,26 +34,26 @@ except ImportError:
 
 from . import util, files
 
-def DumpMatrix(name, m, iSpecies, jSpecies):
-    with open(files.FileHandler.GetPickleDir() + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'wb') as picFile:
+def DumpMatrix(name, m, iSpecies, jSpecies, d_pickle):
+    with open(d_pickle + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'wb') as picFile:
         pic.dump(m, picFile, protocol=util.picProtocol)
     
-def DumpMatrixArray(name, matrixArray, iSpecies):
+def DumpMatrixArray(name, matrixArray, iSpecies, d_pickle):
     for jSpecies, m in enumerate(matrixArray):
-        DumpMatrix(name, m, iSpecies, jSpecies)
+        DumpMatrix(name, m, iSpecies, jSpecies, d_pickle)
 
-def LoadMatrix(name, iSpecies, jSpecies): 
-    with open(files.FileHandler.GetPickleDir() + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'rb') as picFile:  
+def LoadMatrix(name, iSpecies, jSpecies, d_pickle): 
+    with open(d_pickle + "%s%d_%d.pic" % (name, iSpecies, jSpecies), 'rb') as picFile:  
         M = pic.load(picFile)
     return M
         
-def LoadMatrixArray(name, seqsInfo, iSpecies, row=True):
+def LoadMatrixArray(name, seqsInfo, iSpecies, d_pickle, row=True):
     matrixArray = []
     for jSpecies in range(seqsInfo.nSpecies):
         if row == True:
-            matrixArray.append(LoadMatrix(name, iSpecies, jSpecies))
+            matrixArray.append(LoadMatrix(name, iSpecies, jSpecies, d_pickle))
         else:
-            matrixArray.append(LoadMatrix(name, jSpecies, iSpecies))
+            matrixArray.append(LoadMatrix(name, jSpecies, iSpecies, d_pickle))
     return matrixArray
               
 def MatricesAnd_s(Xarr, Yarr):
@@ -68,8 +68,8 @@ def MatricesAndTr_s(Xarr, Yarr):
         Zarr.append(x.multiply(y.transpose()))
     return Zarr   
     
-def DeleteMatrices(baseName):
-    for f in glob.glob(files.FileHandler.GetPickleDir() + baseName + "*_*.pic"):
+def DeleteMatrices(baseName, d_pickle):
+    for f in glob.glob(d_pickle + baseName + "*_*.pic"):
         if os.path.exists(f): os.remove(f)
 
 def sparse_max_row(csr_mat):

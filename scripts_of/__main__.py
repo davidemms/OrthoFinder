@@ -459,15 +459,15 @@ WaterfallMethod
 """ 
 
 def WriteGraph_perSpecies(args):
-    seqsInfo, graphFN, iSpec = args            
+    seqsInfo, graphFN, iSpec, d_pickle = args            
     # calculate the 2-way connections for one query species
     with open(graphFN + "_%d" % iSpec, 'w') as graphFile:
         connect2 = []
         for jSpec in range(seqsInfo.nSpecies):
-            m1 = matrices.LoadMatrix("connect", iSpec, jSpec)
-            m2tr = numeric.transpose(matrices.LoadMatrix("connect", jSpec, iSpec))
+            m1 = matrices.LoadMatrix("connect", iSpec, jSpec, d_pickle)
+            m2tr = numeric.transpose(matrices.LoadMatrix("connect", jSpec, iSpec, d_pickle))
             connect2.append(m1 + m2tr)
-        B = matrices.LoadMatrixArray("B", seqsInfo, iSpec)
+        B = matrices.LoadMatrixArray("B", seqsInfo, iSpec, d_pickle)
         B_connect = matrices.MatricesAnd_s(connect2, B)
         
         W = [b.sorted_indices().tolil() for b in B_connect]
@@ -498,7 +498,7 @@ class WaterfallMethod:
             return sparse.lil_matrix(B.get_shape())
             
     @staticmethod
-    def ProcessBlastHits(seqsInfo, blastDir_list, Lengths, iSpecies, qDoubleBlast):
+    def ProcessBlastHits(seqsInfo, blastDir_list, Lengths, iSpecies, d_pickle, qDoubleBlast):
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
             # process up to the best hits for each species
@@ -507,17 +507,17 @@ class WaterfallMethod:
                 Bij = blast_file_processor.GetBLAST6Scores(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)  
                 Bij = WaterfallMethod.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
                 Bi.append(Bij)
-            matrices.DumpMatrixArray("B", Bi, iSpecies)
+            matrices.DumpMatrixArray("B", Bi, iSpecies, d_pickle)
             BH = GetBH_s(Bi, seqsInfo, iSpecies)
-            matrices.DumpMatrixArray("BH", BH, iSpecies)
+            matrices.DumpMatrixArray("BH", BH, iSpecies, d_pickle)
             util.PrintTime("Initial processing of species %d complete" % iSpecies)
         
     @staticmethod 
-    def Worker_ProcessBlastHits(cmd_queue, qDoubleBlast):
+    def Worker_ProcessBlastHits(cmd_queue, d_pickle, qDoubleBlast):
         while True:
             try:
                 args = cmd_queue.get(True, 1)
-                WaterfallMethod.ProcessBlastHits(*args, qDoubleBlast=qDoubleBlast)
+                WaterfallMethod.ProcessBlastHits(*args, d_pickle=d_pickle, qDoubleBlast=qDoubleBlast)
             except queue.Empty:
                 return 
             except Exception:
@@ -527,23 +527,23 @@ class WaterfallMethod:
                 raise
 
     @staticmethod
-    def ConnectCognates(seqsInfo, iSpecies): 
+    def ConnectCognates(seqsInfo, iSpecies, d_pickle): 
         # calculate RBH for species i
-        BHix = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies)
-        BHxi = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies, row=False)
+        BHix = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies, d_pickle)
+        BHxi = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies, d_pickle, row=False)
         RBHi = matrices.MatricesAndTr_s(BHix, BHxi)   # twice as much work as before (only did upper triangular before)
-        B = matrices.LoadMatrixArray("B", seqsInfo, iSpecies)
+        B = matrices.LoadMatrixArray("B", seqsInfo, iSpecies, d_pickle)
         connect = WaterfallMethod.ConnectAllBetterThanAnOrtholog_s(RBHi, B, seqsInfo, iSpecies) 
-        matrices.DumpMatrixArray("connect", connect, iSpecies)
+        matrices.DumpMatrixArray("connect", connect, iSpecies, d_pickle)
             
     @staticmethod 
-    def Worker_ConnectCognates(cmd_queue):
+    def Worker_ConnectCognates(cmd_queue, d_pickle):
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
             while True:
                 try:
                     args = cmd_queue.get(True, 1)
-                    WaterfallMethod.ConnectCognates(*args)
+                    WaterfallMethod.ConnectCognates(*args, d_pickle=d_pickle)
                 except queue.Empty:
                     return  
                                    
@@ -556,14 +556,14 @@ class WaterfallMethod:
                 graphFile.write("\n(mclmatrix\nbegin\n\n") 
             pool = mp.Pool(nProcess)
             graphFN = files.FileHandler.GetGraphFilename()
-            pool.map(WriteGraph_perSpecies, [(seqsInfo, graphFN, iSpec) for iSpec in range(seqsInfo.nSpecies)])
+            pool.map(WriteGraph_perSpecies, [(seqsInfo, graphFN, iSpec, files.FileHandler.GetPickleDir()) for iSpec in range(seqsInfo.nSpecies)])
             for iSp in range(seqsInfo.nSpecies):
                 subprocess.call("cat " + graphFN + "_%d" % iSp + " >> " + graphFN, shell=True)
                 os.remove(graphFN + "_%d" % iSp)
             # Cleanup
             pool.close()
-            matrices.DeleteMatrices("B") 
-            matrices.DeleteMatrices("connect") 
+            matrices.DeleteMatrices("B", files.FileHandler.GetPickleDir()) 
+            matrices.DeleteMatrices("connect", files.FileHandler.GetPickleDir()) 
     
     @staticmethod
     def GetMostDistant_s(RBH, B, seqsInfo, iSpec):
@@ -1335,7 +1335,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo):
     for iSpecies in range(seqsInfo.nSpecies):
         cmd_queue.put((seqsInfo, blastDir_list, Lengths, iSpecies))
     files.FileHandler.GetPickleDir()     # create the pickle directory before the parallel processing to prevent a race condition
-    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, options.qDoubleBlast)) for i_ in range(options.nProcessAlg)]
+    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, files.FileHandler.GetPickleDir(), options.qDoubleBlast)) for i_ in range(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
     parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
@@ -1343,7 +1343,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo):
     cmd_queue = mp.Queue()
     for iSpecies in range(seqsInfo.nSpecies):
         cmd_queue.put((seqsInfo, iSpecies))
-    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, )) for i_ in range(options.nProcessAlg)]
+    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, files.FileHandler.GetPickleDir())) for i_ in range(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
     parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)

@@ -77,7 +77,7 @@ class __Files_new_dont_manually_create__(object):
     # RefactorDS - FileHandler
     def CreateOutputDirFromStart_new(self, fasta_dir, base, user_name = None, old_wd_base_list=None):
         """
-        The intial difference will be that results will go in OrthoFinder/Results_DATE or USER_SPECIFIED/RESULTS_DATE
+        The initial difference will be that results will go in OrthoFinder/Results_DATE or USER_SPECIFIED/RESULTS_DATE
         whereas before they went in Results_DATE or USER_SPECIFIED.
         
         If this is a composite analysis (-f + -b) then old_wd_base_list != None 
