@@ -167,7 +167,7 @@ class HogWriter(object):
             self.writers[sp_node_name].writerow(["%s.HOG%07d" % (sp_node_name, i_hog),  og_name, "-"] + row_genes)
 
 
-    def write_clade_v2(self, n, og_name):
+    def write_clade_v2(self, n, og_name, split_paralogous_clades_from_same_hog = False):
         """
         Look at parent node to know when to start, look at dups below to know when 
         to stop.
@@ -176,15 +176,27 @@ class HogWriter(object):
 
         - Species-specific clades could still be HOGs if they are all that remain
           of that clade 
+          Args:
+            n - gene tree node
+            og_name - name to use in file output
+            split_paralogous_clades_from_same_hog - should clades which are within 
+                the same HOG but are paralogous be split up
         """
-        if debug: print("\nTree node: %s" % n.name)
         if n.is_leaf():
             return 
+        if debug: print("\nTree node: %s" % n.name)
         if debug: print(n.sp_node)
         if (n.dup and n.sp_node == "N0"): 
             n.add_feature("done", set())
         # self.comp_nodes[n.sp_node] is the set of HOGs relevant to this node
-        hogs_to_write = self.comp_nodes[n.sp_node][0].copy()
+
+        # Only skip doing HOGs for above if it is a dup and want to split paralogous clades from same HOG
+        ch = n.get_children()
+        if (split_paralogous_clades_from_same_hog and n.dup and (ch[0].sp_node == ch[1].sp_node)):
+            # continue to record single-species orthogroups
+            hogs_to_write = set() if n.sp_node.startswith("N") else self.comp_nodes[n.sp_node][0].copy()
+        else:
+            hogs_to_write = self.comp_nodes[n.sp_node][0].copy()
         
         # This node can be skipped immediately if there are no HOGs above to do 
         # and if there is a duplication below with MRCA = n.sp_node
@@ -305,7 +317,8 @@ class HogWriter(object):
 
     def mark_dups_below(self, tree):
         """
-        Marks duplications below and at each node in feature 'dups_below'
+        Marks duplications below and at each node in feature 'dups_below'. This 
+        determines the HOGs.
         Args:
             tree - ete3 gene tree with attributes 'dup' 'sp_node' for all non-terminals
         Returns
@@ -314,15 +327,17 @@ class HogWriter(object):
         """
         for n in tree.traverse('postorder'):
             if n.is_leaf():
+                n.sp_node = n.name.split("_")[0]
                 continue
             if n.dup:
                 # get the MRCA level at which there is evidence of a duplication
                 mrcas = [ch.name.split("_")[0] if ch.is_leaf() else ch.sp_node for ch in n.get_children()]
-                if len(mrcas) == 1:
+                if len(set(mrcas)) == 1 and len(mrcas) > 1:
                     n.add_feature('dup_level', mrcas[0])
                 else:
                     # need two child nodes attesting to that level
                     n.add_feature('dup_level', self.get_evidenced_dup_level(mrcas))
+                # print((n.name, n.dup_level, mrcas))
             dups_below = set()
             for ch in n.get_children():
                 if ch.is_leaf():
@@ -335,9 +350,47 @@ class HogWriter(object):
                     dups_below.add(n.dup_level)   # dups_below now includes current node too
             n.add_feature('dups_below', dups_below)
         return tree
+
+
+    # def mark_dups_below_v2(self, tree):
+    #     """
+    #     - Take no notice of .dup feature.
+    #     - Implement original version first
+    #     """
+    #     for n in tree.traverse('postorder'):
+    #         if n.is_leaf():
+    #             n.add_feature('sp_below', {n.name.split("_"[0])})
+    #             continue
+    #         n.add_feature('sp_below', set.union([ch.sp_below for ch in n.get_children()]))
+            
+    #         for ch in n.get_children():
+
     
     def get_evidenced_dup_level(self, mrcas):
-        # try each in turn
+        """
+        Implementation
+        - V3.1: Currently, we need a representative from X and Y in both ch1 & ch2.
+        - What if we asked for evidence from each descendant clade of evidence of 
+          a duplication?
+            - Version that would be too stringent for duplication identification: 
+              genetree =(ch1, ch2)n, sptree = (X,Y) and ask for a
+              single representative of X that is in both ch1 & ch2 and similarly 
+              for Y in ch1 & ch2.
+            - Better version: V3.1 criterion (X & Y seen in ch1 & 2) plus two copies 
+              of a gene from X and two copies of a gene from Y in clade n (don't 
+              have to be correct topology such that they fall correctly in ch1 & 
+              ch2, just evidence of duplicated genes).
+                - Note, these two copies could arise from a separate & well-evidenced
+                  lower duplication. The idea was that this would strike the right
+                  balance, but can we do better? We'd have to identify the genes
+                  below that go into each component of the interpretation of the 
+                  tree. This is for another time, too much for now.
+
+        - a. get MRCA for ch1 & ch2 and then the lower of the two
+        - b. get all multi-copy species, get MRCA
+        - Get lower of a & b
+        """
+        # try each in turn and see if it is supported
         attested = set()
         for l1, l2 in itertools.combinations(mrcas, 2):
             if l1 == l2:
@@ -366,12 +419,12 @@ class HogWriter(object):
         return n.is_leaf() or n.dup
 
 
-def GetHOGs_from_tree(iog, tree, hog_writer):
+def GetHOGs_from_tree(iog, tree, hog_writer, q_split_paralogous_clades):
     tree = hog_writer.mark_dups_below(tree)
     og_name = "OG%07d" % iog
     if debug: print("\n===== %s =====" % og_name)
     for n in tree.traverse("preorder"):
-        hog_writer.write_clade_v2(n, og_name)
+        hog_writer.write_clade_v2(n, og_name, q_split_paralogous_clades)
 
 
 def get_highest_nodes(nodes, comp_nodes):
@@ -926,7 +979,7 @@ class OrthologsFiles(object):
                 if fh is not None:
                     fh.close()
 
-def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpecies, all_stride_dup_genes, qNoRecon, hog_writer):   
+def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpecies, all_stride_dup_genes, qNoRecon, hog_writer, q_split_paralogous_clades):   
     """
     """
     try:
@@ -963,7 +1016,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
                 # Write rooted tree with accessions
                 util.RenameTreeTaxa(rooted_tree_ids, files.FileHandler.GetOGsTreeFN(iog, True), spec_seq_dict, qSupport=qHaveSupport, qFixNegatives=True, qViaCopy=True)
                 orthologues, recon_tree, suspect_genes = GetOrthologues_from_tree(iog, rooted_tree_ids, species_tree_rooted_labelled, GeneToSpecies, neighbours, dupsWriter=dupWriter, seqIDs=spec_seq_dict, spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes, qNoRecon=qNoRecon)
-                GetHOGs_from_tree(iog, recon_tree, hog_writer)
+                GetHOGs_from_tree(iog, recon_tree, hog_writer, q_split_paralogous_clades)
                 qContainsSuspectGenes = len(suspect_genes) > 0
                 if (not qInitialisedSuspectGenesDirs) and qContainsSuspectGenes:
                     qInitialisedSuspectGenesDirs = True

@@ -834,38 +834,39 @@ def PrintHelp(prog_caller):
     print("") 
       
     print("OPTIONS:")
-    print(" -t <int>          Number of parallel sequence search threads [Default = %d]" % util.nThreadsDefault)
-    print(" -a <int>          Number of parallel analysis threads [Default = %d]" % util.nAlgDefault)
-    print(" -d                Input is DNA sequences")
-    print(" -M <txt>          Method for gene tree inference. Options 'dendroblast' & 'msa'")
-    print("                   [Default = dendroblast]")
-    print(" -S <txt>          Sequence search program [Default = diamond]")
-    print("                   Options: " + ", ".join(['blast'] + search_ops))
-    print(" -A <txt>          MSA program, requires '-M msa' [Default = mafft]")
-    print("                   Options: " + ", ".join(msa_ops))
-    print(" -T <txt>          Tree inference method, requires '-M msa' [Default = fasttree]")
-    print("                   Options: " + ", ".join(tree_ops)) 
-#    print(" -R <txt>          Tree reconciliation method [Default = of_recon]")
-#    print("                   Options: of_recon, dlcpar, dlcpar_convergedsearch")
-    print(" -s <file>         User-specified rooted species tree")
-    print(" -I <int>          MCL inflation parameter [Default = %0.1f]" % g_mclInflation)
-    print(" -x <file>         Info for outputting results in OrthoXML format")
-    print(" -p <dir>          Write the temporary pickle files to <dir>")
-    print(" -1                Only perform one-way sequence search")
-    print(" -X                Don't add species names to sequence IDs")
-    print(" -n <txt>          Name to append to the results directory")  
-    print(" -o <txt>          Non-default results directory")  
-    print(" -h                Print this help text")
+    print(" -t <int>        Number of parallel sequence search threads [Default = %d]" % util.nThreadsDefault)
+    print(" -a <int>        Number of parallel analysis threads [Default = %d]" % util.nAlgDefault)
+    print(" -d              Input is DNA sequences")
+    print(" -M <txt>        Method for gene tree inference. Options 'dendroblast' & 'msa'")
+    print("                 [Default = dendroblast]")
+    print(" -S <txt>        Sequence search program [Default = diamond]")
+    print("                 Options: " + ", ".join(['blast'] + search_ops))
+    print(" -A <txt>        MSA program, requires '-M msa' [Default = mafft]")
+    print("                 Options: " + ", ".join(msa_ops))
+    print(" -T <txt>        Tree inference method, requires '-M msa' [Default = fasttree]")
+    print("                 Options: " + ", ".join(tree_ops)) 
+#    print(" -R <txt>        Tree reconciliation method [Default = of_recon]")
+#    print("                 Options: of_recon, dlcpar, dlcpar_convergedsearch")
+    print(" -s <file>       User-specified rooted species tree")
+    print(" -I <int>        MCL inflation parameter [Default = %0.1f]" % g_mclInflation)
+    print(" -x <file>       Info for outputting results in OrthoXML format")
+    print(" -p <dir>        Write the temporary pickle files to <dir>")
+    print(" -1              Only perform one-way sequence search")
+    print(" -X              Don't add species names to sequence IDs")
+    print(" -y              Split paralogous clades below root of a HOG into separate HOGs")
+    print(" -n <txt>        Name to append to the results directory")  
+    print(" -o <txt>        Non-default results directory")  
+    print(" -h              Print this help text")
 
     print("")    
     print("WORKFLOW STOPPING OPTIONS:")   
-    print(" -op               Stop after preparing input files for BLAST" )
-    print(" -og               Stop after inferring orthogroups")
-    print(" -os               Stop after writing sequence files for orthogroups")
-    print("                   (requires '-M msa')")
-    print(" -oa               Stop after inferring alignments for orthogroups")
-    print("                   (requires '-M msa')")
-    print(" -ot               Stop after inferring gene trees for orthogroups " )
+    print(" -op             Stop after preparing input files for BLAST" )
+    print(" -og             Stop after inferring orthogroups")
+    print(" -os             Stop after writing sequence files for orthogroups")
+    print("                 (requires '-M msa')")
+    print(" -oa             Stop after inferring alignments for orthogroups")
+    print("                 (requires '-M msa')")
+    print(" -ot             Stop after inferring gene trees for orthogroups " )
    
     print("")   
     print("WORKFLOW RESTART COMMANDS:") 
@@ -932,6 +933,7 @@ class Options(object):#
         self.recon_method = "of_recon"
         self.name = None   # name to identify this set of results
         self.qDoubleBlast = True
+        self.qSplitParaClades = False
         self.qPhyldog = False
         self.speciesXMLInfoFN = None
         self.speciesTreeFN = None
@@ -1032,6 +1034,8 @@ def ProcessArgs(prog_caller, args):
                 options.search_program = "blast_nucl"
         elif arg == "-X":
             options.qAddSpeciesToIDs = False
+        elif arg == "-y":
+            options.qSplitParaClades = True
         elif arg == "-I" or arg == "--inflation":
             if len(args) == 0:
                 print("Missing option for command line argument %s\n" % arg)
@@ -1523,11 +1527,12 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
                                     options.qStopAfterTrees,
                                     options.qMSATrees,
                                     options.qPhyldog,
-                                    options.name)
+                                    options.name,
+                                    options.qSplitParaClades)
     util.PrintTime("Done orthologues")
 
 def GetOrthologues_FromTrees(options):
-    orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.speciesTreeFN, options.qAddSpeciesToIDs)
+    orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.speciesTreeFN, options.qAddSpeciesToIDs, options.qSplitParaClades)
  
 def ProcessesNewFasta(fastaDir, q_dna, speciesInfoObj_prev = None, speciesToUse_prev_names=[]):
     """
