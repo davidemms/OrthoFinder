@@ -1,12 +1,12 @@
 # Check out the new OrthoFinder tutorials: https://davidemms.github.io/
 
- 1. Downloading and checking OrthoFinder
+ 1. Downloading and running OrthoFinder
 
 2. Running an example OrthoFinder analysis
 
-3. Diving into the results
+3. Exploring OrthoFinder's results
 
-4. Getting the most from your OrthoFinder analysis
+4. OrthoFinder best practices
 
 ---
 
@@ -25,20 +25,24 @@ For more details see the OrthoFinder papers below.
 [Emms, D.M. and Kelly, S. **(2015)** _OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy._ **Genome Biology** 16:157](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2)
 
 ## Getting started with OrthoFinder
-You can find a step-by-step tutorial here: [Downloading and checking OrthoFinder](https://davidemms.github.io/orthofinder_tutorials/downloading-and-checking-orthofinder.html) including **instructions for Mac**, for which Bioconda is very easy option and is therefore recommended. There are also tutorials on that site which guide you through running your first analysis and exploring the results files. 
+You can find a step-by-step tutorial here: [Downloading and checking OrthoFinder](https://davidemms.github.io/orthofinder_tutorials/downloading-and-checking-orthofinder.html) including **instructions for Mac**, for which Bioconda is recommended and **Windows**, for which the Windows Subsystem for Linux is recommended. There are also tutorials on that site which guide you through running your first analysis and exploring the results files. 
 
 ### Installing OrthoFinder on Linux
-1. Download the latest OrthoFinder.tar.gz release from github: https://github.com/davidemms/OrthoFinder/releases (or use wget from the command line: `wget https://github.com/davidemms/OrthoFinder/releases/latest/download/OrthoFinder.tar.gz`)
+You can install OrthoFinder using Bioconda or download it directly from GitHub. These are the instructions for direct download, see the tutorials for other methods.
+
+1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases 
+    * If you have python installed and the numpy and scipy libraries then download **OrthoFinder_source.tar.gz**.
+    * If not then download the larger bundled package, **OrthoFinder.tar.gz**.
 
 2. In a terminal, 'cd' to where you downloaded the package 
 
-3. Extract the files: `tar xzf OrthoFinder.tar.gz`
+3. Extract the files: `tar xzf OrthoFinder_source.tar.gz`  or `tar xzf OrthoFinder.tar.gz`
 
-4. Test you can run OrthoFinder: `./OrthoFinder/orthofinder -h`. OrthoFinder should print its 'help' text. 
+4. Test you can run OrthoFinder: `python OrthoFinder_source/orthofinder.py -h` or `./OrthoFinder/orthofinder -h`. OrthoFinder should print its 'help' text. 
 
 5. If you want to move the orthofinder executable to another location then you must also place the accompanying config.json file and bin/ directory in the same directory as the orthofinder executable.
 
-OrthoFinder is written in python, but the version you are downloading here is a package that doesn't require python to be installed on your computer. It also contains the programs it needs in order to run (in OrthoFinder/bin), it will use these versions in preference to any of the same programs in your system path. You can delete the individual executables if you would prefer it not to do this. 
+OrthoFinder is written in python, but the bundled version does not require python to be installed on your computer. Both versions contain the programs OrthoFinder needs in order to run (in bin/), it will use these copies in preference to any of the same programs in your system path. You can delete the individual executables if you would prefer it not to do this. 
 
 #### Installing OrthoFinder on Mac & Windows
 
@@ -46,9 +50,7 @@ The easiest way to install OrthoFinder on Mac is using Bioconda:
 
 via bioconda: `conda install orthofinder`
 
-The easiest way to run OrthoFinder on Windows in using docker:
-
-[davidemms/orthofinder](https://hub.docker.com/r/davidemms/orthofinder): 
+The easiest way to run OrthoFinder on Windows is using the Windows Subsystem for Linux or Docker: [davidemms/orthofinder](https://hub.docker.com/r/davidemms/orthofinder): 
 
 ```
 docker pull davidemms/orthofinder
@@ -76,7 +78,7 @@ To run on your own dataset, replace "OrthoFinder/ExampleData" with the directory
 A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplication events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
 
 ### Results Files: Phylogenetic Hierarchical Orthogroups Directory
-From version 2.4.0 OrthoFinder now infers orthogroups from the gene trees at each hierarchical level for your species (i.e. at each node in the species tree). 
+From version 2.4.0 onwards OrthoFinder infers orthogroups at each hierarchical level (i.e. at each node in the species tree) using the gene trees. This is a far more accurate orthogroup inference method than the gene similarity/graph based approach used by all other methods and used previously by OrthoFinder (the deprecated Orthogroups/Orthogroups.tsv file).
 1. **N0.tsv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species. Additional columns give the HOG (Hierarchical Orthogroup) ID and the node in the gene tree from which the HOG descended. **This file effectively replaces the orthogroups from Orthogroups.tsv. Because they are calculated from trees, the orthogroups from N0.tsv are more accurate (approximately 10% relative increase on the Orthobench benchmarks compared to OrthoFinder version 2).**
 
 2. **N1.txt, N2.tsv, ...**: Orthogroups inferred from the gene trees corresponding to the clades of species in the species tree N1, N2, etc. Because OrthoFinder now infers orthogroups at every hierarchical level within the species tree, it is now possible to include outgroup species within the analysis but use the files to get orthogroups defined for your chosen clade within the species tree. The use of an outgroup gives even higher accuracy (approximately 13% relative increase on the Orthobench benchmarks compared to OrthoFinder version 2).
