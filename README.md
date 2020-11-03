@@ -86,8 +86,13 @@ It is important to ensure that the species tree OrthoFinder is using is accurate
 
 2. **N1.txt, N2.tsv, ...**: Orthogroups inferred from the gene trees corresponding to the clades of species in the species tree N1, N2, etc. Because OrthoFinder now infers orthogroups at every hierarchical level within the species tree, it is now possible to include outgroup species within the analysis and then use the HOG files to get the orthogroups defined for your chosen clade within the species tree. 
 
-### Results Files: Orthogroups Directory
-1. **Orthogroups.tsv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species.
+### Results Files: Orthologues Directory 
+The Orthologues directory contains one sub-directory for each species that in turn contains a file for each pairwise species comparison, listing the orthologs between that species pair. Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologs diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each row in a file contains the gene(s) in one species that are orthologues of the gene(s) in the other species and each row is cross-referenced to the orthogroup that contains those genes. 
+
+### Results Files: Orthogroups Directory (deprecated)
+**The orthogroups in Phylogenetic_Hierarchical_Orthogroups/ should be used instead.** They are identifed using rooted genes trees and are 12%-20% more accurate.
+
+1. **Orthogroups.tsv (deprecated)** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species. **The orthogroups in Phylogenetic_Hierarchical_Orthogroups/N0.tsv should be used instead.** 
 
 2. **Orthogroups_UnassignedGenes.tsv** is a tab separated text file that is identical in format to Orthogroups.csv but contains all of the genes that were not assigned to any orthogroup.
 
@@ -96,9 +101,6 @@ It is important to ensure that the species tree OrthoFinder is using is accurate
 4. **Orthogroups.GeneCount.tsv** is a tab separated text file that is identical in format to Orthogroups.csv but contains counts of the number of genes for each species in each orthogroup.
 
 5. **Orthogroups_SingleCopyOrthologues.txt** is a list of orthogroups that contain exactly one gene per species i.e. they contain one-to-one orthologues. They are ideally suited to between-species comparisons and to species tree inference. 
-
-### Results Files: Orthologues Directory 
-The Orthologues directory contains one sub-directory for each species that in turn contains a file for each pairwise species comparison, listing the orthologs between that species pair. Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologs diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each row in a file contains the gene(s) in one species that are orthologues of the gene(s) in the other species and each row is cross-referenced to the orthogroup that contains those genes. 
 
 ### Results Files: Gene Trees Directory
 1. A rooted phylogenetic tree inferred for each orthogroup with 4 or more sequences (4 sequences is the mimimum number required for tree inference with most tree inference programs).
