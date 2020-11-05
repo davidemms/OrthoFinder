@@ -363,5 +363,43 @@ The MSA species tree method is also described in the STAG paper: <https://www.bi
 #### Falback species tree method
 In most datasets there will be thousands of genes present in all species and so the default species tree inference method can be used. In some extreme cases there may not be any such orthogroups. In these cases, instead of the default method, the pairwise distances are calculated in each tree for each species pair that is present in that tree. A single distance matrix is then calculated for the species tree rather than one distance matrix per orthogroup. The distance between each species pair is this matrix is the median of all the closest distances across all the orthogroup gene trees. The species trees is inferred from this distance matrix.
 
+## Command line options
 
+### Options for starting an analysis
+* **-f** \<dir\>: Start analysis from directory of FASTA files
+* **-b** \<dir\>: Start analysis from BLAST results in OrthoFinder directory
+* **-b** \<dir1\> **-f** \<dir2\>: Start analysis from BLAST results in OrthoFinder dir1 and add FASTA files from dir2
+* **-fg** \<dir\>: Start analysis from orthogroups OrthoFinder directory
+ * **-ft** \<dir\>: Start analysis from gene trees in OrthoFinder directory
+ 
+### Options for stopping an analysis 
+* **-op**: Stop after preparing input files for all-vs-all sequence search (e.g. BLAST/DIAMOND)
+* **-og**: Stop after inferring orthogroups
+* **-os**: Stop after writing sequence files for orthogroups (requires '-M msa')
+* **-oa**: Stop after inferring mulitple sequence alignments for orthogroups (requires '-M msa')
+* **-ot**: Stop after inferring gene trees for orthogroups 
+
+
+### Options controlling the workflow
+* **-M** \<opt\>: Use MSA or DendroBLAST gene tree inference, opt=msa,dendroblast [default=dendroblast]
+
+### Options controlling the programs used
+* **-S** \<opt\>: Sequence search program opt=blast,diamond,mmseqs,... user-extendable [Default = diamond]
+* **-A** \<opt\>: MSA program opt=mafft,muscle,... user-extendable (requires '-M msa') [Default = mafft]
+* **-T** \<opt\>: Tree inference program opt=fasttree,raxml,iqtree,... user-extendable (requires '-M msa') [Default = fasttree]
+ 
+ ### Further options
+* **-d**: Input is DNA sequences
+* **-t** \<int\>: Number of threads for sequence search, MSA & tree inference [Default is number of cores on machine]
+* **-a** \<int\>: Number of parallel analysis threads for internal, RAM intensive tasks [Default = 1]
+* **-s** \<file\>: User-specified rooted species tree
+* **-I** \<int\>: MCL inflation parameter [Default = 1.5]
+* **-x** \<file\>: Info for outputting results in OrthoXML format
+* **-p** \<dir\>:  Write the temporary pickle files to \<dir\>
+* **-1**: Only perform one-way sequence search
+* **-X**: Don't add species names to sequence IDs in output files
+* **-y**: Split paralogous clades below root of a HOG into separate HOGs
+* **-n** \<txt\>: Name to append to the results directory
+* **-o** \<txt\>: Non-default results directory
+* **-h**: Print this help text
 
