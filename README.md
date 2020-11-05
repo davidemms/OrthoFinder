@@ -86,6 +86,8 @@ It is important to ensure that the species tree OrthoFinder is using is accurate
 
 2. **N1.txt, N2.tsv, ...**: Orthogroups inferred from the gene trees corresponding to the clades of species in the species tree N1, N2, etc. Because OrthoFinder now infers orthogroups at every hierarchical level within the species tree, it is now possible to include outgroup species within the analysis and then use the HOG files to get the orthogroups defined for your chosen clade within the species tree. 
 
+(Hierarchical orthogroup splitting: When analysing the gene trees, a nested hierarchical group (any HOG other than N0, the HOG at the level of the last common ancestor of all species) may sometimes have lost its genes from the earliest diverging species and then duplicated before the first extant genes. The two first diverging clades will then be paralogous even though the evidence suggests they belong to the same HOG. For most analyses it is often better to split these clades into separate groups. This can be requested using the option '**-y**'.)
+
 ### Results Files: Orthologues Directory 
 The Orthologues directory contains one sub-directory for each species that in turn contains a file for each pairwise species comparison, listing the orthologs between that species pair. Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologs diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each row in a file contains the gene(s) in one species that are orthologues of the gene(s) in the other species and each row is cross-referenced to the orthogroup that contains those genes. 
 
