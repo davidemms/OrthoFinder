@@ -336,7 +336,11 @@ class HogWriter(object):
                     n.add_feature('dup_level', mrcas[0])
                 else:
                     # need two child nodes attesting to that level
-                    n.add_feature('dup_level', self.get_evidenced_dup_level(mrcas))
+                    l = self.get_evidenced_dup_level(mrcas)
+                    if l is None:
+                        n.dup = False
+                        continue
+                    n.add_feature('dup_level', l)
                 # print((n.name, n.dup_level, mrcas))
             dups_below = set()
             for ch in n.get_children():
@@ -402,17 +406,22 @@ class HogWriter(object):
         if len(attested) == 1:
             return attested.pop()
         elif len(attested) == 0:
+            print("WARNING: Unexpected gene tree topology")
             print(mrcas)
-            raise Exception()
+            # raise Exception()
+            return None
         else:
             # get the highest in the tree
             attested = list(attested)
             ancestor_lists = [(self.species_tree & a).get_ancestors() for a in attested]
             x = len(attested)
             for i in range(x):
-                if all(attested[i] in ancestors[j] for j in range(x) if j!=i):
+                if all(attested[i] in ancestor_lists[j] for j in range(x) if j!=i):
                     return attested[i]
-        raise Exception()
+        print("WARNING: Unexpected gene tree topology 2")
+        print(mrcas)
+        # raise Exception()
+        return None
 
     @staticmethod
     def scl_fn(n):
@@ -420,11 +429,16 @@ class HogWriter(object):
 
 
 def GetHOGs_from_tree(iog, tree, hog_writer, q_split_paralogous_clades):
-    tree = hog_writer.mark_dups_below(tree)
     og_name = "OG%07d" % iog
     if debug: print("\n===== %s =====" % og_name)
-    for n in tree.traverse("preorder"):
-        hog_writer.write_clade_v2(n, og_name, q_split_paralogous_clades)
+    try:
+        tree = hog_writer.mark_dups_below(tree)
+        for n in tree.traverse("preorder"):
+            hog_writer.write_clade_v2(n, og_name, q_split_paralogous_clades)
+    except:
+        print("WARNING: HOG analysis for %s failed" % og_name)
+        print("Please report to https://github.com/davidemms/OrthoFinder/issues including \
+SpeciesTree_rooted_ids.txt and Trees_ids/%s_tree_id.txt from WorkingDirectory/" % og_name)
 
 
 def get_highest_nodes(nodes, comp_nodes):
@@ -784,10 +798,12 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                         dups.append(True)
                 if all(dups):
                     dupsWriter.writerow([og_name, stNode.name, n.name, 1., "Non-Terminal", ", ".join([seqIDs[g] for g in n.get_leaf_names()]), " "])
-                # if there are nodes below with same MRCA then dup (no HOGs) otherwise not dup (=> HOGS at this level)
-                descendant_nodes = [MRCA_node(species_tree_rooted, sp) for sp in species]
-                dup = any(down_sp_node == stNode for down_sp_node in descendant_nodes)
-                n.add_feature("dup", dup)  
+                n.add_feature("dup", all(dups))
+                # # if there are nodes below with same MRCA then dup (no HOGs) otherwise not dup (=> HOGS at this level)
+                # descendant_nodes = [MRCA_node(species_tree_rooted, sp) for sp in species]
+                # dup = any(down_sp_node == stNode for down_sp_node in descendant_nodes)
+                # n.add_feature("dup", dup)  
+                # print(n.name + ": dup3")
     return orthologues, tree, suspect_genes
 
 def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, ortholog_file_writers, putative_xenolog_file_writers, qContainsSuspectOlogs):
