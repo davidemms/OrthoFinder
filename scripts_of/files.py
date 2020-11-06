@@ -646,7 +646,13 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
         chain = [wd_base_anchor]
         while os.path.exists(chain[-1] + "previous_wd.txt"):
             with open(chain[-1] + "previous_wd.txt", 'r') as infile:
-                chain.append(infile.readline().rstrip())
+                wd = infile.readline().rstrip()
+                if not os.path.exists(wd):
+                    # try to see if it's a relative directory to current one
+                    path, d_wd = os.path.split(wd[:-1])
+                    path, d_res = os.path.split(path)
+                    wd = wd_base_anchor + ("/../../%s/%s/" % (d_res, d_wd))
+                chain.append(wd)
         return chain
                 
             
