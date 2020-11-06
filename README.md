@@ -1,12 +1,12 @@
 # Check out the new OrthoFinder tutorials: https://davidemms.github.io/
 
- 1. Downloading and checking OrthoFinder
+ 1. Downloading and running OrthoFinder
 
 2. Running an example OrthoFinder analysis
 
-3. Diving into the results
+3. Exploring OrthoFinder's results
 
-4. Getting the most from your OrthoFinder analysis
+4. OrthoFinder best practices
 
 ---
 
@@ -25,20 +25,24 @@ For more details see the OrthoFinder papers below.
 [Emms, D.M. and Kelly, S. **(2015)** _OrthoFinder: solving fundamental biases in whole genome comparisons dramatically improves orthogroup inference accuracy._ **Genome Biology** 16:157](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0721-2)
 
 ## Getting started with OrthoFinder
-You can find a step-by-step tutorial here: [Downloading and checking OrthoFinder](https://davidemms.github.io/orthofinder_tutorials/downloading-and-checking-orthofinder.html) including **instructions for Mac**, for which Bioconda is very easy option and is therefore recommended. There are also tutorials on that site which guide you through running your first analysis and exploring the results files. 
+You can find a step-by-step tutorial here: [Downloading and checking OrthoFinder](https://davidemms.github.io/orthofinder_tutorials/downloading-and-checking-orthofinder.html) including **instructions for Mac**, for which Bioconda is recommended and **Windows**, for which the Windows Subsystem for Linux is recommended. There are also tutorials on that site which guide you through running your first analysis and exploring the results files. 
 
 ### Installing OrthoFinder on Linux
-1. Download the latest OrthoFinder.tar.gz release from github: https://github.com/davidemms/OrthoFinder/releases (or use wget from the command line: `wget https://github.com/davidemms/OrthoFinder/releases/latest/download/OrthoFinder.tar.gz`)
+You can install OrthoFinder using Bioconda or download it directly from GitHub. These are the instructions for direct download, see the tutorials for other methods.
+
+1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases 
+    * If you have python installed and the numpy and scipy libraries then download **OrthoFinder_source.tar.gz**.
+    * If not then download the larger bundled package, **OrthoFinder.tar.gz**.
 
 2. In a terminal, 'cd' to where you downloaded the package 
 
-3. Extract the files: `tar xzf OrthoFinder.tar.gz`
+3. Extract the files: `tar xzf OrthoFinder_source.tar.gz`  or `tar xzf OrthoFinder.tar.gz`
 
-4. Test you can run OrthoFinder: `./OrthoFinder/orthofinder -h`. OrthoFinder should print its 'help' text. 
+4. Test you can run OrthoFinder: `python OrthoFinder_source/orthofinder.py -h` or `./OrthoFinder/orthofinder -h`. OrthoFinder should print its 'help' text. 
 
 5. If you want to move the orthofinder executable to another location then you must also place the accompanying config.json file and bin/ directory in the same directory as the orthofinder executable.
 
-OrthoFinder is written in python, but the version you are downloading here is a package that doesn't require python to be installed on your computer. It also contains the programs it needs in order to run (in OrthoFinder/bin), it will use these versions in preference to any of the same programs in your system path. You can delete the individual executables if you would prefer it not to do this. 
+OrthoFinder is written in python, but the bundled version does not require python to be installed on your computer. Both versions contain the programs OrthoFinder needs in order to run (in bin/), it will use these copies in preference to any of the same programs in your system path. You can delete the individual executables if you would prefer it not to do this. 
 
 #### Installing OrthoFinder on Mac & Windows
 
@@ -46,9 +50,7 @@ The easiest way to install OrthoFinder on Mac is using Bioconda:
 
 via bioconda: `conda install orthofinder`
 
-The easiest way to run OrthoFinder on Windows in using docker:
-
-[davidemms/orthofinder](https://hub.docker.com/r/davidemms/orthofinder): 
+The easiest way to run OrthoFinder on Windows is using the Windows Subsystem for Linux or Docker: [davidemms/orthofinder](https://hub.docker.com/r/davidemms/orthofinder): 
 
 ```
 docker pull davidemms/orthofinder
@@ -76,13 +78,23 @@ To run on your own dataset, replace "OrthoFinder/ExampleData" with the directory
 A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplication events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
 
 ### Results Files: Phylogenetic Hierarchical Orthogroups Directory
-From version 2.4.0 OrthoFinder now infers orthogroups from the gene trees at each hierarchical level for your species (i.e. at each node in the species tree). 
-1. **N0.tsv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species. Additional columns give the HOG (Hierarchical Orthogroup) ID and the node in the gene tree from which the HOG descended. **This file effectively replaces the orthogroups from Orthogroups.tsv. Because they are calculated from trees, the orthogroups from N0.tsv are more accurate (approximately 10% relative increase on the Orthobench benchmarks compared to OrthoFinder version 2).**
+From version 2.4.0 onwards OrthoFinder infers HOGs, orthogroups at each hierarchical level (i.e. at each node in the species tree) by analysing the rooted gene trees. This is a far more accurate orthogroup inference method than the gene similarity/graph based approach used by all other methods and used previously by OrthoFinder (the deprecated Orthogroups/Orthogroups.tsv file). According to the Orthobench benchmarks, these new orthogroups are 12% more accurate than the OrthoFinder 2 orthogroups (Orthogroups/Orthogroups.tsv). The accuracy can be increased still further (20% more accurate on Orthobench) by including outgroup species, which help with the interpretation of the rooted gene trees. 
 
-2. **N1.txt, N2.tsv, ...**: Orthogroups inferred from the gene trees corresponding to the clades of species in the species tree N1, N2, etc. Because OrthoFinder now infers orthogroups at every hierarchical level within the species tree, it is now possible to include outgroup species within the analysis but use the files to get orthogroups defined for your chosen clade within the species tree. The use of an outgroup gives even higher accuracy (approximately 13% relative increase on the Orthobench benchmarks compared to OrthoFinder version 2).
+It is important to ensure that the species tree OrthoFinder is using is accurate so as to maximise the accuracy of the HOGs. To reanalyse with a different species tree use the options `-ft PREVIOUS_RESULTS_DIR -s SPECIES_TREE_FILE`. This runs just the final analysis steps "from trees" and is relatively quick. If outgroup species are used, refer to "Species_Tree/SpeciesTree_rooted_node_labels.txt" to determine which N?.tsv file that contains the orthogroups you require. 
 
-### Results Files: Orthogroups Directory
-1. **Orthogroups.tsv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species.
+1. **N0.tsv** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species. Additional columns give the HOG (Hierarchical Orthogroup) ID and the node in the gene tree from which the HOG was determined (note, this can be above the root of the clade containing the genes). **This file effectively replaces the orthogroups in Orthogroups/Orthogroups.tsv** from Markov clustering using MCL. 
+
+2. **N1.txt, N2.tsv, ...**: Orthogroups inferred from the gene trees corresponding to the clades of species in the species tree N1, N2, etc. Because OrthoFinder now infers orthogroups at every hierarchical level within the species tree, it is now possible to include outgroup species within the analysis and then use the HOG files to get the orthogroups defined for your chosen clade within the species tree. 
+
+(Hierarchical orthogroup splitting: When analysing the gene trees, a nested hierarchical group (any HOG other than N0, the HOG at the level of the last common ancestor of all species) may sometimes have lost its genes from the earliest diverging species and then duplicated before the first extant genes. The two first diverging clades will then be paralogous even though the evidence suggests they belong to the same HOG. For most analyses it is often better to split these clades into separate groups. This can be requested using the option '**-y**'.)
+
+### Results Files: Orthologues Directory 
+The Orthologues directory contains one sub-directory for each species that in turn contains a file for each pairwise species comparison, listing the orthologs between that species pair. Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologs diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each row in a file contains the gene(s) in one species that are orthologues of the gene(s) in the other species and each row is cross-referenced to the orthogroup that contains those genes. 
+
+### Results Files: Orthogroups Directory (deprecated)
+**The orthogroups in Phylogenetic_Hierarchical_Orthogroups/ should be used instead.** They are identifed using rooted genes trees and are 12%-20% more accurate.
+
+1. **Orthogroups.tsv (deprecated)** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species. **The orthogroups in Phylogenetic_Hierarchical_Orthogroups/N0.tsv should be used instead.** 
 
 2. **Orthogroups_UnassignedGenes.tsv** is a tab separated text file that is identical in format to Orthogroups.csv but contains all of the genes that were not assigned to any orthogroup.
 
@@ -91,9 +103,6 @@ From version 2.4.0 OrthoFinder now infers orthogroups from the gene trees at eac
 4. **Orthogroups.GeneCount.tsv** is a tab separated text file that is identical in format to Orthogroups.csv but contains counts of the number of genes for each species in each orthogroup.
 
 5. **Orthogroups_SingleCopyOrthologues.txt** is a list of orthogroups that contain exactly one gene per species i.e. they contain one-to-one orthologues. They are ideally suited to between-species comparisons and to species tree inference. 
-
-### Results Files: Orthologues Directory 
-The Orthologues directory contains one sub-directory for each species that in turn contains a file for each pairwise species comparison, listing the orthologs between that species pair. Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologs diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each row in a file contains the gene(s) in one species that are orthologues of the gene(s) in the other species and each row is cross-referenced to the orthogroup that contains those genes. 
 
 ### Results Files: Gene Trees Directory
 1. A rooted phylogenetic tree inferred for each orthogroup with 4 or more sequences (4 sequences is the mimimum number required for tree inference with most tree inference programs).
@@ -104,7 +113,7 @@ The Orthologues directory contains one sub-directory for each species that in tu
 ### Results Files: Species Tree Directory
 1. **SpeciesTree_rooted.txt** A STAG species tree inferred from all orthogroups, containing STAG support values at internal nodes and rooted using STRIDE.
 
-2. **SpeciesTree_rooted_node_labels.csv** The same tree as above but with the nodes given labels (instead of support values) to allow other results files to cross-reference branches/nodes in the species tree (e.g. location of gene duplication events).
+2. **SpeciesTree_rooted_node_labels.txt** The same tree as above but with the nodes given labels (instead of support values) to allow other results files to cross-reference branches/nodes in the species tree (e.g. location of gene duplication events).
 
 ### Results Files: Comparative Genomics Statistics Directory
 1. **Duplications_per_Orthogroup.tsv** is a tab separated text file that gives the number of duplications identified in each orthogroup. This master file for this data is Gene_Duplication_Events/Duplications.tsv.
@@ -356,5 +365,41 @@ The MSA species tree method is also described in the STAG paper: <https://www.bi
 #### Falback species tree method
 In most datasets there will be thousands of genes present in all species and so the default species tree inference method can be used. In some extreme cases there may not be any such orthogroups. In these cases, instead of the default method, the pairwise distances are calculated in each tree for each species pair that is present in that tree. A single distance matrix is then calculated for the species tree rather than one distance matrix per orthogroup. The distance between each species pair is this matrix is the median of all the closest distances across all the orthogroup gene trees. The species trees is inferred from this distance matrix.
 
+## Command line options
 
+### Options for starting an analysis
+**-f** \<dir\>: Start analysis from directory of FASTA files  
+**-b** \<dir\>: Start analysis from BLAST results in OrthoFinder directory  
+**-b** \<dir1\> **-f** \<dir2\>: Start analysis from BLAST results in OrthoFinder dir1 and add FASTA files from dir2  
+**-fg** \<dir\>: Start analysis from orthogroups OrthoFinder directory  
+**-ft** \<dir\>: Start analysis from gene trees in OrthoFinder directory
+ 
+### Options for stopping an analysis 
+**-op**: Stop after preparing input files for all-vs-all sequence search (e.g. BLAST/DIAMOND)  
+**-og**: Stop after inferring orthogroups  
+**-os**: Stop after writing sequence files for orthogroups (requires '-M msa')  
+**-oa**: Stop after inferring mulitple sequence alignments for orthogroups (requires '-M msa')  
+**-ot**: Stop after inferring gene trees for orthogroups  
 
+### Options controlling the workflow
+**-M** \<opt\>: Use MSA or DendroBLAST gene tree inference, opt=msa,dendroblast [default=dendroblast]    
+
+### Options controlling the programs used
+**-S** \<opt\>: Sequence search program opt=blast,diamond,mmseqs,... user-extendable [Default = diamond]   
+**-A** \<opt\>: MSA program opt=mafft,muscle,... user-extendable (requires '-M msa') [Default = mafft]   
+**-T** \<opt\>: Tree inference program opt=fasttree,raxml,iqtree,... user-extendable (requires '-M msa') [Default = fasttree]    
+ 
+ ### Further options
+**-d**: Input is DNA sequences
+**-t** \<int\>: Number of threads for sequence search, MSA & tree inference [Default is number of cores on machine]  
+**-a** \<int\>: Number of parallel analysis threads for internal, RAM intensive tasks [Default = 1]  
+**-s** \<file\>: User-specified rooted species tree  
+**-I** \<int\>: MCL inflation parameter [Default = 1.5]  
+**-x** \<file\>: Info for outputting results in OrthoXML format  
+**-p** \<dir\>:  Write the temporary pickle files to \<dir\>  
+**-1**: Only perform one-way sequence search  
+**-X**: Don't add species names to sequence IDs in output files  
+**-y**: Split paralogous clades below root of a HOG into separate HOGs  
+**-n** \<txt\>: Name to append to the results directory  
+**-o** \<txt\>: Non-default results directory  
+**-h**: Print this help text  
