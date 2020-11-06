@@ -120,12 +120,13 @@ def MRCA_node(t_rooted, taxa):
     return (t_rooted & next(taxon for taxon in taxa)) if len(taxa) == 1 else t_rooted.get_common_ancestor(taxa)
 
 class HogWriter(object):
-    def __init__(self, species_tree, species_tree_node_names, seq_ids, sp_ids):
+    def __init__(self, species_tree, species_tree_node_names, seq_ids, sp_ids, species_to_use):
         """
         Prepare files, get ready to write.
         species_tree_node_names - list of species tree nodes
         seq_ids - dict of sequence ids
         sp_ids - dict of species ids
+        species_to_use - list of ints
         """
         self.seq_ids = seq_ids
         d = os.path.dirname(files.FileHandler.GetHierarchicalOrthogroupsFN("N0"))
@@ -133,8 +134,8 @@ class HogWriter(object):
             os.mkdir(d)
         self.fhs = dict()
         self.writers = dict()
-        self.iSps = list(sp_ids.keys())
-        self.i_sp_to_index = {isp:i for i, isp in enumerate(self.iSps)}
+        self.iSps = list(map(str, sorted(species_to_use)))   # list of strings
+        self.i_sp_to_index = {isp:i_col for i_col, isp in enumerate(self.iSps)}
         self.iHOG = defaultdict(int)
         self.species_tree = species_tree
         species_names = [sp_ids[i] for i in self.iSps]
