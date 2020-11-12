@@ -24,7 +24,7 @@ from . import resolve, util, files, parallel_task_manager
 
 PY2 = sys.version_info <= (3,)
 csv_write_mode = 'wb' if PY2 else 'wt'
-csv_write_mode = 'ab' if PY2 else 'at'
+csv_append_mode = 'ab' if PY2 else 'at'
 
 debug = False
 
@@ -726,18 +726,23 @@ def Orthologs_and_Suspect(ch, suspect_genes, misplaced_genes, SpeciesAndGene):
     return d[0], d[1], d_sus[0], d_sus[1]
 
 
-def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False):
-    """ if dupsWriter != None then seqIDs and spIDs must also be provided
-
-    Each node of the tree has two features added: dup (bool) and sp_node (str)
+def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neighbours, 
+                             q_get_dups=False, qNoRecon=False):
+    """ 
+    Returns:
+        orthologues 
+        tree - Each node of the tree has two features added: dup (bool) and sp_node (str)
+        suspect_genes - set
+        duplications - list of (sp_node_name, genes0, genes1)
     """
     og_name = "OG%07d" % iog
     qPrune=True
     SpeciesAndGene = SpeciesAndGene_lookup[GeneToSpecies]
     orthologues = []
+    duplications = []
     if not qNoRecon: tree = Resolve(tree, GeneToSpecies)
     if qPrune: tree.prune(tree.get_leaf_names())
-    if len(tree) == 1: return set(orthologues), tree, set()
+    if len(tree) == 1: return set(orthologues), tree, set(), duplications
     """ At this point need to label the tree nodes """
     iNode = 1
     tree.name = "n0"
@@ -769,12 +774,8 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
             dup = oSize != 0 and not qResolved
             n.add_feature("dup", dup)
             if dup:
-                if dupsWriter != None:
-                    if len(sp_present) == 1:
-                        isSTRIDE = "Terminal"
-                    else:
-                        isSTRIDE = "Non-Terminal" if all_stride_dup_genes == None else "Non-Terminal: STRIDE" if frozenset(n.get_leaf_names()) in all_stride_dup_genes else "Non-Terminal"
-                    dupsWriter.writerow([og_name, spIDs[stNode.name] if len(stNode) == 1 else stNode.name, n.name, float(oSize)/(len(stNode)), isSTRIDE, ", ".join([seqIDs[g] for g in ch[0].get_leaf_names()]), ", ".join([seqIDs[g] for g in ch[1].get_leaf_names()])]) 
+                if q_get_dups:
+                    duplications.append((stNode.name, n.name, float(oSize)/(len(stNode)), ch[0].get_leaf_names(), ch[1].get_leaf_names()))
             else:
                 # sort out bad genes - no orthology for all the misplaced genes at this level (misplaced_genes). 
                 # For previous levels, (suspect_genes) have their orthologues written to suspect orthologues file
@@ -805,7 +806,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                 # dup = any(down_sp_node == stNode for down_sp_node in descendant_nodes)
                 # n.add_feature("dup", dup)  
                 # print(n.name + ": dup3")
-    return orthologues, tree, suspect_genes
+    return orthologues, tree, suspect_genes, duplications
 
 def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, ortholog_file_writers, putative_xenolog_file_writers, qContainsSuspectOlogs):
     # Sort the orthologues according to species pairs
@@ -912,10 +913,10 @@ def GetSpeciesNeighbours(t):
     neighbours = {sp:{other:n for n,others in enumerate(lev) for other in others} for sp, lev in levels.items()}
     return neighbours
 
-def RootAndGetOrthologues_from_tree(iog, tree_fn, species_tree_rooted, GeneToSpecies, neighbours, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None, all_stride_dup_genes=None, qNoRecon=False):
+def RootAndGetOrthologues_from_tree(iog, tree_fn, species_tree_rooted, GeneToSpecies, neighbours, qWrite=False, qNoRecon=False):
     rooted_tree_ids, qHaveSupport = CheckAndRootTree(tree_fn, species_tree_rooted, GeneToSpecies) # this can be parallelised easily
     if rooted_tree_ids is None: return
-    orthologues, recon_tree, suspect_genes = GetOrthologues_from_tree(iog, rooted_tree_ids, species_tree_rooted, GeneToSpecies, neighbours, dupsWriter=dupsWriter, seqIDs=seqIDs, spIDs=spIDs, all_stride_dup_genes=all_stride_dup_genes, qNoRecon=qNoRecon)
+    orthologues, recon_tree, suspect_genes, dups = GetOrthologues_from_tree(iog, rooted_tree_ids, species_tree_rooted, GeneToSpecies, neighbours, qNoRecon=qNoRecon)
     if qWrite:
         directory = os.path.split(tree_fn)[0]
         WriteQfO2(orthologues, directory + "_Orthologues_M3/" + os.path.split(tree_fn)[1], qAppend=False)
@@ -924,7 +925,7 @@ def GetOrthologuesStandalone_Parallel(trees_dir, species_tree_rooted_fn, GeneToS
     species_tree_rooted = tree_lib.Tree(species_tree_rooted_fn)
     neighbours = GetSpeciesNeighbours(species_tree_rooted)
     args_queue = mp.Queue()
-    for treeFn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")): args_queue.put((0, treeFn, species_tree_rooted, GeneToSpecies, neighbours, True))
+    for treeFn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")): args_queue.put((0, treeFn, species_tree_rooted, GeneToSpecies, neighbours))
     # Now need to root the tree first
     parallel_task_manager.RunMethodParallel(RootAndGetOrthologues_from_tree, args_queue, 16)
 
@@ -952,7 +953,7 @@ def GetOrthologuesStandalone_Serial(trees_dir, species_tree_rooted_fn, GeneToSpe
     for treeFn in glob.glob(trees_dir + ("*" if qSingleTree else "/*")): 
         print(treeFn)
         # Now need to root the tree first
-        RootAndGetOrthologues_from_tree(0, treeFn, species_tree_rooted, GeneToSpecies, neighbours, True)        
+        RootAndGetOrthologues_from_tree(0, treeFn, species_tree_rooted, GeneToSpecies, neighbours)        
 
 class OrthologsFiles(object):
     """wrapper to open all the orthologs files as once"""
@@ -982,8 +983,8 @@ class OrthologsFiles(object):
                 strsp1 = sp1 + "_"
                 isp1 = self.sp_to_index[sp1]
                 d1 = self.d + "Orthologues_" + self.speciesDict[sp1] + "/"
-                self.ortholog_file_handles[i][j] = open(d0 + '%s__v__%s.tsv' % (self.speciesDict[sp0], self.speciesDict[sp1]), csv_write_mode)
-                self.ortholog_file_handles[j][i] = open(d1 + '%s__v__%s.tsv' % (self.speciesDict[sp1], self.speciesDict[sp0]), csv_write_mode)
+                self.ortholog_file_handles[i][j] = open(d0 + '%s__v__%s.tsv' % (self.speciesDict[sp0], self.speciesDict[sp1]), csv_append_mode)
+                self.ortholog_file_handles[j][i] = open(d1 + '%s__v__%s.tsv' % (self.speciesDict[sp1], self.speciesDict[sp0]), csv_append_mode)
                 ortholog_file_writers[i][j] = csv.writer(self.ortholog_file_handles[i][j], delimiter="\t")
                 ortholog_file_writers[j][i] = csv.writer(self.ortholog_file_handles[j][i], delimiter="\t")
         return ortholog_file_writers, putative_xenolog_file_writers
@@ -995,6 +996,29 @@ class OrthologsFiles(object):
             for fh in fh_list:
                 if fh is not None:
                     fh.close()
+
+def InitialiseSuspectGenesDirs(nspecies, speciesIDs, speciesDict):
+    dSuspectGenes = files.FileHandler.GetSuspectGenesDir()
+    dSuspectOrthologues = files.FileHandler.GetPutativeXenelogsDir()
+    for index1 in xrange(nspecies):
+        with open(dSuspectOrthologues + '%s.tsv' % speciesDict[str(speciesIDs[index1])], csv_write_mode) as outfile:
+            writer1 = csv.writer(outfile, delimiter="\t")
+            writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], "Other"))
+
+def WriteDuplications(dupsWriter, og_name, duplications, spIDs, seqIDs, all_stride_dup_genes):
+    """
+    Args:
+        duplications - list of (sp_node_id, gene_node_name, fraction, genes0, genes1)
+    """
+    for sp_node_id, gene_node_name, frac, genes0, genes1 in duplications:
+        q_terminal = not sp_node_id.startswith("N")
+        if all_stride_dup_genes is None:
+            isSTRIDE = "Terminal" if q_terminal else "Non-Terminal"
+        else:
+            isSTRIDE = "Terminal" if q_terminal else "Non-Terminal: STRIDE" if frozenset(genes0 + genes1) in all_stride_dup_genes else "Non-Terminal"
+        gene_list0 = ", ".join([seqIDs[g] for g in genes0])
+        gene_list1 = ", ".join([seqIDs[g] for g in genes1])
+        dupsWriter.writerow([og_name, spIDs[sp_node_id] if q_terminal else sp_node_id, gene_node_name, frac, isSTRIDE, gene_list0, gene_list1]) 
 
 def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpecies, all_stride_dup_genes, qNoRecon, hog_writer, q_split_paralogous_clades):   
     """
@@ -1017,13 +1041,14 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
                     writer1 = csv.writer(outfile, delimiter="\t")
                     writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]))
         neighbours = GetSpeciesNeighbours(species_tree_rooted_labelled)
-        # Infer orthologues and write them to file           
         nOgs = len(ogSet.OGs())
         nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
-        species = list(speciesDict.keys())
+        species = list(map(str, speciesIDs))
         reconTreesRenamedDir = files.FileHandler.GetOGsReconTreeDir(True)
         spec_seq_dict = ogSet.Spec_SeqDict()
         sp_to_index = {str(sp):i for i, sp in enumerate(ogSet.speciesToUse)}
+
+        # Infer orthologues and write them to file           
         with open(files.FileHandler.GetDuplicationsFN(), csv_write_mode) as outfile, OrthologsFiles(dResultsOrthologues, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index) as (ortholog_file_writers, putative_xenolog_file_writers):
             dupWriter = csv.writer(outfile, delimiter="\t")
             dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
@@ -1032,30 +1057,28 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
                 if rooted_tree_ids is None: continue
                 # Write rooted tree with accessions
                 util.RenameTreeTaxa(rooted_tree_ids, files.FileHandler.GetOGsTreeFN(iog, True), spec_seq_dict, qSupport=qHaveSupport, qFixNegatives=True, qViaCopy=True)
-                orthologues, recon_tree, suspect_genes = GetOrthologues_from_tree(iog, rooted_tree_ids, species_tree_rooted_labelled, GeneToSpecies, neighbours, dupsWriter=dupWriter, seqIDs=spec_seq_dict, spIDs=ogSet.SpeciesDict(), all_stride_dup_genes=all_stride_dup_genes, qNoRecon=qNoRecon)
-                GetHOGs_from_tree(iog, recon_tree, hog_writer, q_split_paralogous_clades)
+                ologs, recon_tree, suspect_genes, dups = GetOrthologues_from_tree(iog, rooted_tree_ids, species_tree_rooted_labelled, GeneToSpecies, neighbours, q_get_dups=True, qNoRecon=qNoRecon)
+                og_name = "OG%07d" % iog
+                WriteDuplications(dupWriter, og_name, dups, speciesDict, spec_seq_dict, all_stride_dup_genes)
                 qContainsSuspectGenes = len(suspect_genes) > 0
-                if (not qInitialisedSuspectGenesDirs) and qContainsSuspectGenes:
-                    qInitialisedSuspectGenesDirs = True
-                    dSuspectGenes = files.FileHandler.GetSuspectGenesDir()
-                    dSuspectOrthologues = files.FileHandler.GetPutativeXenelogsDir()
-                    for index1 in xrange(nspecies):
-                        with open(dSuspectOrthologues + '%s.tsv' % speciesDict[str(speciesIDs[index1])], csv_write_mode) as outfile:
-                            writer1 = csv.writer(outfile, delimiter="\t")
-                            writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], "Other"))
-                for index0 in xrange(nspecies):
-                    strsp0 = species[index0]
-                    strsp0_ = strsp0+"_"
-                    these_genes = [g for g in suspect_genes if g.startswith(strsp0_)]
-                    if len(these_genes) > 0:
-                        with open(dSuspectGenes + speciesDict[strsp0] + ".txt", 'a') as outfile:
-                            outfile.write("\n".join([SequenceDict[g] for g in these_genes]) + "\n")
-                allOrthologues = [(iog, orthologues)]
+                if qContainsSuspectGenes:
+                    if not qInitialisedSuspectGenesDirs:
+                        InitialiseSuspectGenesDirs(nspecies, speciesIDs, speciesDict)
+                        qInitialisedSuspectGenesDirs = True
+                    for index0 in xrange(nspecies):
+                        strsp0 = species[index0]
+                        strsp0_ = strsp0+"_"
+                        these_genes = [g for g in suspect_genes if g.startswith(strsp0_)]
+                        if len(these_genes) > 0:
+                            with open(dSuspectGenes + speciesDict[strsp0] + ".txt", csv_append_mode) as outfile:
+                                outfile.write("\n".join([SequenceDict[g] for g in these_genes]) + "\n")
+                allOrthologues = [(iog, ologs)]
+                nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, dResultsOrthologues, ortholog_file_writers, putative_xenolog_file_writers, qContainsSuspectGenes)
+                GetHOGs_from_tree(iog, recon_tree, hog_writer, q_split_paralogous_clades)
                 # don't relabel nodes, they've already been done
                 util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, spec_seq_dict, qSupport=False, qFixNegatives=True)
                 if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
                     util.PrintTime("Done %d of %d" % (iog, nOgs))
-                nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, dResultsOrthologues, ortholog_file_writers, putative_xenolog_file_writers, qContainsSuspectGenes)
     except IOError as e:
         if str(e).startswith("[Errno 24] Too many open files"):
             util.number_open_files_exception_advice(len(ogSet.speciesToUse), True)
