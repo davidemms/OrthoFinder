@@ -998,12 +998,24 @@ class OrthologsFiles(object):
                     fh.close()
 
 def InitialiseSuspectGenesDirs(nspecies, speciesIDs, speciesDict):
-    dSuspectGenes = files.FileHandler.GetSuspectGenesDir()
+    files.FileHandler.GetSuspectGenesDir()  # creates the directory
     dSuspectOrthologues = files.FileHandler.GetPutativeXenelogsDir()
     for index1 in xrange(nspecies):
         with open(dSuspectOrthologues + '%s.tsv' % speciesDict[str(speciesIDs[index1])], csv_write_mode) as outfile:
             writer1 = csv.writer(outfile, delimiter="\t")
             writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], "Other"))
+
+def WriteSuspectGenes(nspecies, species, suspect_genes, speciesDict, SequenceDict, qInitialisedSuspectGenesDirs):
+    if not qInitialisedSuspectGenesDirs:
+        InitialiseSuspectGenesDirs(nspecies, speciesIDs, speciesDict)
+    dSuspectGenes = files.FileHandler.GetSuspectGenesDir()
+    for index0 in xrange(nspecies):
+        strsp0 = species[index0]
+        strsp0_ = strsp0+"_"
+        these_genes = [g for g in suspect_genes if g.startswith(strsp0_)]
+        if len(these_genes) > 0:
+            with open(dSuspectGenes + speciesDict[strsp0] + ".txt", csv_append_mode) as outfile:
+                outfile.write("\n".join([SequenceDict[g] for g in these_genes]) + "\n")
 
 def WriteDuplications(dupsWriter, og_name, duplications, spIDs, seqIDs, all_stride_dup_genes):
     """
@@ -1062,16 +1074,8 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
                 WriteDuplications(dupWriter, og_name, dups, speciesDict, spec_seq_dict, all_stride_dup_genes)
                 qContainsSuspectGenes = len(suspect_genes) > 0
                 if qContainsSuspectGenes:
-                    if not qInitialisedSuspectGenesDirs:
-                        InitialiseSuspectGenesDirs(nspecies, speciesIDs, speciesDict)
-                        qInitialisedSuspectGenesDirs = True
-                    for index0 in xrange(nspecies):
-                        strsp0 = species[index0]
-                        strsp0_ = strsp0+"_"
-                        these_genes = [g for g in suspect_genes if g.startswith(strsp0_)]
-                        if len(these_genes) > 0:
-                            with open(dSuspectGenes + speciesDict[strsp0] + ".txt", csv_append_mode) as outfile:
-                                outfile.write("\n".join([SequenceDict[g] for g in these_genes]) + "\n")
+                    WriteSuspectGenes(nspecies, species, suspect_genes, speciesDict, SequenceDict, qInitialisedSuspectGenesDirs)
+                    qInitialisedSuspectGenesDirs = True
                 allOrthologues = [(iog, ologs)]
                 nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, dResultsOrthologues, ortholog_file_writers, putative_xenolog_file_writers, qContainsSuspectGenes)
                 GetHOGs_from_tree(iog, recon_tree, hog_writer, q_split_paralogous_clades)
