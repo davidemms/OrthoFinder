@@ -133,7 +133,6 @@ class HogWriter(object):
         if not os.path.exists(d):
             os.mkdir(d)
         self.fhs = dict()
-        self.writers = dict()
         self.iSps = list(map(str, sorted(species_to_use)))   # list of strings
         self.i_sp_to_index = {isp:i_col for i_col, isp in enumerate(self.iSps)}
         self.iHOG = defaultdict(int)
@@ -142,8 +141,8 @@ class HogWriter(object):
         for name in species_tree_node_names:
             fn = files.FileHandler.GetHierarchicalOrthogroupsFN(name)
             self.fhs[name] = open(fn, csv_write_mode)
-            self.writers[name] = csv.writer(self.fhs[name], delimiter="\t")
-            self.writers[name].writerow(["HOG", "OG", "Gene Tree Parent Clade"] + species_names)
+            util.writerow(self.fhs[name], ["HOG", "OG", "Gene Tree Parent Clade"] + species_names)
+            self.fhs[name].flush()
         # Map from HOGs to genes that must be contained in them
         self.hog_contents = dict()  # sp_node_name = hog_name-> list of contents fo hog (internal nodes and leaves)
         for n in species_tree.traverse():
@@ -165,7 +164,7 @@ class HogWriter(object):
         i_hogs = [self.get_hog_index(sp_node_name) for sp_node_name in sp_node_name_list]
         row_genes = [", ".join(genes_per_species[isp]) for isp in self.iSps] 
         for i_hog, sp_node_name in zip(i_hogs, sp_node_name_list):
-            self.writers[sp_node_name].writerow(["%s.HOG%07d" % (sp_node_name, i_hog),  og_name, "-"] + row_genes)
+            util.writerow(self.fhs[sp_node_name], ["%s.HOG%07d" % (sp_node_name, i_hog),  og_name, "-"] + row_genes)
 
 
     def write_clade_v2(self, n, og_name, split_paralogous_clades_from_same_hog = False):
@@ -184,7 +183,7 @@ class HogWriter(object):
                 the same HOG but are paralogous be split up
         """
         if n.is_leaf():
-            return 
+            return []
         if debug: print("\nTree node: %s" % n.name)
         if debug: print(n.sp_node)
         if (n.dup and n.sp_node == "N0"): 
@@ -225,10 +224,10 @@ class HogWriter(object):
         # 2. Write HOGs
         n.add_feature("done", hogs_to_write if n.is_root() else n.up.done.union(hogs_to_write))
         if len(hogs_to_write) == 0:
-            return
+            return []
 
         if debug: print(hogs_to_write)
-        self.write_hogs(hogs_to_write, genes_per_species_index, og_name, n.name)
+        return self.get_hog_file_entries(hogs_to_write, genes_per_species_index, og_name, n.name)
 
     def get_descendant_genes(self, n):
         """
@@ -251,7 +250,7 @@ class HogWriter(object):
             genes_per_species[k] = ", ".join(v)
         return genes_per_species
 
-    def write_hogs(self, hogs_to_write, genes_per_species_index, og_name, gt_node_name):
+    def get_hog_file_entries(self, hogs_to_write, genes_per_species_index, og_name, gt_node_name):
         """
         Write the HOGs that can be determined from this gene tree node.
         Args:
@@ -265,6 +264,7 @@ class HogWriter(object):
               each HOG should contain. For each hog take the intersection of what 
               we have with what the hog should contain.
         """
+        ret = []
         for h in hogs_to_write:
             # print("HOG: " + h)
             q_empty = True
@@ -279,7 +279,9 @@ class HogWriter(object):
                 q_empty = False
             if not q_empty: 
                 # print((h, genes_row))
-                self.writers[h].writerow(["%s.HOG%07d" % (h, self.get_hog_index(h)),  og_name, gt_node_name] + genes_row)
+                ret.append((h, [og_name, gt_node_name] + genes_row))
+                # self.writers[h].writerow(["%s.HOG%07d" % (h, self.get_hog_index(h)),  og_name, gt_node_name] + genes_row)
+        return ret
 
     def close_files(self):
         for fh in self.fhs.values():
@@ -356,20 +358,6 @@ class HogWriter(object):
             n.add_feature('dups_below', dups_below)
         return tree
 
-
-    # def mark_dups_below_v2(self, tree):
-    #     """
-    #     - Take no notice of .dup feature.
-    #     - Implement original version first
-    #     """
-    #     for n in tree.traverse('postorder'):
-    #         if n.is_leaf():
-    #             n.add_feature('sp_below', {n.name.split("_"[0])})
-    #             continue
-    #         n.add_feature('sp_below', set.union([ch.sp_below for ch in n.get_children()]))
-            
-    #         for ch in n.get_children():
-
     
     def get_evidenced_dup_level(self, mrcas):
         """
@@ -424,22 +412,43 @@ class HogWriter(object):
         # raise Exception()
         return None
 
+    def WriteCachedHOGs(self, cached_hogs, lock_hogs):
+        d = defaultdict(list)
+        for h, row in cached_hogs:
+            d[h].append(row)
+        lock_hogs.acquire()
+        try:
+            for h, hog_rows in d.items():
+                fh = self.fhs[h]
+                for r in hog_rows:
+                    hog_id = "%s.HOG%07d" % (h, self.get_hog_index(h))
+                    util.writerow(fh, [hog_id, ] + r)
+                fh.flush()
+        finally:
+            lock_hogs.release()
+
+
     @staticmethod
     def scl_fn(n):
         return n.is_leaf() or n.dup
 
 
-def GetHOGs_from_tree(iog, tree, hog_writer, q_split_paralogous_clades):
+def GetHOGs_from_tree(iog, tree, hog_writer, lock_hogs, q_split_paralogous_clades):
     og_name = "OG%07d" % iog
     if debug: print("\n===== %s =====" % og_name)
     try:
         tree = hog_writer.mark_dups_below(tree)
+        cached_hogs = []
         for n in tree.traverse("preorder"):
-            hog_writer.write_clade_v2(n, og_name, q_split_paralogous_clades)
+            cached_hogs.extend(hog_writer.write_clade_v2(n, og_name, q_split_paralogous_clades))
+        hog_writer.WriteCachedHOGs(cached_hogs, lock_hogs)
     except:
         print("WARNING: HOG analysis for %s failed" % og_name)
         print("Please report to https://github.com/davidemms/OrthoFinder/issues including \
 SpeciesTree_rooted_ids.txt and Trees_ids/%s_tree_id.txt from WorkingDirectory/" % og_name)
+        print(cached_hogs)
+        raise
+
 
 
 def get_highest_nodes(nodes, comp_nodes):
@@ -1118,6 +1127,7 @@ class TreeAnalyser(object):
         self.lock_ologs = mp.Lock()
         self.lock_dups = mp.Lock()
         self.lock_suspect = mp.Lock()
+        self.lock_hogs = mp.Lock()
 
     def AnalyseTree(self, iog):
         try:
@@ -1163,7 +1173,7 @@ class TreeAnalyser(object):
                 # print("%s ologs" % og_name)
             finally:
                 self.lock_ologs.release()
-            # GetHOGs_from_tree(iog, recon_tree, self.hog_writer, self.q_split_paralogous_clades)
+            GetHOGs_from_tree(iog, recon_tree, self.hog_writer, self.lock_hogs, self.q_split_paralogous_clades) 
             # don't relabel nodes, they've already been done
             util.RenameTreeTaxa(recon_tree, self.reconTreesRenamedDir + "OG%07d_tree.txt" % iog, self.spec_seq_dict, qSupport=False, qFixNegatives=True)
             if iog >= 0 and divmod(iog, 10 if self.nOgs <= 200 else 100 if self.nOgs <= 2000 else 1000)[1] == 0:
