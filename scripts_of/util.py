@@ -436,4 +436,6 @@ class Finalise(object):
     def __exit__(self, type, value, traceback):
         ptm = parallel_task_manager.ParallelTaskManager_singleton()
         ptm.Stop()
-              
+
+def writerow(fh, row):
+    fh.write("\t".join(map(str, row)) + "\n")              

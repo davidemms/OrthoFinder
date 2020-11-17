@@ -697,6 +697,12 @@ def WriteOrthologuesStats(ogSet, nOrtho_sp):
     with open(files.FileHandler.GetDuplicationsFN(), 'rb' if PY2 else 'rt') as infile:
         reader = csv.reader(infile, delimiter="\t")
         next(reader)
+        # for line in reader:
+        #     try:
+        #         og, node, _, support, _, _, _ = line
+        #     except:
+        #         print(line)
+        #         raise
         for og, node, _, support, _, _, _ in reader:
             support = float(support)
             nodeCount[node] += 1
@@ -794,8 +800,8 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
         all_orthologues.append((iog, orthologues))
     nspecies = len(ogSet.speciesToUse)
     sp_to_index = {str(sp):i for i, sp in enumerate(ogSet.speciesToUse)}
-    with trees2ologs_of.OrthologsFiles(resultsDir, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index) as (ortholog_file_writers, suspect_genes_file_writers):    
-        nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, resultsDir, ortholog_file_writers, suspect_genes_file_writers, False)
+    with trees2ologs_of.OrthologsFiles(resultsDir, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index) as (olog_files_handles, suspect_genes_file_handles):    
+        nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, resultsDir, olog_files_handles, suspect_genes_file_handles, False)
     return nOrthologues_SpPair
     
 def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=None, stride_dups=None, q_split_para_clades=False):
@@ -1067,6 +1073,3 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
     
     files.FileHandler.CleanWorkingDir2()
     util.PrintUnderline("Writing results files", True)
-    
-    
-    

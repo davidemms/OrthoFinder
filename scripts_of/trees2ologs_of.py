@@ -808,7 +808,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                 # print(n.name + ": dup3")
     return orthologues, tree, suspect_genes, duplications
 
-def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, ortholog_file_writers, putative_xenolog_file_writers, qContainsSuspectOlogs):
+def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, ologs_files_handles, putative_xenolog_file_handles, qContainsSuspectOlogs):
     # Sort the orthologues according to species pairs
     sp_to_index = {str(sp):i for i, sp in enumerate(iSpeciesToUse)}
     nOrtho = util.nOrtho_sp(len(iSpeciesToUse))   
@@ -819,7 +819,7 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
     for i in xrange(nSpecies):
         sp0 = str(iSpeciesToUse[i])
         if qContainsSuspectOlogs: 
-            writer1_sus = putative_xenolog_file_writers[i]
+            writer1_sus = putative_xenolog_file_handles[i]
         strsp0 = sp0 + "_"
         isp0 = sp_to_index[sp0]
         for j in xrange(i, nSpecies):
@@ -828,9 +828,9 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
             strsp1 = sp1 + "_"
             isp1 = sp_to_index[sp1]
             if qContainsSuspectOlogs:
-                writer2_sus = putative_xenolog_file_writers[j]
-            writer1 = ortholog_file_writers[i][j] 
-            writer2 = ortholog_file_writers[j][i] 
+                writer2_sus = putative_xenolog_file_handles[j]
+            writer1 = ologs_files_handles[i][j] 
+            writer2 = ologs_files_handles[j][i] 
             for iog, ortholouges_onetree in orthologues_alltrees:                   
                 og = "OG%07d" % iog
                 for leavesL, leavesR, leavesL_sus, leavesR_sus  in ortholouges_onetree:
@@ -852,8 +852,8 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
                             n1 = nL1
                             text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesR[sp0]])
                             text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]])
-                        writer1.writerow((og, text0, text1))
-                        writer2.writerow((og, text1, text0))
+                        util.writerow(writer1, (og, text0, text1))
+                        util.writerow(writer2, (og, text1, text0))
                         nOrtho.n[isp0, isp1] += n0
                         nOrtho.n[isp1, isp0] += n1
                         if n0 == 1 and n1 == 1:
@@ -883,8 +883,8 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
                         else:
                             text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesR_sus[sp0]])
                             text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]+leavesL_sus[sp1]])
-                        writer1_sus.writerow((og, text0, text1))
-                        writer2_sus.writerow((og, text1, text0))
+                        util.writerow(writer1_sus, (og, text0, text1))
+                        util.writerow(writer2_sus, (og, text1, text0))
     return nOrtho   
                                       
 def Resolve(tree, GeneToSpecies):
@@ -968,12 +968,9 @@ class OrthologsFiles(object):
         self.suspect_genes_file_handles = [None for _ in self.iSpeciesToUse]
 
     def __enter__(self):
-        ortholog_file_writers = [[None for _ in self.iSpeciesToUse] for _ in self.iSpeciesToUse]
-        putative_xenolog_file_writers = [None for _ in self.iSpeciesToUse]
         for i in xrange(self.nSpecies):
             sp0 = str(self.iSpeciesToUse[i])
             self.suspect_genes_file_handles[i] = open(self.dPutativeXenologs + "%s.tsv" % self.speciesDict[sp0], csv_write_mode)
-            putative_xenolog_file_writers[i] = csv.writer(self.suspect_genes_file_handles[i], delimiter="\t")
             strsp0 = sp0 + "_"
             isp0 = self.sp_to_index[sp0]
             d0 = self.d + "Orthologues_" + self.speciesDict[sp0] + "/"
@@ -985,9 +982,7 @@ class OrthologsFiles(object):
                 d1 = self.d + "Orthologues_" + self.speciesDict[sp1] + "/"
                 self.ortholog_file_handles[i][j] = open(d0 + '%s__v__%s.tsv' % (self.speciesDict[sp0], self.speciesDict[sp1]), csv_append_mode)
                 self.ortholog_file_handles[j][i] = open(d1 + '%s__v__%s.tsv' % (self.speciesDict[sp1], self.speciesDict[sp0]), csv_append_mode)
-                ortholog_file_writers[i][j] = csv.writer(self.ortholog_file_handles[i][j], delimiter="\t")
-                ortholog_file_writers[j][i] = csv.writer(self.ortholog_file_handles[j][i], delimiter="\t")
-        return ortholog_file_writers, putative_xenolog_file_writers
+        return self.ortholog_file_handles, self.suspect_genes_file_handles
 
     def __exit__(self, type, value, traceback):
         for fh in self.suspect_genes_file_handles:
@@ -997,6 +992,19 @@ class OrthologsFiles(object):
                 if fh is not None:
                     fh.close()
 
+    @staticmethod
+    def flush_olog_files(ortholog_file_handles):
+        for i, handles in enumerate(ortholog_file_handles):
+            for j, h in enumerate(handles):
+                if i != j:
+                    h.flush()
+
+    @staticmethod
+    def flush_xenolog_files(files_list):
+        for h in files_list:
+            h.flush()
+                    
+
 def InitialiseSuspectGenesDirs(nspecies, speciesIDs, speciesDict):
     files.FileHandler.GetSuspectGenesDir()  # creates the directory
     dSuspectOrthologues = files.FileHandler.GetPutativeXenelogsDir()
@@ -1005,10 +1013,8 @@ def InitialiseSuspectGenesDirs(nspecies, speciesIDs, speciesDict):
             writer1 = csv.writer(outfile, delimiter="\t")
             writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], "Other"))
 
-def WriteSuspectGenes(nspecies, speciesToUse, suspect_genes, speciesDict, SequenceDict, qInitialisedSuspectGenesDirs):
-    species = list(map(str, ogSet.speciesToUse))
-    if not qInitialisedSuspectGenesDirs:
-        InitialiseSuspectGenesDirs(nspecies, speciesIDs, speciesDict)
+def WriteSuspectGenes(nspecies, speciesToUse, suspect_genes, speciesDict, SequenceDict):
+    species = list(map(str, speciesToUse))
     dSuspectGenes = files.FileHandler.GetSuspectGenesDir()
     for index0 in xrange(nspecies):
         strsp0 = species[index0]
@@ -1018,7 +1024,7 @@ def WriteSuspectGenes(nspecies, speciesToUse, suspect_genes, speciesDict, Sequen
             with open(dSuspectGenes + speciesDict[strsp0] + ".txt", csv_append_mode) as outfile:
                 outfile.write("\n".join([SequenceDict[g] for g in these_genes]) + "\n")
 
-def WriteDuplications(dupsWriter, og_name, duplications, spIDs, seqIDs, stride_dups):
+def WriteDuplications(dups_file_handle, og_name, duplications, spIDs, seqIDs, stride_dups):
     """
     Args:
         duplications - list of (sp_node_id, gene_node_name, fraction, genes0, genes1)
@@ -1031,7 +1037,7 @@ def WriteDuplications(dupsWriter, og_name, duplications, spIDs, seqIDs, stride_d
             isSTRIDE = "Terminal" if q_terminal else "Non-Terminal: STRIDE" if frozenset(genes0 + genes1) in stride_dups else "Non-Terminal"
         gene_list0 = ", ".join([seqIDs[g] for g in genes0])
         gene_list1 = ", ".join([seqIDs[g] for g in genes1])
-        dupsWriter.writerow([og_name, spIDs[sp_node_id] if q_terminal else sp_node_id, gene_node_name, frac, isSTRIDE, gene_list0, gene_list1]) 
+        util.writerow(dups_file_handle, [og_name, spIDs[sp_node_id] if q_terminal else sp_node_id, gene_node_name, frac, isSTRIDE, gene_list0, gene_list1]) 
 
 def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpecies, stride_dups, qNoRecon, hog_writer, q_split_paralogous_clades):   
     """
@@ -1060,18 +1066,24 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
         sp_to_index = {str(sp):i for i, sp in enumerate(ogSet.speciesToUse)}
 
         # Infer orthologues and write them to file           
-        with open(files.FileHandler.GetDuplicationsFN(), csv_write_mode) as outfile, OrthologsFiles(dResultsOrthologues, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index) as (ortholog_file_writers, putative_xenolog_file_writers):
-            dupWriter = csv.writer(outfile, delimiter="\t")
-            dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
-            ta = TreeAnalyser(dResultsOrthologues, reconTreesRenamedDir, species_tree_rooted_labelled, 
+        with open(files.FileHandler.GetDuplicationsFN(), csv_write_mode) as outfile_dups, OrthologsFiles(dResultsOrthologues, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index) as (ologs_file_handles, putative_xenolog_file_handles):
+            util.writerow(outfile_dups, ["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
+            outfile_dups.flush()
+            OrthologsFiles.flush_olog_files(ologs_file_handles)
+            InitialiseSuspectGenesDirs(nspecies, ogSet.speciesToUse, speciesDict)
+            ta = TreeAnalyser(nOgs, dResultsOrthologues, reconTreesRenamedDir, species_tree_rooted_labelled, 
                               ogSet.speciesToUse, GeneToSpecies, SequenceDict, speciesDict, spec_seq_dict, 
-                              neighbours, qNoRecon, dupWriter, stride_dups, ortholog_file_writers, 
-                              putative_xenolog_file_writers, hog_writer, q_split_paralogous_clades)
-            for iog in range(nOgs):
-                # parallel_task_manager.RunMethodParallel(RootAndGetOrthologues_from_tree, args_queue, 16)
-                nOrthologues_SpPair += ta.AnalyseTree(iog) 
-                if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
-                    util.PrintTime("Done %d of %d" % (iog, nOgs))
+                              neighbours, qNoRecon, outfile_dups, stride_dups, ologs_file_handles, 
+                              putative_xenolog_file_handles, hog_writer, q_split_paralogous_clades)
+            args_queue = mp.Queue()
+            n_parallel = 16 # None
+            if n_parallel is None:
+                for iog in range(nOgs):
+                    nOrthologues_SpPair += ta.AnalyseTree(iog) 
+            else:
+                for iog in range(nOgs):
+                    args_queue.put((iog, ))
+                parallel_task_manager.RunMethodParallel(ta.AnalyseTree, args_queue, n_parallel)
     except IOError as e:
         if str(e).startswith("[Errno 24] Too many open files"):
             util.number_open_files_exception_advice(len(ogSet.speciesToUse), True)
@@ -1082,10 +1094,11 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
 
 
 class TreeAnalyser(object):
-    def __init__(self, dResultsOrthologues, reconTreesRenamedDir, species_tree_rooted_labelled, 
+    def __init__(self, nOgs, dResultsOrthologues, reconTreesRenamedDir, species_tree_rooted_labelled, 
                 speciesToUse, GeneToSpecies, SequenceDict, speciesDict, spec_seq_dict, 
-                neighbours, qNoRecon, dupWriter, stride_dups, ortholog_file_writers, 
-                putative_xenolog_file_writers, hog_writer, q_split_paralogous_clades):
+                neighbours, qNoRecon, dups_file_handle, stride_dups, ologs_files_handles, 
+                putative_xenolog_file_handles, hog_writer, q_split_paralogous_clades):
+        self.nOgs = nOgs
         self.dResultsOrthologues = dResultsOrthologues
         self.reconTreesRenamedDir = reconTreesRenamedDir
         self.species_tree_rooted_labelled = species_tree_rooted_labelled
@@ -1096,43 +1109,70 @@ class TreeAnalyser(object):
         self.spec_seq_dict = spec_seq_dict
         self.neighbours = neighbours
         self.qNoRecon = qNoRecon
-        self.dupWriter = dupWriter
+        self.dups_file_handle = dups_file_handle
         self.stride_dups = stride_dups
-        self.ortholog_file_writers = ortholog_file_writers
-        self.putative_xenolog_file_writers = putative_xenolog_file_writers
+        self.ologs_files_handles = ologs_files_handles
+        self.putative_xenolog_file_handles = putative_xenolog_file_handles
         self.hog_writer = hog_writer
         self.q_split_paralogous_clades = q_split_paralogous_clades
+        self.lock_ologs = mp.Lock()
+        self.lock_dups = mp.Lock()
+        self.lock_suspect = mp.Lock()
 
     def AnalyseTree(self, iog):
-        og_name = "OG%07d" % iog
-        n_species = len(self.speciesToUse)
-        rooted_tree_ids, qHaveSupport = CheckAndRootTree(files.FileHandler.GetOGsTreeFN(iog), self.species_tree_rooted_labelled, self.GeneToSpecies) # this can be parallelised easily
-        if rooted_tree_ids is None: 
-            return
-        # Write rooted tree with accessions
-        util.RenameTreeTaxa(rooted_tree_ids, files.FileHandler.GetOGsTreeFN(iog, True), 
-                            self.spec_seq_dict, qSupport=qHaveSupport, qFixNegatives=True, qViaCopy=True)
-        ologs, recon_tree, suspect_genes, dups = GetOrthologues_from_tree(iog, rooted_tree_ids, 
-                                                    self.species_tree_rooted_labelled, self.GeneToSpecies, 
-                                                    self.neighbours, q_get_dups=True, qNoRecon=self.qNoRecon)
-        WriteDuplications(self.dupWriter, og_name, dups, self.speciesDict, self.spec_seq_dict, self.stride_dups)
-        if len(suspect_genes) > 0:
-            WriteSuspectGenes(n_species, self.speciesToUse, suspect_genes, self.speciesDict, self.SequenceDict, qInitialisedSuspectGenesDirs)
-            qInitialisedSuspectGenesDirs = True
-        nOrthologues_SpPair = AppendOrthologuesToFiles([(iog, ologs)], self.speciesDict, self.speciesToUse,
-                                                       self.SequenceDict, self.dResultsOrthologues, self.ortholog_file_writers, 
-                                                       self.putative_xenolog_file_writers, len(suspect_genes) > 0)
-        GetHOGs_from_tree(iog, recon_tree, self.hog_writer, self.q_split_paralogous_clades)
-        # don't relabel nodes, they've already been done
-        util.RenameTreeTaxa(recon_tree, self.reconTreesRenamedDir + "OG%07d_tree.txt" % iog, self.spec_seq_dict, qSupport=False, qFixNegatives=True)
-        return nOrthologues_SpPair
+        try:
+            og_name = "OG%07d" % iog
+            # print(og_name)
+            n_species = len(self.speciesToUse)
+            rooted_tree_ids, qHaveSupport = CheckAndRootTree(files.FileHandler.GetOGsTreeFN(iog), self.species_tree_rooted_labelled, self.GeneToSpecies) # this can be parallelised easily
+            if rooted_tree_ids is None: 
+                return
 
+            # Write rooted tree with accessions
+            util.RenameTreeTaxa(rooted_tree_ids, files.FileHandler.GetOGsTreeFN(iog, True), 
+                                self.spec_seq_dict, qSupport=qHaveSupport, qFixNegatives=True, qViaCopy=True)
+            ologs, recon_tree, suspect_genes, dups = GetOrthologues_from_tree(iog, rooted_tree_ids, 
+                                                        self.species_tree_rooted_labelled, self.GeneToSpecies, 
+                                                        self.neighbours, q_get_dups=True, qNoRecon=self.qNoRecon)
+            # Write Duplications
+            self.lock_dups.acquire()
+            try:                                                        
+                WriteDuplications(self.dups_file_handle, og_name, dups, self.speciesDict, self.spec_seq_dict, self.stride_dups)
+                self.dups_file_handle.flush()
+                # print("%s dups" % og_name)
+            finally:
+                self.lock_dups.release()
 
-# def RunMethodParallel(Function, args_queue, nProcesses):
-#     runningProcesses = [mp.Process(target=Worker_RunMethod, args=(Function, args_queue)) for i_ in range(nProcesses)]
-#     for proc in runningProcesses:
-#         proc.start()
-#     ManageQueue(runningProcesses, args_queue)
+            # Write Suspect Genes
+            if len(suspect_genes) > 0:
+                self.lock_suspect.acquire()
+                try:
+                    WriteSuspectGenes(n_species, self.speciesToUse, suspect_genes, self.speciesDict, self.SequenceDict)
+                finally:
+                    self.lock_suspect.release()
+
+            # Write Orthologues
+            self.lock_ologs.acquire()
+            try:   
+                # print(len(ologs))
+                nOrthologues_SpPair = AppendOrthologuesToFiles([(iog, ologs)], self.speciesDict, self.speciesToUse,
+                                                        self.SequenceDict, self.dResultsOrthologues, self.ologs_files_handles, 
+                                                        self.putative_xenolog_file_handles, len(suspect_genes) > 0)
+                OrthologsFiles.flush_olog_files(self.ologs_files_handles)
+                OrthologsFiles.flush_xenolog_files(self.putative_xenolog_file_handles)
+                # print("%s ologs" % og_name)
+            finally:
+                self.lock_ologs.release()
+            # GetHOGs_from_tree(iog, recon_tree, self.hog_writer, self.q_split_paralogous_clades)
+            # don't relabel nodes, they've already been done
+            util.RenameTreeTaxa(recon_tree, self.reconTreesRenamedDir + "OG%07d_tree.txt" % iog, self.spec_seq_dict, qSupport=False, qFixNegatives=True)
+            if iog >= 0 and divmod(iog, 10 if self.nOgs <= 200 else 100 if self.nOgs <= 2000 else 1000)[1] == 0:
+                util.PrintTime("Done %d of %d" % (iog, self.nOgs))
+            return nOrthologues_SpPair
+        except:
+            print("WARNING: Unknown error analysing tree %s" % og_name)
+            raise
+            return util.nOrtho_sp(n_species) 
 
 
 def GetOrthologues_from_phyldog_tree(iog, treeFN, GeneToSpecies, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None):
@@ -1195,7 +1235,7 @@ def DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDirectory, GeneToSpecies, 
             with open(d + '%s__v__%s.tsv' % (speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]), csv_write_mode) as outfile:
                 writer1 = csv.writer(outfile, delimiter="\t")
                 writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]))
-    with OrthologsFiles(dResultsOrthologues, speciesDict, ogSet.speciesToUse, nSpecies, sp_to_index) as ortholog_file_writers, putative_xenolog_file_writers:
+    with OrthologsFiles(dResultsOrthologues, speciesDict, ogSet.speciesToUse, nSpecies, sp_to_index) as ologs_files_handles, putative_xenolog_file_handles:
         nOgs = len(ogSet.OGs())
         nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
         with open(files.FileHandler.GetDuplicationsFN(), csv_write_mode) as outfile:
@@ -1208,7 +1248,7 @@ def DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDirectory, GeneToSpecies, 
                 util.RenameTreeTaxa(recon_tree, reconTreesRenamedDir + "OG%07d_tree.txt" % iog, ogSet.Spec_SeqDict(), qSupport=False, qFixNegatives=True, label='n') 
                 if iog >= 0 and divmod(iog, 10 if nOgs <= 200 else 100 if nOgs <= 2000 else 1000)[1] == 0:
                     util.PrintTime("Done %d of %d" % (iog, nOgs))
-                nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, output_dir, ortholog_file_writers, putative_xenolog_file_writers, False)
+                nOrthologues_SpPair += AppendOrthologuesToFiles(allOrthologues, speciesDict, ogSet.speciesToUse, SequenceDict, output_dir, ologs_files_handles, putative_xenolog_file_handles, False)
     return nOrthologues_SpPair
     
 def RootAllTrees():
