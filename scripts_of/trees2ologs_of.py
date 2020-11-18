@@ -843,8 +843,6 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
                 out_str_sus2 = ""
             writer1 = ologs_files_handles[i][j] 
             writer2 = ologs_files_handles[j][i] 
-            out_str_1 = ""
-            out_str_2 = ""
             for iog, ortholouges_onetree in orthologues_alltrees:                   
                 og = "OG%07d" % iog
                 for leavesL, leavesR, leavesL_sus, leavesR_sus  in ortholouges_onetree:
@@ -868,8 +866,9 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
                             text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]])
                         # util.writerow(writer1, (og, text0, text1))
                         # util.writerow(writer2, (og, text1, text0))
-                        out_str_1 += util.getrow((og, text0, text1))
-                        out_str_2 += util.getrow((og, text1, text0))
+                        if olog_lines is not None:
+                            olog_lines[i][j] += util.getrow((og, text0, text1))
+                            olog_lines[j][i] += util.getrow((og, text1, text0))
                         nOrtho.n[isp0, isp1] += n0
                         nOrtho.n[isp1, isp0] += n1
                         if n0 == 1 and n1 == 1:
@@ -902,44 +901,39 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
                             text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]+leavesL_sus[sp1]])
                         # util.writerow(writer1_sus, (og, text0, text1))
                         # util.writerow(writer2_sus, (og, text1, text0))
-                        out_str_sus1 += util.getrow((og, text0, text1))
-                        out_str_sus2 += util.getrow((og, text1, text0))
-            if olog_lines is not None:
-                olog_lines[i][j] = out_str_1
-                olog_lines[j][i] = out_str_2
-                if qContainsSuspectOlogs:
-                    olog_sus_lines[i] += out_str_sus1
-                    olog_sus_lines[j] += out_str_sus2
-            # Orthologs
-            if len(out_str_1) > 0 or len(out_str_2) > 0:
-                if debug: util.PrintTime("Waiting: %d" % os.getpid())
-                if locks_ologs is not None:
-                    lock = locks_ologs[j]   # j is the larger index (there was a limit of ~65,000 locks, so can't have one for each pair)
-                    lock.acquire()
-                try:
-                    if debug: util.PrintTime("Acquired lock: %d" % os.getpid())
-                    start = time.time()
-                    writer1.write(out_str_1)
-                    writer1.flush()
-                    writer2.write(out_str_2)
-                    writer2.flush()
-                finally:
-                    stop = time.time()
-                    if debug: util.PrintTime("Released lock, OG %d %fs: %d" % (iog, stop-start, os.getpid()))
-                    if locks_ologs is not None:
-                        lock.release()
-            # Xenologs
-            if qContainsSuspectOlogs and (len(out_str_sus1) > 0 or len(out_str_sus2) > 0):
-                if lock_suspect is not None:
-                    lock_suspect.acquire()
-                try:
-                    writer1_sus.write(out_str_sus1)
-                    writer1_sus.flush()
-                    writer2_sus.write(out_str_sus2)
-                    writer2_sus.flush()
-                finally:
-                    if lock_suspect is not None:
-                        lock_suspect.release()
+                        if olog_sus_lines is not None:
+                            olog_sus_lines[i] += util.getrow((og, text0, text1))
+                            olog_sus_lines[j] += util.getrow((og, text1, text0))
+            # # Orthologs
+            # if len(out_str_1) > 0 or len(out_str_2) > 0:
+            #     if debug: util.PrintTime("Waiting: %d" % os.getpid())
+            #     if locks_ologs is not None:
+            #         lock = locks_ologs[j]   # j is the larger index (there was a limit of ~65,000 locks, so can't have one for each pair)
+            #         lock.acquire()
+            #     try:
+            #         if debug: util.PrintTime("Acquired lock: %d" % os.getpid())
+            #         start = time.time()
+            #         writer1.write(out_str_1)
+            #         writer1.flush()
+            #         writer2.write(out_str_2)
+            #         writer2.flush()
+            #     finally:
+            #         stop = time.time()
+            #         if debug: util.PrintTime("Released lock, OG %d %fs: %d" % (iog, stop-start, os.getpid()))
+            #         if locks_ologs is not None:
+            #             lock.release()
+            # # Xenologs
+            # if qContainsSuspectOlogs and (len(out_str_sus1) > 0 or len(out_str_sus2) > 0):
+            #     if lock_suspect is not None:
+            #         lock_suspect.acquire()
+            #     try:
+            #         writer1_sus.write(out_str_sus1)
+            #         writer1_sus.flush()
+            #         writer2_sus.write(out_str_sus2)
+            #         writer2_sus.flush()
+            #     finally:
+            #         if lock_suspect is not None:
+            #             lock_suspect.release()
     return nOrtho
                                       
 def Resolve(tree, GeneToSpecies):
@@ -1225,30 +1219,36 @@ class TreeAnalyser(object):
         except:
             print("WARNING: Unknown error analysing tree %s" % og_name)
             raise
-            return util.nOrtho_sp(n_species), olog_lines, olog_sus_lines
+            # return util.nOrtho_sp(n_species), olog_lines, olog_sus_lines
 
 def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, n_ologs_cache=100):
     nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
-    # nCache = util.nOrtho_cache(nspecies) 
-    # olog_lines_tot = [["" for j in xrange(nspecies)] for i in xrange(nspecies)]
-    # olog_sus_lines_tot = ["" for i in xrange(nspecies)]
+    nCache = util.nOrtho_cache(nspecies) 
+    olog_lines_tot = [["" for j in range(nspecies)] for i in range(nspecies)]
+    olog_sus_lines_tot = ["" for i in range(nspecies)]
     while True:
         try:
             args = args_queue.get(True, .1)
             nOrtho, olog_lines, olog_sus_lines = tree_analyser.AnalyseTree(*args)
             nOrthologues_SpPair += nOrtho
-            # nCache += nOrtho
-            # for i in range(nspecies):
-            #     olog_sus_lines_tot[i] += olog_sus_lines[i]
-            #     for j in range(nspecies):
-            #         olog_lines_tot[i][j] += olog_lines[i][j]
+            nCache += nOrtho
+            for i in range(nspecies):
+                olog_sus_lines_tot[i] += olog_sus_lines[i]
+                for j in range(nspecies):
+                    olog_lines_tot[i][j] += olog_lines[i][j]
             # Now write those that we've collected enough lines for
-            # i_j_write = nCache.get_i_j_to_write(n_ologs_cache)
-            # for i, j in i_j_write:
-            #     WriteOlogLinesToFile(i, j, olog_lines[i][j], olog_sus_lines[i], lock)
+            I,J = nCache.get_i_j_to_write(n_ologs_cache)
+            for i, j in zip(I,J):
+                k_lock = max(i,j)
+                WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][j], olog_lines_tot[i][j], tree_analyser.lock_ologs[k_lock])
+                olog_lines_tot[i][j] = ""
         except parallel_task_manager.queue.Empty:
-            # for i in range(nspecies):
-            #     print(max([ologs_file_lines.count("\n") for ologs_file_lines in olog_lines_tot[i]]))
+            for i in range(nspecies):
+                for j in range(i+1, nspecies):
+                    # j is the largest (and intentionally changing quickest, which I think is best for the lock)
+                    WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][j], olog_lines_tot[i][j], tree_analyser.lock_ologs[j])
+                    WriteOlogLinesToFile(tree_analyser.ologs_files_handles[j][i], olog_lines_tot[j][i], tree_analyser.lock_ologs[j])
+                WriteOlogLinesToFile(tree_analyser.putative_xenolog_file_handles[i], olog_sus_lines_tot[i], tree_analyser.lock_suspect)
             return 
 
 def RunOrthologsParallel(tree_analyser, nspecies, args_queue, nProcesses):
@@ -1258,23 +1258,18 @@ def RunOrthologsParallel(tree_analyser, nspecies, args_queue, nProcesses):
     parallel_task_manager.ManageQueue(runningProcesses, args_queue)
 
 
-# def WriteOlogLinesToFile():
-#     if debug: util.PrintTime("Waiting: %d" % os.getpid())
-#     if lock is not None:
-#         lock.acquire()
-#     try:
-#         if debug: util.PrintTime("Acquired lock: %d" % os.getpid())
-#         start = time.time()
-#         writer1.write(out_str_1)
-#         writer1.flush()
-#         writer2.write(out_str_2)
-#         writer2.flush()
-#         if qContainsSuspectOlogs:
-#             writer1_sus.write(out_str_sus1)
-#             writer1_sus.flush()
-#             writer2_sus.write(out_str_sus2)
-#             writer2_sus.flush()
-
+def WriteOlogLinesToFile(fh, text, lock):
+    if len(text) == 0:
+        return
+    if debug: util.PrintTime("Waiting: %d" % os.getpid())
+    lock.acquire()
+    try:
+        if debug: util.PrintTime("Acquired lock: %d" % os.getpid())
+        fh.write(text)
+        fh.flush()
+    finally:
+        lock.release()
+        if debug: util.PrintTime("Released lock: %d" %  os.getpid())
 
 def GetOrthologues_from_phyldog_tree(iog, treeFN, GeneToSpecies, qWrite=False, dupsWriter=None, seqIDs=None, spIDs=None):
     """ if dupsWriter != None then seqIDs and spIDs must also be provided"""

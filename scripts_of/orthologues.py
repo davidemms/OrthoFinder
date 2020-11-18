@@ -801,7 +801,16 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
     nspecies = len(ogSet.speciesToUse)
     sp_to_index = {str(sp):i for i, sp in enumerate(ogSet.speciesToUse)}
     with trees2ologs_of.OrthologsFiles(resultsDir, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index) as (olog_files_handles, suspect_genes_file_handles):    
-        nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, resultsDir, olog_files_handles, suspect_genes_file_handles, False)
+        olog_lines_tot = [["" for j in range(nspecies)] for i in range(nspecies)]
+        olog_sus_lines_tot = ["" for i in range(nspecies)]
+        nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, resultsDir, 
+                                                                      olog_files_handles, suspect_genes_file_handles, False,
+                                                                      olog_lines=olog_lines_tot, olog_sus_lines=olog_sus_lines_tot)
+        # olog_sus_lines_tot will be empty
+        lock_dummy = mp.Lock()
+        for i in range(nspecies):
+            for j in range(nspecies):
+                trees2ologs_of.WriteOlogLinesToFile(olog_files_handles[i][j], olog_lines_tot[i][j], lock_dummy)
     return nOrthologues_SpPair
     
 def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=None, stride_dups=None, q_split_para_clades=False):

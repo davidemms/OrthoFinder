@@ -441,10 +441,12 @@ class nOrtho_cache(object):
         return self
 
     def get_i_j_to_write(self, n_max_cache):
-        i_j_list = np.where(self.n > n_max_cache)
-        for i, j in i_j_list:
+        IJ = np.where(self.n > n_max_cache)
+        I = list(IJ[0])
+        J = list(IJ[1])
+        for i, j in zip(I,J):
             self.n[i,j] = 0
-        return i_j_list
+        return I,J
         
 class Finalise(object):
     def __enter__(self):
