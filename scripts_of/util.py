@@ -438,4 +438,7 @@ class Finalise(object):
         ptm.Stop()
 
 def writerow(fh, row):
-    fh.write("\t".join(map(str, row)) + "\n")              
+    fh.write("\t".join(map(str, row)) + "\n")
+
+def getrow(row):
+    return "\t".join(map(str, row)) + "\n"

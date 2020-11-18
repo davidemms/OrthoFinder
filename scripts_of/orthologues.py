@@ -837,6 +837,7 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=No
         nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDir, trees2ologs_of.GeneToSpecies_dash, resultsDir_ologs, reconTreesRenamedDir)
         util.PrintTime("Done Orthologues from Phyldog")
     else:
+        start = time.time()
         util.PrintTime("Starting OF Orthologues")
         qNoRecon = ("only_overlap" == recon_method)
         # The next function should not create the HOG writer and label the species tree. This should be done here and passed as arguments
@@ -859,6 +860,8 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=No
         TwoAndThreeGeneHOGs(ogSet, species_tree_rooted_labelled, hog_writer)
         hog_writer.close_files()
     nOrthologues_SpPair += TwoAndThreeGeneOrthogroups(ogSet, resultsDir_ologs)
+    stop = time.time()
+    print("%fs for orthologs etc" % (stop-start))
     WriteOrthologuesStats(ogSet, nOrthologues_SpPair)
 #    print("Identified %d orthologues" % nOrthologues)
         

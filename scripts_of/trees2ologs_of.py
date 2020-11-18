@@ -9,6 +9,7 @@ Perform directed 'reconciliation' first and then apply EggNOG method
 1 - root gene trees on outgroup: unique one this time
 2 - infer orthologues
 """
+import time
 import os
 import sys
 import csv
@@ -797,7 +798,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
             n.add_feature("sp_node", stNode.name)
             # should skip if everything below this is a single species, but should write out the duplications
             if len(all_species) == 1:
-                dupsWriter.writerow([og_name, spIDs[stNode.name], n.name, 1., "Terminal", ", ".join([seqIDs[g] for g in n.get_leaf_names()]), " "]) 
+                duplications.append((stNode.name, n.name, 1., n.get_leaf_names(), ""))
                 n.add_feature("dup", True)  
             else:
                 dups = []
@@ -808,7 +809,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                     else:
                         dups.append(True)
                 if all(dups):
-                    dupsWriter.writerow([og_name, stNode.name, n.name, 1., "Non-Terminal", ", ".join([seqIDs[g] for g in n.get_leaf_names()]), " "])
+                    duplications.append((stNode.name, n.name, 1., n.get_leaf_names(), ""))
                 n.add_feature("dup", all(dups))
                 # # if there are nodes below with same MRCA then dup (no HOGs) otherwise not dup (=> HOGS at this level)
                 # descendant_nodes = [MRCA_node(species_tree_rooted, sp) for sp in species]
@@ -817,7 +818,7 @@ def GetOrthologues_from_tree(iog, tree, species_tree_rooted, GeneToSpecies, neig
                 # print(n.name + ": dup3")
     return orthologues, tree, suspect_genes, duplications
 
-def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, ologs_files_handles, putative_xenolog_file_handles, qContainsSuspectOlogs):
+def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, sequenceDict, resultsDir, ologs_files_handles, putative_xenolog_file_handles, qContainsSuspectOlogs, lock=None):
     # Sort the orthologues according to species pairs
     sp_to_index = {str(sp):i for i, sp in enumerate(iSpeciesToUse)}
     nOrtho = util.nOrtho_sp(len(iSpeciesToUse))   
@@ -829,6 +830,7 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
         sp0 = str(iSpeciesToUse[i])
         if qContainsSuspectOlogs: 
             writer1_sus = putative_xenolog_file_handles[i]
+            out_str_sus1 = ""
         strsp0 = sp0 + "_"
         isp0 = sp_to_index[sp0]
         for j in xrange(i, nSpecies):
@@ -838,8 +840,11 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
             isp1 = sp_to_index[sp1]
             if qContainsSuspectOlogs:
                 writer2_sus = putative_xenolog_file_handles[j]
+                out_str_sus2 = ""
             writer1 = ologs_files_handles[i][j] 
             writer2 = ologs_files_handles[j][i] 
+            out_str_1 = ""
+            out_str_2 = ""
             for iog, ortholouges_onetree in orthologues_alltrees:                   
                 og = "OG%07d" % iog
                 for leavesL, leavesR, leavesL_sus, leavesR_sus  in ortholouges_onetree:
@@ -861,8 +866,10 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
                             n1 = nL1
                             text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesR[sp0]])
                             text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]])
-                        util.writerow(writer1, (og, text0, text1))
-                        util.writerow(writer2, (og, text1, text0))
+                        # util.writerow(writer1, (og, text0, text1))
+                        # util.writerow(writer2, (og, text1, text0))
+                        out_str_1 += util.getrow((og, text0, text1))
+                        out_str_2 += util.getrow((og, text1, text0))
                         nOrtho.n[isp0, isp1] += n0
                         nOrtho.n[isp1, isp0] += n1
                         if n0 == 1 and n1 == 1:
@@ -877,6 +884,7 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
                         else:
                             nOrtho.n_m2m[isp0, isp1] += n0
                             nOrtho.n_m2m[isp1, isp0] += n1
+
                     # Write suspect orthologues
                     if not qContainsSuspectOlogs: continue
                     nL0s = len(leavesL_sus[sp0])
@@ -892,8 +900,29 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
                         else:
                             text0 = ", ".join([sequenceDict[strsp0 + g] for g in leavesR_sus[sp0]])
                             text1 = ", ".join([sequenceDict[strsp1 + g] for g in leavesL[sp1]+leavesL_sus[sp1]])
-                        util.writerow(writer1_sus, (og, text0, text1))
-                        util.writerow(writer2_sus, (og, text1, text0))
+                        # util.writerow(writer1_sus, (og, text0, text1))
+                        # util.writerow(writer2_sus, (og, text1, text0))
+                        out_str_sus1 += util.getrow((og, text0, text1))
+                        out_str_sus2 += util.getrow((og, text1, text0))
+            if lock is not None:
+                if debug: util.PrintTime("Waiting: %d" % os.getpid())
+                lock.acquire()
+                try:
+                    if debug: util.PrintTime("Acquired lock: %d" % os.getpid())
+                    start = time.time()
+                    writer1.write(out_str_1)
+                    writer1.flush()
+                    writer2.write(out_str_2)
+                    writer2.flush()
+                    if qContainsSuspectOlogs:
+                        writer1_sus.write(out_str_sus1)
+                        writer1_sus.flush()
+                        writer2_sus.write(out_str_sus2)
+                        writer2_sus.flush()
+                finally:
+                    stop = time.time()
+                    if debug: util.PrintTime("Released lock, OG %d %fs: %d" % (iog, stop-start, os.getpid()))
+                    lock.release()
     return nOrtho   
                                       
 def Resolve(tree, GeneToSpecies):
@@ -1086,6 +1115,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
                               putative_xenolog_file_handles, hog_writer, q_split_paralogous_clades)
             args_queue = mp.Queue()
             n_parallel = 16 # None
+            # n_parallel = None
             if n_parallel is None:
                 for iog in range(nOgs):
                     nOrthologues_SpPair += ta.AnalyseTree(iog) 
@@ -1136,7 +1166,7 @@ class TreeAnalyser(object):
             n_species = len(self.speciesToUse)
             rooted_tree_ids, qHaveSupport = CheckAndRootTree(files.FileHandler.GetOGsTreeFN(iog), self.species_tree_rooted_labelled, self.GeneToSpecies) # this can be parallelised easily
             if rooted_tree_ids is None: 
-                return
+                return util.nOrtho_sp(n_species) 
 
             # Write rooted tree with accessions
             util.RenameTreeTaxa(rooted_tree_ids, files.FileHandler.GetOGsTreeFN(iog, True), 
@@ -1162,17 +1192,25 @@ class TreeAnalyser(object):
                     self.lock_suspect.release()
 
             # Write Orthologues
-            self.lock_ologs.acquire()
-            try:   
-                # print(len(ologs))
-                nOrthologues_SpPair = AppendOrthologuesToFiles([(iog, ologs)], self.speciesDict, self.speciesToUse,
-                                                        self.SequenceDict, self.dResultsOrthologues, self.ologs_files_handles, 
-                                                        self.putative_xenolog_file_handles, len(suspect_genes) > 0)
-                OrthologsFiles.flush_olog_files(self.ologs_files_handles)
-                OrthologsFiles.flush_xenolog_files(self.putative_xenolog_file_handles)
-                # print("%s ologs" % og_name)
-            finally:
-                self.lock_ologs.release()
+            nOrthologues_SpPair = AppendOrthologuesToFiles([(iog, ologs)], self.speciesDict, self.speciesToUse,
+                                                    self.SequenceDict, self.dResultsOrthologues, self.ologs_files_handles, 
+                                                    self.putative_xenolog_file_handles, len(suspect_genes) > 0, self.lock_ologs)
+            # util.PrintTime("Waiting: %d" % os.getpid())
+            # self.lock_ologs.acquire()
+            # try:   
+            #     util.PrintTime("Acquired lock: %d" % os.getpid())
+            #     start = time.time()
+            #     # print(len(ologs))
+            #     nOrthologues_SpPair = AppendOrthologuesToFiles([(iog, ologs)], self.speciesDict, self.speciesToUse,
+            #                                             self.SequenceDict, self.dResultsOrthologues, self.ologs_files_handles, 
+            #                                             self.putative_xenolog_file_handles, len(suspect_genes) > 0)
+            #     OrthologsFiles.flush_olog_files(self.ologs_files_handles)
+            #     OrthologsFiles.flush_xenolog_files(self.putative_xenolog_file_handles)
+            #     # print("%s ologs" % og_name)
+            # finally:
+            #     stop = time.time()
+            #     util.PrintTime("Released lock, OG %d %fs: %d" % (iog, stop-start, os.getpid()))
+            #     self.lock_ologs.release()
             GetHOGs_from_tree(iog, recon_tree, self.hog_writer, self.lock_hogs, self.q_split_paralogous_clades) 
             # don't relabel nodes, they've already been done
             util.RenameTreeTaxa(recon_tree, self.reconTreesRenamedDir + "OG%07d_tree.txt" % iog, self.spec_seq_dict, qSupport=False, qFixNegatives=True)
