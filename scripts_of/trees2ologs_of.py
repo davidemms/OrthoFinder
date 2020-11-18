@@ -914,7 +914,7 @@ def AppendOrthologuesToFiles(orthologues_alltrees, speciesDict, iSpeciesToUse, s
             if len(out_str_1) > 0 or len(out_str_2) > 0:
                 if debug: util.PrintTime("Waiting: %d" % os.getpid())
                 if locks_ologs is not None:
-                    lock = locks_ologs[j][i]   # j is the larger index
+                    lock = locks_ologs[j]   # j is the larger index (there was a limit of ~65,000 locks, so can't have one for each pair)
                     lock.acquire()
                 try:
                     if debug: util.PrintTime("Acquired lock: %d" % os.getpid())
@@ -1172,7 +1172,7 @@ class TreeAnalyser(object):
         self.putative_xenolog_file_handles = putative_xenolog_file_handles
         self.hog_writer = hog_writer
         self.q_split_paralogous_clades = q_split_paralogous_clades
-        self.lock_ologs = [[mp.Lock() for j in range(i)] for i in range(self.nspecies)]   # so [4][1]  larger first
+        self.lock_ologs = [mp.Lock() for i in range(self.nspecies)]   # lock the larger of the two species index
         self.lock_dups = mp.Lock()
         self.lock_suspect = mp.Lock()
         self.lock_hogs = mp.Lock()
