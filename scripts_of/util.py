@@ -429,6 +429,22 @@ class nOrtho_sp(object):
         self.n_m21 += other.n_m21
         self.n_m2m += other.n_m2m
         return self
+
+
+class nOrtho_cache(object):
+    """ matrix of approx number of unwritten cached orthologs"""
+    def __init__(self, nSp):
+        self.n = np.zeros((nSp, nSp))
+        
+    def __iadd__(self, nOrtho_sp_obj):
+        self.n += nOrtho_sp_obj.n
+        return self
+
+    def get_i_j_to_write(self, n_max_cache):
+        i_j_list = np.where(self.n > n_max_cache)
+        for i, j in i_j_list:
+            self.n[i,j] = 0
+        return i_j_list
         
 class Finalise(object):
     def __enter__(self):
