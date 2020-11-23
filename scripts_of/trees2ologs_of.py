@@ -1072,8 +1072,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
                     writer1 = csv.writer(outfile, delimiter="\t")
                     writer1.writerow(("Orthogroup", speciesDict[str(ogSet.speciesToUse[index1])], speciesDict[str(ogSet.speciesToUse[index2])]))
         neighbours = GetSpeciesNeighbours(species_tree_rooted_labelled)
-        nOgs = len(ogSet.OGs())
-        nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
+        nOgs = len(ogSet.OGs()) 
         reconTreesRenamedDir = files.FileHandler.GetOGsReconTreeDir(True)
         spec_seq_dict = ogSet.Spec_SeqDict()
         sp_to_index = {str(sp):i for i, sp in enumerate(ogSet.speciesToUse)}
@@ -1088,8 +1087,9 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
                               ogSet.speciesToUse, GeneToSpecies, SequenceDict, speciesDict, spec_seq_dict, 
                               neighbours, qNoRecon, outfile_dups, stride_dups, ologs_file_handles, 
                               putative_xenolog_file_handles, hog_writer, q_split_paralogous_clades)
-            args_queue = mp.Queue()
+            
             if n_parallel == 1:
+                nOrthologues_SpPair = util.nOrtho_sp(nspecies)
                 dummy_lock = mp.Lock()
                 for iog in range(nOgs):
                     results = ta.AnalyseTree(iog) 
@@ -1108,9 +1108,10 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
                         WriteOlogLinesToFile(ta.putative_xenolog_file_handles[i], olog_sus_lines[i], dummy_lock)
                 # util.PrintTime("Done writing orthologs")
             else:
+                args_queue = mp.Queue()
                 for iog in range(nOgs):
                     args_queue.put((iog, ))
-                RunOrthologsParallel(ta, len(ogSet.speciesToUse), args_queue, n_parallel)
+                nOrthologues_SpPair = RunOrthologsParallel(ta, len(ogSet.speciesToUse), args_queue, n_parallel)
     except IOError as e:
         if str(e).startswith("[Errno 24] Too many open files"):
             util.number_open_files_exception_advice(len(ogSet.speciesToUse), True)
@@ -1196,7 +1197,7 @@ class TreeAnalyser(object):
             raise
             # return util.nOrtho_sp(n_species), olog_lines, olog_sus_lines
 
-def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, n_ologs_cache=100):
+def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue, n_ologs_cache=100):
     nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
     nCache = util.nOrtho_cache(nspecies) 
     olog_lines_tot = [["" for j in range(nspecies)] for i in range(nspecies)]
@@ -1227,13 +1228,24 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, n_ologs_cache
                     WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][j], olog_lines_tot[i][j], tree_analyser.lock_ologs[j])
                     WriteOlogLinesToFile(tree_analyser.ologs_files_handles[j][i], olog_lines_tot[j][i], tree_analyser.lock_ologs[j])
                 WriteOlogLinesToFile(tree_analyser.putative_xenolog_file_handles[i], olog_sus_lines_tot[i], tree_analyser.lock_suspect)
+            results_queue.put(nOrthologues_SpPair)
             return 
 
 def RunOrthologsParallel(tree_analyser, nspecies, args_queue, nProcesses):
-    runningProcesses = [mp.Process(target=Worker_RunOrthologsMethod, args=(tree_analyser, nspecies, args_queue)) for i_ in range(nProcesses)]
+    results_queue = mp.Queue()
+    runningProcesses = [mp.Process(target=Worker_RunOrthologsMethod, args=(tree_analyser, nspecies, args_queue, results_queue)) for i_ in range(nProcesses)]
     for proc in runningProcesses:
         proc.start()
     parallel_task_manager.ManageQueue(runningProcesses, args_queue)
+    nOrthologues_SpPair = util.nOrtho_sp(nspecies)
+    # All workers have now finished, sum the results
+    while True:
+        try:
+            nOrtho = results_queue.get(False)
+            nOrthologues_SpPair += nOrtho
+        except parallel_task_manager.queue.Empty: 
+            break
+    return nOrthologues_SpPair
 
 
 def WriteOlogLinesToFile(fh, text, lock):
