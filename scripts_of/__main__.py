@@ -1532,7 +1532,7 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
     util.PrintTime("Done orthologues")
 
 def GetOrthologues_FromTrees(options):
-    orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.speciesTreeFN, options.qAddSpeciesToIDs, options.qSplitParaClades)
+    orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.nProcessAlg, options.speciesTreeFN, options.qAddSpeciesToIDs, options.qSplitParaClades)
  
 def ProcessesNewFasta(fastaDir, q_dna, speciesInfoObj_prev = None, speciesToUse_prev_names=[]):
     """

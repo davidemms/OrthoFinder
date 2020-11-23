@@ -803,7 +803,7 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
     with trees2ologs_of.OrthologsFiles(resultsDir, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index) as (olog_files_handles, suspect_genes_file_handles):    
         olog_lines_tot = [["" for j in range(nspecies)] for i in range(nspecies)]
         olog_sus_lines_tot = ["" for i in range(nspecies)]
-        nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles_v2(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, 
+        nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, 
                                                                       False, olog_lines_tot, olog_sus_lines_tot)
         # olog_sus_lines_tot will be empty
         lock_dummy = mp.Lock()
@@ -812,7 +812,7 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
                 trees2ologs_of.WriteOlogLinesToFile(olog_files_handles[i][j], olog_lines_tot[i][j], lock_dummy)
     return nOrthologues_SpPair
     
-def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=None, stride_dups=None, q_split_para_clades=False):
+def ReconciliationAndOrthologues(recon_method, ogSet, nHighParallel, nLowParallel, iSpeciesTree=None, stride_dups=None, q_split_para_clades=False):
     """
     ogSet - info about the orthogroups, species etc
     resultsDir - where the Orthologues top level results directory will go (should exist already)
@@ -829,7 +829,7 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=No
     if "dlcpar" in recon_method:
         qDeepSearch = (recon_method == "dlcpar_convergedsearch")
         util.PrintTime("Starting DLCpar")
-        dlcparResultsDir, dlcparLocusTreePat = trees2ologs_dlcpar.RunDlcpar(ogSet, speciesTree_ids_fn, workingDir, nParallel, qDeepSearch)
+        dlcparResultsDir, dlcparLocusTreePat = trees2ologs_dlcpar.RunDlcpar(ogSet, speciesTree_ids_fn, workingDir, nHighParallel, qDeepSearch)
         util.PrintTime("Done DLCpar")
         spec_seq_dict = ogSet.Spec_SeqDict()
         for iog in range(len(ogSet.OGs())):
@@ -863,7 +863,7 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=No
         speciesDict = ogSet.SpeciesDict()
         SequenceDict = ogSet.SequenceDict()
         hog_writer = trees2ologs_of.HogWriter(species_tree_rooted_labelled, node_names, SequenceDict, speciesDict, ogSet.speciesToUse)
-        nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, trees2ologs_of.GeneToSpecies_dash, stride_dups, qNoRecon, hog_writer, q_split_para_clades)
+        nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, trees2ologs_of.GeneToSpecies_dash, stride_dups, qNoRecon, hog_writer, q_split_para_clades, nLowParallel)
         util.PrintTime("Done OF Orthologues")
         TwoAndThreeGeneHOGs(ogSet, species_tree_rooted_labelled, hog_writer)
         hog_writer.close_files()
@@ -874,7 +874,7 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=No
 #    print("Identified %d orthologues" % nOrthologues)
         
                 
-def OrthologuesFromTrees(recon_method, nHighParallel, userSpeciesTree_fn, qAddSpeciesToIDs, q_split_para_clades):
+def OrthologuesFromTrees(recon_method, nHighParallel, nLowParallel, userSpeciesTree_fn, qAddSpeciesToIDs, q_split_para_clades):
     """
     userSpeciesTree_fn - None if not supplied otherwise rooted tree using user species names (not orthofinder IDs)
     qUserSpTree - is the speciesTree_fn user-supplied
@@ -891,7 +891,7 @@ def OrthologuesFromTrees(recon_method, nHighParallel, userSpeciesTree_fn, qAddSp
         ConvertUserSpeciesTree(userSpeciesTree_fn, speciesDict, speciesTreeFN_ids)
     util.PrintUnderline("Running Orthologue Prediction", True)
     util.PrintUnderline("Reconciling gene and species trees") 
-    ReconciliationAndOrthologues(recon_method, ogSet, nHighParallel, q_split_para_clades=q_split_para_clades)
+    ReconciliationAndOrthologues(recon_method, ogSet, nHighParallel, nLowParallel, q_split_para_clades=q_split_para_clades)
     util.PrintUnderline("Writing results files")
     util.PrintTime("Writing results files")
     files.FileHandler.CleanWorkingDir2()
@@ -902,7 +902,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
                        tree_method,
                        recon_method,
                        nHighParallel,
-                       nLowParrallel,
+                       nLowParallel,
                        qDoubleBlast,
                        qAddSpeciesToIDs,
                        userSpeciesTree = None, 
@@ -965,7 +965,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
         elif qStopAfterAlign:
             print("")
             return 
-        db = DendroBLASTTrees(ogSet, nLowParrallel, nHighParallel, qDoubleBlast)
+        db = DendroBLASTTrees(ogSet, nLowParallel, nHighParallel, qDoubleBlast)
         if qDB_SpeciesTree and not userSpeciesTree and not qLessThanFourSpecies:
             util.PrintUnderline("Inferring species tree (calculating gene distances)")
             print("Loading BLAST scores")
@@ -978,7 +978,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
             util.PrintTime("Starting phyldog")
             species_tree_ids_labelled_phyldog = wrapper_phyldog.RunPhyldogAnalysis(files.FileHandler.GetPhyldogWorkingDirectory(), ogSet.OGs(), speciesToUse, nHighParallel)
     else:
-        db = DendroBLASTTrees(ogSet, nLowParrallel, nHighParallel, qDoubleBlast)
+        db = DendroBLASTTrees(ogSet, nLowParallel, nHighParallel, qDoubleBlast)
         spTreeFN_ids, qSTAG = db.RunAnalysis(userSpeciesTree == None)
         if userSpeciesTree != None:
             spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
@@ -1070,7 +1070,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
         print(("Outgroup: " + (", ".join([spDict[s] for s in r]))))
     util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qSupport=qSpeciesTreeSupports, qFixNegatives=True)
     util.PrintTime("Starting Recon and orthologues")
-    ReconciliationAndOrthologues(recon_method, db.ogSet, nHighParallel, i if qMultiple else None, stride_dups=stride_dups, q_split_para_clades=q_split_para_clades) 
+    ReconciliationAndOrthologues(recon_method, db.ogSet, nHighParallel, nLowParallel, i if qMultiple else None, stride_dups=stride_dups, q_split_para_clades=q_split_para_clades) 
     # util.PrintTime("Done Recon")
     
     if qMultiple:
