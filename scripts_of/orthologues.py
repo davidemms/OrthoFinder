@@ -803,9 +803,8 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
     with trees2ologs_of.OrthologsFiles(resultsDir, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index) as (olog_files_handles, suspect_genes_file_handles):    
         olog_lines_tot = [["" for j in range(nspecies)] for i in range(nspecies)]
         olog_sus_lines_tot = ["" for i in range(nspecies)]
-        nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, resultsDir, 
-                                                                      olog_files_handles, suspect_genes_file_handles, False,
-                                                                      olog_lines=olog_lines_tot, olog_sus_lines=olog_sus_lines_tot)
+        nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles_v2(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, 
+                                                                      False, olog_lines_tot, olog_sus_lines_tot)
         # olog_sus_lines_tot will be empty
         lock_dummy = mp.Lock()
         for i in range(nspecies):
@@ -870,7 +869,7 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nParallel, iSpeciesTree=No
         hog_writer.close_files()
     nOrthologues_SpPair += TwoAndThreeGeneOrthogroups(ogSet, resultsDir_ologs)
     stop = time.time()
-    print("%fs for orthologs etc" % (stop-start))
+    # print("%fs for orthologs etc" % (stop-start))
     WriteOrthologuesStats(ogSet, nOrthologues_SpPair)
 #    print("Identified %d orthologues" % nOrthologues)
         
@@ -1072,7 +1071,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
     util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qSupport=qSpeciesTreeSupports, qFixNegatives=True)
     util.PrintTime("Starting Recon and orthologues")
     ReconciliationAndOrthologues(recon_method, db.ogSet, nHighParallel, i if qMultiple else None, stride_dups=stride_dups, q_split_para_clades=q_split_para_clades) 
-    util.PrintTime("Done Recon")
+    # util.PrintTime("Done Recon")
     
     if qMultiple:
         for i, (r, speciesTree_fn) in enumerate(zip(roots, rootedSpeciesTreeFN)):
