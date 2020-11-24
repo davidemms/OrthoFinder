@@ -1044,6 +1044,7 @@ def WriteSuspectGenes(nspecies, speciesToUse, suspect_genes, speciesDict, Sequen
         these_genes = [g for g in suspect_genes if g.startswith(strsp0_)]
         if len(these_genes) > 0:
             with open(dSuspectGenes + speciesDict[strsp0] + ".txt", csv_append_mode) as outfile:
+                # not a CSV file so \n line endings are fine
                 outfile.write("\n".join([SequenceDict[g] for g in these_genes]) + "\n")
 
 def WriteDuplications(dups_file_handle, og_name, duplications, spIDs, seqIDs, stride_dups):

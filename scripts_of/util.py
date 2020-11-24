@@ -456,7 +456,9 @@ class Finalise(object):
         ptm.Stop()
 
 def writerow(fh, row):
-    fh.write("\t".join(map(str, row)) + "\n")
+    # CSV format specifies CRLF line endings: https://tools.ietf.org/html/rfc4180
+    fh.write("\t".join(map(str, row)) + "\r\n")
 
 def getrow(row):
-    return "\t".join(map(str, row)) + "\n"
+    # CSV format specifies CRLF line endings: https://tools.ietf.org/html/rfc4180
+    return "\t".join(map(str, row)) + "\r\n"
