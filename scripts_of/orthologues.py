@@ -803,7 +803,7 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir):
     with trees2ologs_of.OrthologsFiles(resultsDir, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index) as (olog_files_handles, suspect_genes_file_handles):    
         olog_lines_tot = [["" for j in range(nspecies)] for i in range(nspecies)]
         olog_sus_lines_tot = ["" for i in range(nspecies)]
-        nOrthologues_SpPair += trees2ologs_of.AppendOrthologuesToFiles(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, 
+        nOrthologues_SpPair += trees2ologs_of.GetLinesForOlogFiles(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, 
                                                                       False, olog_lines_tot, olog_sus_lines_tot)
         # olog_sus_lines_tot will be empty
         lock_dummy = mp.Lock()
@@ -869,7 +869,8 @@ def ReconciliationAndOrthologues(recon_method, ogSet, nHighParallel, nLowParalle
         TwoAndThreeGeneHOGs(ogSet, species_tree_rooted_labelled, hog_writer)
         hog_writer.close_files()
     nOrthologues_SpPair += TwoAndThreeGeneOrthogroups(ogSet, resultsDir_ologs)
-    trees2ologs_of.SortParallelFiles(nLowParallel, ogSet.speciesToUse, speciesDict)
+    if nLowParallel > 1:
+        trees2ologs_of.SortParallelFiles(nLowParallel, ogSet.speciesToUse, speciesDict)
     stop = time.time()
     # print("%fs for orthologs etc" % (stop-start))
     WriteOrthologuesStats(ogSet, nOrthologues_SpPair)
