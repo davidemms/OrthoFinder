@@ -27,6 +27,7 @@ import os
 import sys
 import time
 import datetime
+import traceback
 import subprocess
 import multiprocessing as mp
 try: 
@@ -230,6 +231,10 @@ def Worker_RunMethod(Function, args_queue):
             Function(*args)
         except queue.Empty:
             return 
+        except:
+            print("Error in function: " + str(Function))
+            traceback.print_tb()
+            return
 
 def RunMethodParallel(Function, args_queue, nProcesses):
     runningProcesses = [mp.Process(target=Worker_RunMethod, args=(Function, args_queue)) for i_ in range(nProcesses)]
