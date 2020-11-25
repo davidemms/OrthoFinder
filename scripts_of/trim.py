@@ -118,7 +118,7 @@ def write_msa(M, names, outfn, nChar = 80):
     with open(outfn, 'w') as outfile:
         for iSeq, name in enumerate(names):
             outfile.write(">%s\n" % name)
-            seq = M[iSeq,:].tolist()[0]
+            seq = M[iSeq,:].tolist()
             for i in range(0, len(seq), nChar):
                 outfile.write("".join(seq[i:i+nChar]) + "\n")
 
