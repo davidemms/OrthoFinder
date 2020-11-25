@@ -255,7 +255,7 @@ def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, 
                 outfile.write("".join(seq[i:i+nChar]) + "\n")
             
 def trim_fn(fn):
-    trim.main(fn, fn, 0.1, 500)
+    trim.main(fn, fn, 0.1, 500, 0.75)
 
 """ 
 -----------------------------------------------------------------------------
