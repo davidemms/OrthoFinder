@@ -908,6 +908,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
                        nLowParallel,
                        qDoubleBlast,
                        qAddSpeciesToIDs,
+                       qTrim,
                        userSpeciesTree = None, 
                        qStopAfterSeqs = False,
                        qStopAfterAlign = False,
@@ -958,7 +959,16 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
             util.RenameTreeTaxa(spTreeFN_ids, files.FileHandler.GetSpeciesTreeUnrootedFN(True), ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True)
         qDoMSASpeciesTree = (not qLessThanFourSpecies) and (not userSpeciesTree)
         util.PrintTime("Starting MSA/Trees")
-        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), ogSet.OrthogroupMatrix(), ogSet.Spec_SeqDict(), ogSet.SpeciesDict(), ogSet.speciesToUse, nHighParallel, qStopAfterSeqs, qStopAfterAlign or qPhyldog, qDoSpeciesTree=qDoMSASpeciesTree) 
+        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), 
+                                               ogSet.OrthogroupMatrix(), 
+                                               ogSet.Spec_SeqDict(), 
+                                               ogSet.SpeciesDict(), 
+                                               ogSet.speciesToUse, 
+                                               nHighParallel, 
+                                               qStopAfterSeqs, 
+                                               qStopAfterAlign or qPhyldog, 
+                                               qDoSpeciesTree=qDoMSASpeciesTree,
+                                               qTrim = qTrim) 
         util.PrintTime("Done MSA/Trees")
         if qDoMSASpeciesTree:
             spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()

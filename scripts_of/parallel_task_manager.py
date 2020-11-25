@@ -26,6 +26,7 @@
 import os
 import sys
 import time
+import types
 import datetime
 import traceback
 import subprocess
@@ -172,8 +173,8 @@ def Worker_RunCommands_And_Move(cmd_and_filename_queue, nProcesses, nToDo, qList
     or an ordered list of tuples that must be run in the provided order.
   
     Args:
-        cmd_and_filename_queue - queue containing (cmd, actual_target_fn) tuples (if qListOfLists is False) of a list of such 
-            tuples (if qListOfLists is True).
+        cmd_and_filename_queue - queue containing (cmd, actual_target_fn) tuples (if qListOfLists is False) or a list of such 
+            tuples (if qListOfLists is True). Alternatively, 'cmd' can be a python fn and actual_target_fn the fn to call it on.
         nProcesses - the number of processes that are working on the queue.
         nToDo - The total number of elements in the original queue
         qListOfLists - Boolean, whether each element of the queue corresponds to a single command or a list of ordered commands
@@ -191,14 +192,25 @@ def Worker_RunCommands_And_Move(cmd_and_filename_queue, nProcesses, nToDo, qList
             if not qListOfLists:
                 command_fns_list = [command_fns_list]
             for command, fns in command_fns_list:
-                popen = subprocess.Popen(command, env=my_env, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                popen.communicate()
-                if fns != None:
-                    actual, target = fns
-                    if os.path.exists(actual):
-                        os.rename(actual, target)
+                if isinstance(command, types.FunctionType):
+                    fn = command
+                    fn(fns)
+                else:
+                    popen = subprocess.Popen(command, env=my_env, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    popen.communicate()
+                    if fns != None:
+                        actual, target = fns
+                        if os.path.exists(actual):
+                            os.rename(actual, target)
         except queue.Empty:
-            return               
+            return     
+        except Exception as e:
+            print("WARNING: ")
+            print(str(e))
+        except:
+            print("WARNING: Unknown caught unknown exception")
+
+
                             
 def Worker_RunOrderedCommandList(cmd_queue, nProcesses, nToDo):
     """ repeatedly takes items to process from the queue until it is empty at which point it returns. Does not take a new task

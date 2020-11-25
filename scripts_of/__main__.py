@@ -854,6 +854,7 @@ def PrintHelp(prog_caller):
     print(" -1              Only perform one-way sequence search")
     print(" -X              Don't add species names to sequence IDs")
     print(" -y              Split paralogous clades below root of a HOG into separate HOGs")
+    print(" -z              Don't trim MSAs (columns>=90% gap, min. alignment length 500)")
     print(" -n <txt>        Name to append to the results directory")  
     print(" -o <txt>        Non-default results directory")  
     print(" -h              Print this help text")
@@ -927,6 +928,7 @@ class Options(object):#
         self.qStopAfterTrees = False
         self.qMSATrees = False
         self.qAddSpeciesToIDs = True
+        self.qTrim = True
         self.search_program = "diamond"
         self.msa_program = "mafft"
         self.tree_program = "fasttree"
@@ -1036,6 +1038,8 @@ def ProcessArgs(prog_caller, args):
             options.qAddSpeciesToIDs = False
         elif arg == "-y":
             options.qSplitParaClades = True
+        elif arg == "-z":
+            options.qTrim = False
         elif arg == "-I" or arg == "--inflation":
             if len(args) == 0:
                 print("Missing option for command line argument %s\n" % arg)
@@ -1521,6 +1525,7 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
                                     options.nProcessAlg,
                                     options.qDoubleBlast,
                                     options.qAddSpeciesToIDs,
+                                    options.qTrim,
                                     options.speciesTreeFN, 
                                     options.qStopAfterSeqs,
                                     options.qStopAfterAlignments,
@@ -1781,7 +1786,7 @@ def main(args=None):
             raise NotImplementedError
             ptm = parallel_task_manager.ParallelTaskManager_singleton()
             ptm.Stop()
-        d_results = files.FileHandler.GetResultsDirectory1()
+        d_results = os.path.normpath(files.FileHandler.GetResultsDirectory1()) + os.path.sep
         print("\nResults:\n    %s" % d_results)
         util.PrintCitation(d_results)
         files.FileHandler.WriteToLog("OrthoFinder run completed\n", True)

@@ -37,6 +37,7 @@ from collections import Counter, defaultdict
 
 from . import util, program_caller as pc
 from . import files
+from . import trim
 
 class FastaWriter(object):
     def __init__(self, fastaFileDir_list, speciesToUse):
@@ -157,7 +158,7 @@ def DetermineOrthogroupsForSpeciesTree(m, nOGsMin=100, nSufficient=1000, increas
     """Orthogroups can be used if at least a fraction f of the species in the orthogroup are single copy, f is determined as described 
     below. Species that aren't single copy are allowed in the orthogroup as long as there aren't too many (criterion is quite strict). 
     The presence of species with multiple copies suggests that the single copy species might actually have arisen from duplication 
-    and loss. Therefore, we use a probability model to detemine how many of the excluded species can be multicopy before it is likely
+    and loss. Therefore, we use a probability model to determine how many of the excluded species can be multicopy before it is likely
     that the single copy genes are actually hidden paralogues.
     Args:
         m - the orthogroup matrix shape=(nOGs, nSpecies), each entry is number of genes from that species
@@ -253,7 +254,9 @@ def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, 
             for i in range(0, len(seq), nChar):
                 outfile.write("".join(seq[i:i+nChar]) + "\n")
             
-    
+def trim_fn(fn):
+    trim.main(fn, fn, 0.1, 500)
+
 """ 
 -----------------------------------------------------------------------------
                              TreesForOrthogroups            
@@ -308,8 +311,8 @@ class TreesForOrthogroups(object):
                     else:
                         outfile.write(line)
           
-    def DoTrees(self, ogs, ogMatrix, idDict, speciesIdDict, speciesToUse, nProcesses, qStopAfterSeqs, qStopAfterAlignments, qDoSpeciesTree):
-        idDict.update(speciesIdDict) # smae code will then also convert concatenated alignment for species tree
+    def DoTrees(self, ogs, ogMatrix, idDict, speciesIdDict, speciesToUse, nProcesses, qStopAfterSeqs, qStopAfterAlignments, qDoSpeciesTree, qTrim):
+        idDict.update(speciesIdDict) # same code will then also convert concatenated alignment for species tree
         # 0       
         resultsDirsFullPath = [files.FileHandler.GetResultsSeqsDir(), files.FileHandler.GetResultsAlignDir(), files.FileHandler.GetResultsTreesDir()]
         
@@ -357,8 +360,15 @@ class TreesForOrthogroups(object):
             util.PrintUnderline("Inferring multiple sequence alignments for species tree") 
             # Do required alignments and trees
             speciesTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
-            for i in iOgsForSpeciesTree:
-                commands_and_filenames.append([alignCommands_and_filenames[i], treeCommands_and_filenames[i]])
+            if qTrim:
+                for i in iOgsForSpeciesTree:
+                    commands_and_filenames.append([alignCommands_and_filenames[i], 
+                                                (trim_fn, alignmentFilesToUse[i]), 
+                                                treeCommands_and_filenames[i]])
+            else:
+                for i in iOgsForSpeciesTree:
+                    commands_and_filenames.append([alignCommands_and_filenames[i],
+                                                   treeCommands_and_filenames[i]])
             pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
             CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn, fSingleCopy)
             # write OGs used to file
@@ -375,7 +385,13 @@ class TreesForOrthogroups(object):
         iOgsForSpeciesTree = set(iOgsForSpeciesTree)                         
         for i in range(len(treeCommands_and_filenames)):
             if i in iOgsForSpeciesTree: continue
-            commands_and_filenames.append([alignCommands_and_filenames[i], treeCommands_and_filenames[i]])
+            if qTrim:
+                commands_and_filenames.append([alignCommands_and_filenames[i], 
+                                            (trim_fn, alignmentFilesToUse[i]),
+                                            treeCommands_and_filenames[i]])
+            else:
+                commands_and_filenames.append([alignCommands_and_filenames[i], 
+                                            treeCommands_and_filenames[i]])
         for i in range(len(treeCommands_and_filenames), len(alignCommands_and_filenames)):
             if i in iOgsForSpeciesTree: continue
             commands_and_filenames.append([alignCommands_and_filenames[i]])
