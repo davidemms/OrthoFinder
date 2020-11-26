@@ -1501,10 +1501,45 @@ class TreeNode(object):
                 n.children.sort(sort_by_content)
         return node2content
 
+    # def get_cached_content(self, store_attr=None,  _store=None):
+    #     """ 
+    #     .. versionadded: 2.2
+       
+    #     Returns a dictionary pointing to the preloaded content of each
+    #     internal node under this tree. Such a dictionary is intended
+    #     to work as a cache for operations that require many traversal
+    #     operations.
+
+    #     :param None store_attr: Specifies the node attribute that
+    #     should be cached (i.e. name, distance, etc.). When none, the
+    #     whole node instance is cached.
+
+    #     :param _store: (internal use)
+
+    #     """
+    #     if _store is None:
+    #         _store = {}
+            
+    #     for ch in self.children:
+    #         ch.get_cached_content(store_attr=store_attr, _store=_store)
+
+    #     if self.children:
+    #         val = set()
+    #         for ch in self.children:
+    #             val.update(_store[ch])
+    #         _store[self] = val
+    #     else:
+    #         if store_attr is None:
+    #             val = self
+    #         else:
+    #             val = getattr(self, store_attr)
+    #         _store[self] = set([val])
+    #     return _store
+
+    
+    # def get_cached_content_non_recursive(self, store_attr=None,  _store=None):
     def get_cached_content(self, store_attr=None,  _store=None):
         """ 
-        .. versionadded: 2.2
-       
         Returns a dictionary pointing to the preloaded content of each
         internal node under this tree. Such a dictionary is intended
         to work as a cache for operations that require many traversal
@@ -1519,22 +1554,21 @@ class TreeNode(object):
         """
         if _store is None:
             _store = {}
-            
-        for ch in self.children:
-            ch.get_cached_content(store_attr=store_attr, _store=_store)
 
-        if self.children:
-            val = set()
-            for ch in self.children:
-                val.update(_store[ch])
-            _store[self] = val
-        else:
-            if store_attr is None:
-                val = self
+        for n in self.traverse("postorder"):
+            if n.children:
+                val = set()
+                for ch in n.children:
+                    val.update(_store[ch])
+                _store[n] = val
             else:
-                val = getattr(self, store_attr)
-            _store[self] = set([val])
+                if store_attr is None:
+                    val = n
+                else:
+                    val = getattr(n, store_attr)
+                _store[n] = set([val])
         return _store
+
        
     def robinson_foulds(self, t2, attr_t1="name", attr_t2="name"):
         """

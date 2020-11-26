@@ -76,6 +76,7 @@ while not ok:
         ok = True
     except OverflowError:
         max_int = int(max_int/10)
+sys.setrecursionlimit(10**6)
     
 fastaExtensions = {"fa", "faa", "fasta", "fas", "pep"}
 # uncomment to get round problem with python multiprocessing library that can set all cpu affinities to a single cpu

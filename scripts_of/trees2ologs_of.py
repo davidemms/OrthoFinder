@@ -1119,7 +1119,7 @@ def DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, GeneToSpeci
             else:
                 args_queue = mp.Queue()
                 for iog in range(nOgs):
-                    args_queue.put((iog, ))
+                    args_queue.put(iog)
                 nOrthologues_SpPair = RunOrthologsParallel(ta, len(ogSet.speciesToUse), args_queue, n_parallel)
     except IOError as e:
         if str(e).startswith("[Errno 24] Too many open files"):
@@ -1203,8 +1203,9 @@ class TreeAnalyser(object):
             return nOrthologues_SpPair, olog_lines, olog_sus_lines
         except:
             print("WARNING: Unknown error analysing tree %s" % og_name)
-            raise
-            # return util.nOrtho_sp(n_species), olog_lines, olog_sus_lines
+            olog_lines = [["" for j in xrange(self.nspecies)] for i in xrange(self.nspecies)]
+            olog_sus_lines = ["" for i in xrange(self.nspecies)]
+            return util.nOrtho_sp(n_species), olog_lines, olog_sus_lines
 
 def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue, n_ologs_cache=100):
     try:
@@ -1214,8 +1215,8 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
         olog_sus_lines_tot = ["" for i in range(nspecies)]
         while True:
             try:
-                args = args_queue.get(True, 1.)
-                results = tree_analyser.AnalyseTree(*args)
+                iog = args_queue.get(True, 1.)
+                results = tree_analyser.AnalyseTree(iog)
                 if results is None:
                     continue
                 nOrtho, olog_lines, olog_sus_lines = results
@@ -1241,7 +1242,7 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
                 results_queue.put(nOrthologues_SpPair)
                 return
             except:
-                print("Warning: unknown error")
+                print("WARNING: Unknown error, current orthogroups OG%07d" % iog)
                 for i in range(nspecies):
                     for j in range(i+1, nspecies):
                         # j is the largest (and intentionally changing quickest, which I think is best for the lock)
@@ -1252,7 +1253,7 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
                 return
     except Exception as e:
         print(e)
-        print("Unknown ERROR")
+        print("WARNING: Unexpected error, current orthogroups OG%07d" % iog)
         return util.nOrtho_sp(nspecies) 
     return
 
