@@ -39,7 +39,6 @@ import multiprocessing as mp
 from collections import namedtuple
 
 nThreadsDefault = mp.cpu_count()
-nAlgDefault = min(16, int(nThreadsDefault/4))
 
 from . import tree, parallel_task_manager
 

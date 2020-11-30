@@ -300,15 +300,13 @@ Trees can be inferred using  multiple sequence alignments (MSA) by using the opt
 OrthoFinder performs light trimming of the MSA to prevent overly long runtimes & RAM usage caused by very long, gappy alignemnts. A column is trimmed from the alignment if is it greater than 90% gaps and provided two conditions are met. 1. The length of the trimmed alignment cannot go below 500 AA 2. No more than 25% of non-gap characters can be removed from the alignment. If either of these conditions are not met then the threshold for the percentage of gaps in removed columns is progressively increased beyond 90% until both conditions are met. The trimming can be turned off using the option "-z".
 
 ### Parallelising OrthoFinder Algorithm 
-There are two separate options for controlling the parallelisation of OrthoFinder. The '-t' option should always be used, typically with as many cores as are available. This determines how many highly-parallelisable tasks such as DIAMOND/BLAST searches, MSAs etc are run in parallel. 
-
-In addition, most of the internal steps of the OrthoFinder algorithm have been parallelised but by default run sequentially. Running these steps in parallel can be requested using the '-a' option. However, some of the steps can lead to large RAM requirements, potentially more than the computer has. This is the reason for this parallelisation being under separate control. These steps typically only make up a small part of the OrthoFinder runtime and so there is a lot less to gain from running these in parallel. If unsure, don't use this option.
+There are two separate options for controlling the parallelisation of OrthoFinder.
 
 - **'-t number_of_threads'**:
-This option should always be used. It makes the BLAST searches, the tree inference and gene-tree reconciliation run in parallel. These are all highly-parallelisable and the BLAST searches in particular are by far the most time-consuming task. You should use as many threads as there are cores available.
+This option should always be used. It specifies the number of parallel processes for the BLAST/DIAMOND searches and tree inference steps. These steps represent most of the runtime and are highly-parallelisable and so you should typically use as many threads as there are cores available on your computer. This is the value it will default to if not specified by the user.
 
 - **'-a number_of_orthofinder_threads'**
-The remainder of the algorithm, beyond these highly-parallelisable tasks, is relatively fast and efficient and so this option has less overall effect. It is most useful when running OrthoFinder using pre-calculated BLAST results since the time savings will be more noticeable in this case. Using this option will also increase the RAM requirements (see manual for more details).
+In addition to the above, all of the critical internal steps of the OrthoFinder algorithm have been parallelised. The number of threads for these steps is controlled using the '-a' option. These steps typically have larger RAM requirements and so using a value 4-8x smaller than that used for the '-t' option is usually a good choice. Since these steps are a small component of the overall runtime it is not important to set '-a' as high as possible in order to get good performance. Not running out of RAM is a more important consideration. If the '-a' parameter is not set it will default to 16 or one eighth of the '-t' parameter, whichever is smaller.
 
 ### Running BLAST Searches Separately (-op option)
 The '-op' option will prepare the files in the format required by OrthoFinder and print the set of BLAST commands that need to be run. 

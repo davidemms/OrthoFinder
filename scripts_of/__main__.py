@@ -840,7 +840,7 @@ def PrintHelp(prog_caller):
       
     print("OPTIONS:")
     print(" -t <int>        Number of parallel sequence search threads [Default = %d]" % util.nThreadsDefault)
-    print(" -a <int>        Number of parallel analysis threads [Default = %d]" % util.nAlgDefault)
+    print(" -a <int>        Number of parallel analysis threads")
     print(" -d              Input is DNA sequences")
     print(" -M <txt>        Method for gene tree inference. Options 'dendroblast' & 'msa'")
     print("                 [Default = dendroblast]")
@@ -921,7 +921,7 @@ def GetDirectoryArgument(arg, args):
 class Options(object):#
     def __init__(self):
         self.nBlast = util.nThreadsDefault
-        self.nProcessAlg = util.nAlgDefault
+        self.nProcessAlg = None
         self.qStartFromBlast = False  # remove, just store BLAST to do
         self.qStartFromFasta = False  # local to argument checking
         self.qStartFromGroups = False
@@ -1196,6 +1196,10 @@ def ProcessArgs(prog_caller, args):
             print("Unrecognised argument: %s\n" % arg)
             util.Fail()    
     
+    # set a default for number of algorithm threads
+    if options.nProcessAlg is None:
+        options.nProcessAlg = min(16, max(1, int(options.nBlast/8)))
+
     # check argument combinations       
     if not (options.qStartFromFasta or options.qStartFromBlast or options.qStartFromGroups or options.qStartFromTrees):
         print("ERROR: Please specify the input directory for OrthoFinder using one of the options: '-f', '-b', '-fg' or '-ft'.")
