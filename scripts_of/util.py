@@ -38,8 +38,8 @@ except ImportError:
 import multiprocessing as mp
 from collections import namedtuple
 
-nAlgDefault = 1
 nThreadsDefault = mp.cpu_count()
+nAlgDefault = min(16, int(nThreadsDefault/4))
 
 from . import tree, parallel_task_manager
 

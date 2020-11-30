@@ -24,7 +24,6 @@
 #
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.comhor: david
-
 import os
 import sys
 import csv
@@ -262,6 +261,7 @@ def Worker_OGMatrices_ReadBLASTAndUpdateDistances(cmd_queue, worker_status_queue
                         for gi, i in og[iiSp]:
                             for gj, j in og[jjSp]:
                                     m[i][j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) * maxes_inv[gi.iSeq]
+                del Bs, B, mins, maxes, m0, m1, maxes_inv, m    # significantly reduces RAM usage
                 worker_status_queue.put(("finish", iWorker, iiSp))
             except queue.Empty:
                 worker_status_queue.put(("empty", iWorker, None))
@@ -454,6 +454,7 @@ class DendroBLASTTrees(object):
         util.PrintUnderline("Calculating gene distances")
         ogs, ogMatrices_partial = self.GetOGMatrices_FullParallel()
         ogMatrices = self.CompleteAndWriteOGMatrices(ogs, ogMatrices_partial)
+        del ogMatrices_partial
         util.PrintTime("Done")
         cmds_trees = self.PrepareGeneTreeCommand()
         qLessThanFourSpecies = len(self.ogSet.seqsInfo.speciesToUse) < 4
@@ -470,6 +471,7 @@ class DendroBLASTTrees(object):
                 D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
                 cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs)
                 cmds_trees = [[cmd_spTree]] + cmds_trees
+        del ogMatrices
         util.PrintUnderline("Inferring gene and species trees" if qSpeciesTree else "Inferring gene trees")
         parallel_task_manager.RunParallelOrderedCommandLists(self.nProcess_std, cmds_trees)
         if qSTAG:
@@ -491,7 +493,9 @@ class DendroBLASTTrees(object):
         else:
             ogs, ogMatrices_partial = self.GetOGMatrices_FullParallel()
             ogMatrices = self.CompleteOGMatrices(ogs, ogMatrices_partial)
+            del ogMatrices_partial
             D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
+            del ogMatrices
             cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs, True)
             parallel_task_manager.RunOrderedCommandList([cmd_spTree])
         spTreeUnrootedFN = files.FileHandler.GetSpeciesTreeUnrootedFN(True) 

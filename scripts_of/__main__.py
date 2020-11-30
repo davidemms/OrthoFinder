@@ -468,10 +468,13 @@ def WriteGraph_perSpecies(args):
             m1 = matrices.LoadMatrix("connect", iSpec, jSpec, d_pickle)
             m2tr = numeric.transpose(matrices.LoadMatrix("connect", jSpec, iSpec, d_pickle))
             connect2.append(m1 + m2tr)
+            del m1, m2tr
         B = matrices.LoadMatrixArray("B", seqsInfo, iSpec, d_pickle)
         B_connect = matrices.MatricesAnd_s(connect2, B)
+        del B, connect2
         
         W = [b.sorted_indices().tolil() for b in B_connect]
+        del B_connect
         for query in range(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]):
             offset = seqsInfo.seqStartingIndices[iSpec]
             graphFile.write("%d    " % (offset + query))
@@ -533,6 +536,7 @@ class WaterfallMethod:
         BHix = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies, d_pickle)
         BHxi = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies, d_pickle, row=False)
         RBHi = matrices.MatricesAndTr_s(BHix, BHxi)   # twice as much work as before (only did upper triangular before)
+        del BHix, BHxi
         B = matrices.LoadMatrixArray("B", seqsInfo, iSpecies, d_pickle)
         connect = WaterfallMethod.ConnectAllBetterThanAnOrtholog_s(RBHi, B, seqsInfo, iSpecies) 
         matrices.DumpMatrixArray("connect", connect, iSpecies, d_pickle)
