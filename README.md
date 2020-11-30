@@ -295,9 +295,9 @@ The previous two options can be combined, comment out the species to be removed 
 - `orthofinder -b previous_orthofinder_directory -f new_fasta_directory`
 
 ### Inferring Multiple Sequence Alignment (MSA) Gene Trees
-This functionality has been incorporated into the main 'orthofinder' program, replacing the old 'trees_from_MSA' utility. Trees can be inferred using MSAs by using the option "-M msa". If orthogroups have already been inferred then MSA trees can be inferred directly from them (rather than from inferring the orthogroups again from the start) by additionally using the option "-fg" option: "-M msa -fg *previous_results_directory*" instead of "-M msa -f *input_proteomes_directory*".
+Trees can be inferred using  multiple sequence alignments (MSA) by using the option "-M msa". By default MAFFT is used to generate the MSAs and FastTree to generate the gene trees. Alternatively, any other program can be used in place of these. Many popular programs have already been configured by having an entry in the config.json file in the orthofinder directory. All options currently available can be seen by using the option "-h" to see the help file. The config.json file is user-editable to allow for any other desired program to be added. MAFFT, FastTree, or whatever programs are used instead need to be in the system path.
 
-By default MAFFT is used to generate the multiple sequence alignments and FastTree to generate the gene trees. Alternatively, any other program can be used in place of these. Many popular programs have already been configured by having an entry in the config.json file in the orthofinder directory. All options currently available can be seen by using the option "-h" to see the help file. The config.json file is user-editable to allow for any other desired program to be added. MAFFT, FastTree, or whatever programs are used instead need to be in the system path.
+OrthoFinder performs light trimming of the MSA to prevent overly long runtimes & RAM usage caused by very long, gappy alignemnts. A column is trimmed from the alignment if is it greater than 90% gaps and provided two conditions are met. 1. The length of the trimmed alignment cannot go below 500 AA 2. No more than 25% of non-gap characters can be removed from the alignment. If either of these conditions are not met then the threshold for the percentage of gaps in removed columns is progressively increased beyond 90% until both conditions are met. The trimming can be turned off using the option "-z".
 
 ### Parallelising OrthoFinder Algorithm 
 There are two separate options for controlling the parallelisation of OrthoFinder. The '-t' option should always be used, typically with as many cores as are available. This determines how many highly-parallelisable tasks such as DIAMOND/BLAST searches, MSAs etc are run in parallel. 
@@ -400,6 +400,7 @@ In most datasets there will be thousands of genes present in all species and so 
 **-1**: Only perform one-way sequence search  
 **-X**: Don't add species names to sequence IDs in output files  
 **-y**: Split paralogous clades below root of a HOG into separate HOGs  
+**-z**: Don't trim MSAs (columns>=90% gap, min. alignment length 500)  
 **-n** \<txt\>: Name to append to the results directory  
 **-o** \<txt\>: Non-default results directory  
 **-h**: Print this help text  
