@@ -10,7 +10,7 @@ import numpy as np
 class MSA(object):
     def __init__(self, msa_dict):
         self.seqs = msa_dict
-        self.length = len(list(msa_dict.values())[0])
+        self.length = len(list(msa_dict.values())[0]) if len(msa_dict) > 0 else 0
         self.n = len(msa_dict)
 
 
@@ -42,7 +42,6 @@ def main(infn, outfn, f, n_min, c):
     # vectorised is far quicker
     names = list(msa.seqs.keys())
     M = np.array([list(seq) for seq in msa.seqs.values()])
-    # M = np.array([list(msa.seqs[name]) for name in names])
     maxGap = (1.-f)*msa.n
     gap_counts = (M == "-").sum(axis=0)
     aa_counts = msa.n - gap_counts

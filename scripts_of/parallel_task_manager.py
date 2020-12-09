@@ -43,6 +43,7 @@ except ImportError:
 #         subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f)
 
 
+
 if getattr(sys, 'frozen', False):
     __location__ = os.path.split(sys.executable)[0]
 else:
@@ -61,6 +62,15 @@ if getattr(sys, 'frozen', False):
         my_env['DYLD_LIBRARY_PATH'] = my_env['DYLD_LIBRARY_PATH_ORIG']  
     else:
         my_env['DYLD_LIBRARY_PATH'] = ''    
+
+
+def print_traceback(e):
+    PY2 = sys.version_info <= (3,)
+    if PY2:
+        traceback.print_exc()
+    else:
+        traceback.print_tb(e.__traceback__)
+
 
 def stderr_exempt(stderr):
     ok_line_starts = {"diamond v", "Licensed under the GNU GPL", "Check http://github.com/"}
@@ -165,7 +175,8 @@ def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qPrintOnError=False, qPrintS
             RunCommand(command, qPrintOnError=qPrintOnError, qPrintStderr=qPrintStderr)
         except queue.Empty:
             return   
-            
+
+q_print_first_traceback_0 = False
 def Worker_RunCommands_And_Move(cmd_and_filename_queue, nProcesses, nToDo, qListOfLists):
     """
     Continuously takes commands that need to be run from the cmd_and_filename_queue until the queue is empty. If required, moves 
@@ -207,9 +218,12 @@ def Worker_RunCommands_And_Move(cmd_and_filename_queue, nProcesses, nToDo, qList
         except Exception as e:
             print("WARNING: ")
             print(str(e))
+            global q_print_first_traceback_0
+            if not q_print_first_traceback_0:
+                print_traceback(e)
+                q_print_first_traceback_0 = True
         except:
             print("WARNING: Unknown caught unknown exception")
-
 
                             
 def Worker_RunOrderedCommandList(cmd_queue, nProcesses, nToDo):
@@ -236,6 +250,7 @@ def RunParallelOrderedCommandLists(nProcesses, commands):
     ptm = ParallelTaskManager_singleton()
     ptm.RunParallel(commands, True, nProcesses)     
        
+q_print_first_traceback_1 = False
 def Worker_RunMethod(Function, args_queue):
     while True:
         try:
@@ -243,9 +258,12 @@ def Worker_RunMethod(Function, args_queue):
             Function(*args)
         except queue.Empty:
             return 
-        except:
+        except Exception as e:
             print("Error in function: " + str(Function))
-            traceback.print_tb()
+            global q_print_first_traceback_1
+            if not q_print_first_traceback_1:
+                print_traceback(e)
+                q_print_first_traceback_1 = True
             return
 
 def RunMethodParallel(Function, args_queue, nProcesses):

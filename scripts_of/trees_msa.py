@@ -241,6 +241,10 @@ def CreateConcatenatedAlignment(ogsToUse_ids, ogs, alignment_filename_function, 
     maxGap = (1.-fMaxGap*fSingleCopy)*len(allSpecies)
     # vectorise this as the for-loop method took too long (45mins on 3M length alignment vs 1.5s)
     # The write method doesn't require further optimisation. Took 0.15s on the same alignment
+    if len(concatentaedAlignments) == 0 or len(list(concatentaedAlignments.values())[0]) == 0:
+        print("All MSAs for the concatenated multiple sequence alignment were empty.")
+        print("Please correct the error and re-run.")
+        util.Fail()
     names = list(concatentaedAlignments.keys())
     M = np.array([list(concatentaedAlignments[name]) for name in names])
     gap_counts = sum(M == "-")
