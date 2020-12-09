@@ -1242,7 +1242,7 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
                 results_queue.put(nOrthologues_SpPair)
                 return
             except:
-                print("WARNING: Unknown error, current orthogroups OG%07d" % iog)
+                print("WARNING: Unknown error, current orthogroup OG%07d" % iog)
                 for i in range(nspecies):
                     for j in range(i+1, nspecies):
                         # j is the largest (and intentionally changing quickest, which I think is best for the lock)
@@ -1253,7 +1253,7 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
                 return
     except Exception as e:
         print(e)
-        print("WARNING: Unexpected error, current orthogroups OG%07d" % iog)
+        print("WARNING: Unexpected error")
         return util.nOrtho_sp(nspecies) 
     return
 
