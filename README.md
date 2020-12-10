@@ -26,7 +26,7 @@ For more details see the OrthoFinder papers below.
 
 You can see an overview talk for OrthoFinder from the 2020 Virtual symposium on Phylogenomics and Comparative Genomics here:
 
-[![OrthoFinder: Building Fully Phylogenetic Orthology Inference](https://i.ytimg.com/vi/L6eXJAE5J7g/hqdefault.jpg?sqp=-oaymwEZCOADEI4CSFXyq4qpAwsIARUAAIhCGAFwAQ==&rs=AOn4CLDP6WUV4ZO3t7uKm8SlVyO5S5KS0Q)](https://www.youtube.com/watch?v=L6eXJAE5J7g "OrthoFinder: Building Fully Phylogenetic Orthology Inference")
+[![OrthoFinder: Building Fully Phylogenetic Orthology Inference](assets/youtube_title_slide.jpg)](https://www.youtube.com/watch?v=L6eXJAE5J7g "OrthoFinder: Building Fully Phylogenetic Orthology Inference")
 
 Thanks to Rosa Fernández & Jesus Lozano-Fernandez for organising this excellent conference.
 
