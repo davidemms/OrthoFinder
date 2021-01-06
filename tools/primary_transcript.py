@@ -43,7 +43,7 @@ def ScanTags_with_fn(fn, gene_name_fn):
     # print(sorted(genes)[:10])
 
 def GetGeneName(acc_line):
-    tokens = [t.split(":")[1] for t in acc_line.rstrip().split() if "gene:" in t]
+    tokens = [(t.split("=") if "=" in t else t.split(":"))[1] for t in acc_line.rstrip().split() if ("gene:" in t or "gene=" in t)]
     if len(tokens) != 1: return None
     return tokens[0]
 
