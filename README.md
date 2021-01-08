@@ -46,7 +46,9 @@ You can install OrthoFinder using Bioconda or download it directly from GitHub. 
 
 4. Test you can run OrthoFinder: `python OrthoFinder_source/orthofinder.py -h` or `./OrthoFinder/orthofinder -h`. OrthoFinder should print its 'help' text. 
 
-5. If you want to move the orthofinder executable to another location then you must also place the accompanying config.json file and bin/ directory in the same directory as the orthofinder executable.
+5. That's it! You can now run OrthoFinder on a directory of protein sequence fasta files: e.g. `./OrthoFinder/orthofinder -f /OrthoFinder/ExampleData/`
+
+If you want to move the orthofinder executable to another location then you must also place the accompanying config.json file and bin/ directory in the same directory as the orthofinder executable.
 
 OrthoFinder is written in python, but the bundled version does not require python to be installed on your computer. Both versions contain the programs OrthoFinder needs in order to run (in bin/), it will use these copies in preference to any of the same programs in your system path. You can delete the individual executables if you would prefer it not to do this. 
 
