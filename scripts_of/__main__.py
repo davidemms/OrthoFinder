@@ -582,24 +582,24 @@ class WaterfallMethod:
                 raise
 
     @staticmethod
-    def ConnectCognates(seqsInfo, iSpecies, d_pickle): 
+    def ConnectCognates(seqsInfo, iSpecies, d_pickle, gather_version): 
         # calculate RBH for species i
         BHix = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies, d_pickle)
         BHxi = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies, d_pickle, row=False)
         RBHi = matrices.MatricesAndTr_s(BHix, BHxi)   # twice as much work as before (only did upper triangular before)
         del BHix, BHxi
         B = matrices.LoadMatrixArray("B", seqsInfo, iSpecies, d_pickle)
-        connect = WaterfallMethod.ConnectAllBetterThanAnOrtholog_s(RBHi, B, seqsInfo, iSpecies) 
+        connect = WaterfallMethod.ConnectAllBetterThanAnOrtholog_s(RBHi, B, seqsInfo, iSpecies, gather_version) 
         matrices.DumpMatrixArray("connect", connect, iSpecies, d_pickle)
             
     @staticmethod 
-    def Worker_ConnectCognates(cmd_queue, d_pickle):
+    def Worker_ConnectCognates(cmd_queue, d_pickle, gather_version):
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
             while True:
                 try:
                     args = cmd_queue.get(True, 1)
-                    WaterfallMethod.ConnectCognates(*args, d_pickle=d_pickle)
+                    WaterfallMethod.ConnectCognates(*args, d_pickle=d_pickle, gather_version=gather_version)
                 except queue.Empty:
                     return  
                                    
@@ -701,18 +701,19 @@ class WaterfallMethod:
                 rs[-1].append(r)
                 n_pairs[-1].append(len(ratios))
                 # calculate the n vectors and take the min
-        print("\nSpecies %d" % iSpec)
-        print("RBH pair:")
-        print([x for x in range(len(RBH)) if x != iSpec])
+        q_debug_gather = False
+        if q_debug_gather: print("\nSpecies %d" % iSpec)
+        if q_debug_gather: print("RBH pair:")
+        if q_debug_gather: print([x for x in range(len(RBH)) if x != iSpec])
         C = np.matrix(rs)   # Conversion matrix: 
         # To convert from a hit in species j to one in species i multiply by Cij
-        print(C)
+        if q_debug_gather: print(C)
         # To convert from a hit in species j to the furthest hit, need to take 
         # the column-wise minimum
         C = np.amin(C, axis=0)    # conversion from a RBH to the estmate of what the most distant RBH should be
-        print(C)
-        print("Number of data points:")
-        print(np.matrix(n_pairs))
+        if q_debug_gather: print(C)
+        if q_debug_gather: print("Number of data points:")
+        if q_debug_gather: print(np.matrix(n_pairs))
         # So, if X has an RBH to a gene in species A with score a
         # And if r = 0.63 
         # Then 95% of the time the RBH in species B would be 0.63a
@@ -767,8 +768,11 @@ class WaterfallMethod:
         return connect
     
     @staticmethod
-    def ConnectAllBetterThanAnOrtholog_s(RBH, B, seqsInfo, iSpec):        
-        mostDistant = WaterfallMethod.GetMostDistant_s_estimate_from_relative_rbhs(RBH, B, seqsInfo, iSpec) 
+    def ConnectAllBetterThanAnOrtholog_s(RBH, B, seqsInfo, iSpec, gather_version):     
+        if gather_version < (3,0):   
+            mostDistant = WaterfallMethod.GetMostDistant_s(RBH, B, seqsInfo, iSpec) 
+        else:
+            mostDistant = WaterfallMethod.GetMostDistant_s_estimate_from_relative_rbhs(RBH, B, seqsInfo, iSpec) 
         connect = WaterfallMethod.ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec)
         return connect
 
@@ -1013,6 +1017,7 @@ def PrintHelp(prog_caller):
 #    print(" -R <txt>        Tree reconciliation method [Default = of_recon]")
 #    print("                 Options: of_recon, dlcpar, dlcpar_convergedsearch")
     print(" -s <file>       User-specified rooted species tree")
+    # print(" -c1             Use OrthoFinder version 1 gathering algorithm")
     print(" -I <int>        MCL inflation parameter [Default = %0.1f]" % g_mclInflation)
     print(" -x <file>       Info for outputting results in OrthoXML format")
     print(" -p <dir>        Write the temporary pickle files to <dir>")
@@ -1094,6 +1099,7 @@ class Options(object):#
         self.qMSATrees = False
         self.qAddSpeciesToIDs = True
         self.qTrim = True
+        self.gathering_version = (3,0)    # < 3 is the original method
         self.search_program = "diamond"
         self.msa_program = "mafft"
         self.tree_program = "fasttree"
@@ -1205,6 +1211,8 @@ def ProcessArgs(prog_caller, args):
             options.qSplitParaClades = True
         elif arg == "-z":
             options.qTrim = False
+        elif arg == "-c1":
+            options.gathering_version = (1,0)
         elif arg == "-I" or arg == "--inflation":
             if len(args) == 0:
                 print("Missing option for command line argument %s\n" % arg)
@@ -1516,7 +1524,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo):
     cmd_queue = mp.Queue()
     for iSpecies in range(seqsInfo.nSpecies):
         cmd_queue.put((seqsInfo, iSpecies))
-    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, files.FileHandler.GetPickleDir())) for i_ in range(options.nProcessAlg)]
+    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, files.FileHandler.GetPickleDir(), options.gathering_version)) for i_ in range(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
     parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
