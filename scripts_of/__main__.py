@@ -706,7 +706,6 @@ def CheckDependencies(options, prog_caller, dirForTempFiles):
             util.Fail()
 
 
-
 # 0
 def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
     """Checks for:

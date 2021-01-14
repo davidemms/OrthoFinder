@@ -23,6 +23,7 @@ from . import util, files, blast_file_processor, matrices, mcl, orthologues, tre
 def WriteGraph_perSpecies(args):
     seqsInfo, graphFN, iSpec, d_pickle = args            
     # calculate the 2-way connections for one query species
+    species_similarities = matrices.LoadMatrix("species_similarities", iSpec, 0, d_pickle)
     with open(graphFN + "_%d" % iSpec, 'w') as graphFile:
         connect2 = []
         for jSpec in range(seqsInfo.nSpecies):
@@ -32,6 +33,9 @@ def WriteGraph_perSpecies(args):
             del m1, m2tr
         B = matrices.LoadMatrixArray("B", seqsInfo, iSpec, d_pickle)
         B_connect = matrices.MatricesAnd_s(connect2, B)
+        # normalise the scores with the mean species-pair similarities
+        n = [1.0/s for s in species_similarities]
+        B_connect = [BB.multiply(nn) for BB,nn in zip(B_connect, n)]
         del B, connect2
         
         W = [b.sorted_indices().tolil() for b in B_connect]
@@ -166,8 +170,10 @@ class WaterfallMethod:
         Estimate an approximation proportional to 1/(substitutions per site), which is itself a proxy for evolutionary distance
         Args:
             Bij - lil matrix of the bit-scores for hits between iSpecies & jSpecies 
+            d0 -
+            lj - 
         Returns:
-            Dij - 1/(the estimated distance measure) - with sparse matrixes it is easier to use similarity scores rather than distance matrixes
+            Dij - 1/(the estimated distance measure) - since with sparse matrixes it is easier to use similarity scores rather than distance matrixes
         Implementation:
             From a branch-length (substitutions per site) between approximately 0 and 1.5 there is an approximately (negative) linear
             relationship between bitscore/genelength corresponding to a bitscore/length of about 0.6. Above this it approaches an
@@ -183,25 +189,57 @@ class WaterfallMethod:
         drep = np.repeat(d0, np.diff(Dij.indptr))
         Dij.data = 1./(drep - Dij.data)
         return Dij.tolil()  
+
+    @staticmethod
+    def EstimateSimilarity1(Bij, lj):
+        # Diagonal entries for Bii
+        q, h = Bij.get_shape()
+        rangeh = list(range(h))
+        Lj_recip = sparse.csr_matrix((1./lj, (rangeh, rangeh)))
+        Dij = Bij*Lj_recip
+        return Dij.tolil() 
             
     @staticmethod
-    def ProcessBlastHits(seqsInfo, blastDir_list, Lengths, iSpecies, d_pickle, qDoubleBlast, qNewMeasure=False):
+    def ProcessBlastHits(seqsInfo, blastDir_list, Lengths, iSpecies, d_pickle, qDoubleBlast, qNewMeasure=True):
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
             # process up to the best hits for each species
             Bi = []
             if qNewMeasure:
-                print("Calculating a similarity measure")
-                # Do self-self first so can use to calculate the distance measure
-                Bii = blast_file_processor.GetBLAST6Scores(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[iSpecies], qDoubleBlast=qDoubleBlast) 
-                D0 = WaterfallMethod.GetD0(Bii, Lengths[iSpecies])
-                for jSpecies in range(seqsInfo.nSpecies):
-                    if jSpecies == iSpecies:
-                        Bij = Bii.copy()
-                    else:
-                        Bij = blast_file_processor.GetBLAST6Scores(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)
-                    Dij = WaterfallMethod.EstimateReciprocalDistances(Bij, D0, Lengths[jSpecies])
-                    Bi.append(Dij)
+                version = "2a"
+                if version == "0":
+                    # The cover-trees version (which has a max distance of approx 2.0)
+                    # Do self-self first so can use to calculate the distance measure
+                    Bii = blast_file_processor.GetBLAST6Scores(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[iSpecies], qDoubleBlast=qDoubleBlast) 
+                    D0 = WaterfallMethod.GetD0(Bii, Lengths[iSpecies])
+                    for jSpecies in range(seqsInfo.nSpecies):
+                        if jSpecies == iSpecies:
+                            Bij = Bii.copy()
+                        else:
+                            Bij = blast_file_processor.GetBLAST6Scores(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)
+                        Dij = WaterfallMethod.EstimateReciprocalDistances(Bij, D0, Lengths[jSpecies])
+                        Bi.append(Dij)
+                elif version == "1":
+                    # B/L, where L is the length of the hit sequence
+                    Bii = blast_file_processor.GetBLAST6Scores(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[iSpecies], qDoubleBlast=qDoubleBlast) 
+                    for jSpecies in range(seqsInfo.nSpecies):
+                        if jSpecies == iSpecies:
+                            Bij = Bii.copy()
+                        else:
+                            Bij = blast_file_processor.GetBLAST6Scores(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)
+                        Dij = WaterfallMethod.EstimateSimilarity1(Bij, Lengths[jSpecies])
+                        Bi.append(Dij)
+                elif version == "2a":
+                    # B/l, where l is the length of the alignment
+                    Bii = blast_file_processor.GetBLAST6Scores_by_length(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[iSpecies], qDoubleBlast=qDoubleBlast) 
+                    for jSpecies in range(seqsInfo.nSpecies):
+                        if jSpecies == iSpecies:
+                            Bij = Bii.copy()
+                        else:
+                            Bij = blast_file_processor.GetBLAST6Scores_by_length(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)
+                        Bi.append(Bij)
+                else:
+                    raise NotImplementedError("Distance measure selected has not been implemented")
             else:
                 for jSpecies in range(seqsInfo.nSpecies):
                     Bij = blast_file_processor.GetBLAST6Scores(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)  
@@ -271,8 +309,9 @@ class WaterfallMethod:
         RBHi = matrices.MatricesAndTr_s(BHix, BHxi)   # twice as much work as before (only did upper triangular before)
         del BHix, BHxi
         B = matrices.LoadMatrixArray("B", seqsInfo, iSpecies, d_pickle)
-        connect = WaterfallMethod.ConnectAllBetterThanAnOrtholog_s(RBHi, B, seqsInfo, iSpecies, gather_version) 
+        connect, species_similarities = WaterfallMethod.ConnectAllBetterThanAnOrtholog_s(RBHi, B, seqsInfo, iSpecies, gather_version) 
         matrices.DumpMatrixArray("connect", connect, iSpecies, d_pickle)
+        matrices.DumpMatrix("species_similarities", species_similarities, iSpecies, 0, d_pickle)
             
     @staticmethod 
     def Worker_ConnectCognates(cmd_queue, d_pickle, gather_version):
@@ -331,6 +370,10 @@ class WaterfallMethod:
             RBH - array of 0-1 RBH lil matrices
             B - array of corresponding lil score matrices (Similarity ~ 1/Distance)
             p - the percentile of times the estimate will include the most distant RBH 
+        Returns:
+            mostDistant - the cut-off for each sequence in this species
+            species_similarities - the mean species similarity scores (with the max 
+                                   value for its own hits - note, could be higher)
         Implementation:
 			Stage 1: conversion factors for rbh from iSpec to furthest rbh
             - Get the relative similarity scores for RBHs from iSpec to species j
@@ -349,6 +392,7 @@ class WaterfallMethod:
         # For each gene, what is the most distant RBH
         # For each RBH what factor would we apply to get the RBH
         # 1. Reduce to column vectors
+        q_debug_gather = False
         RBH = [rbh.tocsr() for rbh in RBH]
         B = [b.tocsr() for b in B]
         RBH_B = [(rbh.multiply(b)).tolil() for i, (rbh, b) in enumerate(zip(RBH, B)) if i!= iSpec]
@@ -356,7 +400,14 @@ class WaterfallMethod:
         nseqi = seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]
         # nsp-1 x nseqi
         Z = np.matrix([[rhb_b.data[i][0] if rhb_b.getrowview(i).nnz == 1 else 0. for i in range(nseqi)] for rhb_b in RBH_B])   # RBH if it exists else zero
+        # Get the mean similarity scores against each other species
+        species_similarities = Z.sum(1)/(Z!=0).sum(1).astype(float)
+        # this is a matrix, convert it to a list
+        species_similarities = species_similarities.flatten().tolist()[0]
+        # add an entry for this species self-self hits
+        species_similarities = species_similarities[:iSpec] + [max(species_similarities)] + species_similarities[iSpec:]
         # for each pair of these species we want the entires that are both non zero
+        # print(species_similarities)
         nsp_m1 = Z.shape[0]
         Zr = 1./Z
         rs = []
@@ -383,7 +434,6 @@ class WaterfallMethod:
                 rs[-1].append(r)
                 n_pairs[-1].append(len(ratios))
                 # calculate the n vectors and take the min
-        q_debug_gather = False
         if q_debug_gather: print("\nSpecies %d" % iSpec)
         if q_debug_gather: print("RBH pair:")
         if q_debug_gather: print([x for x in range(len(RBH)) if x != iSpec])
@@ -430,7 +480,7 @@ class WaterfallMethod:
         # anything that doesn't have an RBB, set to distance to the closest gene in another species. I.e. it will hit just that gene and all genes closer to it in the its own species
         I = mostDistant > 1e8
         mostDistant[I] = bestHit[I] + 1e-6   # to connect to one in its own species it must be closer than other species. We can deal with hits outside the species later 
-        return mostDistant
+        return mostDistant, species_similarities
 
     @staticmethod
     def ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec):
@@ -454,9 +504,9 @@ class WaterfallMethod:
         if gather_version < (3,0):   
             mostDistant = WaterfallMethod.GetMostDistant_s(RBH, B, seqsInfo, iSpec) 
         else:
-            mostDistant = WaterfallMethod.GetMostDistant_s_estimate_from_relative_rbhs(RBH, B, seqsInfo, iSpec) 
+            mostDistant, species_similarities = WaterfallMethod.GetMostDistant_s_estimate_from_relative_rbhs(RBH, B, seqsInfo, iSpec) 
         connect = WaterfallMethod.ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec)
-        return connect
+        return connect, species_similarities
 
 
 def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXML=None):
