@@ -40,12 +40,10 @@ try:
 except ImportError:
     import Queue as queue  
 
-PY2 = sys.version_info <= (3,)       
-csv_write_mode = 'wb' if PY2 else 'wt'
 
 from . import util
 from . import tree
-from . import mcl as MCL
+from . import mcl
 from . import stride
 from . import trees2ologs_dlcpar
 from . import trees2ologs_of
@@ -152,7 +150,7 @@ class OrthoGroupsSet(object):
                 return self.ogs_all
             else:
                 return self.ogs_all[:self.iOgs4]
-        ogs = MCL.GetPredictedOGs(files.FileHandler.GetClustersFN())     
+        ogs = mcl.GetPredictedOGs(files.FileHandler.GetClustersFN())     
         self.ogs_all = [[Seq(g) for g in og] for og in ogs]   
         self.iOgs4 = len(self.ogs_all) if len(self.ogs_all[-1]) >= 4 else next(i for i, og in enumerate(self.ogs_all) if len(og) < 4) 
         if qInclAll:
@@ -672,7 +670,7 @@ def PrintHelp():
     util.PrintCitation()       
             
 def WriteOrthologuesMatrix(fn, matrix, speciesToUse, speciesDict):
-    with open(fn, csv_write_mode) as outfile:
+    with open(fn, util.csv_write_mode) as outfile:
         writer = csv.writer(outfile, delimiter="\t")
         writer.writerow([""] + [speciesDict[str(index)] for index in speciesToUse])
         for ii, iSp in enumerate(speciesToUse):
@@ -698,7 +696,7 @@ def WriteOrthologuesStats(ogSet, nOrtho_sp):
     ogCount = defaultdict(int)
     ogCount_50 = defaultdict(int)
     if not os.path.exists(files.FileHandler.GetDuplicationsFN()): return
-    with open(files.FileHandler.GetDuplicationsFN(), 'rb' if PY2 else 'rt') as infile:
+    with open(files.FileHandler.GetDuplicationsFN(), util.csv_read_mode) as infile:
         reader = csv.reader(infile, delimiter="\t")
         next(reader)
         # for line in reader:
@@ -714,7 +712,7 @@ def WriteOrthologuesStats(ogSet, nOrtho_sp):
             if support >= 0.5:
                 nodeCount_50[node] += 1
                 ogCount_50[og] += 1
-    with open(d + "Duplications_per_Species_Tree_Node.tsv", csv_write_mode) as outfile:
+    with open(d + "Duplications_per_Species_Tree_Node.tsv", util.csv_write_mode) as outfile:
         writer = csv.writer(outfile, delimiter="\t")
         writer.writerow(["Species Tree Node", "Duplications (all)", "Duplications (50% support)"])
 #        max_node = max([int(s[1:]) for s in nodeCount.keys()])    # Get largest node number
@@ -728,7 +726,7 @@ def WriteOrthologuesStats(ogSet, nOrtho_sp):
         n.name = n.name + "_" + str(nodeCount_50[n.name])
     with open(out_tree_fn, 'w') as outfile:
         outfile.write(t.write(format=1)[:-1] + t.name + ";")
-    with open(d + "Duplications_per_Orthogroup.tsv", csv_write_mode) as outfile:
+    with open(d + "Duplications_per_Orthogroup.tsv", util.csv_write_mode) as outfile:
         writer = csv.writer(outfile, delimiter="\t")
         writer.writerow(["Orthogroup", "Duplications (all)", "Duplications (50% support)"])
         if len(ogCount) > 0:
