@@ -250,7 +250,7 @@ class WaterfallMethod:
                 os.remove(graphFN + "_%d" % iSp)
             # Cleanup
             pool.close()
-            matrices.DeleteMatrices("B", files.FileHandler.GetPickleDir()) 
+            # matrices.DeleteMatrices("B", files.FileHandler.GetPickleDir()) 
             matrices.DeleteMatrices("connect", files.FileHandler.GetPickleDir()) 
     
     @staticmethod
@@ -377,13 +377,124 @@ class WaterfallMethod:
     
     @staticmethod
     def ConnectAllBetterThanAnOrtholog_s(RBH, B, seqsInfo, iSpec, gathering_version):     
-        if gather_version < (3,0):   
+        if gathering_version < (3,0):   
             mostDistant = WaterfallMethod.GetMostDistant_s(RBH, B, seqsInfo, iSpec) 
         else:
             mostDistant = WaterfallMethod.GetMostDistant_s_estimate_from_relative_rbhs(RBH, B, seqsInfo, iSpec) 
         connect = WaterfallMethod.ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec)
         return connect
 
+
+"""
+Phase 2 - ConnectClusters
+-------------------------------------------------------------------------------
+"""
+
+def ConnectClusters(clusters, nSp):
+    """
+    Work out all the relationships between clusters & connect into OGs any that 
+    have been splintered
+    Args:
+        clusters - list of sets of strings
+
+    Implementation:
+    - Matrices available:
+        - B - transformed bit scores
+        - mostDistant - sequence-by-sequence cut-off used
+
+    Tasks should be:
+    1. Identify all relationships between orthogroups, ideally as a tree
+    2. Those that are phylogenetically limited and closely related to another cluster
+    should be joined to it and the later gene tree should be used to determine the
+    relationships.
+
+    Similarity measure between clusters: (Between group similarity)/(Within group similarity)
+    """
+    # Calculate cluster distances
+    # Go through each hit and assign it to the relevant column
+    # parallelize over hit matrices.
+    N = len(clusters)
+    S = sparse.csr_matrix((N, N))
+    d_pickle = files.FileHandler.GetPickleDir()
+    g_to_clust = order_cluster_data(clusters, nSp)
+    for iSpec in range(nSp):
+        for jSpec in range(nSp):
+            S += sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N)
+    # Now normalise the entries by the number of gene pairs between each orthogroup
+    # print(S.todense()[:20,:20])
+    # print(S.nonzero())
+    # print(S[136,136])
+    # print(S[1105,1105])
+    # print(S[136,1105])
+    # print(S[1105,136])
+
+    # join up, sort out
+
+
+def order_cluster_data(clusters, nSp):
+    """
+    Return the clusters sorted by species and the cluster lookup dict
+    Args:
+        clusters - list of lists of strings describing the genes in each cluster 
+    Returns:
+        C - clusters as list (clusters) of lists (species within clusters) of lists (genes from that species) of ints
+        Singletons - list of genes as (iSp, iSeq)
+        g_to_clust - dist from (iSp, iSeq) to iCluster
+    """
+    # C = []
+    # Singletons = []
+    g_to_clust = dict()
+    for iClus, clust in enumerate(clusters):
+        if len(clust) == 1:
+            break
+        # c = [[] for _ in nSp]
+        for g in clust:
+            iSp, iSeq = map(int, g.split("_"))
+            # c[iSp].append(iSeq)
+            g_to_clust[(iSp, iSeq)] = iClus
+        # C.append(c)
+    # Now process the singletons
+    # print(iClus, clust)
+    nMulti = iClus   # since we are one past the end
+    for iSingleton, clust in enumerate(clusters[nMulti:]):
+        # print(nMulti + iSingleton, clust)
+        iSp, iSeq = map(int,next(g for g in clust).split("_"))
+        # Singletons.append(map(int, g))
+        g_to_clust[(iSp, iSeq)] = nMulti + iSingleton
+    return g_to_clust
+
+
+def sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N):
+    """
+    Sum up all the hits between (or within) clusters in the matrix B_{iSpec, jSpec}
+    Args:
+        iSpec - iSpecies
+        jSpec - jSpecies
+        d_pickle - Pickle directory
+        g_to_clust - dict from a gene to its cluster
+        N - Number of clusters
+    Returns:
+        S - (nClust x nClust) sum of hits as a CSR sparse matrix 
+    """
+    # Iterate through the matrix and add the scores 
+    B = matrices.LoadMatrix("B", iSpec, jSpec, d_pickle)    # lil_matrix
+    iClusts = []
+    jClusts = []
+    Vals = []
+    for i, (Js, Vs) in enumerate(zip(B.rows, B.data)):
+        for j, v in zip(Js, Vs):
+            iClusts.append(g_to_clust[(iSpec, i)])
+            jClusts.append(g_to_clust[(jSpec, j)])
+            Vals.append(v)
+    S = sparse.coo_matrix((Vals, (iClusts, jClusts)), shape=(N,N))
+    return S.tocsr()
+
+    
+
+"""
+Orthogroups
+-------------------------------------------------------------------------------
+"""
 
 def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXML=None):
     # Run Algorithm, cluster and output cluster files with original accessions
@@ -427,7 +538,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     ogs = mcl.GetPredictedOGs(clustersFilename_pairs)
     
     # 5c. Connect clusters of limited phylogenetic extent
-
+    ConnectClusters(ogs, seqsInfo.nSpecies)
     
     resultsBaseFilename = files.FileHandler.GetOrthogroupResultsFNBase()
     idsDict = mcl.MCL.WriteOrthogroupFiles(ogs, [files.FileHandler.GetSequenceIDsFN()], resultsBaseFilename, clustersFilename_pairs)
