@@ -79,24 +79,25 @@ def IsNCBI(fn):
 
 def GetGeneName_NCBI(acc_line):
     acc_line = acc_line[1:]
-    if 'isoform' in acc_line:
-        # look for "isoform X[:d]+" or "isoform [:d]+"
-        acc_line = re.sub("isoform [0-9]+ ", "", acc_line)
-        acc_line = re.sub("isoform X[0-9]+ ", "", acc_line)
-        # This last step is nasty. These are the same gene:
-        # >XP_024356342.1 pyruvate decarboxylase 2-like isoform X1 [Physcomitrella patens]
-        # >XP_024356343.1 pyruvate decarboxylase 2-like isoform X1 [Physcomitrella patens]
-        # as the name is the same and they same 'isoform ...'
-        # Whereas these are not the same gene, even though the names are identical
-        # because they don't say isoform:
-        # >XP_024390255.1 40S ribosomal protein S12-like [Physcomitrella patens]
-        # >XP_024399722.1 40S ribosomal protein S12-like [Physcomitrella patens]
-        #
-        # To deal with that, we remove the ID (e.g. XP_024356342.1) if it says 'isoform'
-        # so that the lines are identical, but not when it doesn't say 'isoform'
-        # so that the lines are different. If I were writting the script from scratch
-        # for NCBI files I'd do it a different way, but this is a way to handle it so 
-        # that it works with the existing logic in the file.
+    original = acc_line
+    # look for "isoform X[:d]+" or "isoform [:d]+"
+    acc_line = re.sub("isoform [0-9]+ ", "", acc_line)
+    acc_line = re.sub("isoform X[0-9]+ ", "", acc_line)
+    # This last step is nasty. These are the same gene:
+    # >XP_024356342.1 pyruvate decarboxylase 2-like isoform X1 [Physcomitrella patens]
+    # >XP_024356343.1 pyruvate decarboxylase 2-like isoform X1 [Physcomitrella patens]
+    # as the name is the same and they same 'isoform ...'
+    # Whereas these are not the same gene, even though the names are identical
+    # because they don't say isoform:
+    # >XP_024390255.1 40S ribosomal protein S12-like [Physcomitrella patens]
+    # >XP_024399722.1 40S ribosomal protein S12-like [Physcomitrella patens]
+    #
+    # To deal with that, we remove the ID (e.g. XP_024356342.1) if it says 'isoform'
+    # so that the lines are identical, but not when it doesn't say 'isoform'
+    # so that the lines are different. If I were writting the script from scratch
+    # for NCBI files I'd do it a different way, but this is a way to handle it so 
+    # that it works with the existing logic in the file.
+    if original != acc_line:
         acc_line = acc_line.split(None, 1)[-1]
     return acc_line
 
