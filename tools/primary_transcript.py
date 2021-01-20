@@ -1,8 +1,26 @@
 import os
+import re
 import sys
 from collections import Counter, defaultdict
 
 # Use the 'all' version rather than ab initio
+
+def CheckFile(fn):
+    """
+    Checks for:
+    - Duplicated accession lines
+    """
+    accs = set()
+    with open(fn, 'r') as infile:
+        for l in infile:
+            if l.startswith(">"):
+                a = l.rstrip()[1:]
+                if a in accs:
+                    print("\nERROR: duplicated sequence accession:\n%s" % a)
+                    print("\nPlease correct this and then rerun the script.\n")
+                    return False
+                accs.add(a)
+    return True
 
 def ScanTags(fn):
     """
@@ -42,12 +60,47 @@ def ScanTags_with_fn(fn, gene_name_fn):
     # print(genes[0])
     # print(sorted(genes)[:10])
 
-def GetGeneName(acc_line):
-    tokens = [(t.split("=") if "=" in t else t.split(":"))[1] for t in acc_line.rstrip().split() if ("gene:" in t or "gene=" in t)]
+def GetGeneName_Ensembl(acc_line):
+    tokens = [(t.split("=") if "=" in t else t.split(":"))[1] for t in acc_line.rstrip().split() if ("gene:" in t or "gene=" in t or "locus:" in t or "locus=" in t)]
     if len(tokens) != 1: return None
     return tokens[0]
 
-def CreatePrimaryTranscriptsFile(fn, dout, gene_name_fn=GetGeneName):
+def IsNCBI(fn):
+    with open(fn, 'r') as infile:
+        for l in infile:
+            if l.startswith(">"):
+                l = l.rstrip()
+                if l.startswith(">NP_") and l.endswith("]"): return True
+                elif l.startswith(">XP_") and l.endswith("]"): return True
+                elif l.startswith(">YP_") and l.endswith("]"): return True
+                elif l.startswith(">WP_") and l.endswith("]"): return True
+                return False
+    return False
+
+def GetGeneName_NCBI(acc_line):
+    acc_line = acc_line[1:]
+    if 'isoform' in acc_line:
+        # look for "isoform X[:d]+" or "isoform [:d]+"
+        acc_line = re.sub("isoform [0-9]+ ", "", acc_line)
+        acc_line = re.sub("isoform X[0-9]+ ", "", acc_line)
+        # This last step is nasty. These are the same gene:
+        # >XP_024356342.1 pyruvate decarboxylase 2-like isoform X1 [Physcomitrella patens]
+        # >XP_024356343.1 pyruvate decarboxylase 2-like isoform X1 [Physcomitrella patens]
+        # as the name is the same and they same 'isoform ...'
+        # Whereas these are not the same gene, even though the names are identical
+        # because they don't say isoform:
+        # >XP_024390255.1 40S ribosomal protein S12-like [Physcomitrella patens]
+        # >XP_024399722.1 40S ribosomal protein S12-like [Physcomitrella patens]
+        #
+        # To deal with that, we remove the ID (e.g. XP_024356342.1) if it says 'isoform'
+        # so that the lines are identical, but not when it doesn't say 'isoform'
+        # so that the lines are different. If I were writting the script from scratch
+        # for NCBI files I'd do it a different way, but this is a way to handle it so 
+        # that it works with the existing logic in the file.
+        acc_line = acc_line.split(None, 1)[-1]
+    return acc_line
+
+def CreatePrimaryTranscriptsFile(fn, dout, gene_name_fn, q_use_original_accession_line):
     # Get genes and lengths
     max_gene_lens = defaultdict(int)
     with open(fn, 'r') as infile:
@@ -97,7 +150,10 @@ def CreatePrimaryTranscriptsFile(fn, dout, gene_name_fn=GetGeneName):
             gene = gene_name_fn(line)
             # transcripts not identifying the gene should be written
             if gene != None and iLine != acc_to_use[gene]: continue
-            acc_line_out = line + "\n" if gene == None else ">%s\n" % gene
+            if q_use_original_accession_line or gene == None:
+                acc_line_out = line + "\n"
+            else:
+                 acc_line_out = ">%s\n" % gene
             nGenesWriten += 1
             outfile.write(acc_line_out)
             while iLine < N:
@@ -125,12 +181,18 @@ def space(text):
 function_dict = {"last_dot":last_dot, "space":space}
 
 def main(args=None):
+    print("")
     if args is None:
         args = sys.argv[1:]
     fn = args[0]
+
+    if not CheckFile(fn):
+        return
+
     dout = os.path.dirname(os.path.abspath(fn)) + "/primary_transcripts/"
     if not os.path.exists(dout):
         os.mkdir(dout)
+
     if len(sys.argv) == 3:
         gene_name_function_name = function_dict[sys.argv[2]]
         ScanTags_with_fn(fn, gene_name_function_name)
@@ -139,8 +201,17 @@ def main(args=None):
         # ScanTags(fn)
         # ScanTags_NCBI(fn)
         # ScanTags_second_dot(fn)
-
-        CreatePrimaryTranscriptsFile(fn, dout)
+        if IsNCBI(fn):
+            print("Identified as NCBI file")
+            gene_name_function_name = GetGeneName_NCBI
+            q_use_original_accession_line = True
+        else:
+            # This is the default, unless we can determine that it is an NCBI
+            # file in which case it needs special processing
+            gene_name_function_name = GetGeneName_Ensembl
+            q_use_original_accession_line = False
+            print('Looking for "gene=" of "gene:" to identify isoforms of same gene')
+        CreatePrimaryTranscriptsFile(fn, dout, gene_name_function_name, q_use_original_accession_line)
 
 if __name__ == "__main__":
     args = sys.argv[1:]
