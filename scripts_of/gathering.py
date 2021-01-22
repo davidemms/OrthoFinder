@@ -410,25 +410,36 @@ def ConnectClusters(clusters, nSp):
 
     Similarity measure between clusters: (Between group similarity)/(Within group similarity)
     """
-    # Calculate cluster distances
-    # Go through each hit and assign it to the relevant column
-    # parallelize over hit matrices.
+    S = GetClusterSimilarities(clusters, nSp)
+    clusters = ConnectClusters_v1(S, clusters)
+    return clusters
+        
+def get_latest_location(clusts, i):
+    i_orig = i
+    while isinstance(clusts[i], int):
+        i = clusts[i]
+    if i != i_orig:
+        clusts[i_orig] = i # short-cut a potential series of links
+    return i
+
+def GetClusterSimilarities(clusters, nSp):
+    """
+    Create the similarity matrix between clusters - average score for pairs of 
+    sequences across the two clusters.
+    Args:
+        clusters - list of lists of strings describing the genes in each cluster 
+        nSp - number of species
+    Returns
+        S - lil sparse matrix of average similarity scores between the genes in 
+            each pair of clusters
+    """
     N = len(clusters)
-    sizes = list(map(len, clusters))
-    i_single = sizes.index(1)
-    print("i_single: %d" % i_single)
     S = sparse.csr_matrix((N, N))
     d_pickle = files.FileHandler.GetPickleDir()
     g_to_clust = order_cluster_data(clusters, nSp)
     for iSpec in range(nSp):
         for jSpec in range(nSp):
-            S += sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N) # CSR
-    # print(S.todense()[:20,:20])
-    # print(S.nonzero())
-    # print(S[136,136])
-    # print(S[1105,1105])
-    # print(S[136,1105])
-    # print(S[1105,136])
+            S += sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N, "B") # CSR
 
     # Now normalise the entries by the number of gene pairs between each orthogroup
     n = np.array([len(c) for c in clusters])
@@ -437,17 +448,28 @@ def ConnectClusters(clusters, nSp):
         ni = n[i]
         # only n*n-n pairs for self-self
         S.data[i] = [v/(ni*n[j]-ni*(i==j)) for j, v in zip(Js, Vs)]
-        
+    
+    return S
+
+def ConnectClusters_v1(S, clusters):
+    """
+    V1 - Connect clusters if they have a between score >= 0.5 of the within cluster
+    score or they are a singleton
+    Args:
+        S - lil matrix of similarity scores
+        clusters - list of sets of genes (strings)
+    Returns:
+        clusters - list of sets of genes z
+    """
     # What is the biggest ratio of scores between vs within
     # (note, I will look at this compared to the score for each of the individual 
     # clusters, either of these comparisons might indicate a connection should be made)
     # Since S is symmetrical, ony need to do this once and then look at Sij and Sji
     with np.errstate(divide='ignore'):
         within_m1 = 1./S.diagonal()   # 1/(within cluster similarity)
-    Sc = S.copy()
-    for i, (Js, Vs) in enumerate(zip(Sc.rows, Sc.data)):
+    for i, (Js, Vs) in enumerate(zip(S.rows, S.data)):
         # only n*n-n pairs for self-self
-        Sc.data[i] = [v*within_m1 for j, v in zip(Js, Vs)]
+        S.data[i] = [v*within_m1[i] for j, v in zip(Js, Vs)]
 
     # What are the largest non-diagonal entries
     # Hits (between clusters)
@@ -460,6 +482,9 @@ def ConnectClusters(clusters, nSp):
 
     # indices = list(range(len(H)))
 
+    sizes = list(map(len, clusters))
+    i_single = sizes.index(1)
+    print("i_single: %d" % i_single)
     top_hits = sorted(zip(H, IJs), reverse=True)
     n_print = 100
     for x, ij in top_hits:
@@ -515,16 +540,6 @@ def ConnectClusters(clusters, nSp):
     trees_after = np.array([len(c) for c in clusters if len(c) >= 4])
     print("%d clusters after, cost %d" % (len(trees_after), sum(trees_after*trees_after)))
     return clusters
-        
-def get_latest_location(clusts, i):
-    i_orig = i
-    while isinstance(clusts[i], int):
-        i = clusts[i]
-    if i != i_orig:
-        clusts[i_orig] = i # short-cut a potential series of links
-    return i
-
-
 
 def order_cluster_data(clusters, nSp):
     """
@@ -559,7 +574,7 @@ def order_cluster_data(clusters, nSp):
     return g_to_clust
 
 
-def sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N):
+def sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N, input_matrix_name):
     """
     Sum up all the hits between (or within) clusters in the matrix B_{iSpec, jSpec}
     Args:
@@ -572,7 +587,7 @@ def sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N):
         S - (nClust x nClust) sum of hits as a CSR sparse matrix 
     """
     # Iterate through the matrix and add the scores 
-    B = matrices.LoadMatrix("B", iSpec, jSpec, d_pickle)    # lil_matrix
+    B = matrices.LoadMatrix(input_matrix_name, iSpec, jSpec, d_pickle)    # lil_matrix
     iClusts = []
     jClusts = []
     Vals = []
