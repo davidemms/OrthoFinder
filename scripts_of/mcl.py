@@ -29,6 +29,7 @@ from . import parallel_task_manager
 
 import sys
 import csv
+import shutil
 from collections import defaultdict, Counter
 import xml.etree.ElementTree as ET              # Y
 from xml.etree.ElementTree import SubElement    # Y
@@ -117,6 +118,34 @@ def ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, newFilename):
                     output.write("$\n")
                 else:
                     output.write("\n")
+
+def RewriteMCLpairsFile(ogs, clustersFilename_pairs, stride=9):
+    print("Correct the MCL file header numbers")
+    fn_orig_version = clustersFilename_pairs + ".orig.txt"
+    shutil.copy(clustersFilename_pairs, fn_orig_version)
+    with open(fn_orig_version, 'r') as clusterFile, open(clustersFilename_pairs, "w") as output:
+        header = True
+        for line in clusterFile:
+            output.write(line)
+            if line.count("begin"):
+                break
+        # Now write OGs
+        for iog, og in enumerate(ogs):
+            og = list(og)
+            output.write("%d      " % iog)
+            i_gene = 0
+            while True:
+                output.write(" ".join(og[i_gene:i_gene + stride]))
+                i_gene += stride
+                if i_gene < len(og):
+                    output.write("\n      ")
+                else:
+                    break
+            output.write(" $\n")
+        output.write(")\n")
+
+
+
 
 """
 MCL

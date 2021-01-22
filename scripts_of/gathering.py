@@ -414,13 +414,15 @@ def ConnectClusters(clusters, nSp):
     # Go through each hit and assign it to the relevant column
     # parallelize over hit matrices.
     N = len(clusters)
+    sizes = list(map(len, clusters))
+    i_single = sizes.index(1)
+    print("i_single: %d" % i_single)
     S = sparse.csr_matrix((N, N))
     d_pickle = files.FileHandler.GetPickleDir()
     g_to_clust = order_cluster_data(clusters, nSp)
     for iSpec in range(nSp):
         for jSpec in range(nSp):
-            S += sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N)
-    # Now normalise the entries by the number of gene pairs between each orthogroup
+            S += sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N) # CSR
     # print(S.todense()[:20,:20])
     # print(S.nonzero())
     # print(S[136,136])
@@ -428,7 +430,100 @@ def ConnectClusters(clusters, nSp):
     # print(S[136,1105])
     # print(S[1105,136])
 
+    # Now normalise the entries by the number of gene pairs between each orthogroup
+    n = np.array([len(c) for c in clusters])
+    S = S.tolil()   # can optimise the choice for production
+    for i, (Js, Vs) in enumerate(zip(S.rows, S.data)):
+        ni = n[i]
+        # only n*n-n pairs for self-self
+        S.data[i] = [v/(ni*n[j]-ni*(i==j)) for j, v in zip(Js, Vs)]
+        
+    # What is the biggest ratio of scores between vs within
+    # (note, I will look at this compared to the score for each of the individual 
+    # clusters, either of these comparisons might indicate a connection should be made)
+    # Since S is symmetrical, ony need to do this once and then look at Sij and Sji
+    with np.errstate(divide='ignore'):
+        within_m1 = 1./S.diagonal()   # 1/(within cluster similarity)
+    Sc = S.copy()
+    for i, (Js, Vs) in enumerate(zip(Sc.rows, Sc.data)):
+        # only n*n-n pairs for self-self
+        Sc.data[i] = [v*within_m1 for j, v in zip(Js, Vs)]
+
+    # What are the largest non-diagonal entries
+    # Hits (between clusters)
+    H = []
+    IJs = []
+    # can be more efficient
+    for i, (Js, Vs) in enumerate(zip(S.rows, S.data)):
+        H.extend([v for j, v in zip(Js, Vs) if i != j])
+        IJs.extend([(i,j) for j in Js if i != j])
+
+    # indices = list(range(len(H)))
+
+    top_hits = sorted(zip(H, IJs), reverse=True)
+    n_print = 100
+    for x, ij in top_hits:
+        if ij[0] >= i_single or ij[1] >= i_single:
+            continue
+        print((x, ij))
+        n_print -= 1
+        if n_print == 0:
+            break
+
+    print("# Cut largest clusters down first so that we know what the computational cost currently is")
+
+    # What criteria could be used to determine the clusters should be joined?
+    # Joined in the OrthoFinder graph
+    # Singleton gene (especially since they can be ejected due to number of hits exceeding max requested) 
+    # It joins together the complete set of sequences that are hit by any of them
+    # It makes minimal difference to the cost of the trees (i.e. small are fine, after we've got the largest OGs down)
+    # If they both contain all species we don't want to join
+    # ... but where do we cut?
+    # If there is significant overlap between the best between hist and the worst within hits
+
     # join up, sort out
+    # Join all single genes
+    # Join all ...
+    
+    # Join all singletons
+
+    # Join all others if between score >= 0.5 * within score and not all species present in both
+    trees_before = np.array([len(c) for c in clusters if len(c) >= 4])
+    # join them in the smallest index, replace larger index with pointer to joined clusters
+    print("Put a better check in than looking to see if it's OG 0")
+    for x, (i,j) in top_hits:
+        if i < 5 or j < 5:
+            continue   # don't do this, it is dangerous if the OG 0 genes aren't in this dataset
+        if x < 0.5 and i < i_single and j < i_single:
+            continue
+        i_new = get_latest_location(clusters, i)
+        j_new = get_latest_location(clusters, j)
+        if i_new == j_new:
+            # these have already been joined
+            continue
+        i_low = min(i_new, j_new)
+        j_high = max(i_new, j_new)
+        print((i_low, j_high))
+        # print(clusters[i_low])
+        clusters[i_low].update(clusters[j_high])
+        # print(clusters[i_low])
+        clusters[j_high] = i_low
+
+    # remove the pointers to the combined trees
+    clusters = [c for c in clusters if not isinstance(c, int)]
+    print("%d clusters before, cost %d" % (len(trees_before), sum(trees_before*trees_before)))
+    trees_after = np.array([len(c) for c in clusters if len(c) >= 4])
+    print("%d clusters after, cost %d" % (len(trees_after), sum(trees_after*trees_after)))
+    return clusters
+        
+def get_latest_location(clusts, i):
+    i_orig = i
+    while isinstance(clusts[i], int):
+        i = clusts[i]
+    if i != i_orig:
+        clusts[i_orig] = i # short-cut a potential series of links
+    return i
+
 
 
 def order_cluster_data(clusters, nSp):
@@ -481,8 +576,12 @@ def sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N):
     iClusts = []
     jClusts = []
     Vals = []
+    q_same_species = iSpec == jSpec
     for i, (Js, Vs) in enumerate(zip(B.rows, B.data)):
         for j, v in zip(Js, Vs):
+            # don't count self hits
+            if q_same_species and i == j:
+                continue
             iClusts.append(g_to_clust[(iSpec, i)])
             jClusts.append(g_to_clust[(jSpec, j)])
             Vals.append(v)
@@ -538,8 +637,10 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     ogs = mcl.GetPredictedOGs(clustersFilename_pairs)
     
     # 5c. Connect clusters of limited phylogenetic extent
-    ConnectClusters(ogs, seqsInfo.nSpecies)
+    ogs = ConnectClusters(ogs, seqsInfo.nSpecies)
     
+    mcl.RewriteMCLpairsFile(ogs, clustersFilename_pairs)
+
     resultsBaseFilename = files.FileHandler.GetOrthogroupResultsFNBase()
     idsDict = mcl.MCL.WriteOrthogroupFiles(ogs, [files.FileHandler.GetSequenceIDsFN()], resultsBaseFilename, clustersFilename_pairs)
     mcl.MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesInfoObj.speciesToUse, resultsBaseFilename)
