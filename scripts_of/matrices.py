@@ -26,6 +26,7 @@
 
 import os
 import glob
+import scipy
 import numpy as np
 try:
     import cPickle as pic
@@ -76,3 +77,32 @@ def sparse_max_row(csr_mat):
     ret = np.zeros(csr_mat.shape[0])
     ret[np.diff(csr_mat.indptr) != 0] = np.maximum.reduceat(csr_mat.data,csr_mat.indptr[:-1][np.diff(csr_mat.indptr)>0])
     return ret
+
+def coo_submatrix_pull(matr, rows, cols):
+    """
+    Pulls out an arbitrary i.e. non-contiguous submatrix out of
+    a sparse.coo_matrix. 
+    """
+    if type(matr) != scipy.sparse.coo_matrix:
+        raise TypeError('Matrix must be sparse COOrdinate format')
+    
+    gr = -1 * np.ones(matr.shape[0])
+    gc = -1 * np.ones(matr.shape[1])
+    
+    lr = len(rows)
+    lc = len(cols)
+    
+    ar = np.arange(0, lr)  
+    ac = np.arange(0, lc)
+    # print(ar)
+    # print(rows)
+    # print(rows[ar])
+    gr[rows[ar]] = ar
+    gc[cols[ac]] = ac
+    mrow = matr.row
+    mcol = matr.col
+    newelem = (gr[mrow] > -1) & (gc[mcol] > -1)
+    newrows = mrow[newelem]
+    newcols = mcol[newelem]
+    return scipy.sparse.coo_matrix((matr.data[newelem], np.array([gr[newrows],
+        gc[newcols]])),(lr, lc))

@@ -7,7 +7,7 @@ import subprocess
 from scipy import sparse
 import time
 import warnings
-from collections import Counter
+from collections import Counter, deque
 import numpy.core.numeric as numeric     
 from scipy.optimize import curve_fit         
 import multiprocessing as mp
@@ -17,7 +17,7 @@ except ImportError:
     import Queue as queue  
 
 
-from . import util, files, blast_file_processor, matrices, mcl, orthologues, trees_msa, stats
+from . import util, files, blast_file_processor, matrices, mcl, orthologues, trees_msa, stats, wpgma
  
 
 def WriteGraph_perSpecies(args):
@@ -411,7 +411,8 @@ def ConnectClusters(clusters, nSp):
     Similarity measure between clusters: (Between group similarity)/(Within group similarity)
     """
     S = GetClusterSimilarities(clusters, nSp)
-    clusters = ConnectClusters_v1(S, clusters)
+    # clusters = ConnectClusters_v1(S, clusters)   # connect those better than threshold
+    clusters = ConnectClusters_v2(S, clusters)    # calculate connected components  
     return clusters
         
 def get_latest_location(clusts, i):
@@ -448,8 +449,101 @@ def GetClusterSimilarities(clusters, nSp):
         ni = n[i]
         # only n*n-n pairs for self-self
         S.data[i] = [v/(ni*n[j]-ni*(i==j)) for j, v in zip(Js, Vs)]
-    
     return S
+
+def ConnectClusters_v2(S, clusters, threshold=0.5):
+    """
+    V2 - Get teh number of connected components
+    Args:
+        S - lil matrix of similarity scores
+        clusters - list of sets of genes (strings)
+    Returns:
+        clusters - list of sets of genes z
+    """
+    n = list(map(len, clusters))
+    i_single = n.index(1)
+    S = normalise_cluster_scores(S, i_single)
+    S = 0.5*(S + S.transpose())   # symmetrise  (or should it be one or the other is greater than the threshold?)
+    print(S.shape)
+    print(S.nnz)
+    # set best hit for each singleton to be above the threshold
+    print("%d genes" % sum(n))
+    t2 = threshold*1.1
+    S.setdiag(0)
+    j_largest = S.argmax(0)
+    n_clust = S.get_shape()[0]
+    print("First singleton: %d" % i_single)
+    for i in range(i_single, n_clust):
+        # correct order of i & j if we used argmax(axis=0)
+        if S[j_largest[0,i], i] > 0:
+            S[j_largest[0,i], i] = t2     # if all entries were zero, would still return an argmax so check it is non-zero    
+
+    # threshold the edges in the graph/matrix
+    S_thresh = S.multiply(S>threshold)
+    S_thresh = S_thresh.tolil()
+    # print(S)
+    C, n_comps = ConnectedComponents(S_thresh)
+    print("%d components" % n_comps)
+
+    # # what is the size of these?
+    # n_genes = [0 for _ in range(1+max(C))]
+    # for i_cluster, assignment in enumerate(C):
+    #     n_genes[assignment] += n[i_cluster]
+    # print("%d singletons" % n_genes.count(1))
+
+    # import matplotlib.pyplot as plt
+    # fig, [ax0, ax1] = plt.subplots(2,1)
+    # ax0.set_yscale('log')
+    # ax1.set_yscale('log')
+    # ax0.hist(n, 50)
+    # ax1.hist(n_genes, 50)
+    # ax0.set_xlim([0,2500])
+    # ax1.set_xlim([0,2500])
+    # plt.show()
+    # util.Fail()
+
+    """    
+            ************* Next Steps *************    
+    - Get the phylogenetic extent of each cluster
+    - Load the species tree
+    - For each cluster do a leaf to branch traverse, combining as appropriate:
+        - Use phylogenetic extent
+        - Consider proportion of sequences that hit between the two clusters (note
+          that this could be distorted by the limit on hits. Perhaps we need to only
+          average over those ones we got hits for? Perhaps we should record which 
+          sequences maxed out on the diamond search)
+        - Do we need to look again at the scores?
+    """
+
+    # For each connected component create the WPGMA tree
+    comps = [[] for _ in range(n_comps)]
+    for i_clust, i_assign in enumerate(C):
+        comps[i_assign].append(i_clust)
+    Scoo = S.tocoo()
+    for connect_comp in comps:
+        if len(connect_comp) < 3:
+            continue
+        T = DoTreeOfClusters(Scoo, connect_comp)
+        if len(str(T)) > 6:
+            print(T)
+        # create OGs
+
+    return clusters
+
+def DoTreeOfClusters(S, connect_comp):
+    if len(connect_comp) < 2:
+        return connect_comp
+    # create a dense matrix
+    connect_comp = np.array(connect_comp)
+    M = matrices.coo_submatrix_pull(S, connect_comp, connect_comp)
+    M = M.todense()
+    # do tree
+    try:
+        return wpgma.wpgma(M, list(connect_comp))
+    except:
+        print(connect_comp)
+        print(M)
+        raise
 
 def ConnectClusters_v1(S, clusters):
     """
@@ -461,16 +555,9 @@ def ConnectClusters_v1(S, clusters):
     Returns:
         clusters - list of sets of genes z
     """
-    # What is the biggest ratio of scores between vs within
-    # (note, I will look at this compared to the score for each of the individual 
-    # clusters, either of these comparisons might indicate a connection should be made)
-    # Since S is symmetrical, ony need to do this once and then look at Sij and Sji
-    with np.errstate(divide='ignore'):
-        within_m1 = 1./S.diagonal()   # 1/(within cluster similarity)
-    for i, (Js, Vs) in enumerate(zip(S.rows, S.data)):
-        # only n*n-n pairs for self-self
-        S.data[i] = [v*within_m1[i] for j, v in zip(Js, Vs)]
-
+    sizes = list(map(len, clusters))
+    i_single = sizes.index(1)
+    S = normalise_cluster_scores(S, i_single)
     # What are the largest non-diagonal entries
     # Hits (between clusters)
     H = []
@@ -482,10 +569,9 @@ def ConnectClusters_v1(S, clusters):
 
     # indices = list(range(len(H)))
 
-    sizes = list(map(len, clusters))
-    i_single = sizes.index(1)
     print("i_single: %d" % i_single)
     top_hits = sorted(zip(H, IJs), reverse=True)
+    print([xx[0] for xx in top_hits])
     n_print = 100
     for x, ij in top_hits:
         if ij[0] >= i_single or ij[1] >= i_single:
@@ -541,6 +627,29 @@ def ConnectClusters_v1(S, clusters):
     print("%d clusters after, cost %d" % (len(trees_after), sum(trees_after*trees_after)))
     return clusters
 
+def normalise_cluster_scores(S, i_single):
+    """
+    Divide non-zero entries of a square lil matrix by the diagonal entries
+    Args:
+        S - nxn lil sparse matrix
+    Returns:
+        S - nxn lil sparse matrix
+    """
+    # What is the biggest ratio of scores between vs within
+    # (note, I will look at this compared to the score for each of the individual 
+    # clusters, either of these comparisons might indicate a connection should be made)
+    # Since S is symmetrical, ony need to do this once and then look at Sij and Sji
+    # with np.errstate(divide='ignore'):
+    #     within_m1 = 1./S.diagonal()   # 1/(within cluster similarity)
+    S0=S.copy()
+    d = S.diagonal()
+    d[i_single:] = 1.0
+    within_m1 = 1./d
+    for i, (Js, Vs) in enumerate(zip(S.rows, S.data)):
+        # only n*n-n pairs for self-self
+        S.data[i] = [v*within_m1[i] for j, v in zip(Js, Vs)]
+    return S
+
 def order_cluster_data(clusters, nSp):
     """
     Return the clusters sorted by species and the cluster lookup dict
@@ -572,6 +681,39 @@ def order_cluster_data(clusters, nSp):
         # Singletons.append(map(int, g))
         g_to_clust[(iSp, iSeq)] = nMulti + iSingleton
     return g_to_clust
+
+def ConnectedComponents(S):
+    """
+    Return a list of the connected components of sparse lil matrix S
+    Args:
+        S - lil sparse matrix (0,1)
+    Returns:
+        C - list of components
+    """
+    # A = []   # adjacency list
+    # for i, (Js, Vs) in enumerate(zip(S.rows, S.data)):
+    #     A.extend([(i,j) for j, v in zip(Js, Vs) if i<j and v>0])
+    n = S.get_shape()[0]
+    print("%d vertices, %d edges" % (n, S.nnz/2))
+    explored = [False for _ in range(n)]
+    i_comp = -1
+    assignments = [None for _ in range(n)]
+    q = deque()
+    for u in range(n):
+        if explored[u]:
+            continue
+        i_comp += 1
+        q.append(u)
+        explored[u] = True
+        while q:
+            v = q.popleft()
+            assignments[v] = i_comp
+            for w in S.rows[v]:
+                if not explored[w]:
+                    q.append(w)
+                    explored[w] = True
+    n_comps = i_comp + 1
+    return assignments, n_comps
 
 
 def sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N, input_matrix_name):
@@ -631,6 +773,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
         proc.start()
     parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
     
+    # if options
     cmd_queue = mp.Queue()
     for iSpecies in range(seqsInfo.nSpecies):
         cmd_queue.put((seqsInfo, iSpecies))
