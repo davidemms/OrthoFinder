@@ -418,6 +418,8 @@ def ProcessArgs(prog_caller, args):
             options.qTrim = False
         elif arg == "-c1":
             options.gathering_version = (1,0)
+        elif arg == "-c31":
+            options.gathering_version = (3,1)
         elif arg == "-I" or arg == "--inflation":
             if len(args) == 0:
                 print("Missing option for command line argument %s\n" % arg)

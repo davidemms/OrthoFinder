@@ -5,6 +5,7 @@ import os
 import numpy as np
 import subprocess
 from scipy import sparse
+import random
 import time
 import warnings
 from collections import Counter, deque
@@ -47,6 +48,31 @@ def WriteGraph_perSpecies(args):
             graphFile.write("$\n")
         if iSpec == (seqsInfo.nSpecies - 1): graphFile.write(")\n")
         util.PrintTime("Written final scores for species %d to graph file" % iSpec)
+
+
+def WriteGraph_perSpecies_homology(args):
+    seqsInfo, graphFN, iSpec, d_pickle = args            
+    # calculate the 2-way connections for one query species
+    # W = [matrices.LoadMatrix("B", iSpec, jSpec, d_pickle).tolil() for jSpec in range(seqsInfo.nSpecies)]
+    W = []
+    for jSpec in range(seqsInfo.nSpecies):
+        w1 = matrices.LoadMatrix("B", iSpec, jSpec, d_pickle)
+        matrices.DumpMatrix("H", (w1>0).tolil(), iSpec, jSpec, d_pickle)
+        w2tr = numeric.transpose(matrices.LoadMatrix("B", jSpec, iSpec, d_pickle))
+        W.append((w1 + w2tr > 0).tolil())  # symmetrise
+    # matrices.DumpMatrixArray("H", W, iSpec, d_pickle)
+    with open(graphFN + "_%d" % iSpec, 'w') as graphFile:       
+        for query in range(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]):
+            offset = seqsInfo.seqStartingIndices[iSpec]
+            graphFile.write("%d    " % (offset + query))
+            for jSpec in range(seqsInfo.nSpecies):
+                row = W[jSpec].getrowview(query)
+                jOffset = seqsInfo.seqStartingIndices[jSpec]
+                for j in row.rows[0]:
+                    graphFile.write("%d:%.3f " % (j + jOffset, 1.0))
+            graphFile.write("$\n")
+        if iSpec == (seqsInfo.nSpecies - 1): graphFile.write(")\n")
+        util.PrintTime("Written final scores for species %d to graph file" % iSpec)        
 
 """
 scnorm
@@ -236,7 +262,7 @@ class WaterfallMethod:
                     return  
                                    
     @staticmethod
-    def WriteGraphParallel(seqsInfo, nProcess):
+    def WriteGraphParallel(seqsInfo, nProcess, func=WriteGraph_perSpecies):
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
             with open(files.FileHandler.GetGraphFilename(), 'w') as graphFile:
@@ -244,7 +270,7 @@ class WaterfallMethod:
                 graphFile.write("\n(mclmatrix\nbegin\n\n") 
             pool = mp.Pool(nProcess)
             graphFN = files.FileHandler.GetGraphFilename()
-            pool.map(WriteGraph_perSpecies, [(seqsInfo, graphFN, iSpec, files.FileHandler.GetPickleDir()) for iSpec in range(seqsInfo.nSpecies)])
+            pool.map(func, [(seqsInfo, graphFN, iSpec, files.FileHandler.GetPickleDir()) for iSpec in range(seqsInfo.nSpecies)])
             for iSp in range(seqsInfo.nSpecies):
                 subprocess.call("cat " + graphFN + "_%d" % iSp + " >> " + graphFN, shell=True)
                 os.remove(graphFN + "_%d" % iSp)
@@ -423,7 +449,7 @@ def get_latest_location(clusts, i):
         clusts[i_orig] = i # short-cut a potential series of links
     return i
 
-def GetClusterSimilarities(clusters, nSp):
+def GetClusterSimilarities(clusters, nSp, matrix_type="B"):
     """
     Create the similarity matrix between clusters - average score for pairs of 
     sequences across the two clusters.
@@ -440,8 +466,11 @@ def GetClusterSimilarities(clusters, nSp):
     g_to_clust = order_cluster_data(clusters, nSp)
     for iSpec in range(nSp):
         for jSpec in range(nSp):
-            S += sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N, "B") # CSR
+            S += sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N, matrix_type) # CSR
 
+    # print(S[0,0])
+    # print(S[1,1])
+    # print(S[2,2])
     # Now normalise the entries by the number of gene pairs between each orthogroup
     n = np.array([len(c) for c in clusters])
     S = S.tolil()   # can optimise the choice for production
@@ -451,9 +480,29 @@ def GetClusterSimilarities(clusters, nSp):
         S.data[i] = [v/(ni*n[j]-ni*(i==j)) for j, v in zip(Js, Vs)]
     return S
 
+
+def GetHitsPerSpecies(nSp, matrix_type="H"):
+    """
+    How many hits does each sequence have in each species
+
+    """
+    d_pickle = files.FileHandler.GetPickleDir()
+    nH = []
+    for iSp in range(nSp):
+        nH.append([])
+        for jSp in range(nSp):
+            Hij = matrices.LoadMatrix(matrix_type, iSp, jSp, d_pickle) 
+            nH[-1].append(Hij.sum(axis=1))
+
+    # print(type(nH[0][0]))
+    # print(nH[0][0])
+    # print(nH[0][0].shape)
+    return nH
+
+
 def ConnectClusters_v2(S, clusters, threshold=0.5):
     """
-    V2 - Get teh number of connected components
+    V2 - Get the number of connected components
     Args:
         S - lil matrix of similarity scores
         clusters - list of sets of genes (strings)
@@ -485,11 +534,11 @@ def ConnectClusters_v2(S, clusters, threshold=0.5):
     C, n_comps = ConnectedComponents(S_thresh)
     print("%d components" % n_comps)
 
-    # # what is the size of these?
-    # n_genes = [0 for _ in range(1+max(C))]
-    # for i_cluster, assignment in enumerate(C):
-    #     n_genes[assignment] += n[i_cluster]
-    # print("%d singletons" % n_genes.count(1))
+    # what is the size of these?
+    n_genes = [0 for _ in range(1+max(C))]
+    for i_cluster, assignment in enumerate(C):
+        n_genes[assignment] += n[i_cluster]
+    print("%d singletons" % n_genes.count(1))
 
     # import matplotlib.pyplot as plt
     # fig, [ax0, ax1] = plt.subplots(2,1)
@@ -742,10 +791,71 @@ def sum_cluster_hits(iSpec, jSpec, d_pickle, g_to_clust, N, input_matrix_name):
             iClusts.append(g_to_clust[(iSpec, i)])
             jClusts.append(g_to_clust[(jSpec, j)])
             Vals.append(v)
+    if len(Vals) > 0 and Vals[0] is True:
+        Vals = [1. for _ in Vals]
     S = sparse.coo_matrix((Vals, (iClusts, jClusts)), shape=(N,N))
     return S.tocsr()
 
-    
+from Bio import pairwise2
+from Bio.SubsMat import MatrixInfo as matlist
+
+def evalue(seq1, seq2, db_size, m, l = 0.267, K = 0.041, open = -11, extend = -1):
+    seq1 = seq1.replace("*", "")
+    seq2 = seq2.replace("*", "")
+    alignments = pairwise2.align.localds(seq1, seq2, matlist.blosum62, open, extend)
+    b = max([aa[2] for aa in alignments])    # max bitscore for any of the alignments
+    b_prime = (l*b-np.log(K))/np.log(2.)
+    e = db_size * m * 2**-b_prime
+    return e
+
+
+def IsHomologous(c, fw, Lengths, db_size, e_cutoff = 0.001, n_test_failure=5):
+    """
+    parameters for BLOSUM62 matrix with gapped alignment (11 open, 1 extend)
+    Gapped
+    Lambda      K        H        a         alpha    sigma
+    0.267   0.0410    0.140     1.90     42.6     43.6 
+    """
+    fail = []
+    print("")
+    for j in range(20):
+        s0, s1 = random.sample(c, 2)
+        iSp, iSeq = map(int,s0.split("_"))
+        jSp, jSeq = map(int,s1.split("_"))
+        e = evalue(fw.SeqLists[s0].replace("\n", ""), fw.SeqLists[s1].replace("\n", ""), db_size, Lengths[iSp][iSeq])
+        print(s0, s1, e)
+        if e > e_cutoff:
+            fail.append(s0)
+            fail.append(s1)
+    if len(fail) == 0:
+        return True, []
+    else:
+        q_homologous = len(fail) <= 4  # 2 failures
+        remove = []
+        print("Can identify failures instead from the BLAST results")
+        print("%d failures out of 10" % (len(fail)/2))
+        fail = set(fail)
+        for f in fail:
+            n_fail = 0
+            iSp, iSeq = map(int,f.split("_"))
+            f_seq = fw.SeqLists[f].replace("\n", "")
+            f_len =  Lengths[iSp][iSeq]
+            sothers = random.sample(c, n_test_failure)
+            for sj in sothers:
+                e = evalue(f_seq, fw.SeqLists[sj].replace("\n", ""), db_size, f_len)
+                n_fail += 1 if e > e_cutoff else 0
+            print("Failure: %s, %d out of %d " % (f, n_fail, n_test_failure))
+            if n_fail > 3:
+                remove.append(f)
+    return q_homologous, remove
+
+
+
+
+
+    util.Fail()
+
+
 
 """
 Orthogroups
@@ -762,42 +872,122 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     Lengths = WaterfallMethod.GetSequenceLengths(seqsInfo)
     
     # Process BLAST hits
-    util.PrintTime("Initial processing of each species")
-    cmd_queue = mp.Queue()
-    blastDir_list = files.FileHandler.GetBlastResultsDir()
-    for iSpecies in range(seqsInfo.nSpecies):
-        cmd_queue.put((seqsInfo, blastDir_list, Lengths, iSpecies))
-    files.FileHandler.GetPickleDir()     # create the pickle directory before the parallel processing to prevent a race condition
-    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, files.FileHandler.GetPickleDir(), options.qDoubleBlast)) for i_ in range(options.nProcessAlg)]
-    for proc in runningProcesses:
-        proc.start()
-    parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
+    if os.path.exists(files.FileHandler.GetWorkingDirectory1_Read()[0] + "pickle/B0_0.pic"):
+        files.FileHandler.SetNondefaultPickleDir(files.FileHandler.GetWorkingDirectory1_Read()[0] + "pickle/")
+        print("Loading previous pickled matrices")
+    else:
+        util.PrintTime("Initial processing of each species")
+        cmd_queue = mp.Queue()
+        blastDir_list = files.FileHandler.GetBlastResultsDir()
+        for iSpecies in range(seqsInfo.nSpecies):
+            cmd_queue.put((seqsInfo, blastDir_list, Lengths, iSpecies))
+        files.FileHandler.GetPickleDir()     # create the pickle directory before the parallel processing to prevent a race condition
+        runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, files.FileHandler.GetPickleDir(), options.qDoubleBlast)) for i_ in range(options.nProcessAlg)]
+        for proc in runningProcesses:
+            proc.start()
+        parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
     
-    # if options
-    cmd_queue = mp.Queue()
-    for iSpecies in range(seqsInfo.nSpecies):
-        cmd_queue.put((seqsInfo, iSpecies))
-    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, files.FileHandler.GetPickleDir(), options.gathering_version)) for i_ in range(options.nProcessAlg)]
-    for proc in runningProcesses:
-        proc.start()
-    parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
-    
-    util.PrintTime("Connected putative homologues") 
-    WaterfallMethod.WriteGraphParallel(seqsInfo, options.nProcessAlg)
-    
-    # 5b. MCL     
-    clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN(options.mclInflation) 
-    graphFilename = files.FileHandler.GetGraphFilename() 
-    mcl.MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
-    mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
-    
-    util.PrintUnderline("Writing orthogroups to file")
-    ogs = mcl.GetPredictedOGs(clustersFilename_pairs)
-    
-    # 5c. Connect clusters of limited phylogenetic extent
-    ogs = ConnectClusters(ogs, seqsInfo.nSpecies)
-    
-    mcl.RewriteMCLpairsFile(ogs, clustersFilename_pairs)
+    if options.gathering_version <= (3,0):
+        cmd_queue = mp.Queue()
+        for iSpecies in range(seqsInfo.nSpecies):
+            cmd_queue.put((seqsInfo, iSpecies))
+        runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, files.FileHandler.GetPickleDir(), options.gathering_version)) for i_ in range(options.nProcessAlg)]
+        for proc in runningProcesses:
+            proc.start()
+        parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
+        
+        util.PrintTime("Connected putative homologues") 
+        WaterfallMethod.WriteGraphParallel(seqsInfo, options.nProcessAlg)
+        
+        # 5b. MCL     
+        clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN(options.mclInflation) 
+        graphFilename = files.FileHandler.GetGraphFilename() 
+        mcl.MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
+        mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
+        
+        util.PrintUnderline("Writing orthogroups to file")
+        ogs = mcl.GetPredictedOGs(clustersFilename_pairs)
+        
+        # 5c. Connect clusters of limited phylogenetic extent
+        ogs = ConnectClusters(ogs, seqsInfo.nSpecies)
+        
+        # create a faked version of the clustersFilename_pairs file for these OGs
+        mcl.RewriteMCLpairsFile(ogs, clustersFilename_pairs)
+    elif options.gathering_version == (3,1):
+        # Create the homology graph - this is already done, just the matrix of hits
+
+        # break into clusters and assess their size
+        WaterfallMethod.WriteGraphParallel(seqsInfo, options.nProcessAlg, WriteGraph_perSpecies_homology)
+        clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN(options.mclInflation) 
+        graphFilename = files.FileHandler.GetGraphFilename() 
+        mcl.MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
+        mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs) 
+        clusters = mcl.GetPredictedOGs(clustersFilename_pairs)
+        l = [len(og) for og in clusters]
+        import scipy.stats as stats2
+        print(stats2.describe(l))
+        print("%d orphans" % l.count(1))
+        print(l[:20])
+        
+        # print(clusters[0])
+        # print(clusters[1])
+        # print(clusters[2])
+        S = GetClusterSimilarities(clusters, seqsInfo.nSpecies, "H")
+        # Get the number of hits per seqeunce. What we actually want is the number
+        # of hits each sequence has to its cluster, on a per species basis. We could
+        # probably extend this to all clusters. But cluster similarity will tell use that 
+        # anyway. We can also simplify by just getting the number of hits per sequence
+        # per species and assume they are all to it's cluster since we're mainly interested
+        # in the low homology clusters
+        # Or 
+        # - nHits
+        # - nHits to it's cluster
+        nH = GetHitsPerSpecies(seqsInfo.nSpecies)
+
+        for i in range(20):
+            print((len(clusters[i]), S[i,i]))
+        # print("\nConnecting clusters")
+        # clusters = ConnectClusters_v2(S, clusters)
+        # x = S.diagonal()
+        # import matplotlib.pyplot as plt
+        # fig, ax = plt.subplots()
+        # ax.set_yscale('log')
+        # ax.hist(x, 50)
+        # plt.show()
+        # util.Fail()
+
+        # Are the sequences in each cluster homologous?
+        # if we tested 7 per cluster and they all suggested True (could look in the matrix and then try if not there) then < 1% probability 
+        # that they're not
+        fw = trees_msa.FastaWriter(files.FileHandler.GetSpeciesSeqsDir(), speciesInfoObj.speciesToUse)
+        db_size = sum([len(v)-v.count("\n") for v in fw.SeqLists.values()]) / float(seqsInfo.nSpecies)
+        species = [[int(g.split("_")[0]) for g in cluster] for cluster in clusters]
+        clusters_pairs = [[map(int, g.split("_")) for g in cluster] for cluster in clusters]
+        for i, c in enumerate(clusters):    
+            print(len(c))
+            print(S[i,i])
+            if S[i,i] < 0.75:
+                # v1 - Try some local alignments myself to see if random pairs are homologous
+                # IsHomologous(c, fw, Lengths,db_size)
+
+                # v2 - If they are low then look at number of hits for individual sequences
+                # Have they maxed out? Are there some which are low?
+                # Results: This is really good for screening which genes may not belong, or are dodge 
+                # and need checking out (e.g. lost a domain)
+                counts = Counter(species[i])   # First, what species are they in?
+                print(counts)
+                look_for = [sp for sp, count in counts.most_common() if count >= 25]
+                print(look_for)
+                hit_counts = [[nH[isp][sp_target][iseq, 0] for sp_target in look_for] for isp, iseq in clusters_pairs[i]]
+                all_hits = [sum(h) for h in hit_counts]
+                # import matplotlib.pyplot as plt
+                # plt.hist(all_hits)
+                # plt.show()
+
+                # what are the 
+        mcl.RewriteMCLpairsFile(clusters, clustersFilename_pairs)
+        ogs = clusters
+        
 
     resultsBaseFilename = files.FileHandler.GetOrthogroupResultsFNBase()
     idsDict = mcl.MCL.WriteOrthogroupFiles(ogs, [files.FileHandler.GetSequenceIDsFN()], resultsBaseFilename, clustersFilename_pairs)

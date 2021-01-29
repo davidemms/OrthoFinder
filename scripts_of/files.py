@@ -71,6 +71,7 @@ class __Files_new_dont_manually_create__(object):
         self.speciesTreeRootedIDsFN = None
         self.multipleRootedSpeciesTreesDir = None
         self.species_ids_corrected = None
+        self.pickleDir = None
         # to be modified as appropriate
      
     """ ========================================================================================== """
@@ -209,12 +210,10 @@ class __Files_new_dont_manually_create__(object):
         self.pickleDir = d
    
     def GetPickleDir(self):
-        if self.nondefaultPickleDir != None: 
-            d = self.pickleDir
-        else:
-            d = self.wd_current + "pickle/"
-        if not os.path.exists(d): os.mkdir(d)
-        return d
+        if self.pickleDir is None: 
+            self.pickleDir = self.wd_current + "pickle/"
+        if not os.path.exists(self.pickleDir): os.mkdir(self.pickleDir)
+        return self.pickleDir
             
     """ Standard Methods
         ========================================================================================== """                       
@@ -809,7 +808,7 @@ def InitialiseFileHandler(options, fastaDir=None, continuationDir=None, resultsD
     
     Tasks:
     - Switch this round, I can tell if it's and old or new directory right from the start - read log and check info present,
-    perhaps just psss it to the new file handler and let it decide if everything is there
+    perhaps just pass it to the new file handler and let it decide if everything is there
     """
     # 1 & 2
     # If starting from scratch, no need for a PreviousFileLocator
@@ -838,5 +837,12 @@ def InitialiseFileHandler(options, fastaDir=None, continuationDir=None, resultsD
     - If starting from a previous old-structure directory then, as high up as we can go and still be in the directory structure:
         - Fasta/Results_OldDate/OrthoFinder/Results_Date
     """
-    FileHandler.CreateOutputDirectories(options, pfl, base_dir, fastaDir)    
+    FileHandler.CreateOutputDirectories(options, pfl, base_dir, fastaDir)  
+    if pickleDir_nonDefault is not None and not os.path.exists(pickleDir_nonDefault):
+        try:
+            os.mkdir(pickleDir_nonDefault)
+        except:
+            print("ERROR: Could not create non-default pickle directory: %s" % pickleDir_nonDefault)
+            util.Fail()
+    FileHandler.SetNondefaultPickleDir(pickleDir_nonDefault)  
         
