@@ -590,9 +590,9 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
     def _ProcessLog(self, logFN):
         """
         Get all relevant data from log file. 
-        Checks the paths ssaved do exist still
+        Checks the paths saved do exist still
         Should work with relevant paths to allow directory to move
-        Other methods can then check that the data required for a particualr run is available
+        Other methods can then check that the data required for a particular run is available
         """
         with open(logFN, 'r') as infile:
             for line in infile:
@@ -641,8 +641,9 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
                             util.Fail()
                     self.speciesTreeRootedIDsFN = self.wd_trees + "SpeciesTree_rooted_ids.txt" 
                         
-                            
-    def GetWDBaseChain(self, wd_base_anchor):
+
+    @staticmethod           
+    def GetWDBaseChain(wd_base_anchor):
         chain = [wd_base_anchor]
         while os.path.exists(chain[-1] + "previous_wd.txt"):
             with open(chain[-1] + "previous_wd.txt", 'r') as infile:
