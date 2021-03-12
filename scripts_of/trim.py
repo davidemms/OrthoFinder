@@ -42,9 +42,13 @@ def main(infn, outfn, f, n_min, c):
     # vectorised is far quicker
     names = list(msa.seqs.keys())
     M = np.array([list(seq) for seq in msa.seqs.values()])
-    maxGap = (1.-f)*msa.n
+    # drop msa at this point
+    n = msa.n
+    length = msa.length
+    del msa
+    maxGap = (1.-f)*n
     gap_counts = (M == "-").sum(axis=0)
-    aa_counts = msa.n - gap_counts
+    aa_counts = n - gap_counts
     aa_before = sum(aa_counts)
     i_keep = np.where(gap_counts <= maxGap)
     n_keep = i_keep[0].size     # it's an I, J tuple
@@ -52,15 +56,15 @@ def main(infn, outfn, f, n_min, c):
     # Check we have kept enough columns and characters
     if n_keep < n_min or aa_after < c*aa_before:
         # print("%0.3f: %d columns, %0.1f%% of characters retained" % (f, n_keep, 100.*aa_after/aa_before))
-        f, i_keep = get_satifactory_f(gap_counts, aa_counts, msa.n, f, n_min, c)
+        f, i_keep = get_satifactory_f(gap_counts, aa_counts, n, f, n_min, c)
     n_keep = i_keep[0].size
-    if n_keep == msa.length:
+    if n_keep == length:
         copy_input_to_output(infn, outfn)
     M = M[:, i_keep[0]]
     s,t = M.shape
     aa_after = s * t - (M == '-').sum()
     write_msa(M, names, outfn)
-    # print("%0.3f: %d->%d, %0.1f%% characters retained. Trimmed %s" % (f, msa.length, i_keep[0].size, 100.*aa_after/aa_before, infn))
+    # print("%0.3f: %d->%d, %0.1f%% characters retained. Trimmed %s" % (f, length, i_keep[0].size, 100.*aa_after/aa_before, infn))
 
 
 def get_satifactory_f(gap_counts, aa_counts, N, f_orig, n_min, c, tol = 0.001):
@@ -108,7 +112,8 @@ def get_satifactory_f(gap_counts, aa_counts, N, f_orig, n_min, c, tol = 0.001):
     return x, i_keep
 
 
-def copy_input_to_output(infn, outfn):        
+def copy_input_to_output(infn, outfn):      
+    # if the outfn doesn't exist doesn't the check for being the same is redundant  
     if (not os.path.exists(outfn)) or (not os.path.samefile(infn, outfn)):
         shutil.copy(infn, outfn)
 
