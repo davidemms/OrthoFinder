@@ -1216,6 +1216,8 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
         while True:
             try:
                 iog = args_queue.get(True, 1.)
+                if iog == 7:
+                    raise ImportError
                 results = tree_analyser.AnalyseTree(iog)
                 if results is None:
                     continue
@@ -1241,20 +1243,23 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
                     WriteOlogLinesToFile(tree_analyser.putative_xenolog_file_handles[i], olog_sus_lines_tot[i], tree_analyser.lock_suspect)
                 results_queue.put(nOrthologues_SpPair)
                 return
-            except:
-                print("WARNING: Unknown error, current orthogroup OG%07d" % iog)
-                for i in range(nspecies):
-                    for j in range(i+1, nspecies):
-                        # j is the largest (and intentionally changing quickest, which I think is best for the lock)
-                        WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][j], olog_lines_tot[i][j], tree_analyser.lock_ologs[j])
-                        WriteOlogLinesToFile(tree_analyser.ologs_files_handles[j][i], olog_lines_tot[j][i], tree_analyser.lock_ologs[j])
-                    WriteOlogLinesToFile(tree_analyser.putative_xenolog_file_handles[i], olog_sus_lines_tot[i], tree_analyser.lock_suspect)
-                results_queue.put(nOrthologues_SpPair)
-                return
+            except Exception as e:
+                print("WARNING: Unknown error")
+                print(e)
+                try:
+                    print("Current orthogroup OG%07d" % iog)
+                    for i in range(nspecies):
+                        for j in range(i+1, nspecies):
+                            # j is the largest (and intentionally changing quickest, which I think is best for the lock)
+                            WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][j], olog_lines_tot[i][j], tree_analyser.lock_ologs[j])
+                            WriteOlogLinesToFile(tree_analyser.ologs_files_handles[j][i], olog_lines_tot[j][i], tree_analyser.lock_ologs[j])
+                        WriteOlogLinesToFile(tree_analyser.putative_xenolog_file_handles[i], olog_sus_lines_tot[i], tree_analyser.lock_suspect)
+                    results_queue.put(nOrthologues_SpPair)
+                except:
+                    pass
     except Exception as e:
         print(e)
         print("WARNING: Unexpected error")
-        return util.nOrtho_sp(nspecies) 
     return
 
 def RunOrthologsParallel(tree_analyser, nspecies, args_queue, nProcesses):
