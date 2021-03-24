@@ -4,15 +4,62 @@ import os
 import sys
 import shutil
 import argparse
+import itertools
 import numpy as np
+import scipy.sparse
 
 
 class MSA(object):
-    def __init__(self, msa_dict):
-        self.seqs = msa_dict
-        self.length = len(list(msa_dict.values())[0]) if len(msa_dict) > 0 else 0
-        self.n = len(msa_dict)
-
+    def __init__(self, fn):
+        self.names = []         # list of names
+        self.non_gap_pos = []   # list of list of non-gaps positions
+        self.non_gaps = []      # list of list of non-gaps 
+        self.n = 0              # number of sequences   
+        self.length = None         # number of columns in MSA
+        current_length = 0
+        with open(fn, 'r') as infile:
+            for line in infile:
+                line = line.rstrip()
+                if line.startswith(">"):
+                    if len(self.names) > 1 and current_length != self.length:
+                        print("Error: sequence %d has length %d, previous was %d" % (len(self.names), current_length, self.length))
+                        sys.exit()
+                    self.length = current_length
+                    current_length = 0   
+                    self.names.append(line[1:])
+                    self.non_gap_pos.append([])
+                    self.non_gaps.append([])
+                else:
+                    # process this bit of sequence
+                    # the index arithmetic current_length + i works for base 0 indexing
+                    self.non_gap_pos[-1].extend([current_length + i for i,c in enumerate(line) if (c != "*" and c != "-")])
+                    self.non_gaps[-1].extend([c for c in line if (c != "*" and c != "-")])
+                    current_length += len(line)  
+        if current_length != self.length:
+            print("Error: Last sequence length is %d, previous was %d" % (current_length, self.length))
+            sys.exit()
+        self.length = current_length   # could just be one sequence in file
+        self.n = len(self.names)
+        self.length = 0 if self.length is None else self.length
+        # create a sparse matrix so less of the subsequent analysis code has to change
+        # Quite possibly this is the fastest way to do it too
+        row_ind = [i_seq for i_seq, ngp in enumerate(self.non_gap_pos) for _ in range(len(ngp))]
+        self.n_non_gaps = sum([len(ngp) for ngp in self.non_gap_pos])
+        col_ind = list(itertools.chain.from_iterable(self.non_gap_pos))
+        data = [1 for _ in range(self.n_non_gaps)]
+        self.M = scipy.sparse.csr_matrix((data, (row_ind, col_ind)), shape=(self.n, self.length))
+    
+    def write_msa(self, i_cols, outfn, nChar = 80):
+        with open(outfn, 'w') as outfile:
+            for name, posn, chars in zip(self.names, self.non_gap_pos, self.non_gaps):
+                outfile.write(">" + name + "\n")
+                seq = ("-" * posn[0]) + chars[0]
+                for ipos, ipos_m1, c in zip(posn[1:], posn[:-1], chars[1:]):
+                    seq += "-" * (ipos - ipos_m1 - 1) + c
+                seq += "-" * (self.length - posn[-1] -1)
+                seq = "".join([seq[i] for i in i_cols])
+                for i in range(0, len(seq), nChar):
+                    outfile.write(seq[i:i+nChar] + "\n")
 
 def main(infn, outfn, f, n_min, c):
     """
@@ -33,23 +80,22 @@ def main(infn, outfn, f, n_min, c):
         c parameter is included which specifies the minimum total fraction of the 
         original non-gap characters that must be preserved.
     """
-    msa = ReadAlignment(infn)   
+    msa = MSA(infn)   
     # print(infn)
     if msa.length <= n_min:
         copy_input_to_output(infn, outfn)
         # print("Already below min length: %d" % msa.length)
         return
     # vectorised is far quicker
-    names = list(msa.seqs.keys())
-    M = np.array([list(seq) for seq in msa.seqs.values()])
+    # M = np.array([list(seq) for seq in msa.seqs.values()])
     # drop msa at this point
     n = msa.n
     length = msa.length
-    del msa
     maxGap = (1.-f)*n
-    gap_counts = (M == "-").sum(axis=0)
-    aa_counts = n - gap_counts
-    aa_before = sum(aa_counts)
+    aa_counts = msa.M.sum(axis=0)[0]   # per column
+    aa_counts = np.squeeze(np.asarray(aa_counts))
+    gap_counts = n- aa_counts
+    aa_before = msa.M.nnz
     i_keep = np.where(gap_counts <= maxGap)
     n_keep = i_keep[0].size     # it's an I, J tuple
     aa_after = sum(aa_counts[i_keep])
@@ -60,10 +106,11 @@ def main(infn, outfn, f, n_min, c):
     n_keep = i_keep[0].size
     if n_keep == length:
         copy_input_to_output(infn, outfn)
-    M = M[:, i_keep[0]]
-    s,t = M.shape
-    aa_after = s * t - (M == '-').sum()
-    write_msa(M, names, outfn)
+    # M = M[:, i_keep[0]]
+    # s,t = M.shape
+    # aa_after = s * t - (M == '-').sum()
+    msa.write_msa(i_keep[0], outfn)
+    # write_msa(M, names, outfn)
     # print("%0.3f: %d->%d, %0.1f%% characters retained. Trimmed %s" % (f, length, i_keep[0].size, 100.*aa_after/aa_before, infn))
 
 
@@ -116,42 +163,6 @@ def copy_input_to_output(infn, outfn):
     # if the outfn doesn't exist doesn't the check for being the same is redundant  
     if (not os.path.exists(outfn)) or (not os.path.samefile(infn, outfn)):
         shutil.copy(infn, outfn)
-
-
-def write_msa(M, names, outfn, nChar = 80):
-    with open(outfn, 'w') as outfile:
-        for iSeq, name in enumerate(names):
-            outfile.write(">%s\n" % name)
-            seq = M[iSeq,:].tolist()
-            for i in range(0, len(seq), nChar):
-                outfile.write("".join(seq[i:i+nChar]) + "\n")
-
-
-def ReadAlignment(fn):
-    msa = dict()
-    accession = None
-    length = None
-    seq = ""
-    with open(fn, 'r') as infile:
-        for line in infile:
-            line = line.rstrip()
-            if line.startswith(">"):
-                if accession != None:
-                    if length != None and len(seq) != length:
-                        print("ERROR: Sequence length mismatch in MSA: %s & %d" % (length, len(seq)))
-                        sys.exit()
-                    msa[accession] = seq
-                accession = line[1:]
-                seq = ""
-            else:
-                seq += line.replace('*', '-')
-        if accession != None:
-            if length != None and len(seq) != length:
-                print("Error: Sequence length mismatch in MSA: %s & %d" % (length, len(seq)))
-                sys.exit()
-            msa[accession] = seq
-    return MSA(msa)    
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
