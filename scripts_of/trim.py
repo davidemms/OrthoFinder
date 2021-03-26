@@ -35,11 +35,11 @@ class MSA(object):
                     self.non_gap_pos[-1].extend([current_length + i for i,c in enumerate(line) if (c != "*" and c != "-")])
                     self.non_gaps[-1].extend([c for c in line if (c != "*" and c != "-")])
                     current_length += len(line)  
-        if current_length != self.length:
+        self.n = len(self.names)
+        if self.n >= 2 and current_length != self.length:
             print("Error: Last sequence length is %d, previous was %d" % (current_length, self.length))
             sys.exit()
         self.length = current_length   # could just be one sequence in file
-        self.n = len(self.names)
         self.length = 0 if self.length is None else self.length
         # create a sparse matrix so less of the subsequent analysis code has to change
         # Quite possibly this is the fastest way to do it too
@@ -80,6 +80,15 @@ def main(infn, outfn, f, n_min, c):
         c parameter is included which specifies the minimum total fraction of the 
         original non-gap characters that must be preserved.
     """
+    if not os.path.exists(infn):
+        print("ERROR, input file does not exist: %s" % infn)
+        sys.exit()
+    try:
+        with open(outfn, 'w') as outfile:
+            outfile.write("\n")
+    except:
+        print("ERROR, cannot write to output file: %s" % outfn)
+        sys.exit()
     msa = MSA(infn)   
     # print(infn)
     if msa.length <= n_min:
