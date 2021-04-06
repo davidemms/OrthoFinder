@@ -1216,8 +1216,6 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
         while True:
             try:
                 iog = args_queue.get(True, 1.)
-                if iog == 7:
-                    raise ImportError
                 results = tree_analyser.AnalyseTree(iog)
                 if results is None:
                     continue
@@ -1245,6 +1243,7 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
                 return
             except Exception as e:
                 print("WARNING: Unknown error")
+                print(type(e))
                 print(e)
                 try:
                     print("Current orthogroup OG%07d" % iog)
