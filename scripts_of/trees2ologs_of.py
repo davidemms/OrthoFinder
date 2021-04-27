@@ -1208,6 +1208,9 @@ class TreeAnalyser(object):
             return util.nOrtho_sp(n_species), olog_lines, olog_sus_lines
 
 def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue, n_ologs_cache=100):
+    """
+    Must put an item in the results queue before exiting
+    """
     try:
         nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
         nCache = util.nOrtho_cache(nspecies) 
@@ -1242,6 +1245,10 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
                 results_queue.put(nOrthologues_SpPair)
                 return
             except Exception as e:
+                if type(e) is IOError and "handle out of range in select" in str(e):
+                    print("ERROR in this version of python multiprocessing library. Run with OrthoFinder source code version instead or add the OrthoFinder command line option '-a 1'")
+                    results_queue.put(False)   # signal error so can exit, otherwise hangs
+                    return
                 print("WARNING: Unknown error")
                 print(type(e))
                 print(e)
@@ -1259,6 +1266,7 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
     except Exception as e:
         print(e)
         print("WARNING: Unexpected error")
+    results_queue.put(nOrthologues_SpPair)
     return
 
 def RunOrthologsParallel(tree_analyser, nspecies, args_queue, nProcesses):
@@ -1271,6 +1279,9 @@ def RunOrthologsParallel(tree_analyser, nspecies, args_queue, nProcesses):
     while True:
         try:
             nOrtho = results_queue.get()  # block until an item is available
+            if nOrtho is False:
+                print("ERROR in parallel process, exiting.")
+                util.Fail()
             nOrthologues_SpPair += nOrtho
             n_remain -= 1
             if n_remain == 0:
