@@ -575,7 +575,10 @@ def GetRoots(tree, species_tree_rooted, GeneToSpecies):
     # If we haven't found a unique root then use the scores for completeness of ingroup/outgroup to root
     if len(roots_list) == 0: 
         return [] # This shouldn't occur
-    return [sorted(zip(scores_list, roots_list), key=lambda x: x[0], reverse=True)[0][1]]
+    print(list(sorted(scores_list, reverse=True)[:10]))
+    y = sorted(zip(scores_list, roots_list), key=lambda x: x[0], reverse=True)
+    return y
+    # return [sorted(zip(scores_list, roots_list), key=lambda x: x[0], reverse=True)[0][1]]
                 
 def WriteQfO2(orthologues_list_pairs_list, outfilename, qAppend = True):
     """ takes a list where each entry is a pair, (genes1, genes2), which are orthologues of one another

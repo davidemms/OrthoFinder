@@ -521,11 +521,11 @@ def ConnectClusters_v2(S, clusters, threshold=0.5):
     S.setdiag(0)
     j_largest = S.argmax(0)
     n_clust = S.get_shape()[0]
-    print("First singleton: %d" % i_single)
-    for i in range(i_single, n_clust):
-        # correct order of i & j if we used argmax(axis=0)
-        if S[j_largest[0,i], i] > 0:
-            S[j_largest[0,i], i] = t2     # if all entries were zero, would still return an argmax so check it is non-zero    
+    # print("First singleton: %d" % i_single)
+    # for i in range(i_single, n_clust):
+    #     # correct order of i & j if we used argmax(axis=0)
+    #     if S[j_largest[0,i], i] > 0:
+    #         S[j_largest[0,i], i] = t2     # if all entries were zero, would still return an argmax so check it is non-zero    
 
     # threshold the edges in the graph/matrix
     S_thresh = S.multiply(S>threshold)
@@ -913,6 +913,25 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
         
         # create a faked version of the clustersFilename_pairs file for these OGs
         mcl.RewriteMCLpairsFile(ogs, clustersFilename_pairs)
+    elif options.gathering_version == (3,2):
+        # Do a distance tree for each cluster
+        WaterfallMethod.WriteGraphParallel(seqsInfo, options.nProcessAlg, WriteGraph_perSpecies_homology)
+        clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN(options.mclInflation) 
+        graphFilename = files.FileHandler.GetGraphFilename() 
+        mcl.MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
+        mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs) 
+        clusters = mcl.GetPredictedOGs(clustersFilename_pairs)
+        ogs = clusters
+        # # Trees
+        # tree_generation_method = "dendroblast"
+        # stop_after = ""
+        # results_name = ""
+        # files.FileHandler.MakeResultsDirectory2(tree_generation_method, stop_after, results_name) 
+        # ogSet = orthologues.OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll, True, idExtractor = util.FirstWordExtractor)
+        # db = orthologues.DendroBLASTTrees(ogSet, options.nProcessAlg, options.nBlast, options.qDoubleBlast)
+        # spTreeFN_ids, qSTAG = db.RunAnalysis(True)
+        # print("Done new trees")
+        # util.Fail()
     elif options.gathering_version == (3,1):
         # Create the homology graph - this is already done, just the matrix of hits
 
@@ -923,6 +942,8 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
         mcl.MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
         mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs) 
         clusters = mcl.GetPredictedOGs(clustersFilename_pairs)
+
+
         l = [len(og) for og in clusters]
         import scipy.stats as stats2
         print(stats2.describe(l))
@@ -944,6 +965,8 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
         # - nHits to it's cluster
         nH = GetHitsPerSpecies(seqsInfo.nSpecies)
 
+        i = 500
+        print((len(clusters[i]), S[i,i]))
         for i in range(20):
             print((len(clusters[i]), S[i,i]))
         # print("\nConnecting clusters")
@@ -963,28 +986,32 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
         db_size = sum([len(v)-v.count("\n") for v in fw.SeqLists.values()]) / float(seqsInfo.nSpecies)
         species = [[int(g.split("_")[0]) for g in cluster] for cluster in clusters]
         clusters_pairs = [[map(int, g.split("_")) for g in cluster] for cluster in clusters]
-        for i, c in enumerate(clusters):    
-            print(len(c))
-            print(S[i,i])
-            if S[i,i] < 0.75:
-                # v1 - Try some local alignments myself to see if random pairs are homologous
-                # IsHomologous(c, fw, Lengths,db_size)
+        q_check = False
+        if q_check:
+            for i, c in enumerate(clusters):    
+                if i > 10:
+                    break
+                print(len(c))
+                print(S[i,i])
+                if S[i,i] < 0.75 * speciesInfoObj.nSpAll * 25 / len(c):
+                    # v1 - Try some local alignments myself to see if random pairs are homologous
+                    # IsHomologous(c, fw, Lengths,db_size)
 
-                # v2 - If they are low then look at number of hits for individual sequences
-                # Have they maxed out? Are there some which are low?
-                # Results: This is really good for screening which genes may not belong, or are dodge 
-                # and need checking out (e.g. lost a domain)
-                counts = Counter(species[i])   # First, what species are they in?
-                print(counts)
-                look_for = [sp for sp, count in counts.most_common() if count >= 25]
-                print(look_for)
-                hit_counts = [[nH[isp][sp_target][iseq, 0] for sp_target in look_for] for isp, iseq in clusters_pairs[i]]
-                all_hits = [sum(h) for h in hit_counts]
-                # import matplotlib.pyplot as plt
-                # plt.hist(all_hits)
-                # plt.show()
+                    # v2 - If they are low then look at number of hits for individual sequences
+                    # Have they maxed out? Are there some which are low?
+                    # Results: This is really good for screening which genes may not belong, or are dodge 
+                    # and need checking out (e.g. lost a domain)
+                    counts = Counter(species[i])   # First, what species are they in?
+                    print(counts)
+                    look_for = [sp for sp, count in counts.most_common() if count >= 25]
+                    print(look_for)
+                    hit_counts = [[nH[isp][sp_target][iseq, 0] for sp_target in look_for] for isp, iseq in clusters_pairs[i]]
+                    all_hits = [sum(h) for h in hit_counts]
+                    # import matplotlib.pyplot as plt
+                    # plt.hist(all_hits)
+                    # plt.show()
 
-                # what are the 
+                    # what are the 
         mcl.RewriteMCLpairsFile(clusters, clustersFilename_pairs)
         ogs = clusters
         
