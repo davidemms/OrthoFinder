@@ -407,6 +407,7 @@ class WaterfallMethod:
             mostDistant = WaterfallMethod.GetMostDistant_s(RBH, B, seqsInfo, iSpec) 
         else:
             mostDistant = WaterfallMethod.GetMostDistant_s_estimate_from_relative_rbhs(RBH, B, seqsInfo, iSpec) 
+            print(mostDistant[:5])
         connect = WaterfallMethod.ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec)
         return connect
 
@@ -811,6 +812,11 @@ def evalue(seq1, seq2, db_size, m, l = 0.267, K = 0.041, open = -11, extend = -1
 
 def IsHomologous(c, fw, Lengths, db_size, e_cutoff = 0.001, n_test_failure=5):
     """
+    Args:
+        c - cluster
+        fw - FastaWriter
+        Lengths - Sequence lenths
+        db_size - size of database
     parameters for BLOSUM62 matrix with gapped alignment (11 open, 1 extend)
     Gapped
     Lambda      K        H        a         alpha    sigma
@@ -1026,7 +1032,8 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     fastaWriter = trees_msa.FastaWriter(files.FileHandler.GetSpeciesSeqsDir(), speciesInfoObj.speciesToUse)
     d_seqs = files.FileHandler.GetResultsSeqsDir()
     if not os.path.exists(d_seqs): os.mkdir(d_seqs)
-    treeGen.WriteFastaFiles(fastaWriter, ogSet.OGs(qInclAll=True), idsDict, False)
+    idsDict2 = ogSet.Spec_SeqDict()
+    treeGen.WriteFastaFiles(fastaWriter, ogSet.OGs(qInclAll=True), idsDict2, False)
     
     stats.Stats(ogs, speciesNamesDict, speciesInfoObj.speciesToUse, files.FileHandler.iResultsVersion)
     if options.speciesXMLInfoFN:

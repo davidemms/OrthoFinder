@@ -24,6 +24,8 @@ def main(infn, outfn, f, n_min, c):
         n_min - The min trimmed length
         c - The min fraction of non-gap characters to conserve
     Notes:
+        OrthoFinder uses trim.main(fn, fn, 0.1, 500, 0.75) 
+        i.e. -c 0.75 infn outfn 0.1 500
         If f is too high then it will reduce f s.t. len >= n_min or the full 
         alignment is kept (if less than n_min).
         In some way fraction of gaps is unsatisfactory since as the number of sequences
