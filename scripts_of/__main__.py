@@ -417,12 +417,16 @@ def ProcessArgs(prog_caller, args):
         elif arg == "-z":
             options.qTrim = False
         elif arg == "-c1":
+            # original version
             options.gathering_version = (1,0)
         elif arg == "-c30":
+            # new scores: estimate most distant orthogroup member
             options.gathering_version = (3,0)
         elif arg == "-c31":
+            # calc similarities between clusters, print debug info on best hits
             options.gathering_version = (3,1)
         elif arg == "-c32":
+            # Homology clusters from MCL (could later examine these  with fast tree method before doing full trees)
             options.gathering_version = (3,2)
         elif arg == "-I" or arg == "--inflation":
             if len(args) == 0:
