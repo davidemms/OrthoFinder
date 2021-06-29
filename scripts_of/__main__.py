@@ -1200,6 +1200,14 @@ def ProcessArgs(prog_caller, args):
     if options.nProcessAlg is None:
         options.nProcessAlg = min(16, max(1, int(options.nBlast/8)))
 
+    if options.nBlast < 1:
+        print("ERROR: Number of '-t' threads cannot be fewer than 1, got %d" % options.nBlast)
+        util.Fail()    
+
+    if options.nProcessAlg < 1:
+        print("ERROR: Number of '-a' threads cannot be fewer than 1, got %d" % options.nProcessAlg)
+        util.Fail()  
+
     # check argument combinations       
     if not (options.qStartFromFasta or options.qStartFromBlast or options.qStartFromGroups or options.qStartFromTrees):
         print("ERROR: Please specify the input directory for OrthoFinder using one of the options: '-f', '-b', '-fg' or '-ft'.")
