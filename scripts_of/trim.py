@@ -61,9 +61,10 @@ class MSA(object):
                 for i in range(0, len(seq), nChar):
                     outfile.write(seq[i:i+nChar] + "\n")
 
-def main(infn, outfn, f, n_min, c):
+def main(infn, outfn, f=0.1, n_min=500, c=0.75):
     """
-    Trim the alignment file. Auto reduce f if required
+    Trim the alignment file. Auto reduce f parameter if required. OrthoFinder default
+    parameters are used by default.
     Args:
         infn - input FASTA filename
         outfn - output FASTA filename
