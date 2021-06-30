@@ -176,7 +176,7 @@ This contains all the files necessary for orthofinder to run. You can ignore thi
 * [Preparing and using separately run BLAST files](#running-blast-searches-separately--op-option)
 
 ## Orthogroups, Orthologs & Paralogs
-Figure 2A shows an example gene tree for three species: human, mouse and chicken. Orthologs are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Fig. 2B). An orthogroup is the extension of this concept to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). Genes within an orthogroup may be orthologs of one another or they may be paralogs, as explained below.
+Figure 2A shows an example gene tree for three species: human, mouse and chicken. Orthologs are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Fig. 2B). They can be thought of as 'equivalent genes' between two species. An orthogroup is the extension of this concept to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). Genes within an orthogroup may be orthologs of one another or they may be paralogs, as explained below.
 
 The tree shows the evolutionary history of a gene. First, there was a speciation event where the chicken lineage diverged from the human-mouse ancestor. In the human-mouse ancestor, there was a gene duplication event at X producing two copies of the gene in that ancestor, Y & Z. When human and mouse diverged they each inherited gene Y (becoming HuA & MoA) and gene Z (HuB & MoB). In general, we can identify a gene duplication event because it creates two copies of a gene in a species (e.g. HuA & HuB).
 
