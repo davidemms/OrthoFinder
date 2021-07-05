@@ -27,8 +27,8 @@
 
 import os
 import json
+import tempfile
 import time
-import shutil
 import subprocess
 import multiprocessing as mp
 
@@ -173,30 +173,25 @@ class ProgramCaller(object):
         self._CallMethod('search_search', method_name, queryfilename, outfilename, dbname=dbfilename)  
         
         
-    def TestMSAMethod(self, working_dir, method_name):
-        return self._TestMethod(working_dir, 'msa', method_name)
+    def TestMSAMethod(self, method_name):
+        return self._TestMethod('msa', method_name)
         
-    def TestTreeMethod(self, working_dir, method_name):
-        return self._TestMethod(working_dir, 'tree', method_name)
+    def TestTreeMethod(self, method_name):
+        return self._TestMethod('tree', method_name)
         
-    def TestSearchMethod(self, working_dir, method_name):
-        d = working_dir + "temp_83583209132/"
-        os.mkdir(d)
-        try:
-            fasta = self._WriteTestSequence_Longer(d)
-            dbname = d + method_name + "DBSpecies0"
-            self.CallSearchMethod_DB(method_name, fasta, dbname)
-            # it doesn't matter what file(s) it writes out the database to, only that we can use the database
-            resultsfn = d + "test_search_results.txt"
-            self.CallSearchMethod_Search(method_name, fasta, dbname, resultsfn)
-            success = os.path.exists(resultsfn) or os.path.exists(resultsfn + ".gz")
-#            with open(resultsfn, 'r') as f:
-#                print("".join(f))
-        except:
-            shutil.rmtree(d)
-            raise
-        shutil.rmtree(d)
-        return success
+    def TestSearchMethod(self, method_name):
+        with tempfile.TemporaryDirectory() as d:
+            try:
+                fasta = self._WriteTestSequence_Longer(d)
+                dbname = d + method_name + "DBSpecies0"
+                self.CallSearchMethod_DB(method_name, fasta, dbname)
+                # it doesn't matter what file(s) it writes out the database to, only that we can use the database
+                resultsfn = d + "test_search_results.txt"
+                self.CallSearchMethod_Search(method_name, fasta, dbname, resultsfn)
+                success = os.path.exists(resultsfn) or os.path.exists(resultsfn + ".gz")
+            except:
+                raise
+            return success
     
     def _CallMethod(self, method_type, method_name, infilename, outfilename, identifier=None, dbname=None, nSeqs=None):
         cmd, actual_target_fns = self._GetCommand(method_type, method_name, infilename, outfilename, identifier, dbname, nSeqs)
@@ -216,26 +211,23 @@ class ProgramCaller(object):
                 os.rename(actual, target)
         return stdout, stderr
     
-    def _TestMethod(self, working_dir, method_type, method_name):
+    def _TestMethod(self, method_type, method_name):
         util.PrintNoNewLine("Test can run \"%s\"" % method_name) 
-        d = working_dir + "temp_83583209132/"
-        os.mkdir(d)
-        try:
-            infn = self._WriteTestSequence(d)
-            propossed_outfn = infn + "output.txt"
-            stdout, stderr = self._CallMethod(method_type, method_name, infn, propossed_outfn, "test")
-            success = os.path.exists(propossed_outfn)
-        except:
-            shutil.rmtree(d)
-            raise
-        shutil.rmtree(d)
-        if success: 
-            print(" - ok")
-        else:
-            print(" - failed")
-            print(("".join(stdout)))
-            print(("".join(stderr)))
-        return success
+        with tempfile.TemporaryDirectory() as d:
+            try:
+                infn = self._WriteTestSequence(d)
+                propossed_outfn = infn + "output.txt"
+                stdout, stderr = self._CallMethod(method_type, method_name, infn, propossed_outfn, "test")
+                success = os.path.exists(propossed_outfn)
+            except:
+                raise
+            if success:
+                print(" - ok")
+            else:
+                print(" - failed")
+                print(("".join(stdout)))
+                print(("".join(stderr)))
+            return success
 
     def _ReplaceVariables(self, instring, infilename, outfilename, identifier=None, dbname=None):
         path, basename = os.path.split(infilename)
