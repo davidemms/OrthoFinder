@@ -81,8 +81,8 @@ def GetGeneName_NCBI(acc_line):
     acc_line = acc_line[1:]
     original = acc_line
     # look for "isoform X[:d]+" or "isoform [:d]+"
-    acc_line = re.sub("isoform [0-9]+ ", "", acc_line)
-    acc_line = re.sub("isoform X[0-9]+ ", "", acc_line)
+    acc_line = re.sub("isoform [0-9, A-Z]+ ", "", acc_line)
+    acc_line = re.sub("isoform X[0-9, A-Z]+ ", "", acc_line)
     # This last step is nasty. These are the same gene:
     # >XP_024356342.1 pyruvate decarboxylase 2-like isoform X1 [Physcomitrella patens]
     # >XP_024356343.1 pyruvate decarboxylase 2-like isoform X1 [Physcomitrella patens]
