@@ -1315,7 +1315,7 @@ def CheckDependencies(options, prog_caller, dirForTempFiles):
     if (options.qStartFromFasta):
         if options.search_program == "blast":
             if not CanRunBLAST(): util.Fail()
-        elif not prog_caller.TestSearchMethod(dirForTempFiles, options.search_program):
+        elif not prog_caller.TestSearchMethod(options.search_program):
             print("\nERROR: Cannot run %s" % options.search_program)
             print("Format of make database command:")
             print("  " + prog_caller.GetSearchMethodCommand_DB(options.search_program, "INPUT", "OUTPUT"))
