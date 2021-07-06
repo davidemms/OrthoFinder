@@ -38,6 +38,8 @@ except ImportError:
 import multiprocessing as mp
 from collections import namedtuple
 
+PY2 = sys.version_info <= (3,)
+
 nThreadsDefault = mp.cpu_count()
 
 from . import tree, parallel_task_manager

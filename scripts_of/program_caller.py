@@ -26,13 +26,28 @@
 # david_emms@hotmail.comhor: david
 
 import os
+import sys
 import json
-import tempfile
 import time
 import subprocess
 import multiprocessing as mp
 
+PY2 = sys.version_info <= (3,)
 from . import util, parallel_task_manager
+
+if not PY2:
+    from tempfile import TemporaryDirectory
+else:
+    import shutil
+    import tempfile
+    class TemporaryDirectory:
+        def __enter__(self):
+            self.name = tempfile.mkdtemp()
+            return self.name
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            shutil.rmtree(self.name)
+
 
 class InvalidEntryException(Exception):
     pass
@@ -180,7 +195,7 @@ class ProgramCaller(object):
         return self._TestMethod('tree', method_name)
         
     def TestSearchMethod(self, method_name):
-        with tempfile.TemporaryDirectory() as d:
+        with TemporaryDirectory() as d:
             try:
                 fasta = self._WriteTestSequence_Longer(d)
                 dbname = d + method_name + "DBSpecies0"
@@ -213,7 +228,7 @@ class ProgramCaller(object):
     
     def _TestMethod(self, method_type, method_name):
         util.PrintNoNewLine("Test can run \"%s\"" % method_name) 
-        with tempfile.TemporaryDirectory() as d:
+        with TemporaryDirectory() as d:
             try:
                 infn = self._WriteTestSequence(d)
                 propossed_outfn = infn + "output.txt"
