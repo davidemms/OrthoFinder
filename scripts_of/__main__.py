@@ -38,6 +38,11 @@ import glob                                     # Y
 import shutil                                   # Y
 import time                                     # Y
 import multiprocessing as mp                    # optional  (problems on OpenBSD)
+import platform
+if __name__ == "__main__" and platform.system() == "Darwin":
+    # https://github.com/davidemms/OrthoFinder/issues/570
+    mp.set_start_method('fork')
+
 import itertools                                # Y
 import datetime                                 # Y
 from collections import Counter                 # Y

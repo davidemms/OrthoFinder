@@ -38,8 +38,6 @@ except ImportError:
 import multiprocessing as mp
 from collections import namedtuple
 
-PY2 = sys.version_info <= (3,)
-
 nThreadsDefault = mp.cpu_count()
 
 from . import tree, parallel_task_manager
@@ -51,7 +49,7 @@ Utilities
 SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")    # speciesToUse - list of ints
 
 picProtocol = 1
-version = "2.5.2"
+version = "2.5.3"
     
 def PrintNoNewLine(text):
     parallel_task_manager.PrintNoNewLine(text)
