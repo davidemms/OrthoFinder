@@ -43,6 +43,7 @@ except ImportError:
 #         subprocess.call("taskset -p 0xffffffffffff %d" % os.getpid(), shell=True, stdout=f)
 
 
+PY2 = sys.version_info <= (3,)
 
 if getattr(sys, 'frozen', False):
     __location__ = os.path.split(sys.executable)[0]
@@ -65,7 +66,6 @@ if getattr(sys, 'frozen', False):
 
 
 def print_traceback(e):
-    PY2 = sys.version_info <= (3,)
     if PY2:
         traceback.print_exc()
     else:
@@ -86,7 +86,8 @@ def stderr_exempt(stderr):
     return True
 
 def PrintTime(message):
-    print((str(datetime.datetime.now()).rsplit(".", 1)[0] + " : " + message))      
+    print((str(datetime.datetime.now()).rsplit(".", 1)[0] + " : " + message))
+    sys.stdout.flush()
 
 def PrintNoNewLine(text):
     sys.stdout.write(text)
