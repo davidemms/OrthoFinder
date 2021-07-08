@@ -85,8 +85,9 @@ def main(infn, outfn, f=0.1, n_min=500, c=0.75):
         print("ERROR, input file does not exist: %s" % infn)
         sys.exit()
     try:
-        with open(outfn, 'w') as outfile:
-            outfile.write("\n")
+        # BEWARE: Input and output files may be the same
+        with open(outfn, 'a') as outfile:
+            outfile.write(" ")
     except:
         print("ERROR, cannot write to output file: %s" % outfn)
         sys.exit()

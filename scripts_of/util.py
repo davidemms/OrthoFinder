@@ -49,7 +49,7 @@ Utilities
 SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")    # speciesToUse - list of ints
 
 picProtocol = 1
-version = "2.5.3"
+version = "2.5.4"
     
 def PrintNoNewLine(text):
     parallel_task_manager.PrintNoNewLine(text)
