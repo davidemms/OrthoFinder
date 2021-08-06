@@ -139,7 +139,7 @@ class HogWriter(object):
             os.mkdir(d)
         self.fhs = dict()
         self.iSps = list(map(str, sorted(species_to_use)))   # list of strings
-        self.i_sp_to_index = {isp:i_col for i_col, isp in enumerate(self.iSps)}
+        self.i_sp_to_index = {int(isp):i_col for i_col, isp in enumerate(self.iSps)}
         self.iHOG = defaultdict(int)
         self.species_tree = species_tree
         species_names = [sp_ids[i] for i in self.iSps]
@@ -205,8 +205,8 @@ class HogWriter(object):
         
         # get scl & remove HOGs that can't be written yet due to duplications
         # 0. Get the scl units below this node in the gene tree
-        # I.e. get genes (indexed by species) below each scl (the relevant gene tree nodes)
-        genes_per_species_index = self.get_descendant_genes(n)
+        # I.e. get genes (referenced by species ID) below each scl (the relevant gene tree nodes)
+        genes_per_species_id = self.get_descendant_genes(n)
 
         # scl_mrca = {nn.sp_node for nn in scl if not nn.is_leaf()}
         if debug: print("Dups below: " + str(n.dups_below))
@@ -225,7 +225,7 @@ class HogWriter(object):
             return []
 
         if debug: print(hogs_to_write)
-        return self.get_hog_file_entries(hogs_to_write, genes_per_species_index, og_name, n.name)
+        return self.get_hog_file_entries(hogs_to_write, genes_per_species_id, og_name, n.name)
 
     def get_descendant_genes(self, n):
         """
@@ -234,7 +234,7 @@ class HogWriter(object):
         Args:
             n - node under consideration
         Returns:
-            dict:sp_index->string of genes, comma separated
+            dict:sp_id (int)->string of genes, comma separated
         """
         genes_per_species = defaultdict(list) # iCol (before 'name' columns) -> text string of genes
         genes = n.get_leaves()
@@ -242,19 +242,18 @@ class HogWriter(object):
         for g in genes:
             if "X" in g.features: continue
             q_have_legitimate_gene = True
-            isp = g.name.split("_")[0]
-            genes_per_species[self.i_sp_to_index[isp]].append(self.seq_ids[g.name])
+            isp = int(g.name.split("_")[0])
+            genes_per_species[isp].append(self.seq_ids[g.name])
         for k, v in genes_per_species.items():
             genes_per_species[k] = ", ".join(v)
         return genes_per_species
 
-    def get_hog_file_entries(self, hogs_to_write, genes_per_species_index, og_name, gt_node_name):
+    def get_hog_file_entries(self, hogs_to_write, genes_per_species_id, og_name, gt_node_name):
         """
         Write the HOGs that can be determined from this gene tree node.
         Args:
             hogs_to_write - list of HOG names
-            scl_units - dict:st_node_name->(dict:sp_index->genes string for HOGs file)   
-                        e.g. st_node_name is N5 for internal node, 11 for leaf
+            genes_per_species_id - dict:sp_id (int)->str, comma separated list of genes
             og_name - OG name
             gt_node_name - gene tree node name
         Implementation:
@@ -268,12 +267,14 @@ class HogWriter(object):
             q_empty = True
             # 2. We know the scl, these are the 'taxonomic units' available (clades or individual species in species tree for this node of the gene tree)
             # Note there can be at most one of each. Only a subset of these will fall under this HOG.
-            units = self.hog_contents[h].intersection(genes_per_species_index.keys())
+            units = self.hog_contents[h].intersection(genes_per_species_id.keys())
             # print("Units: " + str(units))
             genes_row = ["" for _ in self.iSps]
             # put the units into the row
             for isp in units:
-                genes_row[isp] = genes_per_species_index[isp]
+                # translate the species ID to the species column it should be in
+                # after accounting for removed species
+                genes_row[self.i_sp_to_index[isp]] = genes_per_species_id[isp]
                 q_empty = False
             if not q_empty: 
                 # print((h, genes_row))

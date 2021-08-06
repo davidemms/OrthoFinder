@@ -506,7 +506,10 @@ def GetRoot(speciesTreeFN, treesDir, GeneToSpeciesMap, nProcessors, qWriteDupTre
         speciesTree = tree.Tree(speciesTreeFN, format=2)
         qHaveBranchSupport = True
     except:
-        speciesTree = tree.Tree(speciesTreeFN, format=1)
+        try:
+            speciesTree = tree.Tree(speciesTreeFN, format=1)
+        except:
+            print("ERROR: Species tree inference failed")
     species, dict_clades, clade_names = AnalyseSpeciesTree(speciesTree)
     pool = mp.Pool(nProcessors, maxtasksperchild=1)       
     list_of_dicts = pool.map(SupportedHierachies_wrapper2, [(fn, GeneToSpeciesMap, species, dict_clades, clade_names, qWriteDupTrees) for fn in glob.glob(treesDir + "/*")])
