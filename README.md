@@ -136,9 +136,9 @@ The Orthologues directory contains one sub-directory for each species that in tu
 
     * ***OrthologuesStats_many-to-many.tsv*** contains the number of orthologues in a many-to-many relationship for each species pair (due to gene duplication events in both lineages post-speciation). Entry (i,j) is the number of genes in species i that are in a many-to-many orthology relationship with genes in species j.
 
-    * ***OrthologuesStats_many-to-one.tsv***: entry (i,j) gives the number of genes in species i that are in a one-to-many orthology relationship with genes from species j. There is a walk-through of an example results file here: https://github.com/davidemms/OrthoFinder/issues/259.
+    * ***OrthologuesStats_one-to-many.tsv***: entry (i,j) gives the number of genes in species i that are in a one-to-many orthology relationship with genes from species j. There is a walk-through of an example results file here: https://github.com/davidemms/OrthoFinder/issues/259.
 
-    * ***OrthologuesStats_one-to-many.tsv***: entry (i,j) gives the number of genes in species i that are in a many-to-one orthology relationship with a gene from species j. There is a walk-through of an example results file here: https://github.com/davidemms/OrthoFinder/issues/259.
+    * ***OrthologuesStats_many-to-one.tsv***: entry (i,j) gives the number of genes in species i that are in a many-to-one orthology relationship with a gene from species j. There is a walk-through of an example results file here: https://github.com/davidemms/OrthoFinder/issues/259.
 
     * ***OrthologuesStats_Total.tsv*** contains the totals for each species pair of orthologues of whatever multiplicity. Entry (i,j) is the total number of genes in species i that have orthologues in species j.
 
