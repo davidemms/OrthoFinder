@@ -502,6 +502,9 @@ class WaterfallMethod:
         if len(topScores) > 1:
             fittingParameters = scnorm.CalculateFittingParameters(topLf, topScores)  
             return scnorm.NormaliseScoresByLogLengthProduct(B, Lengths[iSpecies], Lengths[jSpecies], fittingParameters)
+        elif iSpecies == jSpecies and B.nnz == 0:
+            print("WARNING: THIS IS UNCOMMON, there are zero hits when searching the genes in species %d against itself. Check the input proteome contains all the genes from that species and check the search program is working (default is diamond)." % iSpecies)
+            return sparse.lil_matrix(B.get_shape())
         else:
             print("WARNING: Too few hits between species %d and species %d to normalise the scores, these hits will be ignored" % (iSpecies, jSpecies))
             return sparse.lil_matrix(B.get_shape())
