@@ -196,6 +196,7 @@ class ProgramCaller(object):
         
     def TestSearchMethod(self, method_name):
         with TemporaryDirectory() as d:
+            d+="/"
             try:
                 fasta = self._WriteTestSequence_Longer(d)
                 dbname = d + method_name + "DBSpecies0"
@@ -229,6 +230,7 @@ class ProgramCaller(object):
     def _TestMethod(self, method_type, method_name):
         util.PrintNoNewLine("Test can run \"%s\"" % method_name) 
         with TemporaryDirectory() as d:
+            d+="/"
             try:
                 infn = self._WriteTestSequence(d)
                 propossed_outfn = infn + "output.txt"
