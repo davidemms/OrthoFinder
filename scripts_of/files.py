@@ -616,6 +616,7 @@ class PreviousFilesLocator_new(PreviousFilesLocator):
                             print("ERROR: Missing directory: %s" % wd_base_anchor)
                             util.Fail()
                     self.wd_base_prev = self.GetWDBaseChain(wd_base_anchor)
+                    self.wd_trees = self.wd_base_prev[0]
                 if line.startswith(clusters_str): 
                     clusters_fn_full_path = line.rstrip()[len(clusters_str):]
                     self.clustersFilename_pairs = clusters_fn_full_path 

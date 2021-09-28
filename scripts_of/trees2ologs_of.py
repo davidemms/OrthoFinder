@@ -1202,7 +1202,8 @@ class TreeAnalyser(object):
             if iog >= 0 and divmod(iog, 10 if self.nOgs <= 200 else 100 if self.nOgs <= 2000 else 1000)[1] == 0:
                 util.PrintTime("Done %d of %d" % (iog, self.nOgs))
             return nOrthologues_SpPair, olog_lines, olog_sus_lines
-        except:
+        except Exception as e:
+            print(str(e))
             print("WARNING: Unknown error analysing tree %s" % og_name)
             olog_lines = [["" for j in xrange(self.nspecies)] for i in xrange(self.nspecies)]
             olog_sus_lines = ["" for i in xrange(self.nspecies)]
