@@ -54,6 +54,7 @@ class InvalidEntryException(Exception):
 
 class Method(object):
     def __init__(self, name, config_dict):
+        self.skip_check = False
         if 'cmd_line' in config_dict:
             self.cmd = config_dict['cmd_line']
         else:
@@ -71,6 +72,9 @@ class Method(object):
         else:
             self.cmd_fast = None
             self.n_seqs_use_fast = None
+        if "skip_check" in config_dict:
+            if config_dict["skip_check"] == "true":
+                self.skip_check = True
 
 class ProgramCaller(object):
     def __init__(self, configure_file):
@@ -227,8 +231,27 @@ class ProgramCaller(object):
                 os.rename(actual, target)
         return stdout, stderr
     
+    def _ShouldSkipTest(self, method_type, method_name):
+        if method_type == 'msa':
+            dictionary = self.msa
+        elif method_type == 'tree':
+            dictionary = self.tree
+        elif method_type == 'search_db':
+            dictionary = self.search_db
+        elif method_type == 'search_search':
+            dictionary = self.search_search
+        else:
+            raise NotImplementedError
+        if method_name not in dictionary:
+            raise Exception("No %s method called '%s'" % (self._GetMethodTypeName(method_type), method_name))
+        method_parameters = dictionary[method_name]
+        return method_parameters.skip_check
+
     def _TestMethod(self, method_type, method_name):
         util.PrintNoNewLine("Test can run \"%s\"" % method_name) 
+        if self._ShouldSkipTest(method_type, method_name):
+            print(" - test has been manually over-ridden")
+            return True
         with TemporaryDirectory() as d:
             d+="/"
             try:
@@ -297,6 +320,7 @@ class ProgramCaller(object):
             actual_fn = self._ReplaceVariables(method_parameters.non_default_outfn, infilename, outfilename_proposed, identifier)
             target_fn = outfilename_proposed
             actual_target_fn = (actual_fn, target_fn)
+        # print((cmd, actual_target_fn))
         return cmd, actual_target_fn
         
     def _WriteTestSequence(self, working_dir):
