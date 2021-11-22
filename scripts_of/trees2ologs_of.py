@@ -18,6 +18,8 @@ import operator
 import itertools
 import multiprocessing as mp
 from collections import defaultdict, deque
+import io
+import shutil
 
 from . import tree as tree_lib
 from . import resolve, util, files, parallel_task_manager
@@ -987,13 +989,38 @@ class OrthologsFiles(object):
         self.nSpecies = nSpecies
         self.sp_to_index = sp_to_index
         self.dPutativeXenologs = files.FileHandler.GetPutativeXenelogsDir()
+        self.inMemory = ("USE_MEM" in os.environ and os.environ["USE_MEM"] == "1")
+        if self.inMemory:
+            util.PrintTime("Handling OrthologsFiles in memory")
         self.ortholog_file_handles = [[None for _ in self.iSpeciesToUse] for _ in self.iSpeciesToUse]
         self.xenolog_file_handles = [None for _ in self.iSpeciesToUse]
+
+    def my_open(self, path, mode):
+        tmp = None
+        if self.inMemory and not PY2:
+            tmp  = io.StringIO()
+            setattr(tmp,'filepath',path)
+            if os.path.exists(path):
+                with open(path, "r") as tmp_fh:
+                    shutil.copyfileobj(tmp_fh,tmp)
+        else:
+            tmp = open(xenolog_path, csv_append_mode)
+        return tmp
+
+    def my_close(self, orig_fh):
+        if self.inMemory and not PY2:
+            fh = open(orig_fh.filepath, "w")
+            shutil.copyfileobj(orig_fh,fh)
+            fh.close()
+            orig_fh.close()
+        else:
+            orig_fh.close()
 
     def __enter__(self):
         for i in xrange(self.nSpecies):
             sp0 = str(self.iSpeciesToUse[i])
-            self.xenolog_file_handles[i] = open(self.dPutativeXenologs + "%s.tsv" % self.speciesDict[sp0], csv_append_mode)
+            xenolog_path = self.dPutativeXenologs + "%s.tsv" % self.speciesDict[sp0]
+            self.xenolog_file_handles[i] = self.my_open(xenolog_path, csv_append_mode)
             strsp0 = sp0 + "_"
             isp0 = self.sp_to_index[sp0]
             d0 = self.d + "Orthologues_" + self.speciesDict[sp0] + "/"
@@ -1003,17 +1030,17 @@ class OrthologsFiles(object):
                 strsp1 = sp1 + "_"
                 isp1 = self.sp_to_index[sp1]
                 d1 = self.d + "Orthologues_" + self.speciesDict[sp1] + "/"
-                self.ortholog_file_handles[i][j] = open(d0 + '%s__v__%s.tsv' % (self.speciesDict[sp0], self.speciesDict[sp1]), csv_append_mode)
-                self.ortholog_file_handles[j][i] = open(d1 + '%s__v__%s.tsv' % (self.speciesDict[sp1], self.speciesDict[sp0]), csv_append_mode)
+                self.ortholog_file_handles[i][j] = self.my_open(d0 + '%s__v__%s.tsv' % (self.speciesDict[sp0], self.speciesDict[sp1]), csv_append_mode)
+                self.ortholog_file_handles[j][i] = self.my_open(d1 + '%s__v__%s.tsv' % (self.speciesDict[sp1], self.speciesDict[sp0]), csv_append_mode)
         return self.ortholog_file_handles, self.xenolog_file_handles
 
     def __exit__(self, type, value, traceback):
         for fh in self.xenolog_file_handles:
-            fh.close()
+            self.my_close(fh)
         for fh_list in self.ortholog_file_handles:
             for fh in fh_list:
                 if fh is not None:
-                    fh.close()
+                    self.my_close(fh)
 
     @staticmethod
     def flush_olog_files(ortholog_file_handles):
