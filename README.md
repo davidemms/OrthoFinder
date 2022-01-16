@@ -2,7 +2,7 @@
 
 SHOOT.bio searches your query sequence against a database of gene families and instantly provides you with a phylogenetic tree with your query sequence grafted into it. 
 
-Or if you want to run an orthology analysis for all genes across multiple species then keep reading.
+Or, if you want to run an orthology analysis for all genes in multiple species then keep reading about OrthoFinder.
 
 ---
 
