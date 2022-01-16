@@ -1,6 +1,15 @@
-### Interested in a single gene family, try https://SHOOT.bio
+### Interested in a single gene, try https://SHOOT.bio
 
 Or if you want to run an orthology analysis for all genes across multiple species then keep reading.
+
+---
+
+### In addition to this README there is a set of OrthoFinder tutorials here: https://davidemms.github.io/
+
+1. Downloading and running OrthoFinder
+2. Running an example OrthoFinder analysis
+3. Exploring OrthoFinder's results
+4. OrthoFinder best practices
 
 ---
 
