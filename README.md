@@ -1,4 +1,6 @@
-### Interested in a single gene, try https://SHOOT.bio
+### Interested in a single gene? Try SHOOT.bio, the phylogenetic search engine: https://SHOOT.bio
+
+SHOOT.bio searches your query sequence against a database of gene families and instantly provides you with a phylogenetic tree with your query sequence grafted into it. 
 
 Or if you want to run an orthology analysis for all genes across multiple species then keep reading.
 
