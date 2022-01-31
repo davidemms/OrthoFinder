@@ -235,7 +235,7 @@ def main_create_files():
         parser.add_argument("output_directory", help="Output directory where new files will be written")
         parser.add_argument("node_name", help="Node name, e.g. 'N0', or 'all' for HOGs at all nodes")
         args = parser.parse_args()
-        orthofinder_results_dir = args.orthofinder_results_dir
+        orthofinder_results_dir = args.orthofinder_results
         if not orthofinder_results_dir.endswith("/"):
             orthofinder_results_dir += "/"
         create_files(orthofinder_results_dir, args.node_name, args.output_directory)
