@@ -36,13 +36,15 @@ You can see an overview talk for OrthoFinder from the 2020 Virtual symposium on 
 
 Thanks to Rosa Fernández & Jesus Lozano-Fernandez for organising this excellent conference.
 
+---
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
 - [Getting started with OrthoFinder](#getting-started-with-orthofinder)
   - [Installing OrthoFinder on Linux](#installing-orthofinder-on-linux)
-    - [Installing OrthoFinder on Mac & Windows](#installing-orthofinder-on-mac--windows)
+  - [Installing OrthoFinder on Mac & Windows](#installing-orthofinder-on-mac--windows)
 - [Running OrthoFinder](#running-orthofinder)
 - [What OrthoFinder provides](#what-orthofinder-provides)
   - [Results Files: Phylogenetic Hierarchical Orthogroups Directory](#results-files-phylogenetic-hierarchical-orthogroups-directory)
@@ -62,17 +64,16 @@ Thanks to Rosa Fernández & Jesus Lozano-Fernandez for organising this excellent
   - [Orthogroups allow you to analyse all of your data](#orthogroups-allow-you-to-analyse-all-of-your-data)
   - [Orthogroups allow you to define the unit of comparison](#orthogroups-allow-you-to-define-the-unit-of-comparison)
   - [Orthogroups are the only way to identify orthologs](#orthogroups-are-the-only-way-to-identify-orthologs)
-- [Setting up OrthoFinder](#setting-up-orthofinder)
-  - [Installing Dependencies](#installing-dependencies)
+- [Trees from MSA: `"-M msa"`](#trees-from-msa--m-msa)
+  - [Adding addtional tree inference, local alignment or MSA programs: config.json](#adding-addtional-tree-inference-local-alignment-or-msa-programs-configjson)
+- [Advanced usage](#advanced-usage)
+  - [Python Source Code Version](#python-source-code-version)
+  - [Manually Installing Dependencies](#manually-installing-dependencies)
     - [DIAMOND](#diamond)
     - [MCL](#mcl)
     - [FastME](#fastme)
     - [Optional: BLAST+](#optional-blast)
     - [Optional: MMseqs2](#optional-mmseqs2)
-- [Trees from MSA: `"-M msa"`](#trees-from-msa--m-msa)
-  - [Adding addtional tree inference, local alignment or MSA programs: config.json](#adding-addtional-tree-inference-local-alignment-or-msa-programs-configjson)
-- [Python Source Code Version](#python-source-code-version)
-- [Advanced usage](#advanced-usage)
   - [Adding Extra Species](#adding-extra-species)
   - [Removing Species](#removing-species)
   - [Adding and Removing Species Simultaneously](#adding-and-removing-species-simultaneously)
@@ -117,7 +118,7 @@ If you want to move the orthofinder executable to another location then you must
 
 OrthoFinder is written in python, but the bundled version does not require python to be installed on your computer. Both versions contain the programs OrthoFinder needs in order to run (in bin/), it will use these copies in preference to any of the same programs in your system path. You can delete the individual executables if you would prefer it not to do this. 
 
-#### Installing OrthoFinder on Mac & Windows
+### Installing OrthoFinder on Mac & Windows
 
 The easiest way to install OrthoFinder on Mac is using Bioconda:
 
@@ -262,8 +263,32 @@ It is important to note that with orthogroups you choose where to define the lim
 ### Orthogroups are the only way to identify orthologs
 Orthology is defined by phylogeny. It is not definable by amino acid content, codon bias, GC content or other measures of sequence similarity. Methods that use such scores to define orthologs in the absence of phylogeny can only provide guesses. The only way to be sure that the orthology assignment is correct is by conducting a phylogenetic reconstruction of all genes descended from a single gene the last common ancestor of the species under consideration. This set of genes is an orthogroup. Thus, the only way to define orthology is by analysing orthogroups.   
 
-## Setting up OrthoFinder
-### Installing Dependencies
+## Trees from MSA: `"-M msa"`
+The following is not required for the standard OrthoFinder use cases and are only needed if you want to infer maximum likelihood trees from multiple sequence alignments (MSA). This is more costly computationally but more accurate. By default, MAFFT is used for the alignment and FastTree for the tree inference. The option for this is, "-M msa". You should be careful using any other tree inference programs, such as IQTREE or RAxML, since inferring the gene trees for the complete set of orthogroups using anything that is not as quick as FastTree will require significant computational resources/time. The executables you wish to use should be in the system path. 
+
+### Adding addtional tree inference, local alignment or MSA programs: config.json
+You can actually use **any** alignment or tree inference program you like the best! Be careful with the method you chose, OrthoFinder typically needs to infer about 10,000-20,000 gene trees. If you have many species or if the tree/alignment method isn't super-fast then this can take a very long time! MAFFT + FastTree provides a reasonable compromise. OrthoFinder already knows how to call:
+- mafft
+- muscle
+- iqtree
+- raxml
+- raxml-ng
+- fasttree
+
+For example, to you muscle and iqtree, the command like arguments you need to add are: `"-M msa -A muscle -T iqtree"`
+
+OrthoFinder also knows how to use the following local sequence alignment programs:
+- BLAST
+- DIAMOND
+- MMSeqs2
+
+If you want to use a different program, there is a simple configuration file called **"config.json"** in the orthofinder directory and you can also create a file of the same format called **"config_orthofinder_user.json"** in your user home directory. You just need to add an entry to tell OrthoFinder what the command line looks like for the program you want to use. There are lots of examples in the file that you can follow. The "config.json" file is read first and then the "config_orthofinder_user.json", if it is present. The config_orthofinder_user.json file can be used to add user-specific options and to overwrite options from config.json. In most cases it is best to add additional options to the "config_orthofinder_user.json" since these will continue to apply if you update your version of OrthoFinder.
+
+## Advanced usage
+### Python Source Code Version
+There is a standalone binary for OrthoFinder which do not require python or scipy to be installed which is therefore the easiest for many users. However, the python source code version is available from the github 'releases' page (e.g. 'OrthoFinder_source.tar.gz') and requires python 2.7 or python 3 plus scipy & numpy to be installed. Up-to-date and clear instructions for scipy/numpy are provided here: http://www.scipy.org/install.html. As websites can change, an alternative is to search online for "install scipy". 
+
+### Manually Installing Dependencies
 To perform an analysis OrthoFinder requires some dependencies. The OrthoFinder release package now contains these so you should just be able to download it and run. 
 
 Here are some brief instructions if you do need to download them manually. They will need to be in the system path, which you can check by using the 'which' command, e.g. `which diamond`. Each of these packages also contains more detailed installation instructions on their websites if you need them.
@@ -326,31 +351,6 @@ Download the appropriate version for your machine, extract it and copy the execu
 or alternatively if you don't have root privileges, instead of the last step above, add the directory containing the directory to your PATH variable 
 - ``export PATH=$PATH:`pwd`/mmseqs2/bin/``
 
-## Trees from MSA: `"-M msa"`
-The following is not required for the standard OrthoFinder use cases and are only needed if you want to infer maximum likelihood trees from multiple sequence alignments (MSA). This is more costly computationally but more accurate. By default, MAFFT is used for the alignment and FastTree for the tree inference. The option for this is, "-M msa". You should be careful using any other tree inference programs, such as IQTREE or RAxML, since inferring the gene trees for the complete set of orthogroups using anything that is not as quick as FastTree will require significant computational resources/time. The executables you wish to use should be in the system path. 
-
-### Adding addtional tree inference, local alignment or MSA programs: config.json
-You can actually use **any** alignment or tree inference program you like the best! Be careful with the method you chose, OrthoFinder typically needs to infer about 10,000-20,000 gene trees. If you have many species or if the tree/alignment method isn't super-fast then this can take a very long time! MAFFT + FastTree provides a reasonable compromise. OrthoFinder already knows how to call:
-- mafft
-- muscle
-- iqtree
-- raxml
-- raxml-ng
-- fasttree
-
-For example, to you muscle and iqtree, the command like arguments you need to add are: `"-M msa -A muscle -T iqtree"`
-
-OrthoFinder also knows how to use the following local sequence alignment programs:
-- BLAST
-- DIAMOND
-- MMSeqs2
-
-If you want to use a different program, there is a simple configuration file called **"config.json"** in the orthofinder directory and you can also create a file of the same format called **"config_orthofinder_user.json"** in your user home directory. You just need to add an entry to tell OrthoFinder what the command line looks like for the program you want to use. There are lots of examples in the file that you can follow. The "config.json" file is read first and then the "config_orthofinder_user.json", if it is present. The config_orthofinder_user.json file can be used to add user-specific options and to overwrite options from config.json. In most cases it is best to add additional options to the "config_orthofinder_user.json" since these will continue to apply if you update your version of OrthoFinder.
-
-## Python Source Code Version
-There is a standalone binary for OrthoFinder which do not require python or scipy to be installed which is therefore the easiest for many users. However, the python source code version is available from the github 'releases' page (e.g. 'OrthoFinder_source.tar.gz') and requires python 2.7 or python 3 plus scipy & numpy to be installed. Up-to-date and clear instructions for scipy/numpy are provided here: http://www.scipy.org/install.html. As websites can change, an alternative is to search online for "install scipy". 
-
-## Advanced usage
 ### Adding Extra Species
 OrthoFinder allows you to add extra species without re-running the previously computed BLAST searches:
 
