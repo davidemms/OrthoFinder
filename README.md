@@ -46,7 +46,7 @@ Thanks to Rosa Fernández & Jesus Lozano-Fernandez for organising this excellent
   - [Installing OrthoFinder on Linux](#installing-orthofinder-on-linux)
   - [Installing OrthoFinder on Mac & Windows](#installing-orthofinder-on-mac--windows)
 - [Running OrthoFinder](#running-orthofinder)
-- [What OrthoFinder provides](#what-orthofinder-provides)
+- [OrthoFinder Results Files](#orthofinder-results-files)
   - [Results Files: Phylogenetic Hierarchical Orthogroups Directory](#results-files-phylogenetic-hierarchical-orthogroups-directory)
   - [Results Files: Orthologues Directory](#results-files-orthologues-directory)
   - [Results Files: Orthogroups Directory (deprecated)](#results-files-orthogroups-directory-deprecated)
@@ -58,14 +58,13 @@ Thanks to Rosa Fernández & Jesus Lozano-Fernandez for organising this excellent
   - [Results Files: Orthogroup Sequences](#results-files-orthogroup-sequences)
   - [Results Files: Single Copy Orthologue Sequences](#results-files-single-copy-orthologue-sequences)
   - [Results Files: WorkingDirectory](#results-files-workingdirectory)
-- [Additional Information](#additional-information)
-- [Orthogroups, Orthologs & Paralogs](#orthogroups-orthologs--paralogs)
-- [Why Orthogroups](#why-orthogroups)
+- [Understanding orthology](#understanding-orthology)
+  - [Orthogroups, Orthologs & Paralogs](#orthogroups-orthologs--paralogs)
+  - [Why Orthogroups](#why-orthogroups)
   - [Orthogroups allow you to analyse all of your data](#orthogroups-allow-you-to-analyse-all-of-your-data)
   - [Orthogroups allow you to define the unit of comparison](#orthogroups-allow-you-to-define-the-unit-of-comparison)
   - [Orthogroups are the only way to identify orthologs](#orthogroups-are-the-only-way-to-identify-orthologs)
 - [Trees from MSA: `"-M msa"`](#trees-from-msa--m-msa)
-  - [Adding addtional tree inference, local alignment or MSA programs: config.json](#adding-addtional-tree-inference-local-alignment-or-msa-programs-configjson)
 - [Advanced usage](#advanced-usage)
   - [Python Source Code Version](#python-source-code-version)
   - [Manually Installing Dependencies](#manually-installing-dependencies)
@@ -74,6 +73,7 @@ Thanks to Rosa Fernández & Jesus Lozano-Fernandez for organising this excellent
     - [FastME](#fastme)
     - [Optional: BLAST+](#optional-blast)
     - [Optional: MMseqs2](#optional-mmseqs2)
+  - [config.json : Adding addtional programs for tree inference, local alignment or MSA](#configjson--adding-addtional-programs-for-tree-inference-local-alignment-or-msa)
   - [Adding Extra Species](#adding-extra-species)
   - [Removing Species](#removing-species)
   - [Adding and Removing Species Simultaneously](#adding-and-removing-species-simultaneously)
@@ -146,7 +146,7 @@ To run on your own dataset, replace "OrthoFinder/ExampleData" with the directory
 * .fas
 * .pep
 
-## What OrthoFinder provides
+## OrthoFinder Results Files
 **There is a tutorial that provides a guided tour of the main results files here: <https://davidemms.github.io/orthofinder_tutorials/exploring-orthofinders-results.html>**
 
 A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplication events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
@@ -234,14 +234,8 @@ Most of the terms in the files 'Statistics_Overall.csv' and 'Statistics_PerSpeci
 ### Results Files: WorkingDirectory
 This contains all the files necessary for orthofinder to run. You can ignore this.
 
-## Additional Information
-* [What are orthogroups, orthologs & paralogs?](#orthogroups-orthologs--paralogs)
-* [Why use orthogroups in your analysis](#why-orthogroups)
-* [Installing Dependencies](#setting-up-orthofinder)
-* [Adding and removing species from a completed OrthoFinder run](#advanced-usage)
-* [Preparing and using separately run BLAST files](#running-blast-searches-separately--op-option)
-
-## Orthogroups, Orthologs & Paralogs
+## Understanding orthology
+### Orthogroups, Orthologs & Paralogs
 Figure 2A shows an example gene tree for three species: human, mouse and chicken. Orthologs are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Fig. 2B). They can be thought of as 'equivalent genes' between two species. An orthogroup is the extension of this concept to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). Genes within an orthogroup may be orthologs of one another or they may be paralogs, as explained below.
 
 The tree shows the evolutionary history of a gene. First, there was a speciation event where the chicken lineage diverged from the human-mouse ancestor. In the human-mouse ancestor, there was a gene duplication event at X producing two copies of the gene in that ancestor, Y & Z. When human and mouse diverged they each inherited gene Y (becoming HuA & MoA) and gene Z (HuB & MoB). In general, we can identify a gene duplication event because it creates two copies of a gene in a species (e.g. HuA & HuB).
@@ -253,7 +247,7 @@ To tell which genes are orthologs and which genes are paralogs we need to identi
 
 The chicken gene diverged from the other genes when the lineage leading to chicken split from the lineage leading to human and mouse. Therefore, the chicken gene ChC is an ortholog of HuA & HuB in human and an ortholog of MoA & MoB in mouse. Depending on what happend after the genes diverged, orthologs can be in one-to-one relationships (HuA - MoA), many-to-one (HuA & HuB - ChC), or many-to-many (no examples in this tree, but would occur if there were a duplication in chicken). All of these relationships are identified by OrthoFinder.
 
-## Why Orthogroups
+### Why Orthogroups
 ### Orthogroups allow you to analyse all of your data
 All of the genes in an orthogroup are descended from a single ancestral gene. Thus, all the genes in an orthogroup started out with the same sequence and function. As gene duplication and loss occur frequently in evolution, one-to-one orthologs are rare and limitation of analyses to on-to-one orthologs limits an analysis to a small fraction of the available data. By analysing orthogroups you can analyse all of your data. 
 
@@ -265,24 +259,6 @@ Orthology is defined by phylogeny. It is not definable by amino acid content, co
 
 ## Trees from MSA: `"-M msa"`
 The following is not required for the standard OrthoFinder use cases and are only needed if you want to infer maximum likelihood trees from multiple sequence alignments (MSA). This is more costly computationally but more accurate. By default, MAFFT is used for the alignment and FastTree for the tree inference. The option for this is, "-M msa". You should be careful using any other tree inference programs, such as IQTREE or RAxML, since inferring the gene trees for the complete set of orthogroups using anything that is not as quick as FastTree will require significant computational resources/time. The executables you wish to use should be in the system path. 
-
-### Adding addtional tree inference, local alignment or MSA programs: config.json
-You can actually use **any** alignment or tree inference program you like the best! Be careful with the method you chose, OrthoFinder typically needs to infer about 10,000-20,000 gene trees. If you have many species or if the tree/alignment method isn't super-fast then this can take a very long time! MAFFT + FastTree provides a reasonable compromise. OrthoFinder already knows how to call:
-- mafft
-- muscle
-- iqtree
-- raxml
-- raxml-ng
-- fasttree
-
-For example, to you muscle and iqtree, the command like arguments you need to add are: `"-M msa -A muscle -T iqtree"`
-
-OrthoFinder also knows how to use the following local sequence alignment programs:
-- BLAST
-- DIAMOND
-- MMSeqs2
-
-If you want to use a different program, there is a simple configuration file called **"config.json"** in the orthofinder directory and you can also create a file of the same format called **"config_orthofinder_user.json"** in your user home directory. You just need to add an entry to tell OrthoFinder what the command line looks like for the program you want to use. There are lots of examples in the file that you can follow. The "config.json" file is read first and then the "config_orthofinder_user.json", if it is present. The config_orthofinder_user.json file can be used to add user-specific options and to overwrite options from config.json. In most cases it is best to add additional options to the "config_orthofinder_user.json" since these will continue to apply if you update your version of OrthoFinder.
 
 ## Advanced usage
 ### Python Source Code Version
@@ -350,6 +326,24 @@ Download the appropriate version for your machine, extract it and copy the execu
 
 or alternatively if you don't have root privileges, instead of the last step above, add the directory containing the directory to your PATH variable 
 - ``export PATH=$PATH:`pwd`/mmseqs2/bin/``
+
+### config.json : Adding addtional programs for tree inference, local alignment or MSA
+You can actually use **any** alignment or tree inference program you like the best! Be careful with the method you chose, OrthoFinder typically needs to infer about 10,000-20,000 gene trees. If you have many species or if the tree/alignment method isn't super-fast then this can take a very long time! MAFFT + FastTree provides a reasonable compromise. OrthoFinder already knows how to call:
+- mafft
+- muscle
+- iqtree
+- raxml
+- raxml-ng
+- fasttree
+
+For example, to you muscle and iqtree, the command like arguments you need to add are: `"-M msa -A muscle -T iqtree"`
+
+OrthoFinder also knows how to use the following local sequence alignment programs:
+- BLAST
+- DIAMOND
+- MMSeqs2
+
+If you want to use a different program, there is a simple configuration file called **"config.json"** in the orthofinder directory and you can also create a file of the same format called **"config_orthofinder_user.json"** in your user home directory. You just need to add an entry to tell OrthoFinder what the command line looks like for the program you want to use. There are lots of examples in the file that you can follow. The "config.json" file is read first and then the "config_orthofinder_user.json", if it is present. The config_orthofinder_user.json file can be used to add user-specific options and to overwrite options from config.json. In most cases it is best to add additional options to the "config_orthofinder_user.json" since these will continue to apply if you update your version of OrthoFinder.
 
 ### Adding Extra Species
 OrthoFinder allows you to add extra species without re-running the previously computed BLAST searches:
@@ -463,7 +457,7 @@ In most datasets there will be thousands of genes present in all species and so 
 **-T** \<opt\>: Tree inference program opt=fasttree,raxml,iqtree,... user-extendable (requires '-M msa') [Default = fasttree]    
  
  ### Further options
-**-d**: Input is DNA sequences
+**-d**: Input is DNA sequences 
 **-t** \<int\>: Number of threads for sequence search, MSA & tree inference [Default is number of cores on machine]  
 **-a** \<int\>: Number of parallel analysis threads for internal, RAM intensive tasks [Default = 1]  
 **-s** \<file\>: User-specified rooted species tree  
