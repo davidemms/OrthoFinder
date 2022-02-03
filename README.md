@@ -47,18 +47,18 @@ Thanks to Rosa Fernández & Jesus Lozano-Fernandez for organising this excellent
   - [Installing OrthoFinder on Mac & Windows](#installing-orthofinder-on-mac--windows)
 - [Running OrthoFinder](#running-orthofinder)
 - [OrthoFinder Results Files](#orthofinder-results-files)
-  - [Results Files: Phylogenetic Hierarchical Orthogroups Directory](#results-files-phylogenetic-hierarchical-orthogroups-directory)
-  - [Results Files: Orthologues Directory](#results-files-orthologues-directory)
-  - [Results Files: Orthogroups Directory (deprecated)](#results-files-orthogroups-directory-deprecated)
-  - [Results Files: Gene Trees Directory](#results-files-gene-trees-directory)
-  - [Results Files: Resolved Gene Trees Directory](#results-files-resolved-gene-trees-directory)
-  - [Results Files: Species Tree Directory](#results-files-species-tree-directory)
-  - [Results Files: Comparative Genomics Statistics Directory](#results-files-comparative-genomics-statistics-directory)
-  - [Results Files: Gene Duplication Events Directory](#results-files-gene-duplication-events-directory)
-  - [Results Files: Orthogroup Sequences](#results-files-orthogroup-sequences)
-  - [Results Files: Single Copy Orthologue Sequences](#results-files-single-copy-orthologue-sequences)
-  - [Results Files: WorkingDirectory](#results-files-workingdirectory)
-- [Understanding orthology](#understanding-orthology)
+  - [Phylogenetic Hierarchical Orthogroups Directory](#phylogenetic-hierarchical-orthogroups-directory)
+  - [Orthologues Directory](#orthologues-directory)
+  - [Orthogroups Directory (deprecated)](#orthogroups-directory-deprecated)
+  - [Gene Trees Directory](#gene-trees-directory)
+  - [Resolved Gene Trees Directory](#resolved-gene-trees-directory)
+  - [Species Tree Directory](#species-tree-directory)
+  - [Comparative Genomics Statistics Directory](#comparative-genomics-statistics-directory)
+  - [Gene Duplication Events Directory](#gene-duplication-events-directory)
+  - [Orthogroup Sequences](#orthogroup-sequences)
+  - [Single Copy Orthologue Sequences](#single-copy-orthologue-sequences)
+  - [WorkingDirectory](#workingdirectory)
+- [Understanding Orthology](#understanding-orthology)
   - [Orthogroups, Orthologs & Paralogs](#orthogroups-orthologs--paralogs)
   - [Why Orthogroups](#why-orthogroups)
     - [Orthogroups allow you to analyse all of your data](#orthogroups-allow-you-to-analyse-all-of-your-data)
@@ -151,7 +151,7 @@ To run on your own dataset, replace "OrthoFinder/ExampleData" with the directory
 
 A standard OrthoFinder run produces a set of files describing the orthogroups, orthologs, gene trees, resolve gene trees, the rooted species tree, gene duplication events and comparative genomic statistics for the set of species being analysed. These files are located in an intuitive directory structure.
 
-### Results Files: Phylogenetic Hierarchical Orthogroups Directory
+### Phylogenetic Hierarchical Orthogroups Directory
 From version 2.4.0 onwards OrthoFinder infers HOGs, orthogroups at each hierarchical level (i.e. at each node in the species tree) by analysing the rooted gene trees. This is a far more accurate orthogroup inference method than the gene similarity/graph based approach used by all other methods and used previously by OrthoFinder (the deprecated Orthogroups/Orthogroups.tsv file). According to the Orthobench benchmarks, these new orthogroups are 12% more accurate than the OrthoFinder 2 orthogroups (Orthogroups/Orthogroups.tsv). The accuracy can be increased still further (20% more accurate on Orthobench) by including outgroup species, which help with the interpretation of the rooted gene trees. 
 
 It is important to ensure that the species tree OrthoFinder is using is accurate so as to maximise the accuracy of the HOGs. To reanalyse with a different species tree use the options `-ft PREVIOUS_RESULTS_DIR -s SPECIES_TREE_FILE`. This runs just the final analysis steps "from trees" and is relatively quick. If outgroup species are used, refer to "Species_Tree/SpeciesTree_rooted_node_labels.txt" to determine which N?.tsv file that contains the orthogroups you require. 
@@ -162,10 +162,10 @@ It is important to ensure that the species tree OrthoFinder is using is accurate
 
 (Hierarchical orthogroup splitting: When analysing the gene trees, a nested hierarchical group (any HOG other than N0, the HOG at the level of the last common ancestor of all species) may sometimes have lost its genes from the earliest diverging species and then duplicated before the first extant genes. The two first diverging clades will then be paralogous even though the evidence suggests they belong to the same HOG. For most analyses it is often better to split these clades into separate groups. This can be requested using the option '**-y**'.)
 
-### Results Files: Orthologues Directory 
+### Orthologues Directory 
 The Orthologues directory contains one sub-directory for each species that in turn contains a file for each pairwise species comparison, listing the orthologs between that species pair. Orthologues can be one-to-one, one-to-many or many-to-many depending on the gene duplication events since the orthologs diverged (see Section "Orthogroups, Orthologues & Paralogues" for more details). Each row in a file contains the gene(s) in one species that are orthologues of the gene(s) in the other species and each row is cross-referenced to the orthogroup that contains those genes. 
 
-### Results Files: Orthogroups Directory (deprecated)
+### Orthogroups Directory (deprecated)
 **The orthogroups in Phylogenetic_Hierarchical_Orthogroups/ should be used instead.** They are identifed using rooted genes trees and are 12%-20% more accurate.
 
 1. **Orthogroups.tsv (deprecated)** is a tab separated text file. Each row contains the genes belonging to a single orthogroup. The genes from each orthogroup are organized into columns, one per species. **The orthogroups in Phylogenetic_Hierarchical_Orthogroups/N0.tsv should be used instead.** 
@@ -178,18 +178,18 @@ The Orthologues directory contains one sub-directory for each species that in tu
 
 5. **Orthogroups_SingleCopyOrthologues.txt** is a list of orthogroups that contain exactly one gene per species i.e. they contain one-to-one orthologues. They are ideally suited to between-species comparisons and to species tree inference. 
 
-### Results Files: Gene Trees Directory
+### Gene Trees Directory
 1. A rooted phylogenetic tree inferred for each orthogroup with 4 or more sequences (4 sequences is the mimimum number required for tree inference with most tree inference programs).
 
-### Results Files: Resolved Gene Trees Directory
+### Resolved Gene Trees Directory
 1. A rooted phylogenetic tree inferred for each orthogroup with 4 or more sequences and resolved using the OrthoFinder hybrid species-overlap/duplication-loss coalescent model.
 
-### Results Files: Species Tree Directory
+### Species Tree Directory
 1. **SpeciesTree_rooted.txt** A STAG species tree inferred from all orthogroups, containing STAG support values at internal nodes and rooted using STRIDE.
 
 2. **SpeciesTree_rooted_node_labels.txt** The same tree as above but with the nodes given labels (instead of support values) to allow other results files to cross-reference branches/nodes in the species tree (e.g. location of gene duplication events).
 
-### Results Files: Comparative Genomics Statistics Directory
+### Comparative Genomics Statistics Directory
 1. **Duplications_per_Orthogroup.tsv** is a tab separated text file that gives the number of duplications identified in each orthogroup. This master file for this data is Gene_Duplication_Events/Duplications.tsv.
 
 2. **Duplications_per_Species_Tree_Node.tsv** is a tab separated text file that gives the number of duplications identified as occurring along each branch of the species tree. This master file for this data is Gene_Duplication_Events/Duplications.tsv.
@@ -220,21 +220,21 @@ Most of the terms in the files 'Statistics_Overall.csv' and 'Statistics_PerSpeci
 - Single-copy orthogroup: An orthogroup with exactly one gene (and no more) from each species. These orthogroups are ideal for inferring a species tree and many other analyses. 
 - Unassigned gene: A gene that has not been put into an orthogroup with any other genes.
 
-### Results Files: Gene Duplication Events Directory
+### Gene Duplication Events Directory
 1. **Duplications.tsv** is a tab separated text file that lists all the gene duplication events identified by examining each node of each orthogroup gene tree. The columns are "Orthogroup", "Species Tree node" (branch of the species tree on which the duplication took place, see Species_Tree/SpeciesTree_rooted_node_labels.txt), "Gene tree node" (node corresponding to the gene duplication event, see corresponding orthogroup tree in Resolved_Gene_Trees/); "Support" (proportion of expected species for which both copies of the duplicated gene are present); "Type" ("Terminal": duplication on a terminal branch of the species tree, "Non-Terminal": duplication on an internal branch of the species tree & therefore shared by more than one species, "Non-Terminal: STRIDE": Non-Terminal duplication that also passes the very stringent [STRIDE](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5850722/) checks for what the topology of the gene tree should be post-duplication); "Genes 1" (the list of genes descended from one of the copies of the duplicate gene), "Genes 2" (the list of genes descended from the other copy of the duplicate gene.
 
 2. **SpeciesTree_Gene_Duplications_0.5_Support.txt** provides a summation of the above duplications over the branches of the species tree. It is a text file in newick format. The numbers after each node or species name are the number of gene duplication events with at least 50% support that occurred on the branch leading to the node/species. The branch lengths are the standard branch lengths, as give in Species_Tree/SpeciesTree_rooted.txt.
 
-### Results Files: Orthogroup Sequences
+### Orthogroup Sequences
 1. A FASTA file for each orthogroup giving the amino acid sequences for each gene in the orthogroup.
 
-### Results Files: Single Copy Orthologue Sequences
+### Single Copy Orthologue Sequences
 1. The same files as the "Orthogroup Sequences" directory but restricted to only those orthogroups which contain exactly one gene per species.
 
-### Results Files: WorkingDirectory
+### WorkingDirectory
 This contains all the files necessary for orthofinder to run. You can ignore this.
 
-## Understanding orthology
+## Understanding Orthology
 ### Orthogroups, Orthologs & Paralogs
 Figure 2A shows an example gene tree for three species: human, mouse and chicken. Orthologs are pairs of genes that descended from a single gene in the last common ancestor (LCA) of two species (Fig. 2B). They can be thought of as 'equivalent genes' between two species. An orthogroup is the extension of this concept to groups of species. An orthogroup is the group of genes descended from a single gene in the LCA of a group of species (Figure 2A). Genes within an orthogroup may be orthologs of one another or they may be paralogs, as explained below.
 
