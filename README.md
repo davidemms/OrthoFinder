@@ -61,9 +61,9 @@ Thanks to Rosa Fernández & Jesus Lozano-Fernandez for organising this excellent
 - [Understanding orthology](#understanding-orthology)
   - [Orthogroups, Orthologs & Paralogs](#orthogroups-orthologs--paralogs)
   - [Why Orthogroups](#why-orthogroups)
-  - [Orthogroups allow you to analyse all of your data](#orthogroups-allow-you-to-analyse-all-of-your-data)
-  - [Orthogroups allow you to define the unit of comparison](#orthogroups-allow-you-to-define-the-unit-of-comparison)
-  - [Orthogroups are the only way to identify orthologs](#orthogroups-are-the-only-way-to-identify-orthologs)
+    - [Orthogroups allow you to analyse all of your data](#orthogroups-allow-you-to-analyse-all-of-your-data)
+    - [Orthogroups allow you to define the unit of comparison](#orthogroups-allow-you-to-define-the-unit-of-comparison)
+    - [Orthogroups are the only way to identify orthologs](#orthogroups-are-the-only-way-to-identify-orthologs)
 - [Trees from MSA: `"-M msa"`](#trees-from-msa--m-msa)
 - [Advanced usage](#advanced-usage)
   - [Python Source Code Version](#python-source-code-version)
@@ -248,13 +248,13 @@ To tell which genes are orthologs and which genes are paralogs we need to identi
 The chicken gene diverged from the other genes when the lineage leading to chicken split from the lineage leading to human and mouse. Therefore, the chicken gene ChC is an ortholog of HuA & HuB in human and an ortholog of MoA & MoB in mouse. Depending on what happend after the genes diverged, orthologs can be in one-to-one relationships (HuA - MoA), many-to-one (HuA & HuB - ChC), or many-to-many (no examples in this tree, but would occur if there were a duplication in chicken). All of these relationships are identified by OrthoFinder.
 
 ### Why Orthogroups
-### Orthogroups allow you to analyse all of your data
+#### Orthogroups allow you to analyse all of your data
 All of the genes in an orthogroup are descended from a single ancestral gene. Thus, all the genes in an orthogroup started out with the same sequence and function. As gene duplication and loss occur frequently in evolution, one-to-one orthologs are rare and limitation of analyses to on-to-one orthologs limits an analysis to a small fraction of the available data. By analysing orthogroups you can analyse all of your data. 
 
-### Orthogroups allow you to define the unit of comparison
+#### Orthogroups allow you to define the unit of comparison
 It is important to note that with orthogroups you choose where to define the limits of the unit of comparison. For example, if you just chose to analyse human and mouse in the above figure then you would have two orthogroups. 
 
-### Orthogroups are the only way to identify orthologs
+#### Orthogroups are the only way to identify orthologs
 Orthology is defined by phylogeny. It is not definable by amino acid content, codon bias, GC content or other measures of sequence similarity. Methods that use such scores to define orthologs in the absence of phylogeny can only provide guesses. The only way to be sure that the orthology assignment is correct is by conducting a phylogenetic reconstruction of all genes descended from a single gene the last common ancestor of the species under consideration. This set of genes is an orthogroup. Thus, the only way to define orthology is by analysing orthogroups.   
 
 ## Trees from MSA: `"-M msa"`
