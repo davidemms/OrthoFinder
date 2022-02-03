@@ -38,9 +38,11 @@ Thanks to Rosa Fernández & Jesus Lozano-Fernandez for organising this excellent
 
 ---
 
+## Table of Contents
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+*generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
 - [Getting started with OrthoFinder](#getting-started-with-orthofinder)
   - [Installing OrthoFinder on Linux](#installing-orthofinder-on-linux)
