@@ -1,3 +1,4 @@
+
 ### Interested in a single gene? Try SHOOT.bio, the phylogenetic search engine: https://SHOOT.bio
 
 SHOOT.bio searches your query sequence against a database of gene families and instantly provides you with a phylogenetic tree with your query sequence grafted into it. 
@@ -34,6 +35,69 @@ You can see an overview talk for OrthoFinder from the 2020 Virtual symposium on 
 [![OrthoFinder: Building Fully Phylogenetic Orthology Inference](assets/youtube_title_slide.jpg)](https://www.youtube.com/watch?v=L6eXJAE5J7g "OrthoFinder: Building Fully Phylogenetic Orthology Inference")
 
 Thanks to Rosa Fernández & Jesus Lozano-Fernandez for organising this excellent conference.
+
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+    - [Interested in a single gene? Try SHOOT.bio, the phylogenetic search engine: https://SHOOT.bio](#interested-in-a-single-gene-try-shootbio-the-phylogenetic-search-engine-httpsshootbio)
+    - [In addition to this README there is a set of OrthoFinder tutorials here: https://davidemms.github.io/](#in-addition-to-this-readme-there-is-a-set-of-orthofinder-tutorials-here-httpsdavidemmsgithubio)
+- [OrthoFinder: phylogenetic orthology inference for comparative genomics](#orthofinder-phylogenetic-orthology-inference-for-comparative-genomics)
+  - [What does OrthoFinder do?](#what-does-orthofinder-do)
+  - [Getting started with OrthoFinder](#getting-started-with-orthofinder)
+    - [Installing OrthoFinder on Linux](#installing-orthofinder-on-linux)
+      - [Installing OrthoFinder on Mac & Windows](#installing-orthofinder-on-mac--windows)
+  - [Running OrthoFinder](#running-orthofinder)
+  - [What OrthoFinder provides](#what-orthofinder-provides)
+    - [Results Files: Phylogenetic Hierarchical Orthogroups Directory](#results-files-phylogenetic-hierarchical-orthogroups-directory)
+    - [Results Files: Orthologues Directory](#results-files-orthologues-directory)
+    - [Results Files: Orthogroups Directory (deprecated)](#results-files-orthogroups-directory-deprecated)
+    - [Results Files: Gene Trees Directory](#results-files-gene-trees-directory)
+    - [Results Files: Resolved Gene Trees Directory](#results-files-resolved-gene-trees-directory)
+    - [Results Files: Species Tree Directory](#results-files-species-tree-directory)
+    - [Results Files: Comparative Genomics Statistics Directory](#results-files-comparative-genomics-statistics-directory)
+    - [Results Files: Gene Duplication Events Directory](#results-files-gene-duplication-events-directory)
+    - [Results Files: Orthogroup Sequences](#results-files-orthogroup-sequences)
+    - [Results Files: Single Copy Orthologue Sequences](#results-files-single-copy-orthologue-sequences)
+    - [Results Files: WorkingDirectory](#results-files-workingdirectory)
+  - [Additional Information](#additional-information)
+  - [Orthogroups, Orthologs & Paralogs](#orthogroups-orthologs--paralogs)
+  - [Why Orthogroups](#why-orthogroups)
+    - [Orthogroups allow you to analyse all of your data](#orthogroups-allow-you-to-analyse-all-of-your-data)
+    - [Orthogroups allow you to define the unit of comparison](#orthogroups-allow-you-to-define-the-unit-of-comparison)
+    - [Orthogroups are the only way to identify orthologs](#orthogroups-are-the-only-way-to-identify-orthologs)
+  - [Setting up OrthoFinder](#setting-up-orthofinder)
+    - [Installing Dependencies](#installing-dependencies)
+      - [DIAMOND](#diamond)
+      - [MCL](#mcl)
+      - [FastME](#fastme)
+      - [Optional: BLAST+](#optional-blast)
+      - [Optional: MMseqs2](#optional-mmseqs2)
+  - [Trees from MSA: `"-M msa"`](#trees-from-msa--m-msa)
+    - [Adding addtional tree inference, local alignment or MSA programs: config.json](#adding-addtional-tree-inference-local-alignment-or-msa-programs-configjson)
+  - [Python Source Code Version](#python-source-code-version)
+  - [Advanced usage](#advanced-usage)
+    - [Adding Extra Species](#adding-extra-species)
+    - [Removing Species](#removing-species)
+    - [Adding and Removing Species Simultaneously](#adding-and-removing-species-simultaneously)
+    - [Inferring Multiple Sequence Alignment (MSA) Gene Trees](#inferring-multiple-sequence-alignment-msa-gene-trees)
+    - [Parallelising OrthoFinder Algorithm](#parallelising-orthofinder-algorithm)
+    - [Running BLAST Searches Separately (-op option)](#running-blast-searches-separately--op-option)
+    - [Using Pre-Computed BLAST Results](#using-pre-computed-blast-results)
+    - [Regression Tests](#regression-tests)
+  - [Methods](#methods)
+    - [Species Tree Inference](#species-tree-inference)
+      - [Default species tree method](#default-species-tree-method)
+      - [Multiple Sequence Alignment species tree method (-M msa)](#multiple-sequence-alignment-species-tree-method--m-msa)
+      - [Falback species tree method](#falback-species-tree-method)
+  - [Command line options](#command-line-options)
+    - [Options for starting an analysis](#options-for-starting-an-analysis)
+    - [Options for stopping an analysis](#options-for-stopping-an-analysis)
+    - [Options controlling the workflow](#options-controlling-the-workflow)
+    - [Options controlling the programs used](#options-controlling-the-programs-used)
+    - [Further options](#further-options)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## Getting started with OrthoFinder
 You can find a step-by-step tutorial here: [Downloading and checking OrthoFinder](https://davidemms.github.io/orthofinder_tutorials/downloading-and-checking-orthofinder.html) including **instructions for Mac**, for which Bioconda is recommended and **Windows**, for which the Windows Subsystem for Linux is recommended. There are also tutorials on that site which guide you through running your first analysis and exploring the results files. 
