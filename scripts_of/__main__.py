@@ -39,8 +39,9 @@ import shutil                                   # Y
 import time                                     # Y
 import multiprocessing as mp                    # optional  (problems on OpenBSD)
 import platform
-if __name__ == "__main__" and platform.system() == "Darwin":
+if platform.system() == "Darwin":
     # https://github.com/davidemms/OrthoFinder/issues/570
+    # https://github.com/davidemms/OrthoFinder/issues/663 
     mp.set_start_method('fork')
 
 import itertools                                # Y
