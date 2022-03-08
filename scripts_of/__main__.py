@@ -1817,6 +1817,8 @@ def main(args=None):
         util.PrintCitation(d_results)
         files.FileHandler.WriteToLog("OrthoFinder run completed\n", True)
     except Exception as e:
+        print(str(e))
+        parallel_task_manager.print_traceback(e)
         ptm = parallel_task_manager.ParallelTaskManager_singleton()
         ptm.Stop()
         raise
