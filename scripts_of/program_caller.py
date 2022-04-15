@@ -35,22 +35,21 @@ import multiprocessing as mp
 PY2 = sys.version_info <= (3,)
 from . import util, parallel_task_manager
 
-if not PY2:
-    from tempfile import TemporaryDirectory
-else:
-    import shutil
-    import tempfile
-    class TemporaryDirectory:
-        def __enter__(self):
-            self.name = tempfile.mkdtemp()
-            return self.name
-
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            shutil.rmtree(self.name)
-
 
 class InvalidEntryException(Exception):
     pass
+
+
+def PrintDependencyCheckFailure(cmd):
+    """Error message including environment & PATH if a dependency check fails
+    """
+    print("\nEnvironment:")
+    print(parallel_task_manager.my_env)
+    print("\nCommand:")
+    print("export PATH=%s:" % parallel_task_manager.my_env['PATH'])
+    print(cmd)
+    print("\nResolve any issues so that you can successfully run the above commands for OrthoFinder's dependencies on your computer and then re-run OrthoFinder.")
+
 
 class Method(object):
     def __init__(self, name, config_dict):
@@ -180,38 +179,41 @@ class ProgramCaller(object):
     
     
     def CallMSAMethod(self, method_name, infilename, outfilename, identifier, nSeqs=None):
-        self._CallMethod('msa', method_name, infilename, outfilename, identifier, nSeqs=nSeqs)
+        return self._CallMethod('msa', method_name, infilename, outfilename, identifier, nSeqs=nSeqs)
         
     def CallTreeMethod(self, method_name, infilename, outfilename, identifier, nSeqs=None):
-        self._CallMethod('tree', method_name, infilename, outfilename, identifier, nSeqs=nSeqs)   
+        return self._CallMethod('tree', method_name, infilename, outfilename, identifier, nSeqs=nSeqs)   
         
     def CallSearchMethod_DB(self, method_name, infilename, outfilename):
-        self._CallMethod('search_db', method_name, infilename, outfilename)     
+        return self._CallMethod('search_db', method_name, infilename, outfilename)     
         
     def CallSearchMethod_Search(self, method_name, queryfilename, dbfilename, outfilename):
-        self._CallMethod('search_search', method_name, queryfilename, outfilename, dbname=dbfilename)  
+        return self._CallMethod('search_search', method_name, queryfilename, outfilename, dbname=dbfilename)  
         
         
-    def TestMSAMethod(self, method_name):
-        return self._TestMethod('msa', method_name)
+    def TestMSAMethod(self, method_name, d_test):
+        return self._TestMethod('msa', method_name, d_test)
         
-    def TestTreeMethod(self, method_name):
-        return self._TestMethod('tree', method_name)
+    def TestTreeMethod(self, method_name, d_test):
+        return self._TestMethod('tree', method_name, d_test)
         
-    def TestSearchMethod(self, method_name):
-        with TemporaryDirectory() as d:
-            d+="/"
-            try:
-                fasta = self._WriteTestSequence_Longer(d)
-                dbname = d + method_name + "DBSpecies0"
-                self.CallSearchMethod_DB(method_name, fasta, dbname)
-                # it doesn't matter what file(s) it writes out the database to, only that we can use the database
-                resultsfn = d + "test_search_results.txt"
-                self.CallSearchMethod_Search(method_name, fasta, dbname, resultsfn)
-                success = os.path.exists(resultsfn) or os.path.exists(resultsfn + ".gz")
-            except:
-                raise
-            return success
+    def TestSearchMethod(self, method_name, d_deps_check):
+        success = False
+        fasta = self._WriteTestSequence_Longer(d_deps_check)
+        dbname = d_deps_check + method_name + "DBSpecies0"
+        stdout_db, stderr_db, cmd_db = self.CallSearchMethod_DB(method_name, fasta, dbname)
+        # it doesn't matter what file(s) it writes out the database to, only that we can use the database
+        resultsfn = d_deps_check + "test_search_results.txt"
+        stdout_s, stderr_s, cmd_s = self.CallSearchMethod_Search(method_name, fasta, dbname, resultsfn)
+        success = os.path.exists(resultsfn) or os.path.exists(resultsfn + ".gz")
+        if not success:
+            print("%s produced the following output:" % method_name)
+            print("\n".join(stdout_db))
+            print("\n".join(stderr_db))
+            print("\n".join(stdout_s))
+            print("\n".join(stderr_s))
+        cmd = cmd_db + "\n" + cmd_s
+        return success, stdout_db  + stdout_s, stderr_db + stderr_s, cmd
     
     def _CallMethod(self, method_type, method_name, infilename, outfilename, identifier=None, dbname=None, nSeqs=None):
         cmd, actual_target_fns = self._GetCommand(method_type, method_name, infilename, outfilename, identifier, dbname, nSeqs)
@@ -229,7 +231,7 @@ class ProgramCaller(object):
             actual, target = actual_target_fns
             if os.path.exists(actual): 
                 os.rename(actual, target)
-        return stdout, stderr
+        return stdout, stderr, cmd
     
     def _ShouldSkipTest(self, method_type, method_name):
         if method_type == 'msa':
@@ -247,27 +249,22 @@ class ProgramCaller(object):
         method_parameters = dictionary[method_name]
         return method_parameters.skip_check
 
-    def _TestMethod(self, method_type, method_name):
+    def _TestMethod(self, method_type, method_name, d_test):
         util.PrintNoNewLine("Test can run \"%s\"" % method_name) 
         if self._ShouldSkipTest(method_type, method_name):
             print(" - test has been manually over-ridden")
             return True
-        with TemporaryDirectory() as d:
-            d+="/"
-            try:
-                infn = self._WriteTestSequence(d)
-                propossed_outfn = infn + "output.txt"
-                stdout, stderr = self._CallMethod(method_type, method_name, infn, propossed_outfn, "test")
-                success = os.path.exists(propossed_outfn)
-            except:
-                raise
-            if success:
-                print(" - ok")
-            else:
-                print(" - failed")
-                print(("".join(stdout)))
-                print(("".join(stderr)))
-            return success
+        infn = self._WriteTestSequence(d_test)
+        propossed_outfn = infn + ".output.txt"
+        stdout, stderr, cmd = self._CallMethod(method_type, method_name, infn, propossed_outfn, "test")
+        success = os.path.exists(propossed_outfn)
+        if success:
+            print(" - ok")
+        else:
+            print(" - failed")
+            print("".join(stdout))
+            print("".join(stderr))
+        return success, stdout, stderr, cmd
 
     def _ReplaceVariables(self, instring, infilename, outfilename, identifier=None, dbname=None):
         path, basename = os.path.split(infilename)

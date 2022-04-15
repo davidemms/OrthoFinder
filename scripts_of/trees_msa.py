@@ -86,14 +86,11 @@ class FastaWriter(object):
     def SortSeqs(self, seqs):
         return sorted(seqs, key=lambda x: list(map(int, x.split("_"))))
 
-def WriteTestFile(workingDir):
-    d = workingDir + "/_dependencies_check/"
-    if not os.path.exists(d):
-        os.mkdir(d)
+def WriteTestFile(d_deps_test):
     testFN = d + "SimpleTest.fa"
     with open(testFN, 'w') as outfile:
         outfile.write(">a\nA\n>b\nA")
-    return testFN, d
+    return testFN
  
 """ 
 -----------------------------------------------------------------------------

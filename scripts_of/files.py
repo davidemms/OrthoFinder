@@ -541,6 +541,12 @@ class __Files_new_dont_manually_create__(object):
         if not os.path.exists(d): os.mkdir(d)
         return d    
 
+    def GetDependenciesCheckDir(self):
+        d = self.GetWorkingDirectory_Write() + "dependencies/"
+        if not os.path.exists(d):
+            os.mkdir(d)
+        return d
+
 FileHandler = __Files_new_dont_manually_create__()
                     
 """ ************************************************************************************************************************* """

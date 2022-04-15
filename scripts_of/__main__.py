@@ -813,6 +813,7 @@ def CanRunBLAST():
         return True
     else:
         print("ERROR: Cannot run BLAST+")
+        program_caller.PrintDependencyCheckFailure("makeblastdb -help\nblastp -help")
         print("Please check BLAST+ is installed and that the executables are in the system path\n")
         return False
 
@@ -822,7 +823,8 @@ def CanRunMCL():
         return True
     else:
         print("ERROR: Cannot run MCL with the command \"%s\"" % command)
-        print("Please check MCL is installed and in the system path\n")
+        program_caller.PrintDependencyCheckFailure(command)
+        print("Please check MCL is installed and in the system path. See information above.\n")
         return False
     
 def GetProgramCaller():
@@ -1324,15 +1326,14 @@ def CheckDependencies(options, prog_caller, dirForTempFiles):
     if (options.qStartFromFasta):
         if options.search_program == "blast":
             if not CanRunBLAST(): util.Fail()
-        elif not prog_caller.TestSearchMethod(options.search_program):
-            print("\nERROR: Cannot run %s" % options.search_program)
-            print("Format of make database command:")
-            print("  " + prog_caller.GetSearchMethodCommand_DB(options.search_program, "INPUT", "OUTPUT"))
-            print("ERROR: Cannot run %s" % options.search_program)
-            print("Format of search database command:")
-            print("  " + prog_caller.GetSearchMethodCommand_Search(options.search_program, "INPUT", "DATABASE", "OUTPUT"))
-            print("Please check %s is installed and that the executables are in the system path\n" % options.search_program)
-            util.Fail()
+        else:
+            d_deps_check = files.FileHandler.GetDependenciesCheckDir()
+            success, stdout, stderr, cmd = prog_caller.TestSearchMethod(options.search_program, d_deps_check)
+            if not success:
+                print("\nERROR: Cannot run %s" % options.search_program)
+                program_caller.PrintDependencyCheckFailure(cmd)
+                print("Please check %s is installed and that the executables are in the system path\n" % options.search_program)
+                util.Fail()
     if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunMCL():
         util.Fail()
     if not (options.qStopAfterPrepare or options.qStopAfterSeqs or options.qStopAfterGroups):
