@@ -40,17 +40,6 @@ class InvalidEntryException(Exception):
     pass
 
 
-def PrintDependencyCheckFailure(cmd):
-    """Error message including environment & PATH if a dependency check fails
-    """
-    print("\nEnvironment:")
-    print(parallel_task_manager.my_env)
-    print("\nCommand:")
-    print("export PATH=%s:" % parallel_task_manager.my_env['PATH'])
-    print(cmd)
-    print("\nResolve any issues so that you can successfully run the above commands for OrthoFinder's dependencies on your computer and then re-run OrthoFinder.")
-
-
 class Method(object):
     def __init__(self, name, config_dict):
         self.skip_check = False
@@ -257,7 +246,7 @@ class ProgramCaller(object):
         infn = self._WriteTestSequence(d_test)
         propossed_outfn = infn + ".output.txt"
         stdout, stderr, cmd = self._CallMethod(method_type, method_name, infn, propossed_outfn, "test")
-        success = os.path.exists(propossed_outfn)
+        success = os.path.exists(propossed_outfn) and os.stat(propossed_outfn).st_size > 0 
         if success:
             print(" - ok")
         else:
@@ -354,6 +343,20 @@ TKDQILKSFIEKVTNRKNLILSKDPKYVFDKIKYHFNVSEDVLKSSKRKKEIVQARHICMYVLKNVYNKN
 LSQIGKLLRKDHTTVRHGIDKVEEELENDPNLKSFLDLFKN""")
         return fn
    
+    @staticmethod
+    def PrintDependencyCheckFailure(cmd):
+        """Error message including environment & PATH if a dependency check fails
+        """
+        print("\nEnvironment:")
+        print(parallel_task_manager.my_env)
+        print("\nCommand:")
+        print("export PATH=%s:" % parallel_task_manager.my_env['PATH'])
+        print(cmd)
+        print("\nResolve any issues so that you can successfully run the above commands for OrthoFinder's dependencies on your computer and then re-run OrthoFinder.")
+
+
+# ========================================================================================================================
+
 def RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, qListOfList):
     """
     Calls the commands in parallel and if required moves the results file to the required new filename

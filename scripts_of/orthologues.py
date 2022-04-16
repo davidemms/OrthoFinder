@@ -565,9 +565,9 @@ def WriteTestDistancesFile(testFN):
     return testFN
 
 def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfterTrees, msa_method, tree_method, recon_method, program_caller, qStopAfterAlignments):  
+    d_deps_test = files.FileHandler.GetDependenciesCheckDir()
     # FastME
     if not qMSAGeneTrees:
-        d_deps_test = files.FileHandler.GetDependenciesCheckDir()
         testFN = d_deps_test + "SimpleTest.phy"
         WriteTestDistancesFile(testFN)
         outFN = d_deps_test + "SimpleTest.tre"
@@ -616,36 +616,21 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
     # FastTree & MAFFT
     if qMSAGeneTrees or qPhyldog:
         testFN = trees_msa.WriteTestFile(d_deps_test)
-        if msa_method == "mafft":
-            cmd = "mafft %s" % testFN
-            if not parallel_task_manager.CanRunCommand(cmd, qAllowStderr=True):
-                print("ERROR: Cannot run mafft")
-                program_caller.PrintDependencyCheckFailure(cmd)
-                print("Please check MAFFT is installed and that the executables are in the system path\n")
-                return False
-        elif msa_method != None:
+        if msa_method is not None:
             success, stdout, stderr, cmd = program_caller.TestMSAMethod(msa_method, d_deps_test)
             if not success:
-                print("ERROR: Cannot run user-configured MSA method '%s'" % msa_method)
+                print("ERROR: Cannot run MSA method '%s'" % msa_method)
                 program_caller.PrintDependencyCheckFailure(cmd)
-                print("Please check program is installed and that it is correctly configured in the orthofinder/config.json file\n")
+                print("Please check program is installed. If it is user-configured please check the configuration in the orthofinder/config.json file\n")
                 return False
-        if tree_method == "fasttree":
+        if tree_method is not None:
             if qMSAGeneTrees and (not qStopAfterAlignments):
-                cmd = "FastTree %s" % testFN
-                success, stdout, stderr, cmd = parallel_task_manager.CanRunCommand(cmd, qAllowStderr=True)
+                success, stdout, stderr, cmd = program_caller.TestTreeMethod(tree_method, d_deps_test)
                 if not success:
-                    print("ERROR: Cannot run FastTree")
-                    program_caller.PrintDependencyCheckFailure(cmd)
-                    print("Please check FastTree is installed and that the executables are in the system path\n")
-                return False      
-        elif tree_method != None:
-            success, stdout, stderr, cmd = program_caller.TestTreeMethod(tree_method, d_deps_test)
-            if not success:
-                print("ERROR: Cannot run user-configured tree method '%s'" % tree_method)
-                program_caller.PrintDependencyCheckFailure(cmd)
-                print("Please check program is installed and that it is correctly configured in the orthofinder/config.json file\n")
-                return False
+                   print("ERROR: Cannot run tree method '%s'" % tree_method)
+                   program_caller.PrintDependencyCheckFailure(cmd)
+                   print("Please check program is installed. If it is user-configured please check the configuration in the orthofinder/config.json file\n")
+                   return False
             
     if qPhyldog:
         if not parallel_task_manager.CanRunCommand("mpirun -np 1 phyldog", qAllowStderr=False):

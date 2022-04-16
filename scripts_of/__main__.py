@@ -813,7 +813,7 @@ def CanRunBLAST():
         return True
     else:
         print("ERROR: Cannot run BLAST+")
-        program_caller.PrintDependencyCheckFailure("makeblastdb -help\nblastp -help")
+        program_caller.ProgramCaller.PrintDependencyCheckFailure("makeblastdb -help\nblastp -help")
         print("Please check BLAST+ is installed and that the executables are in the system path\n")
         return False
 
@@ -823,7 +823,7 @@ def CanRunMCL():
         return True
     else:
         print("ERROR: Cannot run MCL with the command \"%s\"" % command)
-        program_caller.PrintDependencyCheckFailure(command)
+        program_caller.ProgramCaller.PrintDependencyCheckFailure(command)
         print("Please check MCL is installed and in the system path. See information above.\n")
         return False
     
@@ -1331,7 +1331,7 @@ def CheckDependencies(options, prog_caller, dirForTempFiles):
             success, stdout, stderr, cmd = prog_caller.TestSearchMethod(options.search_program, d_deps_check)
             if not success:
                 print("\nERROR: Cannot run %s" % options.search_program)
-                program_caller.PrintDependencyCheckFailure(cmd)
+                prog_caller.PrintDependencyCheckFailure(cmd)
                 print("Please check %s is installed and that the executables are in the system path\n" % options.search_program)
                 util.Fail()
     if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunMCL():

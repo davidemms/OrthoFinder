@@ -86,7 +86,7 @@ class FastaWriter(object):
     def SortSeqs(self, seqs):
         return sorted(seqs, key=lambda x: list(map(int, x.split("_"))))
 
-def WriteTestFile(d_deps_test):
+def WriteTestFile(d):
     testFN = d + "SimpleTest.fa"
     with open(testFN, 'w') as outfile:
         outfile.write(">a\nA\n>b\nA")
