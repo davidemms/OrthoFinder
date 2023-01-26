@@ -1683,7 +1683,7 @@ def CheckOptions(options, speciesToUse):
     # check can open enough files
     n_extra = 50
     q_do_orthologs = not any((options.qStopAfterPrepare, options.qStopAfterGroups, options.qStopAfterSeqs, options.qStopAfterAlignments, options.qStopAfterTrees))
-    if q_do_orthologs and not options.qStartFromTrees:
+    if q_do_orthologs and not options.qStartFromTrees and not ("USE_MEM" in os.environ and os.environ["USE_MEM"] == "1"):
         n_sp = len(speciesToUse)
         wd = files.FileHandler.GetWorkingDirectory_Write()
         wd_files_test = wd + "Files_test/"

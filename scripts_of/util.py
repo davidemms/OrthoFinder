@@ -387,7 +387,9 @@ def number_open_files_exception_advice(n_species, q_at_trees):
     """
     # parallel_task_manager.RunCommand("ulimit -Hn")    
     n_req = n_species*n_species + 100
-    msg="\nERROR: The system limits on the number of files a process can open is too low. For %d species \
+    msg="\nERROR: The system limits on the number of files a process can open is too low."
+    if not ("USE_MEM" in os.environ and os.environ["USE_MEM"] == "1"):
+        msg += "For %d species \
 OrthoFinder needs to be able to open at least r=%d files. Please increase the limit and restart OrthoFinder\n\
 1. Check the hard and soft limits on the number of open files for your system:\n\
     $ ulimit -Hn\n\
@@ -398,16 +400,17 @@ OrthoFinder needs to be able to open at least r=%d files. Please increase the li
 To increase the limit to %d for user  called 'emms' add the lines:\n\
     emms hard nofile %d\n\
     emms soft nofile %d\n" % (n_species, n_req, n_req, n_req, n_req, n_req)   
-    msg +="    (edit these lines to match your username)\n\
+        msg +="    (edit these lines to match your username)\n\
 4. Check the limit has now been updated (if you changed the hard limit you'll need to open a new session and confirm it's updated):\n\
-    $ ulimit -Sn" 
-
-    if q_at_trees:
-        msg_part_2 = "5. Once the limit is updated restart OrthoFinder 'from trees' using the '-ft' command"
+    $ ulimit -Sn\n" 
+        if q_at_trees:
+            msg += "\n5. Once the limit is updated restart OrthoFinder 'from trees' using the '-ft' command"
+        else:
+            msg += "\n5. Once the limit is updated restart OrthoFinder with the original command"
     else:
-        msg_part_2 = "5. Once the limit is updated restart OrthoFinder with the original command"
-    msg_part_3 = "\nFor full details see: https://github.com/davidemms/OrthoFinder/issues/384"
-    print(msg + "\n" + msg_part_2 + "\n" + msg_part_3 + "\n")
+        msg += "Please try to run OrthoFinder with USE_MEM=1 as environment variable. You need more memory for it"
+    msg += "\nFor full details see: https://github.com/davidemms/OrthoFinder/issues/384"
+    print(msg + "\n")
 """
 -------------------------------------------------------------------------------
 """
