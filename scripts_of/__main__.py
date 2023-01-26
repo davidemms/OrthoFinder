@@ -1680,45 +1680,18 @@ def CheckOptions(options, speciesToUse):
         print("ERROR: Must use '-M msa' option to generate sequence files and infer multiple sequence alignments for orthogroups")
         util.Fail()
 
-    # check can open enough files
-    n_extra = 50
+    # check can open enough files 
+    import resource
+    n_extra = 100 # as used in util.number_open_files_exception_advice instead of 50
     q_do_orthologs = not any((options.qStopAfterPrepare, options.qStopAfterGroups, options.qStopAfterSeqs, options.qStopAfterAlignments, options.qStopAfterTrees))
     if q_do_orthologs and not options.qStartFromTrees:
         n_sp = len(speciesToUse)
-        wd = files.FileHandler.GetWorkingDirectory_Write()
-        wd_files_test = wd + "Files_test/"
-        fh = []
-        try:
-            if not os.path.exists(wd_files_test):
-                os.mkdir(wd_files_test)
-            for i_sp in range(n_sp):
-                di = wd_files_test + "Sp%d/" % i_sp
-                if not os.path.exists(di):
-                    os.mkdir(di)
-                for j_sp in range(n_sp):
-                    fnij = di + "Sp%d.txt" % j_sp
-                    fh.append(open(fnij, 'w'))
-            # create a few extra files to be safe
-            for i_extra in range(n_extra):
-                fh.append(open(wd_files_test + "Extra%d.txt" % i_extra, 'w'))
-            # close the files again and delete
-            for fhh in fh:
-                fhh.close()
-            DeleteDirectoryTree(wd_files_test)
-        except IOError as e:
-            if str(e).startswith("[Errno 24] Too many open files"):
+        u_nfile, sys_nfile = resource.getrlimit(resource.RLIMIT_OFILE)
+        if (n_sp*n_sp)+n_extra >= u_nfile :
                 util.number_open_files_exception_advice(len(speciesToUse), False)
-                for fhh in fh:
-                    fhh.close()
-                DeleteDirectoryTree(wd_files_test)
                 util.Fail()
-            else:
-                for fhh in fh:
-                    fhh.close()
-                DeleteDirectoryTree(wd_files_test)
-                print("ERROR: Attempted to open required files for OrthoFinder run but an unexpected error occurred. \n\nStacktrace:")
-                raise
     return options
+
 
 def main(args=None):    
     try:
