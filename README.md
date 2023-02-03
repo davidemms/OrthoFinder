@@ -75,6 +75,7 @@ Thanks to Rosa Fernández & Jesus Lozano-Fernandez for organising this excellent
     - [FastME](#fastme)
     - [Optional: BLAST+](#optional-blast)
     - [Optional: MMseqs2](#optional-mmseqs2)
+    - [Optional: LAST](#optional-last)
   - [config.json : Adding addtional programs for tree inference, local alignment or MSA](#configjson--adding-addtional-programs-for-tree-inference-local-alignment-or-msa)
   - [Adding Extra Species](#adding-extra-species)
   - [Removing Species](#removing-species)
