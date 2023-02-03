@@ -63,5 +63,11 @@
     "program_type": "search",
     "db_cmd": "makeblastdb -dbtype nucl -in INPUT -out OUTPUT",
     "search_cmd": "blastn -outfmt 6 -evalue 0.001 -query INPUT -db DATABASE | gzip > OUTPUT.gz"
+    },
+    
+    "last":{
+    "program_type": "search",
+    "db_cmd": "lastdb -p -cR01 OUTPUT INPUT",
+    "search_cmd": "lastal -f BlastTab+ -D 1e6 DATABASE INPUT | sed -n '/^#/!p' > OUTPUT"
     }
 }
