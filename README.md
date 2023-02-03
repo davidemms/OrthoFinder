@@ -329,6 +329,18 @@ Download the appropriate version for your machine, extract it and copy the execu
 or alternatively if you don't have root privileges, instead of the last step above, add the directory containing the directory to your PATH variable 
 - ``export PATH=$PATH:`pwd`/mmseqs2/bin/``
 
+#### Optional: LAST
+Available here: https://gitlab.com/mcfrith/last/-/tags
+
+Download latest version, extract it, compile and copy the executable to a directory in your system path, e.g.:
+- `wget https://gitlab.com/mcfrith/last/-/archive/1447/last-1447.tar.gz`
+- `tar xzf last-1447.tar.gz`
+- `cd last-1447; make; cd ..`
+- `sudo cp last-1447/bin/* /usr/local/bin`
+
+or alternatively if you don't have root privileges, instead of the last step above, add the directory containing the directory to your PATH variable 
+- ``export PATH=$PATH:`pwd`/last-1447/bin/``
+
 ### config.json : Adding addtional programs for tree inference, local alignment or MSA
 You can actually use **any** alignment or tree inference program you like the best! Be careful with the method you chose, OrthoFinder typically needs to infer about 10,000-20,000 gene trees. If you have many species or if the tree/alignment method isn't super-fast then this can take a very long time! MAFFT + FastTree provides a reasonable compromise. OrthoFinder already knows how to call:
 - mafft
@@ -344,6 +356,7 @@ OrthoFinder also knows how to use the following local sequence alignment program
 - BLAST
 - DIAMOND
 - MMSeqs2
+- LAST
 
 If you want to use a different program, there is a simple configuration file called **"config.json"** in the orthofinder directory and you can also create a file of the same format called **"config_orthofinder_user.json"** in your user home directory. You just need to add an entry to tell OrthoFinder what the command line looks like for the program you want to use. There are lots of examples in the file that you can follow. The "config.json" file is read first and then the "config_orthofinder_user.json", if it is present. The config_orthofinder_user.json file can be used to add user-specific options and to overwrite options from config.json. In most cases it is best to add additional options to the "config_orthofinder_user.json" since these will continue to apply if you update your version of OrthoFinder.
 
