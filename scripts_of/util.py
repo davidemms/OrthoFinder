@@ -439,8 +439,8 @@ class nOrtho_cache(object):
         self.n += nOrtho_sp_obj.n
         return self
 
-    def get_i_j_to_write(self, n_max_cache, fewer_files=False):
-        if fewer_files:
+    def get_i_j_to_write(self, n_max_cache, fewer_open_files=False):
+        if fewer_open_files:
             # all genes for species i are collated
             IJ = np.where(self.n.sum(axis=1) > n_max_cache)
             I = list(IJ[0])
