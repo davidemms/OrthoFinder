@@ -957,6 +957,7 @@ class Options(object):#
         self.speciesTreeFN = None
         self.mclInflation = g_mclInflation
         self.dna = False
+        self.fewer_files = False
     
     def what(self):
         for k, v in self.__dict__.items():
@@ -1065,7 +1066,9 @@ def ProcessArgs(prog_caller, args):
                 options.mclInflation = float(arg)
             except:
                 print("Incorrect argument for MCL inflation parameter: %s\n" % arg)
-                util.Fail()    
+                util.Fail()
+        elif arg == "--fewer-open-files":
+            options.fewer_files = True
         elif arg == "-x" or arg == "--orthoxml":  
             if options.speciesXMLInfoFN:
                 print("Repeated argument: -x/--orthoxml")
@@ -1553,6 +1556,7 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
                                     options.qDoubleBlast,
                                     options.qAddSpeciesToIDs,
                                     options.qTrim,
+                                    options.fewer_files,
                                     options.speciesTreeFN, 
                                     options.qStopAfterSeqs,
                                     options.qStopAfterAlignments,
@@ -1564,7 +1568,8 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
     util.PrintTime("Done orthologues")
 
 def GetOrthologues_FromTrees(options):
-    orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.nProcessAlg, options.speciesTreeFN, options.qAddSpeciesToIDs, options.qSplitParaClades)
+    orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.nProcessAlg, options.speciesTreeFN,
+                                     options.qAddSpeciesToIDs, options.qSplitParaClades, options.fewer_files)
  
 def ProcessesNewFasta(fastaDir, q_dna, speciesInfoObj_prev = None, speciesToUse_prev_names=[]):
     """
