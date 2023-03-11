@@ -49,7 +49,7 @@ Utilities
 SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")    # speciesToUse - list of ints
 
 picProtocol = 1
-version = "2.5.5"
+version = "3.0.0"
     
 def PrintNoNewLine(text):
     parallel_task_manager.PrintNoNewLine(text)
@@ -386,7 +386,7 @@ def number_open_files_exception_advice(n_species, q_at_trees):
         q_at_trees - has this error occurred at the orthologs from trees stage
     """
     # parallel_task_manager.RunCommand("ulimit -Hn")    
-    n_req = n_species*n_species + 100
+    n_req = n_species + 100
     msg="\nERROR: The system limits on the number of files a process can open is too low. For %d species \
 OrthoFinder needs to be able to open at least r=%d files. Please increase the limit and restart OrthoFinder\n\
 1. Check the hard and soft limits on the number of open files for your system:\n\
@@ -408,6 +408,8 @@ To increase the limit to %d for user  called 'emms' add the lines:\n\
         msg_part_2 = "5. Once the limit is updated restart OrthoFinder with the original command"
     msg_part_3 = "\nFor full details see: https://github.com/davidemms/OrthoFinder/issues/384"
     print(msg + "\n" + msg_part_2 + "\n" + msg_part_3 + "\n")
+    print("Since this issue OrthoFinder has been updated to only require O(n) open files for n species rather than O(n^2).")
+    print("Please follow the above advice to ensure that it is able to.")
 """
 -------------------------------------------------------------------------------
 """

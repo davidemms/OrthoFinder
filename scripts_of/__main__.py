@@ -1690,7 +1690,7 @@ def CheckOptions(options, speciesToUse):
     # check can open enough files
     n_extra = 50
     q_do_orthologs = not any((options.qStopAfterPrepare, options.qStopAfterGroups, options.qStopAfterSeqs, options.qStopAfterAlignments, options.qStopAfterTrees))
-    if q_do_orthologs and not options.qStartFromTrees:
+    if q_do_orthologs:
         n_sp = len(speciesToUse)
         wd = files.FileHandler.GetWorkingDirectory_Write()
         wd_files_test = wd + "Files_test/"
@@ -1702,7 +1702,7 @@ def CheckOptions(options, speciesToUse):
                 di = wd_files_test + "Sp%d/" % i_sp
                 if not os.path.exists(di):
                     os.mkdir(di)
-                for j_sp in range(n_sp):
+                for j_sp in range(1):  # We only create a linear number of ortholog files now
                     fnij = di + "Sp%d.txt" % j_sp
                     fh.append(open(fnij, 'w'))
             # create a few extra files to be safe
