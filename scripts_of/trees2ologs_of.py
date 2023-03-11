@@ -1151,7 +1151,7 @@ def DoOrthologuesForOrthoFinder(ogSet,
                 args_queue = mp.Queue()
                 for iog in range(nOgs):
                     args_queue.put(iog)
-                nOrthologues_SpPair = RunOrthologsParallel(ta, len(ogSet.speciesToUse), args_queue, n_parallel)
+                nOrthologues_SpPair = RunOrthologsParallel(ta, len(ogSet.speciesToUse), args_queue, n_parallel, fewer_files=fewer_files)
     except IOError as e:
         if str(e).startswith("[Errno 24] Too many open files"):
             util.number_open_files_exception_advice(len(ogSet.speciesToUse), True)
@@ -1241,7 +1241,7 @@ class TreeAnalyser(object):
             olog_sus_lines = ["" for i in xrange(self.nspecies)]
             return util.nOrtho_sp(n_species), olog_lines, olog_sus_lines
 
-def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue, n_ologs_cache=100):
+def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue, fewer_files, n_ologs_cache=100):
     """
     Args:
         nspecies - the number in the analysis, after species have been removed
@@ -1258,6 +1258,8 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
                 results = tree_analyser.AnalyseTree(iog)
                 if results is None:
                     continue
+                # if fewer_genes nOrtho still counts orthologs between all i,j species but olog_lines contains all the
+                # orthologs in olog_lines[i][0]
                 nOrtho, olog_lines, olog_sus_lines = results
                 nOrthologues_SpPair += nOrtho
                 nCache += nOrtho
@@ -1266,17 +1268,25 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
                     for j in range(nspecies):
                         olog_lines_tot[i][j] += olog_lines[i][j]
                 # Now write those that we've collected enough lines for
-                I,J = nCache.get_i_j_to_write(n_ologs_cache)
-                for i, j in zip(I,J):
-                    k_lock = max(i,j)
-                    WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][j], olog_lines_tot[i][j], tree_analyser.lock_ologs[k_lock])
-                    olog_lines_tot[i][j] = ""
+                I,J = nCache.get_i_j_to_write(n_ologs_cache, fewer_files)
+                if fewer_files:
+                    for i in I:
+                        WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][0], olog_lines_tot[i][0], tree_analyser.lock_ologs[i])
+                        olog_lines_tot[i][0] = ""
+                else:
+                    for i, j in zip(I,J):
+                        k_lock = max(i,j)
+                        WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][j], olog_lines_tot[i][j], tree_analyser.lock_ologs[k_lock])
+                        olog_lines_tot[i][j] = ""
             except parallel_task_manager.queue.Empty:
                 for i in range(nspecies):
-                    for j in range(i+1, nspecies):
-                        # j is the largest (and intentionally changing quickest, which I think is best for the lock)
-                        WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][j], olog_lines_tot[i][j], tree_analyser.lock_ologs[j])
-                        WriteOlogLinesToFile(tree_analyser.ologs_files_handles[j][i], olog_lines_tot[j][i], tree_analyser.lock_ologs[j])
+                    if fewer_files:
+                        WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][0], olog_lines_tot[i][0], tree_analyser.lock_ologs[i])
+                    else:
+                        for j in range(i+1, nspecies):
+                            # j is the largest (and intentionally changing quickest, which I think is best for the lock)
+                            WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][j], olog_lines_tot[i][j], tree_analyser.lock_ologs[j])
+                            WriteOlogLinesToFile(tree_analyser.ologs_files_handles[j][i], olog_lines_tot[j][i], tree_analyser.lock_ologs[j])
                     WriteOlogLinesToFile(tree_analyser.putative_xenolog_file_handles[i], olog_sus_lines_tot[i], tree_analyser.lock_suspect)
                 results_queue.put(nOrthologues_SpPair)
                 return
@@ -1291,10 +1301,13 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
                 try:
                     print("Current orthogroup OG%07d" % iog)
                     for i in range(nspecies):
-                        for j in range(i+1, nspecies):
-                            # j is the largest (and intentionally changing quickest, which I think is best for the lock)
-                            WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][j], olog_lines_tot[i][j], tree_analyser.lock_ologs[j])
-                            WriteOlogLinesToFile(tree_analyser.ologs_files_handles[j][i], olog_lines_tot[j][i], tree_analyser.lock_ologs[j])
+                        if fewer_files:
+                            WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][0], olog_lines_tot[i][0], tree_analyser.lock_ologs[i])
+                        else:
+                            for j in range(i+1, nspecies):
+                                # j is the largest (and intentionally changing quickest, which I think is best for the lock)
+                                WriteOlogLinesToFile(tree_analyser.ologs_files_handles[i][j], olog_lines_tot[i][j], tree_analyser.lock_ologs[j])
+                                WriteOlogLinesToFile(tree_analyser.ologs_files_handles[j][i], olog_lines_tot[j][i], tree_analyser.lock_ologs[j])
                         WriteOlogLinesToFile(tree_analyser.putative_xenolog_file_handles[i], olog_sus_lines_tot[i], tree_analyser.lock_suspect)
                     results_queue.put(nOrthologues_SpPair)
                 except:
@@ -1305,9 +1318,9 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
     results_queue.put(nOrthologues_SpPair)
     return
 
-def RunOrthologsParallel(tree_analyser, nspecies, args_queue, nProcesses):
+def RunOrthologsParallel(tree_analyser, nspecies, args_queue, nProcesses, fewer_files):
     results_queue = mp.Queue()
-    runningProcesses = [mp.Process(target=Worker_RunOrthologsMethod, args=(tree_analyser, nspecies, args_queue, results_queue)) for i_ in range(nProcesses)]
+    runningProcesses = [mp.Process(target=Worker_RunOrthologsMethod, args=(tree_analyser, nspecies, args_queue, results_queue, fewer_files)) for i_ in range(nProcesses)]
     for proc in runningProcesses:
         proc.start()
     nOrthologues_SpPair = util.nOrtho_sp(nspecies)
@@ -1340,8 +1353,10 @@ def WriteOlogLinesToFile(fh, text, lock):
         lock.release()
         if debug: util.PrintTime("Released lock: %d" %  os.getpid())
 
-def SortParallelFiles(n_parallel, speciesToUse, speciesDict):
+def SortParallelFiles(n_parallel, speciesToUse, speciesDict, fewer_files):
     """
+    Args:
+        fewer_files - Orthologs have been written to one file per species, not one per species pair
     Sort the lines by orthogroup for the files that were written in parallel:
     - Orthologs
     - Xenologs
@@ -1351,8 +1366,11 @@ def SortParallelFiles(n_parallel, speciesToUse, speciesDict):
     species = [speciesDict[str(sp1)] for sp1 in speciesToUse]
     # Orthologs
     dResultsOrthologues = files.FileHandler.GetOrthologuesDirectory()
-    ds = [dResultsOrthologues + "Orthologues_" + sp1 + "/"  for sp1 in species]
-    fns_type = [(d + '%s__v__%s.tsv' % (sp1, sp2), "o") for sp1, d in zip(species, ds) for sp2 in species if sp1 != sp2]
+    if fewer_files:
+        fns_type = [(dResultsOrthologues + '%s.tsv' % sp1, "o") for sp1 in species]
+    else:
+        ds = [dResultsOrthologues + "Orthologues_" + sp1 + "/" for sp1 in species]
+        fns_type = [(d + '%s__v__%s.tsv' % (sp1, sp2), "o") for sp1, d in zip(species, ds) for sp2 in species if sp1 != sp2]
     # Xenologs 
     dXenologs = files.FileHandler.GetPutativeXenelogsDir()
     fns_type.extend([(dXenologs + '%s.tsv' % sp1, "x") for sp1 in species])

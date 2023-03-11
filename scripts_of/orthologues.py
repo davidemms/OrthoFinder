@@ -873,7 +873,7 @@ def ReconciliationAndOrthologues(
         hog_writer.close_files()
     nOrthologues_SpPair += TwoAndThreeGeneOrthogroups(ogSet, resultsDir_ologs, fewer_files)
     if nLowParallel > 1 and "phyldog" != recon_method and "dlcpar" not in recon_method:
-        trees2ologs_of.SortParallelFiles(nLowParallel, ogSet.speciesToUse, speciesDict)
+        trees2ologs_of.SortParallelFiles(nLowParallel, ogSet.speciesToUse, speciesDict, fewer_files)
     stop = time.time()
     # print("%fs for orthologs etc" % (stop-start))
     WriteOrthologuesStats(ogSet, nOrthologues_SpPair)

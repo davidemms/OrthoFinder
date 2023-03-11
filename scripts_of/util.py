@@ -439,13 +439,21 @@ class nOrtho_cache(object):
         self.n += nOrtho_sp_obj.n
         return self
 
-    def get_i_j_to_write(self, n_max_cache):
-        IJ = np.where(self.n > n_max_cache)
-        I = list(IJ[0])
-        J = list(IJ[1])
-        for i, j in zip(I,J):
-            self.n[i,j] = 0
-        return I,J
+    def get_i_j_to_write(self, n_max_cache, fewer_files=False):
+        if fewer_files:
+            # all genes for species i are collated
+            IJ = np.where(self.n.sum(axis=1) > n_max_cache)
+            I = list(IJ[0])
+            J = None
+            for i in I:
+                self.n[i, :] = 0
+        else:
+            IJ = np.where(self.n > n_max_cache)
+            I = list(IJ[0])
+            J = list(IJ[1])
+            for i, j in zip(I,J):
+                self.n[i, j] = 0
+        return I, J
         
 class Finalise(object):
     def __enter__(self):
