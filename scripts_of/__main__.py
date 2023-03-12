@@ -1866,10 +1866,11 @@ def main(args=None):
             if not acc.check_for_orthoxcelerate(continuationDir):
                 util.Fail()
             # Prepare previous directory as database
-            util.PrintUnderline("Creating orthogroup profiles")
-            fn_diamond_db = acc.prepare_accelerate_database(continuationDir)
-            # Process previous and new files, hopefully can reuse existing code
             speciesInfoObj, speciesToUse_names = ProcessPreviousFiles(files.FileHandler.GetWorkingDirectory1_Read(), qDoubleBlast=False)
+            util.PrintUnderline("Creating orthogroup profiles")
+            wd_list = files.FileHandler.GetWorkingDirectory1_Read()
+            fn_diamond_db = acc.prepare_accelerate_database(continuationDir, wd_list, speciesInfoObj.nSpAll)
+            # Process previous and new files, hopefully can reuse existing code
             print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, continuationDir))
             speciesInfoObj = ProcessesNewFasta(fastaDir, options.dna, speciesInfoObj, speciesToUse_names)
 

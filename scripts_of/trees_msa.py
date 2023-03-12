@@ -42,14 +42,14 @@ from . import trim
 class FastaWriter(object):
     def __init__(self, fastaFileDir_list, speciesToUse):
         """
-        The ist of previous directories could incude species that are no longer used, 
+        The ist of previous directories could include species that are no longer used,
         but not ones that are conflicting
         """
         self.SeqLists = dict()
         qFirst = True
         accession = ""
         sequence = ""
-        required_files = set(["Species%d.fa" %i for i in speciesToUse])
+        required_files = set(["Species%d.fa" % i for i in speciesToUse])
         for d in fastaFileDir_list:
             for fn in glob.glob(d + "Species*.fa"):
                 if os.path.basename(fn) not in required_files: continue
