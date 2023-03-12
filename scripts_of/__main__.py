@@ -27,6 +27,7 @@
 
 # first import parallel task manager to minimise RAM overhead for small processes
 from __future__ import absolute_import
+
 from . import parallel_task_manager
 
 import os                                       # Y
@@ -38,7 +39,7 @@ import glob                                     # Y
 import shutil                                   # Y
 import time                                     # Y
 import multiprocessing as mp                    # optional  (problems on OpenBSD)
-import platform
+import platform                                 # Y
 if platform.system() == "Darwin":
     # https://github.com/davidemms/OrthoFinder/issues/570
     # https://github.com/davidemms/OrthoFinder/issues/663 
@@ -67,6 +68,7 @@ PY2 = sys.version_info <= (3,)
 csv_write_mode = 'wb' if PY2 else 'wt'
 
 from . import blast_file_processor, files, mcl, util, matrices, orthologues, program_caller, trees_msa, split_ortholog_files
+from . import accelerate as acc
 
 # Get directory containing script/bundle
 if getattr(sys, 'frozen', False):
@@ -103,8 +105,9 @@ if getattr(sys, 'frozen', False):
     if 'DYLD_LIBRARY_PATH_ORIG' in my_env:
         my_env['DYLD_LIBRARY_PATH'] = my_env['DYLD_LIBRARY_PATH_ORIG']  
     else:
-        my_env['DYLD_LIBRARY_PATH'] = ''      
-         
+        my_env['DYLD_LIBRARY_PATH'] = ''
+
+
 def RunBlastDBCommand(command):
     capture = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env, shell=True)
     stdout, stderr = capture.communicate()
@@ -844,9 +847,12 @@ def PrintHelp(prog_caller):
     print("SIMPLE USAGE:") 
     print("Run full OrthoFinder analysis on FASTA format proteomes in <dir>")
     print("  orthofinder [options] -f <dir>")   
-    print("")          
-    print("Add new species in <dir1> to previous run in <dir2> and run new analysis")
-    print("  orthofinder [options] -f <dir1> -b <dir2>")
+    # print("")
+    # print("Add new species in <dir1> to previous run in <dir2> and run new analysis")
+    # print("  orthofinder [options] -f <dir1> -b <dir2>")
+    print("")
+    print("To add species quickly from <dir1> to a completed OrthoFinder analysis <dir2>")
+    print("  orthofinder [options] --fast-add <dir1> --core <dir2>")
     print("") 
       
     print("OPTIONS:")
@@ -854,7 +860,7 @@ def PrintHelp(prog_caller):
     print(" -a <int>        Number of parallel analysis threads")
     print(" -d              Input is DNA sequences")
     print(" -M <txt>        Method for gene tree inference. Options 'dendroblast' & 'msa'")
-    print("                 [Default = dendroblast]")
+    print("                 [Default = msa]")
     print(" -S <txt>        Sequence search program [Default = diamond]")
     print("                 Options: " + ", ".join(['blast'] + search_ops))
     print(" -A <txt>        MSA program, requires '-M msa' [Default = mafft]")
@@ -934,6 +940,7 @@ class Options(object):#
     def __init__(self):
         self.nBlast = util.nThreadsDefault
         self.nProcessAlg = None
+        self.qFastAdd = False  # Add species in near-linear time
         self.qStartFromBlast = False  # remove, just store BLAST to do
         self.qStartFromFasta = False  # local to argument checking
         self.qStartFromGroups = False
@@ -943,7 +950,7 @@ class Options(object):#
         self.qStopAfterSeqs = False
         self.qStopAfterAlignments = False
         self.qStopAfterTrees = False
-        self.qMSATrees = False
+        self.qMSATrees = True  # Updated default
         self.qAddSpeciesToIDs = True
         self.qTrim = True
         self.search_program = "diamond"
@@ -992,6 +999,7 @@ def ProcessArgs(prog_caller, args):
     pickleDir_nonDefault = None
     q_selected_msa_options = False
     q_selected_search_option = False
+    user_specified_M = False
     
     """
     -f: store fastaDir
@@ -1014,6 +1022,12 @@ def ProcessArgs(prog_caller, args):
                 print("Repeated argument: -b/--blast\n")
                 util.Fail()
             options.qStartFromBlast = True
+            continuationDir = GetDirectoryArgument(arg, args)
+        elif arg == "--fast-add":
+            options.qFastAdd = True
+            fastaDir = GetDirectoryArgument(arg, args)
+        elif arg == "--core":
+            options.qFastAdd = True
             continuationDir = GetDirectoryArgument(arg, args)
         elif arg == "-fg" or arg == "--from-groups":
             if options.qStartFromGroups:
@@ -1137,6 +1151,7 @@ def ProcessArgs(prog_caller, args):
                 util.Fail()
         elif arg == "-M" or arg == "--method":
             arg_M_or_msa = arg
+            user_specified_M = True
             if len(args) == 0:
                 print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
@@ -1147,7 +1162,8 @@ def ProcessArgs(prog_caller, args):
                 options.qPhyldog = True
                 options.recon_method = "phyldog"
                 options.qMSATrees = False
-            elif arg == "dendroblast": options.qMSATrees = False    
+            elif arg == "dendroblast":
+                options.qMSATrees = False
             else:
                 print("Invalid argument for option %s: %s" % (arg_M_or_msa, arg))
                 print("Valid options are 'dendroblast' and 'msa'\n")
@@ -1210,8 +1226,8 @@ def ProcessArgs(prog_caller, args):
             util.Success()
         else:
             print("Unrecognised argument: %s\n" % arg)
-            util.Fail()    
-    
+            util.Fail()
+
     # set a default for number of algorithm threads
     if options.nProcessAlg is None:
         options.nProcessAlg = min(16, max(1, int(options.nBlast/8)))
@@ -1225,10 +1241,24 @@ def ProcessArgs(prog_caller, args):
         util.Fail()  
 
     # check argument combinations       
-    if not (options.qStartFromFasta or options.qStartFromBlast or options.qStartFromGroups or options.qStartFromTrees):
-        print("ERROR: Please specify the input directory for OrthoFinder using one of the options: '-f', '-b', '-fg' or '-ft'.")
+    if not (options.qStartFromFasta or options.qStartFromBlast or options.qStartFromGroups or options.qStartFromTrees or options.qFastAdd):
+        print("ERROR: Please specify the input directory for OrthoFinder using one of the options: '-f', '-b', '-fg' or '-ft', '--fast-add'.")
         util.Fail()
-    
+
+    if options.qFastAdd:
+        if (options.qStartFromFasta or options.qStartFromBlast or options.qStartFromGroups or options.qStartFromTrees):
+            print("ERROR: Incompatible options used with --fast-add, cannot accept: '-f', '-b', '-fg' or '-ft'")
+            util.Fail()
+        if fastaDir is None:
+            print("ERROR: '--fast-add' required with option '--core'")
+            util.Fail()
+        if continuationDir is None:
+            print("ERROR: '--core' required with option '--fast-add'")
+            util.Fail()
+        if not options.qMSATrees:
+            print("ERROR: --fast-add requires MSA trees, option '-M dendroblast' is invalid")
+            util.Fail()
+
     if options.qStartFromFasta and (options.qStartFromTrees or options.qStartFromGroups):
         print("ERROR: Incompatible arguments, -f (start from fasta files) and" + (" -fg (start from orthogroups)" if options.qStartFromGroups else " -ft (start from trees)"))
         util.Fail()
@@ -1268,7 +1298,7 @@ def ProcessArgs(prog_caller, args):
     util.PrintTime("Starting OrthoFinder %s" % util.version)    
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
     print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
-    return options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault            
+    return options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault, user_specified_M
 
 def GetXMLSpeciesInfo(seqsInfoObj, options):
     # speciesInfo:  name, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile
@@ -1326,8 +1356,11 @@ def IDsFileOK(filename):
                 return False, line
     return True, None
 
-def CheckDependencies(options, prog_caller, dirForTempFiles):
+def CheckDependencies(options, user_specified_m, prog_caller, dirForTempFiles):
     util.PrintUnderline("Checking required programs are installed")
+    if not user_specified_m:
+        print("Running with the recommended MSA tree inference by default.")
+        print("To revert to legacy method use '-M dendroblast'.\n")
     if (options.qStartFromFasta):
         if options.search_program == "blast":
             if not CanRunBLAST(): util.Fail()
@@ -1359,7 +1392,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo):
     # Run Algorithm, cluster and output cluster files with original accessions
     util.PrintUnderline("Running OrthoFinder algorithm")
     # it's important to free up the memory from python used for processing the genomes
-    # before launching MCL becuase both use sizeable ammounts of memory. The only
+    # before launching MCL because both use sizeable amounts of memory. The only
     # way I can find to do this is to launch the memory intensive python code 
     # as separate process that exits before MCL is launched.
     Lengths = GetSequenceLengths(seqsInfo)
@@ -1388,7 +1421,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo):
     WaterfallMethod.WriteGraphParallel(seqsInfo, options.nProcessAlg)
     
     # 5b. MCL     
-    clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN(options.mclInflation) 
+    clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN("_I%0.1f" % options.mclInflation)
     graphFilename = files.FileHandler.GetGraphFilename() 
     MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
     mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
@@ -1523,7 +1556,7 @@ def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller):
         cmd_queue.put((iCmd+1, cmd))           
     runningProcesses = [mp.Process(target=parallel_task_manager.Worker_RunCommand, args=(cmd_queue, options.nBlast, len(commands), True)) for i_ in range(options.nBlast)]
     for proc in runningProcesses:
-        proc.start()#
+        proc.start()
     for proc in runningProcesses:
         while proc.is_alive():
             proc.join()
@@ -1737,11 +1770,11 @@ def main(args=None):
         print(("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version))
         prog_caller = GetProgramCaller()
         
-        options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault = ProcessArgs(prog_caller, args)  
+        options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault, user_specified_M = ProcessArgs(prog_caller, args)
         
         files.InitialiseFileHandler(options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault)     
                     
-        CheckDependencies(options, prog_caller, files.FileHandler.GetWorkingDirectory1_Read()[0]) 
+        CheckDependencies(options, user_specified_M, prog_caller, files.FileHandler.GetWorkingDirectory1_Read()[0])
             
         # if using previous Trees etc., check these are all present - Job for orthologues
         if options.qStartFromBlast and options.qStartFromFasta:
@@ -1816,11 +1849,32 @@ def main(args=None):
             files.FileHandler.LogSpecies()
             options = CheckOptions(options, speciesInfoObj.speciesToUse)
             GetOrthologues_FromTrees(options)
+        elif options.qFastAdd:
+            # Check previous directory has been done with MSA trees
+            if not acc.check_for_orthoxcelerate(continuationDir):
+                util.Fail()
+            # Prepare previous directory as database
+            util.PrintUnderline("Creating orthogroup profiles")
+            fn_diamond_db = acc.prepare_accelerate_database(continuationDir)
+            # Process previous and new files, hopefully can reuse existing code
+            speciesInfoObj, speciesToUse_names = ProcessPreviousFiles(files.FileHandler.GetWorkingDirectory1_Read(), qDoubleBlast=False)
+            print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, continuationDir))
+            speciesInfoObj = ProcessesNewFasta(fastaDir, options.dna, speciesInfoObj, speciesToUse_names)
+
+            options = CheckOptions(options, speciesInfoObj.speciesToUse)
+            seqsInfo = util.GetSeqsInfo(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
+            # Add genes to orthogroups
+            results_files = acc.RunSearch(options, speciesInfoObj, fn_diamond_db, prog_caller)
+            acc.assign_genes(results_files)
+            # Infer remaining orthogroups (will need modified gene distance measure)
+            # continue with trees
+            if not options.qStopAfterGroups:
+                GetOrthologues(speciesInfoObj, options, prog_caller)
         else:
             raise NotImplementedError
             ptm = parallel_task_manager.ParallelTaskManager_singleton()
             ptm.Stop()
-        if not options.fewer_files:
+        if not options.fewer_files and not options.qFastAdd:
             # split up the orthologs into one file per species-pair
             split_ortholog_files.split_ortholog_files(files.FileHandler.GetOrthologuesDirectory())
         d_results = os.path.normpath(files.FileHandler.GetResultsDirectory1()) + os.path.sep

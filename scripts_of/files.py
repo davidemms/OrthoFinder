@@ -155,10 +155,10 @@ class __Files_new_dont_manually_create__(object):
         self.LogWorkingDirectoryTrees()
                                          
     def CreateOutputDirectories(self, options, previous_files_locator, base_dir, fastaDir=None):
-        if options.qStartFromFasta and options.qStartFromBlast:
+        if (options.qStartFromFasta and options.qStartFromBlast) or options.qFastAdd:
             wd1 = previous_files_locator.GetStartFromBlast()
             self.CreateOutputDirFromStart_new(fastaDir, base_dir, user_name=options.name, old_wd_base_list = wd1)
-        
+
         elif options.qStartFromFasta:
             self.CreateOutputDirFromStart_new(fastaDir, base_dir, user_name=options.name)
             
@@ -325,9 +325,9 @@ class __Files_new_dont_manually_create__(object):
         if self.wd_current == None: raise Exception("No wd_current")
         return self.wd_current + "%s_graph.txt" % self.fileIdentifierString
         
-    def CreateUnusedClustersFN(self, mclInflation):
+    def CreateUnusedClustersFN(self, mcl_inflation_str=""):
         if self.wd_current == None: raise Exception("No wd_current")
-        self.clustersFilename, self.iResultsVersion = util.GetUnusedFilename(self.wd_current  + "clusters_%s_I%0.1f" % (self.fileIdentifierString, mclInflation), ".txt")
+        self.clustersFilename, self.iResultsVersion = util.GetUnusedFilename(self.wd_current + "clusters_%s%s" % (self.fileIdentifierString, mcl_inflation_str), ".txt")
         return self.clustersFilename, self.clustersFilename + "_id_pairs.txt"
         
     def SetClustersFN(self, pairsFN):

@@ -23,8 +23,14 @@
 #
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
+from typing import List, Set
+
 
 def GetPredictedOGs(clustersFilename):
+    """
+    Returns:
+        ogs: List[Set[str]] - List of sets of genes ids (as strings)
+    """
     predictedOGs = []
     nOGsString = ""
     qContainsProfiles = False
@@ -104,4 +110,12 @@ def ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, newFilename):
                     output.write("$\n")
                 else:
                     output.write("\n")
-                    
+
+
+def write_updated_clusters_file(ogs: List[Set[str]], clustersFilename_pairs):
+    with open(clustersFilename_pairs, 'w') as outfile:
+        outfile.write("(mclmatrix")
+        outfile.write("begin\n")
+        for iog, og in enumerate(ogs):
+            outfile.write("%d      %s $\n" % (iog, " ".join(sorted(og))))
+        outfile.write(")\n")
