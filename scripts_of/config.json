@@ -12,6 +12,16 @@
     "program_type": "msa",
     "cmd_line": "muscle -in INPUT -out OUTPUT"
     },
+
+    "mafft_memsave":{
+    "program_type": "msa",
+    "cmd_line": "mafft --anysymbol --memsave INPUT > OUTPUT"
+    },
+
+    "fasttree_fastest":{
+    "program_type": "tree",
+    "cmd_line": "FastTree -fastest INPUT > OUTPUT"
+    },
         
     "raxml":{ 
     "program_type": "tree",

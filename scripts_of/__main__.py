@@ -998,6 +998,7 @@ def ProcessArgs(prog_caller, args):
     resultsDir_nonDefault = None
     pickleDir_nonDefault = None
     q_selected_msa_options = False
+    q_selected_tree_options = False
     q_selected_search_option = False
     user_specified_M = False
     
@@ -1191,7 +1192,7 @@ def ProcessArgs(prog_caller, args):
             arg = args.pop(0)
             if arg in choices:
                 options.tree_program = arg
-                q_selected_msa_options = True
+                q_selected_tree_options = True
             else:
                 print("Invalid argument for option %s: %s" % (switch_used, arg))
                 print("Valid options are: {%s}\n" % (", ".join(choices)))
@@ -1279,7 +1280,7 @@ def ProcessArgs(prog_caller, args):
         print("ERROR: Argument '-oa' (stop after alignments) also requires option '-M msa'")
         util.Fail()     
 
-    if q_selected_msa_options and (not options.qMSATrees and not options.qPhyldog):
+    if (q_selected_msa_options or q_selected_tree_options) and (not options.qMSATrees and not options.qPhyldog):
         print("ERROR: Argument '-A' or '-T' (multiple sequence alignment/tree inference program) also requires option '-M msa'")
         util.Fail()       
         
@@ -1294,7 +1295,15 @@ def ProcessArgs(prog_caller, args):
     if options.search_program not in (prog_caller.ListSearchMethods() + ['blast']):
         print("ERROR: Search program (%s) not configured in config.json file" % options.search_program)
         util.Fail()
-        
+
+    if options.qFastAdd and not q_selected_msa_options:
+        print("INFO: For --fast-add defaulting to 'mafft --memsave'\n")
+        options.msa_program = "mafft_memsave"
+
+    if options.qFastAdd and not q_selected_tree_options:
+        print("INFO: For --fast-add defaulting to 'FastTree -fastest'\n")
+        options.tree_program = "fasttree_fastest"
+
     util.PrintTime("Starting OrthoFinder %s" % util.version)    
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
     print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
@@ -1427,15 +1436,18 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo):
     mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
     
     util.PrintUnderline("Writing orthogroups to file")
+    post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, options)
+
+
+def post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, options):
     ogs = mcl.GetPredictedOGs(clustersFilename_pairs)
-    
     resultsBaseFilename = files.FileHandler.GetOrthogroupResultsFNBase()
     idsDict = MCL.WriteOrthogroupFiles(ogs, [files.FileHandler.GetSequenceIDsFN()], resultsBaseFilename, clustersFilename_pairs)
     speciesNamesDict = SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN())
     MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesInfoObj.speciesToUse, resultsBaseFilename)
     
     # Write Orthogroup FASTA files    
-    ogSet = orthologues.OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll, options.qAddSpeciesToIDs, idExtractor = util.FirstWordExtractor)
+    ogSet = orthologues.OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll, options.qAddSpeciesToIDs, idExtractor=util.FirstWordExtractor)
     treeGen = trees_msa.TreesForOrthogroups(None, None, None)
     fastaWriter = trees_msa.FastaWriter(files.FileHandler.GetSpeciesSeqsDir(), speciesInfoObj.speciesToUse)
     d_seqs = files.FileHandler.GetResultsSeqsDir()
@@ -1865,9 +1877,10 @@ def main(args=None):
             seqsInfo = util.GetSeqsInfo(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # Add genes to orthogroups
             results_files = acc.RunSearch(options, speciesInfoObj, fn_diamond_db, prog_caller)
-            acc.assign_genes(results_files)
+            clustersFilename_pairs = acc.assign_genes(results_files)
             # Infer remaining orthogroups (will need modified gene distance measure)
             # continue with trees
+            post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, options)
             if not options.qStopAfterGroups:
                 GetOrthologues(speciesInfoObj, options, prog_caller)
         else:

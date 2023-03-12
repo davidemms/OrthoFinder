@@ -137,4 +137,5 @@ def assign_genes(results_files):
             ogs[int(og)].add(gene)
     clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN()
     mcl.write_updated_clusters_file(ogs, clustersFilename_pairs)
+    return clustersFilename_pairs
 
