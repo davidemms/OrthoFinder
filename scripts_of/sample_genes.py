@@ -15,7 +15,7 @@ from sklearn import cluster
 import numpy as np
 from Bio import AlignIO
 
-from shoot import fasta_writer
+from . import fasta_writer
 
 
 def get_embedding_vectors():
@@ -227,7 +227,7 @@ def select_from_aligned(infn, n_sample, q_trim=True):
     M = embed(m)
     # print("embedding successful")
     # Cluster
-    kmeans = cluster.KMeans(n_clusters=n_sample, random_state=0, n_init='auto').fit(M)
+    kmeans = cluster.KMeans(n_clusters=n_sample, random_state=0).fit(M)
     # print("clustering successful")
     labels = kmeans.predict(M)
     # print("labels successful")
