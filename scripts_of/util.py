@@ -471,3 +471,6 @@ def writerow(fh, row):
 def getrow(row):
     # CSV format specifies CRLF line endings: https://tools.ietf.org/html/rfc4180
     return "\t".join(map(str, row)) + "\r\n"
+
+def version_parse_simple(sem_version):
+    return list(map(int, sem_version.split(".")[:3]))

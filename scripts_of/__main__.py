@@ -1297,11 +1297,11 @@ def ProcessArgs(prog_caller, args):
         util.Fail()
 
     if options.qFastAdd and not q_selected_msa_options:
-        print("INFO: For --fast-add defaulting to 'mafft --memsave'\n")
+        print("INFO: For --fast-add defaulting to 'mafft --memsave' to reduce RAM usage\n")
         options.msa_program = "mafft_memsave"
 
     if options.qFastAdd and not q_selected_tree_options:
-        print("INFO: For --fast-add defaulting to 'FastTree -fastest'\n")
+        print("INFO: For --fast-add defaulting to 'FastTree -fastest' to reduce RAM usage\n")
         options.tree_program = "fasttree_fastest"
 
     util.PrintTime("Starting OrthoFinder %s" % util.version)    

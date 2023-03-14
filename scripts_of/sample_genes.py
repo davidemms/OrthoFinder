@@ -6,16 +6,18 @@ What to try?
 
 """
 import os
-import sys
 import random
 import argparse
 from collections import defaultdict
 
+import sklearn
 from sklearn import cluster
 import numpy as np
 from Bio import AlignIO
 
-from . import fasta_writer
+from . import fasta_writer, util
+
+use_n_auto = util.version_parse_simple(sklearn.__version__) >= util.version_parse_simple('1.2.0')
 
 
 def get_embedding_vectors():
@@ -115,10 +117,11 @@ def select_from_unaligned(infn, k, n, nmax=50000):
             # print((i, lookup[kmer]))
             S[i][lookup[kmer]] = 1
     print("Constructed features matrix")
-    # Now just need to pick the most representative ones (using a greedy algorithm)
-    # Or we could do PCA?
-    # For now, use a heuristic k-means clustering 
-    kmeans = cluster.KMeans(n_clusters=n, random_state=0).fit(S)
+    # Now just need to pick the most representative ones, use a heuristic k-means clustering
+    if use_n_auto:
+        kmeans = cluster.KMeans(n_clusters=n, random_state=0, n_init='auto').fit(S)
+    else:
+        kmeans = cluster.KMeans(n_clusters=n, random_state=0).fit(S)
     labels = kmeans.predict(S)
     # clusters = cluster.Birch(n_clusters=n).fit_predict(S)
     print(labels)
@@ -227,7 +230,10 @@ def select_from_aligned(infn, n_sample, q_trim=True):
     M = embed(m)
     # print("embedding successful")
     # Cluster
-    kmeans = cluster.KMeans(n_clusters=n_sample, random_state=0).fit(M)
+    if use_n_auto:
+        kmeans = cluster.KMeans(n_clusters=n_sample, random_state=0, n_init='auto').fit(M)
+    else:
+        kmeans = cluster.KMeans(n_clusters=n_sample, random_state=0).fit(M)
     # print("clustering successful")
     labels = kmeans.predict(M)
     # print("labels successful")

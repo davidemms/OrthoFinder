@@ -164,6 +164,14 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", min_for_p
         pat_sub_msa_glob = din + subtrees_dir + "/msa_sub/OG%07d.*.fa"
     else:
         subtrees_label = ""
+    if selection == "all":
+        fn_fasta = wd + "profile_sequences%s.all.fa" % subtrees_label
+    else:
+        fn_fasta = wd + "profile_sequences%s.d%d_min%d_%s.fa" % (subtrees_label, divide, min_for_profile, selection)
+    fn_diamond_db = fn_fasta + ".dmnd"
+    if os.path.exists(fn_diamond_db):
+        print("Profiles database already exists and will be reused: %s" % fn_diamond_db)
+        return fn_diamond_db
     ogs = mcl.GetPredictedOGs(wd + "clusters_OrthoFinder_I1.5.txt_id_pairs.txt")
     fw = fasta_writer.FastaWriter(wd + "Species*fa", qGlob=True)
     seq_write = []
@@ -178,7 +186,7 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", min_for_p
     nToDo = len(ogs)
     for iog, og in enumerate(ogs):
         if iog >= 0 and divmod(iog, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
-            print("Done %d of %d" % (iog, nToDo))
+            util.PrintTime("Done %d of %d" % (iog, nToDo))
         og_id = "%07d" % iog
         q_subtrees = subtrees_dir and os.path.exists(pat_super % iog)
         fn_msa = wd + "Alignments_ids/OG%07d.fa" % iog
@@ -227,12 +235,8 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", min_for_p
             seq_write.extend(s)
             for ss in s:
                 seq_convert[ss] = og_id_full + "_" + ss
-    if selection == "all":
-        fn_fasta = din + "profile_sequences%s.all.fa" % subtrees_label
-    else:
-        fn_fasta = din + "profile_sequences%s.d%d_min%d_%s.fa" % (subtrees_label, divide, min_for_profile, selection)
+    print("")
     fw.WriteSeqsToFasta_withNewAccessions(seq_write, fn_fasta, seq_convert)
-    fn_diamond_db = fn_fasta + ".db"
     subprocess.call(["diamond", "makedb", "--in", fn_fasta, "-d", fn_diamond_db])
     return fn_diamond_db
 
