@@ -1462,7 +1462,7 @@ def post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo
     files.FileHandler.LogOGs()
 
 # 0
-def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
+def ProcessPreviousFiles(workingDir_list, qDoubleBlast, check_blast=True):
     """Checks for:
     workingDir should be the WorkingDirectory containing Blast*.txt files
     
@@ -1505,25 +1505,26 @@ def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
         files.FileHandler.LogFailAndExit("ERROR: Not all expected fasta files are present. Index of last fasta file is %s but found %d fasta files.\n" % (lastFastaNumberString, len(previousFastaFiles)))
     
     # check BLAST files
-    blast_fns_triangular = [files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies >= iSpecies]
-    have_triangular = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_triangular]
-    for qHave, fn in zip(have_triangular, blast_fns_triangular):
-        if not qHave: print("BLAST results file is missing: %s" % fn)
-    
-    if qDoubleBlast:
-        blast_fns_remainder = [files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies < iSpecies]
-        have_remainder = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_remainder]
-        if not (all(have_triangular) and all(have_remainder)):
-            for qHave, fn in zip(have_remainder, blast_fns_remainder):
-                if not qHave: print("BLAST results file is missing: %s" % fn)
+    if check_blast:
+        blast_fns_triangular = [files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies >= iSpecies]
+        have_triangular = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_triangular]
+        for qHave, fn in zip(have_triangular, blast_fns_triangular):
+            if not qHave: print("BLAST results file is missing: %s" % fn)
+
+        if qDoubleBlast:
+            blast_fns_remainder = [files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies < iSpecies]
+            have_remainder = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_remainder]
+            if not (all(have_triangular) and all(have_remainder)):
+                for qHave, fn in zip(have_remainder, blast_fns_remainder):
+                    if not qHave: print("BLAST results file is missing: %s" % fn)
+                if not all(have_triangular):
+                    files.FileHandler.LogFailAndExit()
+                else:
+                    # would be able to do it using just one-way blast
+                    files.FileHandler.LogFailAndExit("ERROR: Required BLAST results files are present for using the one-way sequence search option (default) but not the double BLAST search ('-d' option)")
+        else:
             if not all(have_triangular):
                 files.FileHandler.LogFailAndExit()
-            else:
-                # would be able to do it using just one-way blast
-                files.FileHandler.LogFailAndExit("ERROR: Required BLAST results files are present for using the one-way sequence search option (default) but not the double BLAST search ('-d' option)")
-    else:
-        if not all(have_triangular):
-            files.FileHandler.LogFailAndExit()
                             
     # check SequenceIDs.txt and SpeciesIDs.txt files are present
     if not os.path.exists(files.FileHandler.GetSequenceIDsFN()):
@@ -1857,7 +1858,7 @@ def main(args=None):
             # 9
             GetOrthologues(speciesInfoObj, options, prog_caller)
         elif options.qStartFromTrees:
-            speciesInfoObj, _ = ProcessPreviousFiles(files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast)
+            speciesInfoObj, _ = ProcessPreviousFiles(files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast, check_blast=False)
             files.FileHandler.LogSpecies()
             options = CheckOptions(options, speciesInfoObj.speciesToUse)
             GetOrthologues_FromTrees(options)
@@ -1866,7 +1867,7 @@ def main(args=None):
             if not acc.check_for_orthoxcelerate(continuationDir):
                 util.Fail()
             # Prepare previous directory as database
-            speciesInfoObj, speciesToUse_names = ProcessPreviousFiles(files.FileHandler.GetWorkingDirectory1_Read(), qDoubleBlast=False)
+            speciesInfoObj, speciesToUse_names = ProcessPreviousFiles(files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast, check_blast=False)
             util.PrintUnderline("Creating orthogroup profiles")
             wd_list = files.FileHandler.GetWorkingDirectory1_Read()
             fn_diamond_db = acc.prepare_accelerate_database(continuationDir, wd_list, speciesInfoObj.nSpAll)

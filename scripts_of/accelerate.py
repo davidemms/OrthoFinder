@@ -186,7 +186,10 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", min_for_p
     if os.path.exists(fn_diamond_db):
         print("Profiles database already exists and will be reused: %s" % fn_diamond_db)
         return fn_diamond_db
-    ogs = mcl.GetPredictedOGs(wd + "clusters_OrthoFinder_I1.5.txt_id_pairs.txt")
+    clusters_filename = list(glob.glob(wd + "clusters_OrthoFinder*id_pairs.txt"))
+    if len(clusters_filename) == 0:
+        print("ERROR: Can't find %s" % wd + "clusters_OrthoFinder*id_pairs.txt")
+    ogs = mcl.GetPredictedOGs(clusters_filename[0])
     fw = fasta_writer.FastaWriter(wd + "Species*fa", qGlob=True)
     seq_write = []
     seq_convert = dict()
