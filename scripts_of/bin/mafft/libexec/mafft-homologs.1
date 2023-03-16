@@ -1,0 +1,131 @@
+.\"     Title: MAFFT-HOMOLOGS
+.\"    Author: Kazutaka Katoh <katoh_at_bioreg.kyushu-u.ac.jp.>
+.\" Generator: DocBook XSL Stylesheets v1.72.0 <http://docbook.sf.net/>
+.\"      Date: 2007-08-14
+.\"    Manual: Mafft Manual
+.\"    Source: mafft-homologs 2.1
+.\"
+.TH "MAFFT\-HOMOLOGS" "1" "2007\-06\-09" "mafft\-homologs 2.1" "Mafft Manual"
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.SH "NAME"
+.RS 0
+mafft\-homologs \- aligns sequences together with homologues automatically collected from SwissProt via NCBI BLAST
+.RE
+.SH "SYNOPSIS"
+.RS 0
+\fBmafft\-homologs\fR [\fBoptions\fR] \fIinput\fR [>\ \fIoutput\fR]
+.RE
+.SH "DESCRIPTION"
+.RS 0
+The accuracy of an alignment of a few distantly related sequences is considerably improved when being aligned together with their close homologs. The reason for the improvement is probably the same as that for PSI\-BLAST. That is, the positions of highly conserved residues, those with many gaps and other additional information is brought by close homologs. According to Katoh et al. (2005), the improvement by adding close homologs is 10% or so, which is comparable to the improvement by incorporating structural information of a pair of sequences. Mafft\-homologs in a mafft server works like this:
+.sp
+.RS 4
+\h'-04' 1.\h'+02'Collect a number (50 by default) of close homologs (E=1e\-10 by default) of the input sequences.
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+02'Align the input sequences and homologs all together using the L\-INS\-i strategy.
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+02'Remove the homologs.
+.RE
+.RE
+.SH "OPTIONS"
+.RS 0
+.PP
+\fB\-a\fR \fI\fIn\fR\fR
+.RS 4
+The number of collected sequences (default: 50).
+.RE
+.PP
+\fB\-e\fR \fI\fIn\fR\fR
+.RS 4
+Threshold value (default: 1e\-10).
+.RE
+.PP
+\fB\-o\fR \fI\fIxxx\fR\fR
+.RS 4
+Options for mafft (default: " \-\-op 1.53 \-\-ep 0.123 \-\-maxiterate 1000 --localpair --reorder").
+.RE
+.PP
+\fB\-l\fR
+.RS 4
+Locally carries out BLAST searches instead of NCBI BLAST (requires locally installed BLAST and a database).
+.RE
+.PP
+\fB\-f\fR
+.RS 4
+Outputs collected homologues also (default: off).
+.RE
+.PP
+\fB\-w\fR
+.RS 4
+entire sequences are subjected to BLAST search (default: well\-aligned region only)
+.RE
+.RE
+.SH "REQUIREMENTS"
+.RS 0
+.PP
+MAFFT version > 5.58.
+.PP
+Either of
+.RS 4
+.PP
+lynx (when remote BLAST server is used)
+.PP
+BLAST and a protein sequence database (when local BLAST is used)
+.RE
+.RE
+.SH "REFERENCES"
+.RS 0
+.PP
+Katoh, Kuma, Toh and Miyata (Nucleic Acids Res. 33:511\-518, 2005) MAFFT version 5: improvement in accuracy of multiple sequence alignment.
+.RE
+.SH "SEE ALSO"
+.RS 0
+.PP
+\fBmafft\fR(1)
+.RE
+.SH "AUTHORS"
+.RS 0
+.PP
+\fBKazutaka Katoh\fR <\&katoh_at_bioreg.kyushu\-u.ac.jp.\&>
+.sp -1n
+.IP "" 4
+Wrote Mafft.
+.PP
+\fBCharles Plessy\fR <\&charles\-debian\-nospam@plessy.org\&>
+.sp -1n
+.IP "" 4
+Wrote this manpage in DocBook XML for the Debian distribution, using Mafft's homepage as a template.
+.RE
+.SH "COPYRIGHT"
+.RS 0
+Copyright \(co 2002\-2007 Kazutaka Katoh (mafft)
+.br
+Copyright \(co 2007 Charles Plessy (this manpage)
+.br
+.PP
+Mafft and its manpage are offered under the following conditions:
+.PP
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+.sp
+.RS 4
+\h'-04' 1.\h'+02'Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+02'Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+02'The name of the author may not be used to endorse or promote products derived from this software without specific prior written permission.
+.RE
+.PP
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.br
+.RE

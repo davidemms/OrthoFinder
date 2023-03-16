@@ -1,0 +1,479 @@
+.\"     Title: MAFFT
+.\"    Author: Kazutaka Katoh <kazutaka.katoh@aist.go.jp>
+.\" Generator: DocBook XSL Stylesheets v1.72.0 <http://docbook.sf.net/>
+.\"      Date: 2007-08-14
+.\"    Manual: Mafft Manual
+.\"    Source: mafft 6.240
+.\"
+.TH "MAFFT" "1" "2007\-06\-09" "mafft 6.240" "Mafft Manual"
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.SH "THIS MANUAL IS FOR V6.2XX (2007)"
+Recent versions (v7.1xx; 2013 Jan.) have more features than those described below.
+See also the tips page at 
+http://mafft.cbrc.jp/alignment/software/tips0.html
+.SH "NAME"
+.RS 0
+.sp
+mafft \- Multiple alignment program for amino acid or nucleotide sequences
+.RE
+.SH "SYNOPSIS"
+.RS 0
+.HP 6
+\fBmafft\fR [\fBoptions\fR] \fIinput\fR [>\ \fIoutput\fR]
+.HP 6
+\fBlinsi\fR \fIinput\fR [>\ \fIoutput\fR]
+.HP 6
+\fBginsi\fR \fIinput\fR [>\ \fIoutput\fR]
+.HP 6
+\fBeinsi\fR \fIinput\fR [>\ \fIoutput\fR]
+.HP 7
+\fBfftnsi\fR \fIinput\fR [>\ \fIoutput\fR]
+.HP 6
+\fBfftns\fR \fIinput\fR [>\ \fIoutput\fR]
+.HP 5
+\fBnwns\fR \fIinput\fR [>\ \fIoutput\fR]
+.HP 6
+\fBnwnsi\fR \fIinput\fR [>\ \fIoutput\fR]
+.HP 14
+\fBmafft\-profile\fR \fIgroup1\fR \fIgroup2\fR [>\ \fIoutput\fR]
+.HP
+.sp
+\fIinput\fR, \fIgroup1\fR and \fIgroup2\fR must be in FASTA format.
+.RE
+.SH "DESCRIPTION"
+.RS 0
+\fBMAFFT\fR is a multiple sequence alignment program for unix\-like operating systems. It offers a range of multiple alignment methods.
+.SS "Accuracy\-oriented methods:"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'L\-INS\-i (probably most accurate; recommended for <200 sequences; iterative refinement method incorporating local pairwise alignment information):
+.HP 6
+\fBmafft\fR \fB\-\-localpair\fR \fB\-\-maxiterate\fR\ \fI1000\fR \fIinput\fR [>\ \fIoutput\fR]
+.HP 6
+\fBlinsi\fR \fIinput\fR [>\ \fIoutput\fR]
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'G\-INS\-i (suitable for sequences of similar lengths; recommended for <200 sequences; iterative refinement method incorporating global pairwise alignment information):
+.HP 6
+\fBmafft\fR \fB\-\-globalpair\fR \fB\-\-maxiterate\fR\ \fI1000\fR \fIinput\fR [>\ \fIoutput\fR]
+.HP 6
+\fBginsi\fR \fIinput\fR [>\ \fIoutput\fR]
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'E\-INS\-i (suitable for sequences containing large unalignable regions; recommended for <200 sequences):
+.HP 6
+\fBmafft\fR \fB\-\-ep\fR\ \fI0\fR \fB\-\-genafpair\fR \fB\-\-maxiterate\fR\ \fI1000\fR \fIinput\fR [>\ \fIoutput\fR]
+.HP 6
+\fBeinsi\fR \fIinput\fR [>\ \fIoutput\fR]
+.br
+
+For E\-INS\-i, the
+\fB\-\-ep\fR
+\fI0\fR
+option is recommended to allow large gaps.
+.RE
+.SS "Speed\-oriented methods:"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'FFT\-NS\-i (iterative refinement method; two cycles only):
+.HP 6
+\fBmafft\fR \fB\-\-retree\fR\ \fI2\fR \fB\-\-maxiterate\fR\ \fI2\fR \fIinput\fR [>\ \fIoutput\fR]
+.HP 7
+\fBfftnsi\fR \fIinput\fR [>\ \fIoutput\fR]
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'FFT\-NS\-i (iterative refinement method; max. 1000 iterations):
+.HP 6
+\fBmafft\fR \fB\-\-retree\fR\ \fI2\fR \fB\-\-maxiterate\fR\ \fI1000\fR \fIinput\fR [>\ \fIoutput\fR]
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'FFT\-NS\-2 (fast; progressive method):
+.HP 6
+\fBmafft\fR \fB\-\-retree\fR\ \fI2\fR \fB\-\-maxiterate\fR\ \fI0\fR \fIinput\fR [>\ \fIoutput\fR]
+.HP 6
+\fBfftns\fR \fIinput\fR [>\ \fIoutput\fR]
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'FFT\-NS\-1 (very fast; recommended for >2000 sequences; progressive method with a rough guide tree):
+.HP 6
+\fBmafft\fR \fB\-\-retree\fR\ \fI1\fR \fB\-\-maxiterate\fR\ \fI0\fR \fIinput\fR [>\ \fIoutput\fR]
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'NW\-NS\-i (iterative refinement method without FFT approximation; two cycles only):
+.HP 6
+\fBmafft\fR \fB\-\-retree\fR\ \fI2\fR \fB\-\-maxiterate\fR\ \fI2\fR \fB\-\-nofft\fR\ \fIinput\fR [>\ \fIoutput\fR]
+.HP 7
+\fBnwnsi\fR \fIinput\fR [>\ \fIoutput\fR]
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'NW\-NS\-2 (fast; progressive method without the FFT approximation):
+.HP 6
+\fBmafft\fR \fB\-\-retree\fR\ \fI2\fR \fB\-\-maxiterate\fR\ \fI0\fR \fB\-\-nofft\fR\ \fIinput\fR [>\ \fIoutput\fR]
+.HP 6
+\fBnwns\fR \fIinput\fR [>\ \fIoutput\fR]
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'NW\-NS\-PartTree\-1 (recommended for ~10,000 to ~50,000 sequences; progressive method with the PartTree algorithm):
+.HP 6
+\fBmafft\fR \fB\-\-retree\fR\ \fI1\fR \fB\-\-maxiterate\fR\ \fI0\fR \fB\-\-nofft\fR\ \fB\-\-parttree\fR \fIinput\fR [>\ \fIoutput\fR]
+.RE
+.SS "Group\-to\-group alignments"
+.HP 6
+.RS 4
+\fBmafft\-profile\fR \fIgroup1\fR \fIgroup2\fR [>\ \fIoutput\fR]
+.sp
+or:
+.sp
+\fBmafft\fR \fB\-\-maxiterate\fR\ \fI1000\fR \fB\-\-seed\fR\ \fIgroup1\fR \fB\-\-seed\fR\ \fIgroup2\fR /dev/null [>\ \fIoutput\fR]
+.RE
+.RE
+.RE
+.SH "OPTIONS"
+.SS "Algorithm"
+.RS 0
+.PP
+\fB\-\-auto\fR
+.RS 4
+Automatically selects an appropriate strategy from L\-INS\-i, FFT\-NS\-i and FFT\-NS\-2, according to data 
+size.  Default: off (always FFT\-NS\-2)
+.RE
+.PP
+\fB\-\-6merpair\fR
+.RS 4
+Distance is calculated based on the number of shared 6mers.  Default: on
+.RE
+.PP
+\fB\-\-globalpair\fR
+.RS 4
+All pairwise alignments are computed with the Needleman\-Wunsch
+algorithm.  More accurate but slower 
+than \-\-6merpair.  Suitable for a set of
+globally alignable sequences.  Applicable to 
+up to ~200 sequences.  A combination with \-\-maxiterate 1000 is recommended (G\-INS\-i).  Default: off (6mer distance is used)
+.RE
+.PP
+\fB\-\-localpair\fR
+.RS 4
+All pairwise alignments are computed with the Smith\-Waterman
+algorithm.  More accurate but slower
+than \-\-6merpair.  Suitable for a set of 
+locally alignable sequences.  Applicable to 
+up to ~200 sequences.  A combination with \-\-maxiterate 1000 is recommended (L\-INS\-i).  Default: off (6mer distance is used)
+.RE
+.PP
+\fB\-\-genafpair\fR
+.RS 4
+All pairwise alignments are computed with a local
+algorithm with the generalized affine gap cost
+(Altschul 1998).  More accurate but slower
+than \-\-6merpair.  Suitable when large internal gaps
+are expected.  Applicable to 
+up to ~200 sequences.  A combination with \-\-maxiterate 1000 is recommended (E\-INS\-i).  Default: off (6mer distance is used)
+.RE
+.\".PP
+.\"\fB\-\-fastswpair\fR
+.\".RS 4
+.\"Distance is calculated based on a FASTA alignment. 
+.\"FASTA is required.  Default: off (6mer distance is used)
+.\".RE
+.PP
+\fB\-\-fastapair\fR
+.RS 4
+All pairwise alignments are computed with FASTA (Pearson and Lipman 1988).
+FASTA is required.  Default: off (6mer distance is used)
+.RE
+.\".PP
+.\"\fB\-\-blastpair\fR
+.\".RS 4
+.\"Distance is calculated based on a BLAST alignment.  BLAST is 
+.\"required.  Default: off (6mer distance is used)
+.\".RE
+.PP
+\fB\-\-weighti\fR \fInumber\fR
+.RS 4
+Weighting factor for the consistency term calculated from pairwise alignments.  Valid when 
+either of \-\-globalpair, \-\-localpair,  \-\-genafpair, \-\-fastapair or 
+\-\-blastpair is selected.  Default: 2.7
+.RE
+.PP
+\fB\-\-retree\fR \fInumber\fR
+.RS 4
+Guide tree is built \fInumber\fR times in the 
+progressive stage.  Valid with 6mer distance.  Default: 2
+.RE
+.PP
+\fB\-\-maxiterate\fR \fInumber\fR
+.RS 4
+\fInumber\fR cycles of iterative refinement are performed.  Default: 0
+.RE
+.PP
+\fB\-\-fft\fR
+.RS 4
+Use FFT approximation in group\-to\-group alignment.  Default: on
+.RE
+.PP
+\fB\-\-nofft\fR
+.RS 4
+Do not use FFT approximation in group\-to\-group alignment.  Default: off
+.RE
+.PP
+\fB\-\-noscore\fR
+.RS 4
+Alignment score is not checked in the iterative refinement stage.  Default: off (score is checked)
+.RE
+.PP
+\fB\-\-memsave\fR
+.RS 4
+Use the Myers\-Miller (1988) algorithm.  Default: automatically turned on when the alignment length exceeds 10,000 (aa/nt).
+.RE
+.PP
+\fB\-\-parttree\fR
+.RS 4
+Use a fast tree\-building method (PartTree, Katoh and Toh 2007) with
+the 6mer distance.  Recommended for a large number (> ~10,000) 
+of sequences are input.  Default: off
+.RE
+.PP
+\fB\-\-dpparttree\fR
+.RS 4
+The PartTree algorithm is used with distances based on DP.  Slightly
+more accurate and slower than \-\-parttree.  Recommended for a large
+number (> ~10,000) of sequences are input.   Default: off
+.RE
+.PP
+\fB\-\-fastaparttree\fR
+.RS 4
+The PartTree algorithm is used with distances based on FASTA.  Slightly more accurate and slower than \-\-parttree.  Recommended for a large number (> ~10,000) of sequences are input.  FASTA is required.  Default: off
+.RE
+.PP
+\fB\-\-partsize\fR \fInumber\fR
+.RS 4
+The number of partitions in the PartTree algorithm.  Default: 50
+.RE
+.PP
+\fB\-\-groupsize\fR \fInumber\fR
+.RS 4
+Do not make alignment larger than \fInumber\fR sequences. Valid only with the \-\-*parttree options.  Default: the number of input sequences
+.RE
+.RE
+.SS "Parameter"
+.RS 0
+.PP
+\fB\-\-op\fR \fInumber\fR
+.RS 4
+Gap opening penalty at group\-to\-group alignment.  Default: 1.53
+.RE
+.PP
+\fB\-\-ep\fR \fInumber\fR
+.RS 4
+Offset value, which works like gap extension penalty, for
+group\-to\-group alignment.  Default: 0.123
+.RE
+.PP
+\fB\-\-lop\fR \fInumber\fR
+.RS 4
+Gap opening penalty at local pairwise 
+alignment.  Valid when
+the \-\-localpair or \-\-genafpair option is selected.  Default: \-2.00
+.RE
+.PP
+\fB\-\-lep\fR \fInumber\fR
+.RS 4
+Offset value at local pairwise alignment.  Valid when
+the \-\-localpair or \-\-genafpair option is selected.  Default: 0.1
+.RE
+.PP
+\fB\-\-lexp\fR \fInumber\fR
+.RS 4
+Gap extension penalty at local pairwise alignment.  Valid when
+the \-\-localpair or \-\-genafpair option is selected.  Default: \-0.1
+.RE
+.PP
+\fB\-\-LOP\fR \fInumber\fR
+.RS 4
+Gap opening penalty to skip the alignment.  Valid when the
+\-\-genafpair option is selected.   Default: \-6.00
+.RE
+.PP
+\fB\-\-LEXP\fR \fInumber\fR
+.RS 4
+Gap extension penalty to skip the alignment.  Valid when the
+\-\-genafpair option is selected.   Default: 0.00
+.RE
+.PP
+\fB\-\-bl\fR \fInumber\fR
+.RS 4
+BLOSUM \fInumber\fR matrix (Henikoff and Henikoff 1992) is used.  \fInumber\fR=30, 45, 62 or 80.  Default: 62
+.RE
+.PP
+\fB\-\-jtt\fR \fInumber\fR
+.RS 4
+JTT PAM \fInumber\fR (Jones et al. 1992) matrix is used.  \fInumber\fR>0.  Default: BLOSUM62
+.RE
+.PP
+\fB\-\-tm\fR \fInumber\fR
+.RS 4
+Transmembrane PAM \fInumber\fR (Jones et al. 1994) matrix is used.  \fInumber\fR>0.  Default: BLOSUM62
+.RE
+.PP
+\fB\-\-aamatrix\fR \fImatrixfile\fR
+.RS 4
+Use a user\-defined AA scoring matrix.  The format of \fImatrixfile\fR is
+the same to that of BLAST.  Ignored when nucleotide sequences are input.   Default: BLOSUM62
+.RE
+.PP
+\fB\-\-fmodel\fR
+.RS 4
+Incorporate the AA/nuc composition information into
+the scoring matrix.  Default: off
+.RE
+.RE
+.SS "Output"
+.RS 0
+.PP
+\fB\-\-clustalout\fR
+.RS 4
+Output format: clustal format.  Default: off (fasta format)
+.RE
+.PP
+\fB\-\-inputorder\fR
+.RS 4
+Output order: same as input.  Default: on
+.RE
+.PP
+\fB\-\-reorder\fR
+.RS 4
+Output order: aligned.  Default: off (inputorder)
+.RE
+.PP
+\fB\-\-treeout\fR
+.RS 4
+Guide tree is output to the \fIinput\fR.tree file.  Default: off
+.RE
+.PP
+\fB\-\-quiet\fR
+.RS 4
+Do not report progress.  Default: off
+.RE
+.RE
+.SS "Input"
+.RS 0
+.PP
+\fB\-\-nuc\fR
+.RS 4
+Assume the sequences are nucleotide.  Default: auto
+.RE
+.PP
+\fB\-\-amino\fR
+.RS 4
+Assume the sequences are amino acid.  Default: auto
+.RE
+.PP
+\fB\-\-seed\fR \fIalignment1\fR [\fB--seed\fR \fIalignment2\fR \fB--seed\fR \fIalignment3\fR ...]
+.RS 4
+Seed alignments given in \fIalignment_n\fR (fasta format) are aligned with 
+sequences in \fIinput\fR.  The alignment within every seed is preserved.
+.RE
+.RE
+.SH "FILES"
+.RS 0
+.PP
+Mafft stores the input sequences and other files in a temporary directory, which by default is located in
+\fI/tmp\fR.
+.RE
+.SH "ENVIONMENT"
+.RS 0
+.PP
+\fBMAFFT_BINARIES\fR
+.RS 4
+Indicates the location of the binary files used by mafft. By default, they are searched in
+\fI/usr/local/lib/mafft\fR, but on Debian systems, they are searched in
+\fI/usr/lib/mafft\fR.
+.RE
+.PP
+\fBFASTA_4_MAFFT\fR
+.RS 4
+This variable can be set to indicate to mafft the location to the fasta34 program if it is not in the PATH.
+.RE
+.RE
+.SH "SEE ALSO"
+.RS 0
+.PP
+
+\fBmafft\-homologs\fR(1)
+.RE
+.SH "REFERENCES"
+.RS 0
+.SS "In English"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Katoh and Toh (Bioinformatics 23:372\-374, 2007) PartTree: an algorithm to build an approximate tree from a large number of unaligned sequences (describes the PartTree algorithm).
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Katoh, Kuma, Toh and Miyata (Nucleic Acids Res. 33:511\-518, 2005) MAFFT version 5: improvement in accuracy of multiple sequence alignment (describes [ancestral versions of] the G\-INS\-i, L\-INS\-i and E\-INS\-i strategies)
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Katoh, Misawa, Kuma and Miyata (Nucleic Acids Res. 30:3059\-3066, 2002) MAFFT: a novel method for rapid multiple sequence alignment based on fast Fourier transform (describes the FFT\-NS\-1, FFT\-NS\-2 and FFT\-NS\-i strategies)
+.RE
+.SS "In Japanese"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Katoh and Misawa (Seibutsubutsuri 46:312\-317, 2006) Multiple Sequence Alignments: the Next Generation
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Katoh and Kuma (Kagaku to Seibutsu 44:102\-108, 2006) Jissen\-teki Multiple Alignment
+.RE
+.RE
+.SH "AUTHORS"
+.RS 0
+.PP
+\fBKazutaka Katoh\fR <\&kazutaka.katoh_at_aist.go.jp\&>
+.sp -1n
+.IP "" 4
+Wrote Mafft.
+.PP
+\fBCharles Plessy\fR <\&charles\-debian\-nospam_at_plessy.org\&>
+.sp -1n
+.IP "" 4
+Wrote this manpage in DocBook XML for the Debian distribution, using Mafft's homepage as a template.
+.RE
+.SH "COPYRIGHT"
+.RS 0
+Copyright \(co 2002\-2007 Kazutaka Katoh (mafft)
+.br
+Copyright \(co 2007 Charles Plessy (this manpage)
+.br
+.PP
+Mafft and its manpage are offered under the following conditions:
+.PP
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+.sp
+.RS 4
+\h'-04' 1.\h'+02'Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+02'Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+02'The name of the author may not be used to endorse or promote products derived from this software without specific prior written permission.
+.RE
+.PP
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.br
+.RE

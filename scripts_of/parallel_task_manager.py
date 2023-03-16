@@ -50,9 +50,9 @@ if getattr(sys, 'frozen', False):
 else:
     __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-# use orthofinder supplied executables by preference
+# use user's executables by preference over OrthoFinder's
 my_env = os.environ.copy()
-my_env['PATH'] = os.path.join(__location__, 'bin:') + my_env['PATH']
+my_env['PATH'] = my_env['PATH'] + ":" + os.path.join(__location__, 'bin')
 # Fix LD_LIBRARY_PATH when using pyinstaller 
 if getattr(sys, 'frozen', False):
     if 'LD_LIBRARY_PATH_ORIG' in my_env:

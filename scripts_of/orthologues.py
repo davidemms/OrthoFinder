@@ -131,7 +131,7 @@ class OrthoGroupsSet(object):
         
     def SpeciesDict(self):
         d = self.speciesIDsEx.GetIDToNameDict()
-        return {k:v.rsplit(".",1)[0] for k,v in d.items()}
+        return {k: v.rsplit(".", 1)[0] for k, v in d.items()}
         
     def Spec_SeqDict(self):
         if self._Spec_SeqIDs != None:
@@ -618,6 +618,13 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
         testFN = trees_msa.WriteTestFile(d_deps_test)
         if msa_method is not None:
             success, stdout, stderr, cmd = program_caller.TestMSAMethod(msa_method, d_deps_test)
+            if not success and msa_method.startswith("mafft"):
+                mafft_var = "MAFFT_BINARIES"
+                print("Trying OrthoFinder packaged version of MAFFT")
+                if mafft_var not in parallel_task_manager.my_env:
+                    parallel_task_manager.my_env[mafft_var] = os.path.join(parallel_task_manager.__location__, 'bin/mafft/libexec/')
+                    parallel_task_manager.my_env["PATH"] = parallel_task_manager.my_env["PATH"] + ":" + os.path.join(parallel_task_manager.__location__, 'bin/mafft/bin/')
+                    success, stdout, stderr, cmd = program_caller.TestMSAMethod(msa_method, d_deps_test)
             if not success:
                 print("ERROR: Cannot run MSA method '%s'" % msa_method)
                 program_caller.PrintDependencyCheckFailure(cmd)
