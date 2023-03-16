@@ -42,6 +42,11 @@ nThreadsDefault = mp.cpu_count()
 
 from . import tree, parallel_task_manager
 
+PY2 = sys.version_info <= (3,)
+csv_write_mode = 'wb' if PY2 else 'wt'
+csv_append_mode = 'ab' if PY2 else 'at'
+csv_read_mode = 'rb' if PY2 else 'rt'
+
 """
 Utilities
 -------------------------------------------------------------------------------

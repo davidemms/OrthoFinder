@@ -156,7 +156,8 @@ def assign_genes(results_files):
     return clustersFilename_pairs
 
 
-def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", min_for_profile=20, q_ids=True, divide=10, subtrees_dir=""):
+def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", min_for_profile=20, q_ids=True, divide=10,
+                             subtrees_dir="", q_hogs=True):
     """
     Create a fasta file with profile genes from each orthogroup
     Args:
@@ -186,20 +187,30 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", min_for_p
     if os.path.exists(fn_diamond_db):
         print("Profiles database already exists and will be reused: %s" % fn_diamond_db)
         return fn_diamond_db
-    clusters_filename = list(glob.glob(wd + "clusters_OrthoFinder*id_pairs.txt"))
-    if len(clusters_filename) == 0:
-        print("ERROR: Can't find %s" % wd + "clusters_OrthoFinder*id_pairs.txt")
-    ogs = mcl.GetPredictedOGs(clusters_filename[0])
+    og_set = orthologues.OrthoGroupsSet(wd_list, list(range(nSpAll)), nSpAll, True)
+    ids = og_set.Spec_SeqDict()
+    ids_rev = {v: k for k, v in ids.items()}
+    if q_hogs:
+        try:
+            ids_simple = og_set.SequenceDict()
+            ids_simple_rev = {v: k for k, v in ids_simple.items()}
+            ogs = ReadHOGs(din, "N0.tsv", ids_simple_rev)
+        except RuntimeError:
+            print("ERROR: Cannot read HOGs file, please report this error: https://github.com/davidemms/OrthoFinder/issues")
+            q_hogs = False
+            print("WARNING: Using MCL-based orthogroups as a fall-back")
+            # util.Fail()
+    if q_hogs:
+        clusters_filename = list(glob.glob(wd + "clusters_OrthoFinder*id_pairs.txt"))
+        if len(clusters_filename) == 0:
+            print("ERROR: Can't find %s" % wd + "clusters_OrthoFinder*id_pairs.txt")
+        ogs = mcl.GetPredictedOGs(clusters_filename[0])
     fw = fasta_writer.FastaWriter(wd + "Species*fa", qGlob=True)
     seq_write = []
     seq_convert = dict()
     # print("WARNING: Check all gene names, can't start with '__'")
     # If there are subtrees then we need to convert their IDs in the profile file
     # back to internal IDs
-    if q_ids:
-        og_set = orthologues.OrthoGroupsSet(wd_list, list(range(nSpAll)), nSpAll, True)
-        ids = og_set.Spec_SeqDict()
-        ids_rev = {v: k for k, v in ids.items()}
     nToDo = len(ogs)
     for iog, og in enumerate(ogs):
         if iog >= 0 and divmod(iog, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
@@ -256,6 +267,25 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", min_for_p
     fw.WriteSeqsToFasta_withNewAccessions(seq_write, fn_fasta, seq_convert)
     subprocess.call(["diamond", "makedb", "--in", fn_fasta, "-d", fn_diamond_db])
     return fn_diamond_db
+
+
+def ReadHOGs(din, fn_hogs, ids_rev):
+    fn = din + "Phylogenetic_Hierarchical_Orthogroups/" + fn_hogs
+    if not os.path.exists(fn):
+        print("ERROR: %s does not exist" % fn)
+        raise RuntimeError
+    ogs = []
+    with open(fn, util.csv_read_mode) as infile:
+        reader = csv.reader(infile, delimiter="\t")
+        next(reader)  # header
+        for line in reader:
+            ogs.append([])
+            for species in line[3:]:
+                genes = species.split(", ")
+                genes = [ids_rev[g] for g in genes if g != '']
+                ogs[-1].extend(genes)
+            ogs[-1] = set(ogs[-1])
+    return ogs
 
 
 def sample_random(og, n_max):

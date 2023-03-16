@@ -24,7 +24,7 @@ from . import resolve, util, files, parallel_task_manager
 try: 
     import queue
 except ImportError:
-    import Queue as queue   
+    import Queue as queue
 
 PY2 = sys.version_info <= (3,)
 csv_write_mode = 'wb' if PY2 else 'wt'
@@ -1122,7 +1122,7 @@ def DoOrthologuesForOrthoFinder(ogSet,
                               ogSet.speciesToUse, GeneToSpecies, SequenceDict, speciesDict, spec_seq_dict, 
                               neighbours, qNoRecon, outfile_dups, stride_dups, ologs_file_handles, 
                               putative_xenolog_file_handles, hog_writer, q_split_paralogous_clades, fewer_open_files=fewer_open_files)
-            
+
             if n_parallel == 1:
                 nOrthologues_SpPair = util.nOrtho_sp(nspecies)
                 dummy_lock = mp.Lock()
@@ -1146,7 +1146,7 @@ def DoOrthologuesForOrthoFinder(ogSet,
                                     WriteOlogLinesToFile(ta.ologs_files_handles[i][j], olog_lines[i][j], dummy_lock)
                                     WriteOlogLinesToFile(ta.ologs_files_handles[j][i], olog_lines[j][i], dummy_lock)
                             WriteOlogLinesToFile(ta.putative_xenolog_file_handles[i], olog_sus_lines[i], dummy_lock)
-                # util.PrintTime("Done writing orthologs")
+                util.PrintTime("Done writing orthologs")
             else:
                 args_queue = mp.Queue()
                 for iog in range(nOgs):
@@ -1197,6 +1197,7 @@ class TreeAnalyser(object):
                 return None
             og_name = "OG%07d" % iog
             n_species = len(self.speciesToUse)
+            dim2 = 1 if self.fewer_open_files else self.nspecies
             rooted_tree_ids, qHaveSupport = CheckAndRootTree(files.FileHandler.GetOGsTreeFN(iog), self.species_tree_rooted_labelled, self.GeneToSpecies) # this can be parallelised easily
             if rooted_tree_ids is None: 
                 return None
@@ -1223,7 +1224,7 @@ class TreeAnalyser(object):
                     self.lock_suspect.release()
 
             # Get Orthologues
-            olog_lines = [["" for j in xrange(self.nspecies)] for i in xrange(self.nspecies)]
+            olog_lines = [["" for j in xrange(dim2)] for i in xrange(self.nspecies)]
             olog_sus_lines = ["" for i in xrange(self.nspecies)]
             nOrthologues_SpPair = GetLinesForOlogFiles([(iog, ologs)], self.speciesDict, self.speciesToUse,
                                                        self.SequenceDict, len(suspect_genes) > 0, olog_lines,
@@ -1231,6 +1232,7 @@ class TreeAnalyser(object):
             GetHOGs_from_tree(iog, recon_tree, self.hog_writer, self.lock_hogs, self.q_split_paralogous_clades) 
             # don't relabel nodes, they've already been done
             util.RenameTreeTaxa(recon_tree, self.reconTreesRenamedDir + "OG%07d_tree.txt" % iog, self.spec_seq_dict, qSupport=False, qFixNegatives=True)
+            # recon_tree.delete_traverse()
             if iog >= 0 and divmod(iog, 10 if self.nOgs <= 200 else 100 if self.nOgs <= 2000 else 1000)[1] == 0:
                 util.PrintTime("Done %d of %d" % (iog, self.nOgs))
             return nOrthologues_SpPair, olog_lines, olog_sus_lines
@@ -1248,9 +1250,10 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
     Must put an item in the results queue before exiting
     """
     try:
+        dim2 = 1 if fewer_open_files else nspecies
         nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
         nCache = util.nOrtho_cache(nspecies) 
-        olog_lines_tot = [["" for j in range(nspecies)] for i in range(nspecies)]
+        olog_lines_tot = [["" for j in range(dim2)] for i in range(nspecies)]
         olog_sus_lines_tot = ["" for i in range(nspecies)]
         while True:
             try:
@@ -1265,7 +1268,7 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
                 nCache += nOrtho
                 for i in range(nspecies):
                     olog_sus_lines_tot[i] += olog_sus_lines[i]
-                    for j in range(nspecies):
+                    for j in range(dim2):
                         olog_lines_tot[i][j] += olog_lines[i][j]
                 # Now write those that we've collected enough lines for
                 I,J = nCache.get_i_j_to_write(n_ologs_cache, fewer_open_files)

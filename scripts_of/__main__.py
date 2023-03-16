@@ -29,6 +29,7 @@
 from __future__ import absolute_import
 
 from . import parallel_task_manager
+ptm_initialised = parallel_task_manager.ParallelTaskManager_singleton()
 
 import os                                       # Y
 os.environ["OPENBLAS_NUM_THREADS"] = "1"    # fix issue with numpy/openblas. Will mean that single threaded options aren't automatically parallelised 
@@ -1383,7 +1384,7 @@ def CheckDependencies(options, user_specified_m, prog_caller, dirForTempFiles):
                 util.Fail()
     if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunMCL():
         util.Fail()
-    if not (options.qStopAfterPrepare or options.qStopAfterSeqs or options.qStopAfterGroups):
+    if not (options.qStopAfterPrepare or options.qStopAfterSeqs or options.qStopAfterGroups or options.qStartFromTrees):
         if not orthologues.CanRunOrthologueDependencies(dirForTempFiles, 
                                                             options.qMSATrees, 
                                                             options.qPhyldog, 
