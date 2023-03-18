@@ -348,7 +348,7 @@ LSQIGKLLRKDHTTVRHGIDKVEEELENDPNLKSFLDLFKN""")
         """Error message including environment & PATH if a dependency check fails
         """
         print("\nEnvironment:")
-        print(parallel_task_manager.my_env)
+        print({key: parallel_task_manager.my_env[key] for key in sorted(parallel_task_manager.my_env)})
         print("\nCommand:")
         print("export PATH=%s:" % parallel_task_manager.my_env['PATH'])
         print(cmd)

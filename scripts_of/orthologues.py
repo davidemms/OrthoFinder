@@ -750,7 +750,7 @@ def TwoAndThreeGeneHOGs(ogSet, st_rooted_labelled, hog_writer):
         genes = [g.ToString() for g in og] # Inefficient as will convert back again, but trivial cost I think
         hog_writer.write_hog_genes(genes, hogs_to_write, og_name)
 
-def TwoAndThreeGeneOrthogroups(ogSet, resultsDir, fewer_open_files):
+def TwoAndThreeGeneOrthogroups(ogSet, resultsDir, save_space, fewer_open_files):
     speciesDict = ogSet.SpeciesDict()
     sequenceDict = ogSet.SequenceDict()
     ogs = ogSet.OGs(qInclAll=True)
@@ -800,7 +800,7 @@ def TwoAndThreeGeneOrthogroups(ogSet, resultsDir, fewer_open_files):
         all_orthologues.append((iog, orthologues))
     nspecies = len(ogSet.speciesToUse)
     sp_to_index = {str(sp):i for i, sp in enumerate(ogSet.speciesToUse)}
-    with trees2ologs_of.OrthologsFiles(resultsDir, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index, fewer_open_files) as (olog_files_handles, suspect_genes_file_handles):
+    with trees2ologs_of.OrthologsFiles(resultsDir, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index, save_space, fewer_open_files) as (olog_files_handles, suspect_genes_file_handles):
         olog_lines_tot = [["" for j in range(nspecies)] for i in range(nspecies)]
         olog_sus_lines_tot = ["" for i in range(nspecies)]
         nOrthologues_SpPair += trees2ologs_of.GetLinesForOlogFiles(all_orthologues, speciesDict, ogSet.speciesToUse, sequenceDict, 
@@ -821,6 +821,7 @@ def ReconciliationAndOrthologues(
         stride_dups=None,
         q_split_para_clades=False,
         fewer_open_files=False,
+        save_space=False,
 ):
     """
     ogSet - info about the orthogroups, species etc.
@@ -874,11 +875,11 @@ def ReconciliationAndOrthologues(
         hog_writer = trees2ologs_of.HogWriter(species_tree_rooted_labelled, node_names, SequenceDict, speciesDict, ogSet.speciesToUse)
         nOrthologues_SpPair = trees2ologs_of.DoOrthologuesForOrthoFinder(ogSet, species_tree_rooted_labelled, trees2ologs_of.GeneToSpecies_dash, 
                                                                          stride_dups, qNoRecon, hog_writer, q_split_para_clades, nLowParallel,
-                                                                         fewer_open_files)
+                                                                         fewer_open_files, save_space)
         util.PrintTime("Done OF Orthologues")
         TwoAndThreeGeneHOGs(ogSet, species_tree_rooted_labelled, hog_writer)
         hog_writer.close_files()
-    nOrthologues_SpPair += TwoAndThreeGeneOrthogroups(ogSet, resultsDir_ologs, fewer_open_files)
+    nOrthologues_SpPair += TwoAndThreeGeneOrthogroups(ogSet, resultsDir_ologs, save_space=save_space, fewer_open_files=fewer_open_files)
     if nLowParallel > 1 and "phyldog" != recon_method and "dlcpar" not in recon_method:
         trees2ologs_of.SortParallelFiles(nLowParallel, ogSet.speciesToUse, speciesDict, fewer_open_files)
     stop = time.time()
@@ -935,7 +936,8 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
                        qMSA = False,
                        qPhyldog = False,
                        results_name = "",
-                       q_split_para_clades=False):
+                       q_split_para_clades=False,
+                       save_space=False):
     """
     1. Setup:
         - ogSet, directories
@@ -1103,7 +1105,8 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
     util.RenameTreeTaxa(speciesTree_fn, resultsSpeciesTrees[-1], db.ogSet.SpeciesDict(), qSupport=qSpeciesTreeSupports, qFixNegatives=True)
     util.PrintTime("Starting Recon and orthologues")
     ReconciliationAndOrthologues(recon_method, db.ogSet, nHighParallel, nLowParallel, i if qMultiple else None,
-                                 stride_dups=stride_dups, q_split_para_clades=q_split_para_clades, fewer_open_files=fewer_open_files)
+                                 stride_dups=stride_dups, q_split_para_clades=q_split_para_clades,
+                                 fewer_open_files=fewer_open_files, save_space=save_space)
     # util.PrintTime("Done Recon")
     
     if qMultiple:

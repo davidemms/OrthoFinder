@@ -684,7 +684,10 @@ class PreviousFilesLocator_old(PreviousFilesLocator):
                 self.wd_base_prev = continuationDir + "WorkingDirectory/"
             else:
                 self.wd_base_prev = continuationDir   # nothing much to do, set this as the one to try and fail later
-        self.wd_base_prev = [self.wd_base_prev]
+        if self.wd_base_prev:
+            self.wd_base_prev = [self.wd_base_prev]
+        else:
+            self.wd_base_prev = []
                 
     def _GetOGsFile(self, userArg):
         """returns the WorkingDirectory, ResultsDirectory and clusters_id_pairs filename"""
@@ -832,7 +835,10 @@ def InitialiseFileHandler(options, fastaDir=None, continuationDir=None, resultsD
             base_dir = pfl.GetHomeForResults()
         except Unprocessable:
             pfl = PreviousFilesLocator_old(options, continuationDir)
-            base_dir = resultsDir_nonDefault if resultsDir_nonDefault != None else pfl.GetHomeForResults()
+            if not pfl.wd_base_prev:
+                print("ERROR: Couldn't process as an OrthoFinder results directory: %s" % continuationDir)
+                util.Fail()
+            base_dir = resultsDir_nonDefault if resultsDir_nonDefault is not None else pfl.GetHomeForResults()
     if not os.path.exists(base_dir): os.mkdir(base_dir)
     # 3 
     # RefactorDS - this might be suitable as a constructor now

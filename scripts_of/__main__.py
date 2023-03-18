@@ -872,7 +872,7 @@ def PrintHelp(prog_caller):
 #    print("                 Options: of_recon, dlcpar, dlcpar_convergedsearch")
     print(" -s <file>       User-specified rooted species tree")
     print(" -I <int>        MCL inflation parameter [Default = %0.1f]" % g_mclInflation)
-    print(" --fewer-files   Only create one orthologs file per species")
+    print(" --save-space    Only create one compressed orthologs file per species")
     print(" -x <file>       Info for outputting results in OrthoXML format")
     print(" -p <dir>        Write the temporary pickle files to <dir>")
     print(" -1              Only perform one-way sequence search")
@@ -967,7 +967,7 @@ class Options(object):#
         self.mclInflation = g_mclInflation
         self.dna = False
         self.fewer_open_files = True  # By default only open O(n) orthologs files at a time
-        self.fewer_files = False  # On complete, have only one orthologs file per species
+        self.save_space = False  # On complete, have only one orthologs file per species
 
     def what(self):
         for k, v in self.__dict__.items():
@@ -1085,8 +1085,8 @@ def ProcessArgs(prog_caller, args):
             except:
                 print("Incorrect argument for MCL inflation parameter: %s\n" % arg)
                 util.Fail()
-        elif arg == "--fewer-files":
-            options.fewer_files = True
+        elif arg == "--save-space":
+            options.save_space = True
         elif arg == "-x" or arg == "--orthoxml":  
             if options.speciesXMLInfoFN:
                 print("Repeated argument: -x/--orthoxml")
@@ -1613,7 +1613,8 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
                                     options.qMSATrees,
                                     options.qPhyldog,
                                     options.name,
-                                    options.qSplitParaClades)
+                                    options.qSplitParaClades,
+                                    options.save_space)
     util.PrintTime("Done orthologues")
 
 def GetOrthologues_FromTrees(options):
@@ -1890,7 +1891,7 @@ def main(args=None):
             raise NotImplementedError
             ptm = parallel_task_manager.ParallelTaskManager_singleton()
             ptm.Stop()
-        if not options.fewer_files and not options.qFastAdd:
+        if not options.save_space and not options.qFastAdd:
             # split up the orthologs into one file per species-pair
             split_ortholog_files.split_ortholog_files(files.FileHandler.GetOrthologuesDirectory())
         d_results = os.path.normpath(files.FileHandler.GetResultsDirectory1()) + os.path.sep

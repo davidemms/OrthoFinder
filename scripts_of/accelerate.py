@@ -4,7 +4,6 @@ import gzip
 import os
 import string
 import random
-import subprocess
 from collections import defaultdict
 from typing import Optional
 import multiprocessing as mp
@@ -24,7 +23,7 @@ xcelerate_config = XcelerateConfig()
 
 
 def check_for_orthoxcelerate(input_dir):
-    # Fill in details as developed
+    # Add any specific checks required here
     return True
 
 
@@ -55,7 +54,8 @@ def RunSearch(options, speciessInfoObj, fn_diamond_db, prog_caller, q_one_query=
     for proc in runningProcesses:
         while proc.is_alive():
             proc.join()
-    util.PrintTime("Done profiles search")
+    print("")
+    util.PrintTime("Done profiles search\n")
     return results_files
 
 
@@ -265,7 +265,7 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", min_for_p
                 seq_convert[ss] = og_id_full + "_" + ss
     print("")
     fw.WriteSeqsToFasta_withNewAccessions(seq_write, fn_fasta, seq_convert)
-    subprocess.call(["diamond", "makedb", "--in", fn_fasta, "-d", fn_diamond_db])
+    parallel_task_manager.RunCommand_Simple(" ".join(["diamond", "makedb", "--in", fn_fasta, "-d", fn_diamond_db]))
     return fn_diamond_db
 
 

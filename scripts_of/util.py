@@ -22,9 +22,8 @@
 #      improves orthogroup inference accuracy, Genome Biology 16:157
 #
 # For any enquiries send an email to David Emms
-# david_emms@hotmail.com 
-
-
+# david_emms@hotmail.com
+import gzip
 import os
 import sys
 import time
@@ -479,3 +478,10 @@ def getrow(row):
 
 def version_parse_simple(sem_version):
     return list(map(int, sem_version.split(".")[:3]))
+
+
+def file_open(filename_with_gz, mode, gz):
+    if gz:
+        return gzip.open(filename_with_gz + ".gz", mode)
+    else:
+        return open(filename_with_gz, mode)

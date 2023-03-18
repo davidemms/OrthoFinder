@@ -121,10 +121,15 @@ def ManageQueue(runningProcesses, cmd_queue):
     if qError:
         Fail()
 
+
+def RunCommand_Simple(command):
+    subprocess.call(command, env=my_env, shell=True)
+
+
 def RunCommand(command, qPrintOnError=False, qPrintStderr=True):
     """ Run a single command """
+    popen = subprocess.Popen(command, env=my_env, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if qPrintOnError:
-        popen = subprocess.Popen(command, env=my_env, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = popen.communicate()
         if popen.returncode != 0:
             print(("\nERROR: external program called by OrthoFinder returned an error code: %d" % popen.returncode))
@@ -138,7 +143,6 @@ def RunCommand(command, qPrintOnError=False, qPrintStderr=True):
             print(("stderr\n------\n%s" % stderr))
         return popen.returncode
     else:
-        popen = subprocess.Popen(command, env=my_env, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         popen.communicate()
         return popen.returncode
 
