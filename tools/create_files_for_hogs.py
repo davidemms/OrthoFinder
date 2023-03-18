@@ -34,9 +34,6 @@ if __name__ == "__main__" and __package__ is None:
 
 from scripts_of import util, trees_msa, orthologues, files
 
-PY2 = sys.version_info <= (3,)
-csv_write_mode = 'wb' if PY2 else 'wt'
-csv_read_mode = 'rb' if PY2 else 'rt'
 
 def process_log(logFN):
     """

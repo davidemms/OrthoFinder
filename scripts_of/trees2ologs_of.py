@@ -27,9 +27,6 @@ except ImportError:
     import Queue as queue
 
 PY2 = sys.version_info <= (3,)
-csv_write_mode = 'wb' if PY2 else 'wt'
-csv_append_mode = 'ab' if PY2 else 'at'
-csv_read_mode = 'rb' if PY2 else 'rt'
 
 debug = False   # HOGs
 
@@ -145,7 +142,7 @@ class HogWriter(object):
         species_names = [sp_ids[i] for i in self.iSps]
         for name in species_tree_node_names:
             fn = files.FileHandler.GetHierarchicalOrthogroupsFN(name)
-            self.fhs[name] = open(fn, csv_write_mode)
+            self.fhs[name] = open(fn, util.csv_write_mode)
             util.writerow(self.fhs[name], ["HOG", "OG", "Gene Tree Parent Clade"] + species_names)
             self.fhs[name].flush()
         # Map from HOGs to genes that must be contained in them
@@ -1000,12 +997,12 @@ class OrthologsFiles(object):
     def __enter__(self):
         for i in xrange(self.nSpecies):
             sp0 = str(self.iSpeciesToUse[i])
-            self.xenolog_file_handles[i] = open(self.dPutativeXenologs + "%s.tsv" % self.speciesDict[sp0], csv_append_mode)
+            self.xenolog_file_handles[i] = open(self.dPutativeXenologs + "%s.tsv" % self.speciesDict[sp0], util.csv_append_mode)
             strsp0 = sp0 + "_"
             isp0 = self.sp_to_index[sp0]
             d0 = self.d + "Orthologues_" + self.speciesDict[sp0] + "/"
             if self.fewer_open_files or self.save_space:
-                othologs_file_handle = util.file_open(self.d + self.speciesDict[sp0] + '.tsv', csv_append_mode, self.save_space)
+                othologs_file_handle = util.file_open(self.d + self.speciesDict[sp0] + '.tsv', util.csv_append_mode, self.save_space)
                 self.ortholog_file_handles[i] = [othologs_file_handle for _ in xrange(self.nSpecies)]
             else:
                 for j in xrange(i, self.nSpecies):
@@ -1014,8 +1011,8 @@ class OrthologsFiles(object):
                     strsp1 = sp1 + "_"
                     isp1 = self.sp_to_index[sp1]
                     d1 = self.d + "Orthologues_" + self.speciesDict[sp1] + "/"
-                    self.ortholog_file_handles[i][j] = open(d0 + '%s__v__%s.tsv' % (self.speciesDict[sp0], self.speciesDict[sp1]), csv_append_mode)
-                    self.ortholog_file_handles[j][i] = open(d1 + '%s__v__%s.tsv' % (self.speciesDict[sp1], self.speciesDict[sp0]), csv_append_mode)
+                    self.ortholog_file_handles[i][j] = open(d0 + '%s__v__%s.tsv' % (self.speciesDict[sp0], self.speciesDict[sp1]), util.csv_append_mode)
+                    self.ortholog_file_handles[j][i] = open(d1 + '%s__v__%s.tsv' % (self.speciesDict[sp1], self.speciesDict[sp0]), util.csv_append_mode)
         return self.ortholog_file_handles, self.xenolog_file_handles
 
     def __exit__(self, type, value, traceback):
@@ -1046,7 +1043,7 @@ def InitialiseSuspectGenesDirs(nspecies, speciesIDs, speciesDict):
     files.FileHandler.GetSuspectGenesDir()  # creates the directory
     dSuspectOrthologues = files.FileHandler.GetPutativeXenelogsDir()
     for index1 in xrange(nspecies):
-        with open(dSuspectOrthologues + '%s.tsv' % speciesDict[str(speciesIDs[index1])], csv_write_mode) as outfile:
+        with open(dSuspectOrthologues + '%s.tsv' % speciesDict[str(speciesIDs[index1])], util.csv_write_mode) as outfile:
             writer1 = csv.writer(outfile, delimiter="\t")
             writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], "Other"))
 
@@ -1058,7 +1055,7 @@ def WriteSuspectGenes(nspecies, speciesToUse, suspect_genes, speciesDict, Sequen
         strsp0_ = strsp0+"_"
         these_genes = [g for g in suspect_genes if g.startswith(strsp0_)]
         if len(these_genes) > 0:
-            with open(dSuspectGenes + speciesDict[strsp0] + ".txt", csv_append_mode) as outfile:
+            with open(dSuspectGenes + speciesDict[strsp0] + ".txt", util.csv_append_mode) as outfile:
                 # not a CSV file so \n line endings are fine
                 outfile.write("\n".join([SequenceDict[g] for g in these_genes]) + "\n")
 
@@ -1097,7 +1094,7 @@ def DoOrthologuesForOrthoFinder(ogSet,
         for index1 in xrange(nspecies):
             if fewer_open_files or save_space:  # current thinking (2023.03) is that fewer_open_files will always be true anyway
                 filename = dResultsOrthologues + '%s.tsv' % speciesDict[str(ogSet.speciesToUse[index1])]
-                with util.file_open(filename, csv_write_mode, gz=save_space) as outfile:
+                with util.file_open(filename, util.csv_write_mode, gz=save_space) as outfile:
                     writer1 = csv.writer(outfile, delimiter="\t")
                     writer1.writerow(("Orthogroup", "Species", speciesDict[str(ogSet.speciesToUse[index1])], "Orthologs"))
             else:
@@ -1105,7 +1102,7 @@ def DoOrthologuesForOrthoFinder(ogSet,
                 if not os.path.exists(d): os.mkdir(d)
                 for index2 in xrange(nspecies):
                     if index2 == index1: continue
-                    with open(d + '%s__v__%s.tsv' % (speciesDict[str(ogSet.speciesToUse[index1])], speciesDict[str(ogSet.speciesToUse[index2])]), csv_write_mode) as outfile:
+                    with open(d + '%s__v__%s.tsv' % (speciesDict[str(ogSet.speciesToUse[index1])], speciesDict[str(ogSet.speciesToUse[index2])]), util.csv_write_mode) as outfile:
                         writer1 = csv.writer(outfile, delimiter="\t")
                         writer1.writerow(("Orthogroup", speciesDict[str(ogSet.speciesToUse[index1])], speciesDict[str(ogSet.speciesToUse[index2])]))
         InitialiseSuspectGenesDirs(nspecies, ogSet.speciesToUse, speciesDict)
@@ -1116,7 +1113,7 @@ def DoOrthologuesForOrthoFinder(ogSet,
         sp_to_index = {str(sp):i for i, sp in enumerate(ogSet.speciesToUse)}
 
         # Infer orthologues and write them to file           
-        with open(files.FileHandler.GetDuplicationsFN(), csv_write_mode) as outfile_dups, \
+        with open(files.FileHandler.GetDuplicationsFN(), util.csv_write_mode) as outfile_dups, \
                 OrthologsFiles(dResultsOrthologues, speciesDict, ogSet.speciesToUse, nspecies, sp_to_index, save_space, fewer_open_files) as (ologs_file_handles, putative_xenolog_file_handles):
             util.writerow(outfile_dups, ["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
             outfile_dups.flush()
@@ -1399,7 +1396,7 @@ def SortFile(fn, f_type):
     first_column_sort = lambda s : s.split("\t", 1)[0]
     if f_type == "h":
         # Need to renumber the hogs as the parallel numbering is incorrect
-        with open(fn, csv_read_mode) as infile:
+        with open(fn, util.csv_read_mode) as infile:
             try:
                 header = next(infile)
             except StopIteration:
@@ -1412,19 +1409,19 @@ def SortFile(fn, f_type):
                 return
             hog_base = line.split(".", 1)[0]
         lines.sort(key = first_column_sort)
-        with open(fn, csv_write_mode) as outfile:
+        with open(fn, util.csv_write_mode) as outfile:
             outfile.write(header)
             for ihog, l in enumerate(lines):
                 outfile.write(hog_base + (".HOG%07d" % ihog) + "\t" + l)
     else:
-        with open(fn, csv_read_mode) as infile:
+        with open(fn, util.csv_read_mode) as infile:
             try:
                 header = next(infile)
             except StopIteration:
                 return
             lines = list(infile)
         lines.sort(key=first_column_sort)
-        with open(fn, csv_write_mode) as outfile:
+        with open(fn, util.csv_write_mode) as outfile:
             outfile.write(header)
             outfile.write("".join(lines))
 
@@ -1486,13 +1483,13 @@ def DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDirectory, GeneToSpecies, 
         if not os.path.exists(d): os.mkdir(d)     
         for index2 in range(nspecies):
             if index2 == index1: continue
-            with open(d + '%s__v__%s.tsv' % (speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]), csv_write_mode) as outfile:
+            with open(d + '%s__v__%s.tsv' % (speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]), util.csv_write_mode) as outfile:
                 writer1 = csv.writer(outfile, delimiter="\t")
                 writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]))
     with OrthologsFiles(dResultsOrthologues, speciesDict, ogSet.speciesToUse, nSpecies, sp_to_index, save_space=True) as ologs_files_handles, putative_xenolog_file_handles:
         nOgs = len(ogSet.OGs())
         nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
-        with open(files.FileHandler.GetDuplicationsFN(), csv_write_mode) as outfile:
+        with open(files.FileHandler.GetDuplicationsFN(), util.csv_write_mode) as outfile:
             dupWriter = csv.writer(outfile, delimiter="\t")
             dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
             for iog in range(nOgs):
