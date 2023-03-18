@@ -230,24 +230,24 @@ class WaterfallMethod:
         return H
 
     @staticmethod
-    def ConnectCognates(seqsInfo, iSpecies, d_pickle):
+    def ConnectCognates(seqsInfo, iSpecies, d_pickle, v2_scores=False):
         # calculate RBH for species i
         BHix = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies, d_pickle)
         BHxi = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies, d_pickle, row=False)
         RBHi = matrices.MatricesAndTr_s(BHix, BHxi)  # twice as much work as before (only did upper triangular before)
         del BHix, BHxi
         B = matrices.LoadMatrixArray("B", seqsInfo, iSpecies, d_pickle)
-        connect = WaterfallMethod.ConnectAllBetterThanAnOrtholog_s(RBHi, B, seqsInfo, iSpecies)
+        connect = WaterfallMethod.ConnectAllBetterThanAnOrtholog_s(RBHi, B, seqsInfo, iSpecies, v2_scores)
         matrices.DumpMatrixArray("connect", connect, iSpecies, d_pickle)
 
     @staticmethod
-    def Worker_ConnectCognates(cmd_queue, d_pickle):
+    def Worker_ConnectCognates(cmd_queue, d_pickle, v2_scores=True):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             while True:
                 try:
                     args = cmd_queue.get(True, 1)
-                    WaterfallMethod.ConnectCognates(*args, d_pickle=d_pickle)
+                    WaterfallMethod.ConnectCognates(*args, d_pickle=d_pickle, v2_scores=v2_scores)
                 except queue.Empty:
                     return
 
@@ -290,6 +290,97 @@ class WaterfallMethod:
                              I] + 1e-6  # to connect to one in it's own species it must be closer than other species. We can deal with hits outside the species later
         return mostDistant
 
+
+    @staticmethod
+    def GetMostDistant_s_estimate_from_relative_rbhs(RBH, B, seqsInfo, iSpec, p=50):
+        """
+        Get the cut-off score for each sequence
+        Args:
+            RBH - array of 0-1 RBH lil matrices
+            B - array of corresponding lil score matrices (Similarity ~ 1/Distance)
+            p - the percentile of times the estimate will include the most distant RBH
+        Returns:
+            mostDistant - the cut-off for each sequence in this species
+        Implementation:
+			Stage 1: conversion factors for rbh from iSpec to furthest rbh
+            - Get the relative similarity scores for RBHs from iSpec to species j
+              versus species k where the two RBHs exist
+            - Find the p^th percentile of what the rbh would be in species j given
+              what the rbh is in species k. This is the conversion factor for
+              similarity score of an rbh in j vs k
+            - Take the column min: I.e. the expected score for the furthest RBH
+            Stage 2: For each rbh observed, estimate what this would imply would be the cut-off
+             for the furthest rbh
+             - Take the furthest of these estimates (could potentially use a percentile, but I
+               think the point is that we should take diverged genes as a clue we should look
+               further and then allow the trees to sort it out.
+        """
+        # 1. Reduce to column vectors
+        q_debug_gather = True
+        RBH = [rbh.tocsr() for rbh in RBH]
+        B = [b.tocsr() for b in B]
+        RBH_B = [(rbh.multiply(b)).tolil() for i, (rbh, b) in enumerate(zip(RBH, B)) if i!= iSpec]
+        # create a vector of these scores
+        nseqi = seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]
+        # nsp-1 x nseqi
+        Z = np.matrix([[rhb_b.data[i][0] if rhb_b.getrowview(i).nnz == 1 else 0. for i in range(nseqi)] for rhb_b in RBH_B])   # RBH if it exists else zero
+        nsp_m1 = Z.shape[0]
+        Zr = 1./Z
+        rs = []
+        n_pairs = []
+        for isp in range(nsp_m1):
+            rs.append([])
+            n_pairs.append([])
+            for jsp in range(nsp_m1):
+                if isp == jsp:
+                    rs[-1].append(1.0)
+                    n_pairs[-1].append(np.count_nonzero(Z[isp,:]))
+                    continue
+                ratios = np.multiply(Z[isp,:], Zr[jsp,:])
+                i_nonzeros = np.where(np.logical_and(np.isfinite(ratios), ratios > 0))  # only those which a score is availabe for both
+                # print(ratios[i_nonzeros].shape)
+                # print(type(ratios[i_nonzeros]))
+                # ratios = ratios[i_nonzeros].reshape(-1,1)
+                ratios = ratios[i_nonzeros]
+                # print(ratios)
+                r = np.percentile(np.asarray(ratios), 100-p)
+                print(r)
+                rs[-1].append(r)
+                n_pairs[-1].append(len(ratios))
+                # calculate the n vectors and take the min
+        if q_debug_gather: print("\nSpecies %d" % iSpec)
+        if q_debug_gather: print("RBH pair:")
+        if q_debug_gather: print([x for x in range(len(RBH)) if x != iSpec])
+        C = np.matrix(rs)   # Conversion matrix:
+        # To convert from a hit in species j to one in species i multiply by Cij
+        if q_debug_gather: print(C)
+        # To convert from a hit in species j to the furthest hit, need to take
+        # the column-wise minimum
+        C = np.amin(C, axis=0)    # conversion from a RBH to the estmate of what the most distant RBH should be
+        if q_debug_gather: print(C)
+        if q_debug_gather: print("Number of data points:")
+        if q_debug_gather: print(np.matrix(n_pairs))
+        mostDistant = numeric.transpose(np.ones(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]])*1e9)
+
+        bestHit = numeric.transpose(np.zeros(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]))
+        j_conversion = 0
+        for kSpec in range(seqsInfo.nSpecies):
+            B[kSpec] = B[kSpec].tocsr()
+            if iSpec == kSpec:
+                continue
+            species_factor_to_most_distant = C[0,j_conversion]
+            if q_debug_gather: print(species_factor_to_most_distant)
+            j_conversion += 1
+            bestHit = np.maximum(bestHit, matrices.sparse_max_row(B[kSpec]))
+            I, J = RBH[kSpec].nonzero()
+            if len(I) > 0:
+                if q_debug_gather: print("%d updated" % np.count_nonzero(species_factor_to_most_distant * B[kSpec][I, J] < mostDistant[I]))
+                mostDistant[I] = np.minimum(species_factor_to_most_distant * B[kSpec][I, J], mostDistant[I])
+        # anything that doesn't have an RBB, set to distance to the closest gene in another species. I.e. it will hit just that gene and all genes closer to it in the its own species
+        I = mostDistant > 1e8
+        mostDistant[I] = bestHit[I] + 1e-6   # to connect to one in its own species it must be closer than other species. We can deal with hits outside the species later
+        return mostDistant
+
     @staticmethod
     def ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec):
         connect = []
@@ -311,8 +402,11 @@ class WaterfallMethod:
         return connect
 
     @staticmethod
-    def ConnectAllBetterThanAnOrtholog_s(RBH, B, seqsInfo, iSpec):
-        mostDistant = WaterfallMethod.GetMostDistant_s(RBH, B, seqsInfo, iSpec)
+    def ConnectAllBetterThanAnOrtholog_s(RBH, B, seqsInfo, iSpec, v2_scores):
+        if v2_scores:
+            mostDistant = WaterfallMethod.GetMostDistant_s_estimate_from_relative_rbhs(RBH, B, seqsInfo, iSpec)
+        else:
+            mostDistant = WaterfallMethod.GetMostDistant_s(RBH, B, seqsInfo, iSpec)
         connect = WaterfallMethod.ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec)
         return connect
 
@@ -376,7 +470,8 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
         # in an orthogroup from a gene, G, in species, S, based on observed:
         # - distance from gene G to its orthologs in some other species, T
         # - known ratios of distances of orthologs between species S and T to distance to most distant ortholog (i.e. still in orthogroup)
-        max_bit_scores = GetMaxBitscores()
+        # max_bit_scores = GetMaxBitscores()
+        pass
 
     Lengths = GetSequenceLengths(seqsInfo)
 
@@ -398,7 +493,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     for iSpecies in range(seqsInfo.nSpecies):
         cmd_queue.put((seqsInfo, iSpecies))
     runningProcesses = [
-        mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, files.FileHandler.GetPickleDir()))
+        mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, files.FileHandler.GetPickleDir(), options.v2_scores))
         for i_ in range(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
