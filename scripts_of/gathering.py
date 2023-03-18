@@ -17,13 +17,6 @@ try:
 except ImportError:
     import Queue as queue
 
-from Bio.Align import substitution_matrices
-try:
-    from Bio.SubsMat import MatrixInfo
-    BLOSUM62 = MatrixInfo.blosum62
-except ModuleNotFoundError:
-    BLOSUM62 = substitution_matrices.load('BLOSUM62')
-
 from . import util, files, blast_file_processor, matrices, mcl, orthologues, trees_msa, stats
 
 
@@ -174,6 +167,9 @@ class WaterfallMethod:
 
     @staticmethod
     def ProcessBlastHits(seqsInfo, blastDir_list, Lengths, iSpecies, d_pickle, qDoubleBlast, v2_scores):
+        """
+        iLimitNewSpecies: int - Only process fasta files with OrthoFidner ID >= iLimitNewSpecies
+        """
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             # process up to the best hits for each species
@@ -341,21 +337,20 @@ class WaterfallMethod:
         nsp_m1 = Z.shape[0]
         Zr = 1./Z
         rs = []
-        n_pairs = []
         for isp in range(nsp_m1):
             rs.append([])
-            n_pairs.append([])
             for jsp in range(nsp_m1):
                 if isp == jsp:
                     rs[-1].append(1.0)
-                    n_pairs[-1].append(np.count_nonzero(Z[isp,:]))
                     continue
                 ratios = np.multiply(Z[isp,:], Zr[jsp,:])
                 i_nonzeros = np.where(np.logical_and(np.isfinite(ratios), ratios > 0))  # only those which a score is availabe for both
-                ratios = ratios[i_nonzeros]
-                r = np.percentile(np.asarray(ratios), 100-p)
-                rs[-1].append(r)
-                n_pairs[-1].append(len(ratios))
+                if i_nonzeros[0].size == 0:
+                    rs[-1].append(1.)  # no conversion bertween this pair
+                else:
+                    ratios = ratios[i_nonzeros]
+                    r = np.percentile(np.asarray(ratios), 100-p)
+                    rs[-1].append(r)
                 # calculate the n vectors and take the min
         C = np.matrix(rs)   # Conversion matrix:
         # To convert from a hit in species j to one in species i multiply by Cij
@@ -460,7 +455,10 @@ def GetSequenceLengths(seqsInfo):
     return sequenceLengths
 
 
-def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXML=None):
+def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXML=None, q_unassigned=False):
+    """
+    q_unassigned: bool - Do orthogroups for unassigned genes after --fast-add (i.e. not for all species)
+    """
     # Run Algorithm, cluster and output cluster files with original accessions
     util.PrintUnderline("Running OrthoFinder algorithm")
     # it's important to free up the memory from python used for processing the genomes
@@ -468,18 +466,18 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     # way I can find to do this is to launch the memory intensive python code
     # as separate process that exits before MCL is launched.
 
-    Lengths = GetSequenceLengths(seqsInfo)
+    Lengths = GetSequenceLengths(seqsInfo)  # Alternatively, self-self bit scores, but it amounts to the same thing
 
     # Process BLAST hits
     util.PrintTime("Initial processing of each species")
     cmd_queue = mp.Queue()
     blastDir_list = files.FileHandler.GetBlastResultsDir()
-    for iSpecies in range(seqsInfo.nSpecies):
-        cmd_queue.put((seqsInfo, blastDir_list, Lengths, iSpecies))
+    for iSpeciesJob in range(seqsInfo.nSpecies):  # The i-th job, not the OrthoFinder species ID
+        cmd_queue.put((seqsInfo, blastDir_list, Lengths, iSpeciesJob))
     files.FileHandler.GetPickleDir()  # create the pickle directory before the parallel processing to prevent a race condition
     runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits,
-                                   args=(cmd_queue, files.FileHandler.GetPickleDir(), options.qDoubleBlast, options.v2_scores)) for i_ in
-                        range(options.nProcessAlg)]
+                                   args=(cmd_queue, files.FileHandler.GetPickleDir(), options.qDoubleBlast, options.v2_scores))
+                        for i_ in range(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
     parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
@@ -505,7 +503,9 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)
 
     util.PrintUnderline("Writing orthogroups to file")
-    post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML)
+    if not q_unassigned:
+        post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML)
+    return clustersFilename_pairs
 
 
 def post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML):

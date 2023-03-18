@@ -45,18 +45,7 @@ import datetime
 
 from . import util
 
-class SpeciesInfo(object):
-    def __init__(self):
-        self.speciesToUse = []           #       seqsInfo.iSpeciesToUse   - which to include for this analysis 
-        self.nSpAll = None               #       seqsInfo.nSpAll => 0, 1, ..., nSpAll - 1 are valid species indices
-        self.iFirstNewSpecies = None     #       iFirstNew   => (0, 1, ..., iFirstNew-1) are from previous and (iFirstNew, iFirstNew+1, ..., nSpecies-1) are the new species indices
-    def __str__(self):
-        return str((self.speciesToUse, self.nSpAll, self.iFirstNewSpecies))
-   
-""" ************************************************************************************************************************* """
-""" ************************************************************************************************************************* """
-""" ************************************************************************************************************************* """
-                    
+
 class __Files_new_dont_manually_create__(object):    
     def __init__(self):
         self.baseOgFormat = "OG%07d"
@@ -292,6 +281,18 @@ class __Files_new_dont_manually_create__(object):
             return "%sSpecies%d.fa" % (self.wd_base[0], iSpecies)
         for d in self.wd_base:
             fn = "%sSpecies%d.fa" % (d, iSpecies)
+            if os.path.exists(fn): return fn
+        raise Exception(fn + " not found")
+
+    def GetSpeciesUnassignedFastaFN(self, iSpecies, qForCreation=False):
+        """
+        qForCreation: A path is required at which the file should be created (don't search for it)
+        """
+        if len(self.wd_base) == 0: raise Exception("No wd1")
+        if qForCreation:
+            return "%sUnassigned.Species%d.fa" % (self.wd_base[0], iSpecies)
+        for d in self.wd_base:
+            fn = "%sUnassigned.Species%d.fa" % (d, iSpecies)
             if os.path.exists(fn): return fn
         raise Exception(fn + " not found")
         

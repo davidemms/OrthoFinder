@@ -22,8 +22,11 @@ class XcelerateConfig(object):
 xcelerate_config = XcelerateConfig()
 
 
-def check_for_orthoxcelerate(input_dir):
+def check_for_orthoxcelerate(input_dir, speciesInfoObj):
     # Add any specific checks required here
+    if speciesInfoObj.speciesToUse != list(range(speciesInfoObj.nSpAll)):
+        print("ERROR: Removing species from 'core' results directory is not supported for a --fast-add analysis.")
+        return False
     return True
 
 
@@ -136,8 +139,7 @@ def ogs_from_diamond_results(fn_og_results_out, q_ignore_sub=False):
             # scores_all_genes[gene] = scores[0]
     return ogs_all_genes
 
-
-def assign_genes(results_files):
+def get_original_orthogroups():
     wd_input_clusters = files.FileHandler.GetWorkingDirectory1_Read()[1]  # first is the current working directory, second is the most recent of the input directories
     fn_clusters = glob.glob(wd_input_clusters + "clusters*_id_pairs.txt")
     if len(fn_clusters) == 0:
@@ -147,10 +149,27 @@ def assign_genes(results_files):
         print("WARNING: Found multiple orthogroup files: %s" % fn_clusters)
     fn_clusters = fn_clusters[0]
     ogs = mcl.GetPredictedOGs(fn_clusters)
+    return ogs
+
+
+def assign_genes(results_files):
+    """
+    Returns OGs with the new species added
+    """
+    ogs = defaultdict(set)
     for fn in results_files:
         ogs_all_genes = ogs_from_diamond_results(fn)
         for gene, og in ogs_all_genes.items():
             ogs[int(og)].add(gene)
+    return ogs
+
+
+# def write_all_orthogroups(ogs: List[Set[str]], ogs_new_species: Dict[int, Set[str]], ogs_clade_specific: List[Set[str]]):
+def write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific):
+    for iog, genes in ogs_new_species.items():
+        ogs[iog].update(genes)
+    for og in ogs_clade_specific:
+        ogs.append(og)
     clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN()
     mcl.write_updated_clusters_file(ogs, clustersFilename_pairs)
     return clustersFilename_pairs
@@ -287,6 +306,20 @@ def ReadHOGs(din, fn_hogs, ids_rev):
             ogs[-1] = set(ogs[-1])
     return ogs
 
+
+def write_unassigned_fasta(ogs_new_genes, speciesInfoObj):
+    assigned_genes = set.union(*ogs_new_genes.values())
+    # Write out files for all unassigned genes
+    iSpeciesNew = list(range(speciesInfoObj.iFirstNewSpecies, speciesInfoObj.nSpAll))
+    for iSp in iSpeciesNew:
+        fw = fasta_writer.FastaWriter(files.FileHandler.GetSpeciesFastaFN(iSp))
+        unassigned = set(fw.SeqLists.keys()).difference(assigned_genes)
+        fw.WriteSeqsToFasta(unassigned, files.FileHandler.GetSpeciesUnassignedFastaFN(iSp, qForCreation=True))
+
+    # Run standard algorithm
+
+def clade_specific_orthogroups():
+    pass
 
 def sample_random(og, n_max):
     """

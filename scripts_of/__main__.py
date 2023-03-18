@@ -35,6 +35,7 @@ import os                                       # Y
 os.environ["OPENBLAS_NUM_THREADS"] = "1"    # fix issue with numpy/openblas. Will mean that single threaded options aren't automatically parallelised 
 
 import sys                                      # Y
+import copy                                     # Y
 import subprocess                               # Y
 import glob                                     # Y
 import shutil                                   # Y
@@ -157,22 +158,31 @@ def GetNumberOfSequencesInFile(filename):
 
 """ Question: Do I want to do all BLASTs or just the required ones? It's got to be all BLASTs I think. They could potentially be 
 run after the clustering has finished."""
-def GetOrderedSearchCommands(seqsInfo, speciesInfoObj, qDoubleBlast, search_program, prog_caller):
+def GetOrderedSearchCommands(seqsInfo, speciesInfoObj, qDoubleBlast, search_program, prog_caller, q_unassigned=False):
     """ Using the nSeq1 x nSeq2 as a rough estimate of the amount of work required for a given species-pair, returns the commands 
     ordered so that the commands predicted to take the longest come first. This allows the load to be balanced better when processing 
     the BLAST commands.
     """
     iSpeciesPrevious = list(range(speciesInfoObj.iFirstNewSpecies))
     iSpeciesNew = list(range(speciesInfoObj.iFirstNewSpecies, speciesInfoObj.nSpAll))
-    speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew) if (qDoubleBlast or i <=j)] + \
-                   [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesPrevious) if (qDoubleBlast or i <=j)] + \
-                   [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew) if (qDoubleBlast or i <=j)] 
+    if q_unassigned:
+        speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew)]
+    else:
+        speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew) if (qDoubleBlast or i <=j)] + \
+                       [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesPrevious) if (qDoubleBlast or i <=j)] + \
+                       [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew) if (qDoubleBlast or i <=j)]
     taskSizes = [seqsInfo.nSeqsPerSpecies[i]*seqsInfo.nSeqsPerSpecies[j] for i,j in speciesPairs]
     taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
     if search_program == "blast":
-        commands = [" ".join(["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", files.FileHandler.GetSpeciesFastaFN(iFasta), "-db", files.FileHandler.GetSpeciesDatabaseN(iDB), "-out", files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)]) for iFasta, iDB in speciesPairs]
+        commands = [" ".join(["blastp", "-outfmt", "6", "-evalue", "0.001",
+                              "-query", files.FileHandler.GetSpeciesUnassignedFastaFN(iFasta) if q_unassigned else files.FileHandler.GetSpeciesFastaFN(iFasta),
+                              "-db", files.FileHandler.GetSpeciesDatabaseN(iDB),
+                              "-out", files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)]) for iFasta, iDB in speciesPairs]
     else:
-        commands = [prog_caller.GetSearchMethodCommand_Search(search_program, files.FileHandler.GetSpeciesFastaFN(iFasta), files.FileHandler.GetSpeciesDatabaseN(iDB, search_program), files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)) for iFasta, iDB in speciesPairs]
+        commands = [prog_caller.GetSearchMethodCommand_Search(search_program,
+                        files.FileHandler.GetSpeciesUnassignedFastaFN(iFasta) if q_unassigned else files.FileHandler.GetSpeciesFastaFN(iFasta),
+                        files.FileHandler.GetSpeciesDatabaseN(iDB, search_program),
+                        files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)) for iFasta, iDB in speciesPairs]
     return commands
 
 
@@ -788,7 +798,7 @@ def ProcessPreviousFiles(workingDir_list, qDoubleBlast, check_blast=True):
         err_text = "ERROR: Previous/Pre-calculated BLAST results directory does not exist: %s\n" % workingDir_list[0]
         files.FileHandler.LogFailAndExit(err_text)
         
-    speciesInfo = files.SpeciesInfo()
+    speciesInfo = util.SpeciesInfo()
     if not os.path.exists(files.FileHandler.GetSpeciesIDsFN()):
         err_text = "ERROR: %s file must be provided if using previously calculated BLAST results" % files.FileHandler.GetSpeciesIDsFN()
         files.FileHandler.LogFailAndExit(err_text)
@@ -845,28 +855,29 @@ def ProcessPreviousFiles(workingDir_list, qDoubleBlast, check_blast=True):
     return speciesInfo, speciesToUse_names
 
 # 6
-def CreateSearchDatabases(seqsInfoObj, options, prog_caller):
-    nDB = max(seqsInfoObj.speciesToUse) + 1
-    for iSp in range(nDB):
+def CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned=False):
+    iSpeciesToDo = range(speciesInfoObj.iFirstNewSpecies, speciesInfoObj.nSpAll) if q_unassigned else range(max(speciesInfoObj.speciesToUse) + 1)
+    for iSp in iSpeciesToDo:
+        fn_fasta = files.FileHandler.GetSpeciesFastaFN(iSp)
         if options.search_program == "blast":
-            command = " ".join(["makeblastdb", "-dbtype", "prot", "-in", files.FileHandler.GetSpeciesFastaFN(iSp), "-out", files.FileHandler.GetSpeciesDatabaseN(iSp)])
-            util.PrintTime("Creating Blast database %d of %d" % (iSp + 1, nDB))
+            command = " ".join(["makeblastdb", "-dbtype", "prot", "-in", fn_fasta, "-out", files.FileHandler.GetSpeciesDatabaseN(iSp)])
+            util.PrintTime("Creating Blast database %d of %d" % (iSp + 1, len(iSpeciesToDo)))
             RunBlastDBCommand(command) 
         else:
-            command = prog_caller.GetSearchMethodCommand_DB(options.search_program, files.FileHandler.GetSpeciesFastaFN(iSp), files.FileHandler.GetSpeciesDatabaseN(iSp, options.search_program))
-            util.PrintTime("Creating %s database %d of %d" % (options.search_program, iSp + 1, nDB))
+            command = prog_caller.GetSearchMethodCommand_DB(options.search_program, fn_fasta, files.FileHandler.GetSpeciesDatabaseN(iSp, options.search_program))
+            util.PrintTime("Creating %s database %d of %d" % (options.search_program, iSp + 1, len(iSpeciesToDo)))
             ret_code = parallel_task_manager.RunCommand(command, qPrintOnError=True, qPrintStderr=False)
             if ret_code != 0:
                 files.FileHandler.LogFailAndExit("ERROR: diamond makedb failed")
 
 # 7
-def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller):
+def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller, q_unassigned=False):
     name_to_print = "BLAST" if options.search_program == "blast" else options.search_program
     if options.qStopAfterPrepare:
         util.PrintUnderline("%s commands that must be run" % name_to_print)
     else:        
         util.PrintUnderline("Running %s all-versus-all" % name_to_print)
-    commands = GetOrderedSearchCommands(seqsInfo, speciessInfoObj, options.qDoubleBlast, options.search_program, prog_caller)
+    commands = GetOrderedSearchCommands(seqsInfo, speciessInfoObj, options.qDoubleBlast, options.search_program, prog_caller, q_unassigned)
     if options.qStopAfterPrepare:
         for command in commands:
             print(command)
@@ -966,7 +977,7 @@ def ProcessesNewFasta(fastaDir, q_dna, speciesInfoObj_prev = None, speciesToUse_
         util.Fail()
     if speciesInfoObj_prev == None:
         # Then this is a new, clean analysis 
-        speciesInfoObj = files.SpeciesInfo()
+        speciesInfoObj = util.SpeciesInfo()
     else:
         speciesInfoObj = speciesInfoObj_prev
     iSeq = 0
@@ -1174,11 +1185,11 @@ def main(args=None):
             options = CheckOptions(options, speciesInfoObj.speciesToUse)
             GetOrthologues_FromTrees(options)
         elif options.qFastAdd:
-            # Check previous directory has been done with MSA trees
-            if not acc.check_for_orthoxcelerate(continuationDir):
-                util.Fail()
             # Prepare previous directory as database
             speciesInfoObj, speciesToUse_names = ProcessPreviousFiles(files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast, check_blast=False)
+            # Check previous directory has been done with MSA trees
+            if not acc.check_for_orthoxcelerate(continuationDir, speciesInfoObj):
+                util.Fail()
             util.PrintUnderline("Creating orthogroup profiles")
             wd_list = files.FileHandler.GetWorkingDirectory1_Read()
             fn_diamond_db = acc.prepare_accelerate_database(continuationDir, wd_list, speciesInfoObj.nSpAll)
@@ -1190,10 +1201,34 @@ def main(args=None):
             seqsInfo = util.GetSeqsInfo(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # Add genes to orthogroups
             results_files = acc.RunSearch(options, speciesInfoObj, fn_diamond_db, prog_caller)
-            clustersFilename_pairs = acc.assign_genes(results_files)
-            # Infer remaining orthogroups (will need modified gene distance measure)
-            # continue with trees
+            # clustersFilename_pairs = acc.assign_genes(results_files)
+            ogs = acc.get_original_orthogroups()
+            ogs_new_species = acc.assign_genes(results_files)
+            acc.write_unassigned_fasta(ogs_new_species, speciesInfoObj)
+            CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned=True)
+            RunSearch(options, speciesInfoObj, seqsInfo, prog_caller, q_unassigned=True)
             speciesNamesDict = SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN())
+
+            # Update info objects for clustering of only the new species
+            speciesInfoObj_for_unassigned = copy.deepcopy(speciesInfoObj)
+            speciesInfoObj_for_unassigned.speciesToUse = [iSp for iSp in speciesInfoObj.speciesToUse if iSp >= speciesInfoObj.iFirstNewSpecies]
+
+            nSpecies_unassigned = len(speciesInfoObj_for_unassigned.speciesToUse)
+            nSeqs_in_new_species = sum([seqsInfo.nSeqsPerSpecies[iSp] for iSp in speciesInfoObj_for_unassigned.speciesToUse])
+            n_offset = seqsInfo.seqStartingIndices[-nSpecies_unassigned]
+            starting_indicies = [n-n_offset for n in seqsInfo.seqStartingIndices[-nSpecies_unassigned:]]
+            seqsInfo_for_unassigned = util.SequencesInfo(
+                nSeqs = nSeqs_in_new_species,
+                nSpecies = nSpecies_unassigned,
+                speciesToUse = speciesInfoObj_for_unassigned.speciesToUse,
+                seqStartingIndices = starting_indicies,
+                nSeqsPerSpecies = seqsInfo.nSeqsPerSpecies
+            )
+            options.v2_scores = True
+            clustersFilename_pairs_unassigned = gathering.DoOrthogroups(options, speciesInfoObj_for_unassigned, seqsInfo_for_unassigned,
+                                                             speciesNamesDict, speciesXML=None, q_unassigned=True)
+            ogs_clade_specific = mcl.GetPredictedOGs(clustersFilename_pairs_unassigned)
+            clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific)
             gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML=None)
             if not options.qStopAfterGroups:
                 GetOrthologues(speciesInfoObj, options, prog_caller)

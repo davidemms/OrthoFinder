@@ -50,7 +50,23 @@ csv_read_mode = 'rb' if PY2 else 'rt'
 Utilities
 -------------------------------------------------------------------------------
 """
-SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")    # speciesToUse - list of ints
+SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")
+"""
+nSeqs: int - number of sequences in speciesToUse
+nSpecies: int - number in speciesToUse
+speciesToUse: List[int]
+seqStartingIndices: List[int] of size |speciesToUse|
+nSeqsPerSpecies: Dict[int, int] - indexed by OrthoFinder species ID, info on all species, nto just those included in analysis
+"""
+
+class SpeciesInfo(object):
+    def __init__(self):
+        self.speciesToUse = []           #       seqsInfo.iSpeciesToUse   - which to include for this analysis
+        self.nSpAll = None               #       seqsInfo.nSpAll => 0, 1, ..., nSpAll - 1 are valid species indices
+        self.iFirstNewSpecies = None     #       iFirstNew   => (0, 1, ..., iFirstNew-1) are from previous and (iFirstNew, iFirstNew+1, ..., nSpecies-1) are the new species indices
+    def __str__(self):
+        return str((self.speciesToUse, self.nSpAll, self.iFirstNewSpecies))
+
 
 picProtocol = 1
 version = "3.0.0"
