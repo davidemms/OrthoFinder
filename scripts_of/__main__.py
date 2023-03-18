@@ -68,6 +68,13 @@ import warnings                                 # Y
 PY2 = sys.version_info <= (3,)
 csv_write_mode = 'wb' if PY2 else 'wt'
 
+from Bio.Align import substitution_matrices
+try:
+    from Bio.SubsMat import MatrixInfo
+    BLOSUM62 = MatrixInfo.blosum62
+except ModuleNotFoundError:
+    BLOSUM62 = substitution_matrices.load('BLOSUM62')
+
 from . import blast_file_processor, files, mcl, util, matrices, orthologues, program_caller, trees_msa, split_ortholog_files
 from . import accelerate as acc
 
@@ -370,7 +377,32 @@ class scnorm:
 """
 RunInfo
 -------------------------------------------------------------------------------
-"""     
+"""
+def BitScore(sequence):
+add
+
+
+def GetMaxBitscores(seqsInfo):
+    sequenceLengths = []
+    for iSpecies, iFasta in enumerate(seqsInfo.speciesToUse):
+        bit_scores.append(np.zeros(seqsInfo.nSeqsPerSpecies[iFasta]))
+        fastaFilename = files.FileHandler.GetSpeciesFastaFN(iFasta)
+        current_sequence = ""
+        qFirstLine = True
+        with open(fastaFilename) as infile:
+            for row in infile:
+                if len(row) > 1 and row[0] == ">":
+                    if qFirstLine:
+                        qFirstLine = False
+                    else:
+                        bit_scores[iSpecies][iCurrentSequence] = BitScore(current_sequence)
+                        current_sequence = ""
+                    _, iCurrentSequence = util.GetIDPairFromString(row[1:])
+                else:
+                    current_sequence += row.rstrip()
+        sequenceLengths[iSpecies][iCurrentSequence] = BitScore(current_sequence)
+    return bit_scores
+
 
 def GetSequenceLengths(seqsInfo):                
     sequenceLengths = []
@@ -968,6 +1000,7 @@ class Options(object):#
         self.dna = False
         self.fewer_open_files = True  # By default only open O(n) orthologs files at a time
         self.save_space = False  # On complete, have only one orthologs file per species
+        self.v2_scores = False
 
     def what(self):
         for k, v in self.__dict__.items():
@@ -1138,6 +1171,8 @@ def ProcessArgs(prog_caller, args):
                 print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
             options.speciesTreeFN = args.pop(0)
+        elif arg == "--scores-v2":
+            options.v2_scores = True
         elif arg == "-S" or arg == "--search":
             choices = ['blast'] + prog_caller.ListSearchMethods()
             switch_used = arg
@@ -1398,13 +1433,20 @@ def CheckDependencies(options, user_specified_m, prog_caller, dirForTempFiles):
             print("Either install the required dependencies or use the option '-og' to stop the analysis after the inference of orthogroups.\n")
             util.Fail()
 
-def DoOrthogroups(options, speciesInfoObj, seqsInfo):
+def DoOrthogroups(options, speciesInfoObj, seqsInfo, v2_scores=False):
     # Run Algorithm, cluster and output cluster files with original accessions
     util.PrintUnderline("Running OrthoFinder algorithm")
     # it's important to free up the memory from python used for processing the genomes
     # before launching MCL because both use sizeable amounts of memory. The only
     # way I can find to do this is to launch the memory intensive python code 
     # as separate process that exits before MCL is launched.
+    if v2_scores:
+        # Estimate scores using DendroBLAST-like scores, then estimate expected relative distances to most distant genes
+        # in an orthogroup from a gene, G, in species, S, based on observed:
+        # - distance from gene G to its orthologs in some other species, T
+        # - known ratios of distances of orthologs between species S and T to distance to most distant ortholog (i.e. still in orthogroup)
+        max_bit_scores = GetMaxBitscores()
+
     Lengths = GetSequenceLengths(seqsInfo)
     
     # Process BLAST hits
@@ -1811,7 +1853,7 @@ def main(args=None):
             # 7.  
             RunSearch(options, speciesInfoObj, seqsInfo, prog_caller)
             # 8.
-            DoOrthogroups(options, speciesInfoObj, seqsInfo)
+            DoOrthogroups(options, speciesInfoObj, seqsInfo, options=options.v2_scores)
             # 9.
             if not options.qStopAfterGroups:
                 GetOrthologues(speciesInfoObj, options, prog_caller)   
@@ -1832,7 +1874,7 @@ def main(args=None):
             # 7. 
             RunSearch(options, speciesInfoObj, seqsInfo, prog_caller)
             # 8.  
-            DoOrthogroups(options, speciesInfoObj, seqsInfo)    
+            DoOrthogroups(options, speciesInfoObj, seqsInfo, options=options.v2_scores)
             # 9. 
             if not options.qStopAfterGroups:
                 GetOrthologues(speciesInfoObj, options, prog_caller)
@@ -1848,7 +1890,7 @@ def main(args=None):
             if options.speciesXMLInfoFN:   
                 speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
             # 8        
-            DoOrthogroups(options, speciesInfoObj, seqsInfo)    
+            DoOrthogroups(options, speciesInfoObj, seqsInfo, options=options.v2_scores)
             # 9
             if not options.qStopAfterGroups:
                 GetOrthologues(speciesInfoObj, options, prog_caller)

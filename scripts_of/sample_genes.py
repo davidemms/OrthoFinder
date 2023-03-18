@@ -236,15 +236,7 @@ def select_from_aligned(infn, n_sample, q_trim=True):
         kmeans = cluster.KMeans(n_clusters=n_sample, random_state=0).fit(M)
     # print("clustering successful")
     labels = kmeans.predict(M)
-    # print("labels successful")
-    # clusters = cluster.Birch(n_clusters=n).fit_predict(S)
-    # print(labels)
-    # print(kmeans.cluster_centers_)
-    # print((max(labels), len(kmeans.cluster_centers_)))
     n_keep = len(ikeep)
-    # for i_clust in range(n_sample):
-    #     print(i_clust)
-    #     print("|".join([accs[d_new_old[iseq]] for iseq in range(n_keep) if labels[iseq] == i_clust]))
     cluster_representative = []
     for i_clust, centre in enumerate(kmeans.cluster_centers_):
         c = centre > 0.5
@@ -254,12 +246,9 @@ def select_from_aligned(infn, n_sample, q_trim=True):
             if l == i_clust:
                 reps.append(i_sample)
                 similarity.append(M[i_sample].dot(c))
-        # print("%d sequences for cluster" % len(similarity))
         if len(similarity) == 0:
             continue
         j = np.argmax(similarity)
-        # print(reps[j])
-        # print(np.where(c))
         cluster_representative.append(reps[j])
     cluster_representative = list(set(cluster_representative))
     n_found = len(cluster_representative)
