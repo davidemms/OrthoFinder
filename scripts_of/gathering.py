@@ -160,9 +160,20 @@ class WaterfallMethod:
                 "WARNING: Too few hits between species %d and species %d to normalise the scores, these hits will be ignored" % (
                 iSpecies, jSpecies))
             return sparse.lil_matrix(B.get_shape())
+    @staticmethod
+    def NormalisedBitScore(B, Lengths, iSpecies, jSpecies):
+        Lq = Lengths[iSpecies]
+        Lh = Lengths[jSpecies]
+        rangeq = list(range(len(Lq)))
+        rangeh = list(range(len(Lh)))
+        li_vals = Lq**(-0.5)
+        lj_vals = Lh**(-0.5)
+        li_matrix = sparse.csr_matrix((li_vals, (rangeq, rangeq)))
+        lj_matrix = sparse.csr_matrix((lj_vals, (rangeh, rangeh)))
+        return sparse.lil_matrix(li_matrix * B * lj_matrix)
 
     @staticmethod
-    def ProcessBlastHits(seqsInfo, blastDir_list, Lengths, iSpecies, d_pickle, qDoubleBlast):
+    def ProcessBlastHits(seqsInfo, blastDir_list, Lengths, iSpecies, d_pickle, qDoubleBlast, v2_scores):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             # process up to the best hits for each species
@@ -170,7 +181,10 @@ class WaterfallMethod:
             for jSpecies in range(seqsInfo.nSpecies):
                 Bij = blast_file_processor.GetBLAST6Scores(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies],
                                                            seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)
-                Bij = WaterfallMethod.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
+                if v2_scores:
+                    Bij = WaterfallMethod.NormalisedBitScore(Bij, Lengths, iSpecies, jSpecies)
+                else:
+                    Bij = WaterfallMethod.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
                 Bi.append(Bij)
             matrices.DumpMatrixArray("B", Bi, iSpecies, d_pickle)
             BH = WaterfallMethod.GetBH_s(Bi, seqsInfo, iSpecies)
@@ -178,11 +192,11 @@ class WaterfallMethod:
             util.PrintTime("Initial processing of species %d complete" % iSpecies)
 
     @staticmethod
-    def Worker_ProcessBlastHits(cmd_queue, d_pickle, qDoubleBlast):
+    def Worker_ProcessBlastHits(cmd_queue, d_pickle, qDoubleBlast, v2_scores):
         while True:
             try:
                 args = cmd_queue.get(True, 1)
-                WaterfallMethod.ProcessBlastHits(*args, d_pickle=d_pickle, qDoubleBlast=qDoubleBlast)
+                WaterfallMethod.ProcessBlastHits(*args, d_pickle=d_pickle, qDoubleBlast=qDoubleBlast, v2_scores=v2_scores)
             except queue.Empty:
                 return
             except Exception:
@@ -292,7 +306,7 @@ class WaterfallMethod:
 
 
     @staticmethod
-    def GetMostDistant_s_estimate_from_relative_rbhs(RBH, B, seqsInfo, iSpec, p=50):
+    def GetMostDistant_s_estimate_from_relative_rbhs(RBH, B, seqsInfo, iSpec, p=90):
         """
         Get the cut-off score for each sequence
         Args:
@@ -316,7 +330,7 @@ class WaterfallMethod:
                further and then allow the trees to sort it out.
         """
         # 1. Reduce to column vectors
-        q_debug_gather = True
+        q_debug_gather = False
         RBH = [rbh.tocsr() for rbh in RBH]
         B = [b.tocsr() for b in B]
         RBH_B = [(rbh.multiply(b)).tolil() for i, (rbh, b) in enumerate(zip(RBH, B)) if i!= iSpec]
@@ -338,28 +352,16 @@ class WaterfallMethod:
                     continue
                 ratios = np.multiply(Z[isp,:], Zr[jsp,:])
                 i_nonzeros = np.where(np.logical_and(np.isfinite(ratios), ratios > 0))  # only those which a score is availabe for both
-                # print(ratios[i_nonzeros].shape)
-                # print(type(ratios[i_nonzeros]))
-                # ratios = ratios[i_nonzeros].reshape(-1,1)
                 ratios = ratios[i_nonzeros]
-                # print(ratios)
                 r = np.percentile(np.asarray(ratios), 100-p)
-                print(r)
                 rs[-1].append(r)
                 n_pairs[-1].append(len(ratios))
                 # calculate the n vectors and take the min
-        if q_debug_gather: print("\nSpecies %d" % iSpec)
-        if q_debug_gather: print("RBH pair:")
-        if q_debug_gather: print([x for x in range(len(RBH)) if x != iSpec])
         C = np.matrix(rs)   # Conversion matrix:
         # To convert from a hit in species j to one in species i multiply by Cij
-        if q_debug_gather: print(C)
         # To convert from a hit in species j to the furthest hit, need to take
         # the column-wise minimum
         C = np.amin(C, axis=0)    # conversion from a RBH to the estmate of what the most distant RBH should be
-        if q_debug_gather: print(C)
-        if q_debug_gather: print("Number of data points:")
-        if q_debug_gather: print(np.matrix(n_pairs))
         mostDistant = numeric.transpose(np.ones(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]])*1e9)
 
         bestHit = numeric.transpose(np.zeros(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]))
@@ -465,13 +467,6 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     # before launching MCL because both use sizeable amounts of memory. The only
     # way I can find to do this is to launch the memory intensive python code
     # as separate process that exits before MCL is launched.
-    if options.v2_scores:
-        # Estimate scores using DendroBLAST-like scores, then estimate expected relative distances to most distant genes
-        # in an orthogroup from a gene, G, in species, S, based on observed:
-        # - distance from gene G to its orthologs in some other species, T
-        # - known ratios of distances of orthologs between species S and T to distance to most distant ortholog (i.e. still in orthogroup)
-        # max_bit_scores = GetMaxBitscores()
-        pass
 
     Lengths = GetSequenceLengths(seqsInfo)
 
@@ -483,7 +478,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
         cmd_queue.put((seqsInfo, blastDir_list, Lengths, iSpecies))
     files.FileHandler.GetPickleDir()  # create the pickle directory before the parallel processing to prevent a race condition
     runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits,
-                                   args=(cmd_queue, files.FileHandler.GetPickleDir(), options.qDoubleBlast)) for i_ in
+                                   args=(cmd_queue, files.FileHandler.GetPickleDir(), options.qDoubleBlast, options.v2_scores)) for i_ in
                         range(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
