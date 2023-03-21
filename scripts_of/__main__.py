@@ -66,7 +66,7 @@ import warnings                                 # Y
 PY2 = sys.version_info <= (3,)
 csv_write_mode = 'wb' if PY2 else 'wt'
 
-from . import blast_file_processor, files, mcl, util, matrices, orthologues, program_caller, trees_msa 
+from . import blast_file_processor, files, mcl, util, matrices, orthologues, program_caller, trees_msa, split_ortholog_files
 
 # Get directory containing script/bundle
 if getattr(sys, 'frozen', False):
@@ -865,6 +865,7 @@ def PrintHelp(prog_caller):
 #    print("                 Options: of_recon, dlcpar, dlcpar_convergedsearch")
     print(" -s <file>       User-specified rooted species tree")
     print(" -I <int>        MCL inflation parameter [Default = %0.1f]" % g_mclInflation)
+    print(" --fewer-files   Only create one orthologs file per species")
     print(" -x <file>       Info for outputting results in OrthoXML format")
     print(" -p <dir>        Write the temporary pickle files to <dir>")
     print(" -1              Only perform one-way sequence search")
@@ -957,7 +958,9 @@ class Options(object):#
         self.speciesTreeFN = None
         self.mclInflation = g_mclInflation
         self.dna = False
-    
+        self.fewer_open_files = True  # By default only open O(n) orthologs files at a time
+        self.fewer_files = False  # On complete, have only one orthologs file per species
+
     def what(self):
         for k, v in self.__dict__.items():
             if v == True:
@@ -1065,7 +1068,9 @@ def ProcessArgs(prog_caller, args):
                 options.mclInflation = float(arg)
             except:
                 print("Incorrect argument for MCL inflation parameter: %s\n" % arg)
-                util.Fail()    
+                util.Fail()
+        elif arg == "--fewer-files":
+            options.fewer_files = True
         elif arg == "-x" or arg == "--orthoxml":  
             if options.speciesXMLInfoFN:
                 print("Repeated argument: -x/--orthoxml")
@@ -1553,7 +1558,8 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
                                     options.qDoubleBlast,
                                     options.qAddSpeciesToIDs,
                                     options.qTrim,
-                                    options.speciesTreeFN, 
+                                    options.fewer_open_files,
+                                    options.speciesTreeFN,
                                     options.qStopAfterSeqs,
                                     options.qStopAfterAlignments,
                                     options.qStopAfterTrees,
@@ -1564,7 +1570,8 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
     util.PrintTime("Done orthologues")
 
 def GetOrthologues_FromTrees(options):
-    orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.nProcessAlg, options.speciesTreeFN, options.qAddSpeciesToIDs, options.qSplitParaClades)
+    orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.nProcessAlg, options.speciesTreeFN,
+                                     options.qAddSpeciesToIDs, options.qSplitParaClades, options.fewer_open_files)
  
 def ProcessesNewFasta(fastaDir, q_dna, speciesInfoObj_prev = None, speciesToUse_prev_names=[]):
     """
@@ -1683,7 +1690,7 @@ def CheckOptions(options, speciesToUse):
     # check can open enough files
     n_extra = 50
     q_do_orthologs = not any((options.qStopAfterPrepare, options.qStopAfterGroups, options.qStopAfterSeqs, options.qStopAfterAlignments, options.qStopAfterTrees))
-    if q_do_orthologs and not options.qStartFromTrees:
+    if q_do_orthologs:
         n_sp = len(speciesToUse)
         wd = files.FileHandler.GetWorkingDirectory_Write()
         wd_files_test = wd + "Files_test/"
@@ -1695,7 +1702,7 @@ def CheckOptions(options, speciesToUse):
                 di = wd_files_test + "Sp%d/" % i_sp
                 if not os.path.exists(di):
                     os.mkdir(di)
-                for j_sp in range(n_sp):
+                for j_sp in range(1):  # We only create a linear number of ortholog files now
                     fnij = di + "Sp%d.txt" % j_sp
                     fh.append(open(fnij, 'w'))
             # create a few extra files to be safe
@@ -1813,6 +1820,9 @@ def main(args=None):
             raise NotImplementedError
             ptm = parallel_task_manager.ParallelTaskManager_singleton()
             ptm.Stop()
+        if not options.fewer_files:
+            # split up the orthologs into one file per species-pair
+            split_ortholog_files.split_ortholog_files(files.FileHandler.GetOrthologuesDirectory())
         d_results = os.path.normpath(files.FileHandler.GetResultsDirectory1()) + os.path.sep
         print("\nResults:\n    %s" % d_results)
         util.PrintCitation(d_results)

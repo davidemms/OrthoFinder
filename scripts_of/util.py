@@ -49,7 +49,7 @@ Utilities
 SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")    # speciesToUse - list of ints
 
 picProtocol = 1
-version = "2.5.5"
+version = "3.0.0"
     
 def PrintNoNewLine(text):
     parallel_task_manager.PrintNoNewLine(text)
@@ -391,7 +391,7 @@ def number_open_files_exception_advice(n_species, q_at_trees):
         q_at_trees - has this error occurred at the orthologs from trees stage
     """
     # parallel_task_manager.RunCommand("ulimit -Hn")    
-    n_req = n_species*n_species + 100
+    n_req = n_species + 100
     msg="\nERROR: The system limits on the number of files a process can open is too low. For %d species \
 OrthoFinder needs to be able to open at least r=%d files. Please increase the limit and restart OrthoFinder\n\
 1. Check the hard and soft limits on the number of open files for your system:\n\
@@ -413,6 +413,8 @@ To increase the limit to %d for user  called 'emms' add the lines:\n\
         msg_part_2 = "5. Once the limit is updated restart OrthoFinder with the original command"
     msg_part_3 = "\nFor full details see: https://github.com/davidemms/OrthoFinder/issues/384"
     print(msg + "\n" + msg_part_2 + "\n" + msg_part_3 + "\n")
+    print("Since this issue OrthoFinder has been updated to only require O(n) open files for n species rather than O(n^2).")
+    print("Please follow the above advice to ensure that it is able to.")
 """
 -------------------------------------------------------------------------------
 """
@@ -444,13 +446,21 @@ class nOrtho_cache(object):
         self.n += nOrtho_sp_obj.n
         return self
 
-    def get_i_j_to_write(self, n_max_cache):
-        IJ = np.where(self.n > n_max_cache)
-        I = list(IJ[0])
-        J = list(IJ[1])
-        for i, j in zip(I,J):
-            self.n[i,j] = 0
-        return I,J
+    def get_i_j_to_write(self, n_max_cache, fewer_open_files=False):
+        if fewer_open_files:
+            # all genes for species i are collated
+            IJ = np.where(self.n.sum(axis=1) > n_max_cache)
+            I = list(IJ[0])
+            J = None
+            for i in I:
+                self.n[i, :] = 0
+        else:
+            IJ = np.where(self.n > n_max_cache)
+            I = list(IJ[0])
+            J = list(IJ[1])
+            for i, j in zip(I,J):
+                self.n[i, j] = 0
+        return I, J
         
 class Finalise(object):
     def __enter__(self):
