@@ -167,7 +167,6 @@ def assign_genes(results_files):
     ogs = defaultdict(set)
     species_closest_hits_totals = defaultdict(lambda: defaultdict(int))
     for fn in results_files:
-        print(fn)
         ogs_all_genes, species_closest_hits = ogs_from_diamond_results(fn)
         for query_species, hits in species_closest_hits.items():
             for hit_species, count in hits.items():
@@ -177,7 +176,7 @@ def assign_genes(results_files):
     species_group = dict()
     for query_species, hits in species_closest_hits_totals.items():
         species_group[query_species] = max(hits, key=hits.get)
-        print((query_species, max(hits, key=hits.get), hits))
+        # print((query_species, max(hits, key=hits.get), hits))
     return ogs, species_group
 
 

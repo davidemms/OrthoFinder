@@ -349,6 +349,7 @@ class Options(object):#
         self.fewer_open_files = True  # By default only open O(n) orthologs files at a time
         self.save_space = False  # On complete, have only one orthologs file per species
         self.v2_scores = False
+        self.root_from_previous = False
 
     def what(self):
         for k, v in self.__dict__.items():
@@ -933,7 +934,8 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
                                     options.qPhyldog,
                                     options.name,
                                     options.qSplitParaClades,
-                                    options.save_space)
+                                    options.save_space,
+                                    root_from_previous = options.root_from_previous)
     util.PrintTime("Done orthologues")
 
 def GetOrthologues_FromTrees(options):
@@ -1201,36 +1203,42 @@ def main(args=None):
             seqsInfo = util.GetSeqsInfo(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # Add genes to orthogroups
             results_files = acc.RunSearch(options, speciesInfoObj, fn_diamond_db, prog_caller)
-            # clustersFilename_pairs = acc.assign_genes(results_files)
-            ogs = acc.get_original_orthogroups()
-            ogs_new_species, species_group = acc.assign_genes(results_files)
-            acc.write_unassigned_fasta(ogs_new_species, speciesInfoObj)
-            CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned=True)
-            RunSearch(options, speciesInfoObj, seqsInfo, prog_caller, q_unassigned=True)
             speciesNamesDict = SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN())
+            ogs = acc.get_original_orthogroups()
+            ogs_new_species, _ = acc.assign_genes(results_files)
+            clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, [])
 
-            # Update info objects for clustering of only the new species
-            speciesInfoObj_for_unassigned = copy.deepcopy(speciesInfoObj)
-            speciesInfoObj_for_unassigned.speciesToUse = [iSp for iSp in speciesInfoObj.speciesToUse if iSp >= speciesInfoObj.iFirstNewSpecies]
+            # # Clade-specific genes
+            # ogs = acc.get_original_orthogroups()
+            # ogs_new_species, _ = acc.assign_genes(results_files)
+            # acc.write_unassigned_fasta(ogs_new_species, speciesInfoObj)
+            # CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned=True)
+            # RunSearch(options, speciesInfoObj, seqsInfo, prog_caller, q_unassigned=True)
+            #
+            # # Update info objects for clustering of only the new species
+            # speciesInfoObj_for_unassigned = copy.deepcopy(speciesInfoObj)
+            # speciesInfoObj_for_unassigned.speciesToUse = [iSp for iSp in speciesInfoObj.speciesToUse if iSp >= speciesInfoObj.iFirstNewSpecies]
+            #
+            # nSpecies_unassigned = len(speciesInfoObj_for_unassigned.speciesToUse)
+            # nSeqs_in_new_species = sum([seqsInfo.nSeqsPerSpecies[iSp] for iSp in speciesInfoObj_for_unassigned.speciesToUse])
+            # n_offset = seqsInfo.seqStartingIndices[-nSpecies_unassigned]
+            # starting_indicies = [n-n_offset for n in seqsInfo.seqStartingIndices[-nSpecies_unassigned:]]
+            # seqsInfo_for_unassigned = util.SequencesInfo(
+            #     nSeqs = nSeqs_in_new_species,
+            #     nSpecies = nSpecies_unassigned,
+            #     speciesToUse = speciesInfoObj_for_unassigned.speciesToUse,
+            #     seqStartingIndices = starting_indicies,
+            #     nSeqsPerSpecies = seqsInfo.nSeqsPerSpecies
+            # )
+            # options.v2_scores = True
+            # clustersFilename_pairs_unassigned = gathering.DoOrthogroups(options, speciesInfoObj_for_unassigned, seqsInfo_for_unassigned,
+            #                                                  speciesNamesDict, speciesXML=None, q_unassigned=True)
+            # ogs_clade_specific = mcl.GetPredictedOGs(clustersFilename_pairs_unassigned)
+            # clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific)
 
-            nSpecies_unassigned = len(speciesInfoObj_for_unassigned.speciesToUse)
-            nSeqs_in_new_species = sum([seqsInfo.nSeqsPerSpecies[iSp] for iSp in speciesInfoObj_for_unassigned.speciesToUse])
-            n_offset = seqsInfo.seqStartingIndices[-nSpecies_unassigned]
-            starting_indicies = [n-n_offset for n in seqsInfo.seqStartingIndices[-nSpecies_unassigned:]]
-            seqsInfo_for_unassigned = util.SequencesInfo(
-                nSeqs = nSeqs_in_new_species,
-                nSpecies = nSpecies_unassigned,
-                speciesToUse = speciesInfoObj_for_unassigned.speciesToUse,
-                seqStartingIndices = starting_indicies,
-                nSeqsPerSpecies = seqsInfo.nSeqsPerSpecies
-            )
-            options.v2_scores = True
-            clustersFilename_pairs_unassigned = gathering.DoOrthogroups(options, speciesInfoObj_for_unassigned, seqsInfo_for_unassigned,
-                                                             speciesNamesDict, speciesXML=None, q_unassigned=True)
-            ogs_clade_specific = mcl.GetPredictedOGs(clustersFilename_pairs_unassigned)
-            clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific)
             gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML=None)
             if not options.qStopAfterGroups:
+                options.root_from_previous = True
                 GetOrthologues(speciesInfoObj, options, prog_caller)
         else:
             raise NotImplementedError
