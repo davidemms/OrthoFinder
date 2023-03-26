@@ -101,26 +101,29 @@ def ogs_from_diamond_results(fn_og_results_out, q_ignore_sub=False):
         q_ignore_sub - ignore any subtrees and just look at overall OGs
     Returns:
         iog        : List[str] "int.int" or "int" of ordered, ambiguous assignments
+        species_closest_hits : Dict[str, Dict[str, int]] search_species -> Dict[hit_species, n_closest_hits]
     Info:
         Hits to other groups are returned if np.log10 difference is less than 10
         and -np.log10 score > difference.
     """
-    ogs_all_genes = defaultdict(list)
+    ogs_sp_hits = defaultdict(list)
     scores_all_genes = defaultdict(list)
     with gzip.open(fn_og_results_out, 'rt') as infile:
         reader = csv.reader(infile, delimiter="\t")
         for line in reader:
             gene = line[0]
-            og = line[1].split("_")[0]
-            ogs_all_genes[gene].append(og.split(".", 1)[0] if q_ignore_sub else og)
+            og, sp, _ = line[1].split("_")
+            ogs_sp_hits[gene].append((og.split(".", 1)[0] if q_ignore_sub else og, sp))
             scores_all_genes[gene].append(float(line[-2]))
-    all_genes = list(ogs_all_genes.keys())
+    all_genes = list(ogs_sp_hits.keys())
+    og_assignments = defaultdict()
+    species_closest_hits = defaultdict(lambda: defaultdict(int))
     for gene in all_genes:
-        ogs = ogs_all_genes[gene]
+        ogs_sp = ogs_sp_hits[gene]
         scores = scores_all_genes[gene]
-        sortedTuples = sorted(zip(scores, ogs))
+        sortedTuples = sorted(zip(scores, ogs_sp))
         scores = [i for i, j in sortedTuples]
-        ogs = [j for i, j in sortedTuples]
+        ogs = [j[0] for i, j in sortedTuples]
         unique = [i for i in range(len(ogs)) if ogs[i] not in ogs[:i]]
         ogs = [ogs[i] for i in unique]
         scores = [scores[i] for i in unique]
@@ -132,12 +135,17 @@ def ogs_from_diamond_results(fn_og_results_out, q_ignore_sub=False):
             # in a test of 15k sequences only 12 passed the first test but failed s>(s0-s)
             # it is not worth arguing over whether it's a good second criteria
             # scores = [s for s in scores if s0-s<10 and s>(s0-s)]
-            scores_ml10 = [s for s in scores_ml10 if s0-s<10]
+            scores_ml10ml10 = [s for s in scores_ml10 if s0-s<10]
             # ogs_all_genes[gene] = ogs[:len(scores_ml10)]
             # scores_all_genes[gene] = scores[:len(scores_ml10)]
-            ogs_all_genes[gene] = ogs[0]
+            og_assignments[gene] = ogs[0]
+            # print(sortedTuplesples)
+            sp_hit = sortedTuples[0][1][1]
+            # sys.exit()
+            search_sp = gene.split("_")[0]
+            species_closest_hits[search_sp][sp_hit] += 1
             # scores_all_genes[gene] = scores[0]
-    return ogs_all_genes
+    return og_assignments, species_closest_hits
 
 def get_original_orthogroups():
     wd_input_clusters = files.FileHandler.GetWorkingDirectory1_Read()[1]  # first is the current working directory, second is the most recent of the input directories
@@ -154,14 +162,23 @@ def get_original_orthogroups():
 
 def assign_genes(results_files):
     """
-    Returns OGs with the new species added
+    Returns OGs with the new species added + species group: Dict[query_species, closest_species]
     """
     ogs = defaultdict(set)
+    species_closest_hits_totals = defaultdict(lambda: defaultdict(int))
     for fn in results_files:
-        ogs_all_genes = ogs_from_diamond_results(fn)
+        print(fn)
+        ogs_all_genes, species_closest_hits = ogs_from_diamond_results(fn)
+        for query_species, hits in species_closest_hits.items():
+            for hit_species, count in hits.items():
+                species_closest_hits_totals[query_species][hit_species] += count
         for gene, og in ogs_all_genes.items():
             ogs[int(og)].add(gene)
-    return ogs
+    species_group = dict()
+    for query_species, hits in species_closest_hits_totals.items():
+        species_group[query_species] = max(hits, key=hits.get)
+        print((query_species, max(hits, key=hits.get), hits))
+    return ogs, species_group
 
 
 # def write_all_orthogroups(ogs: List[Set[str]], ogs_new_species: Dict[int, Set[str]], ogs_clade_specific: List[Set[str]]):

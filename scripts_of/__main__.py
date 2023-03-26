@@ -1203,7 +1203,7 @@ def main(args=None):
             results_files = acc.RunSearch(options, speciesInfoObj, fn_diamond_db, prog_caller)
             # clustersFilename_pairs = acc.assign_genes(results_files)
             ogs = acc.get_original_orthogroups()
-            ogs_new_species = acc.assign_genes(results_files)
+            ogs_new_species, species_group = acc.assign_genes(results_files)
             acc.write_unassigned_fasta(ogs_new_species, speciesInfoObj)
             CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned=True)
             RunSearch(options, speciesInfoObj, seqsInfo, prog_caller, q_unassigned=True)
