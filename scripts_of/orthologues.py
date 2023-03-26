@@ -127,10 +127,12 @@ class OrthoGroupsSet(object):
         return self.seqIDsEx.GetIDToNameDict()
         
     def SpeciesDict(self):
+        """returns Dict[str, str]"""
         d = self.speciesIDsEx.GetIDToNameDict()
         return {k: v.rsplit(".", 1)[0] for k, v in d.items()}
         
     def Spec_SeqDict(self):
+        """returns Dict[str, str]"""
         if self._Spec_SeqIDs != None:
             return self._Spec_SeqIDs
         seqs = self.SequenceDict()
@@ -917,7 +919,7 @@ def OrthologuesFromTrees(
 
 
 def OrthologuesWorkflow(speciesToUse, nSpAll, 
-                       tree_options,
+                       program_caller,
                        msa_method,
                        tree_method,
                        recon_method,
@@ -938,24 +940,17 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
                        save_space=False,
                        root_from_previous=False,
 ):
-    ogSet = OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesToUse, nSpAll, qAddSpeciesToIDs, idExtractor = util.FirstWordExtractor)
+    ogSet = OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesToUse, nSpAll,
+                           qAddSpeciesToIDs, idExtractor = util.FirstWordExtractor)
 
     return_obj = InferGeneAndSpeciesTrees(ogSet,
-                       tree_options, msa_method, tree_method,
+                       program_caller, msa_method, tree_method,
                        nHighParallel, nLowParallel, qDoubleBlast, qAddSpeciesToIDs, qTrim,
-                       userSpeciesTree, qStopAfterSeqs, qStopAfterAlign, qStopAfterTrees, qMSA, qPhyldog,
+                       userSpeciesTree, qStopAfterSeqs, qStopAfterAlign, qMSA, qPhyldog,
                        results_name, root_from_previous)
     if return_obj is None:
         return
     spTreeFN_ids, qSpeciesTreeSupports = return_obj
-
-    # Xcelerate:
-    # - root new trees with previously rooted trees
-    # - infer rooted species tree from rooted triplets
-    # - return to clade-specific orthogroup inference
-    # - infer those trees too
-    # - continue analysis
-    # Question: Can we extract the above code as a function?
 
     return_obj = RootSpeciesTree(ogSet, spTreeFN_ids, qSpeciesTreeSupports,
                        nHighParallel, nLowParallel,
@@ -973,7 +968,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
 
 
 def InferGeneAndSpeciesTrees(ogSet,
-                       tree_options,
+                       program_caller,
                        msa_method,
                        tree_method,
                        nHighParallel,
@@ -984,7 +979,6 @@ def InferGeneAndSpeciesTrees(ogSet,
                        userSpeciesTree = None,
                        qStopAfterSeqs = False,
                        qStopAfterAlign = False,
-                       qStopAfterTrees = False,
                        qMSA = False,
                        qPhyldog = False,
                        results_name = "",
@@ -1024,7 +1018,7 @@ def InferGeneAndSpeciesTrees(ogSet,
     if qMSA or qPhyldog:
         """ A. MSA & Tree inference + unrooted species tree"""
         qLessThanFourSpecies = len(ogSet.seqsInfo.speciesToUse) < 4
-        treeGen = trees_msa.TreesForOrthogroups(tree_options, msa_method, tree_method)       
+        treeGen = trees_msa.TreesForOrthogroups(program_caller, msa_method, tree_method)
         if (not userSpeciesTree) and qLessThanFourSpecies:
             spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
             WriteSpeciesTreeIDs_TwoThree(ogSet.seqsInfo.speciesToUse, spTreeFN_ids)
@@ -1050,7 +1044,7 @@ def InferGeneAndSpeciesTrees(ogSet,
         elif qStopAfterAlign:
             print("")
             return
-        if qDB_SpeciesTree and not userSpeciesTree and not qLessThanFourSpecies:
+        if qDB_SpeciesTree and not userSpeciesTree and not qLessThanFourSpecies and not root_from_previous:
             db = DendroBLASTTrees(ogSet, nLowParallel, nHighParallel, qDoubleBlast)
             util.PrintUnderline("Inferring species tree (calculating gene distances)")
             print("Loading BLAST scores")

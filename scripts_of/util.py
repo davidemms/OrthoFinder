@@ -66,6 +66,11 @@ class SpeciesInfo(object):
         self.iFirstNewSpecies = None     #       iFirstNew   => (0, 1, ..., iFirstNew-1) are from previous and (iFirstNew, iFirstNew+1, ..., nSpecies-1) are the new species indices
     def __str__(self):
         return str((self.speciesToUse, self.nSpAll, self.iFirstNewSpecies))
+    def get_original_species(self):
+        if self.iFirstNewSpecies is None:
+            return self.speciesToUse
+        else:
+            return [iSp for iSp in  self.speciesToUse if iSp < self.iFirstNewSpecies]
 
 
 picProtocol = 1

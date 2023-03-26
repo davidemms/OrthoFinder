@@ -155,6 +155,14 @@ class WaterfallMethod:
             return sparse.lil_matrix(B.get_shape())
     @staticmethod
     def NormalisedBitScore(B, Lengths, iSpecies, jSpecies):
+        """
+        Args:
+            B - LIL matrix
+        Returns
+            B' - LIL matrix
+        """
+        if B.nnz == 0:
+            return B
         Lq = Lengths[iSpecies]
         Lh = Lengths[jSpecies]
         rangeq = list(range(len(Lq)))
@@ -166,7 +174,7 @@ class WaterfallMethod:
         return sparse.lil_matrix(li_matrix * B * lj_matrix)
 
     @staticmethod
-    def ProcessBlastHits(seqsInfo, blastDir_list, Lengths, iSpecies, d_pickle, qDoubleBlast, v2_scores):
+    def ProcessBlastHits(seqsInfo, blastDir_list, Lengths, iSpecies, d_pickle, qDoubleBlast, v2_scores, q_allow_empty=False):
         """
         iLimitNewSpecies: int - Only process fasta files with OrthoFidner ID >= iLimitNewSpecies
         """
@@ -176,7 +184,7 @@ class WaterfallMethod:
             Bi = []
             for jSpecies in range(seqsInfo.nSpecies):
                 Bij = blast_file_processor.GetBLAST6Scores(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies],
-                                                           seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)
+                                                           seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast, q_allow_empty=q_allow_empty)
                 if v2_scores:
                     Bij = WaterfallMethod.NormalisedBitScore(Bij, Lengths, iSpecies, jSpecies)
                 else:
@@ -188,11 +196,11 @@ class WaterfallMethod:
             util.PrintTime("Initial processing of species %d complete" % iSpecies)
 
     @staticmethod
-    def Worker_ProcessBlastHits(cmd_queue, d_pickle, qDoubleBlast, v2_scores):
+    def Worker_ProcessBlastHits(cmd_queue, d_pickle, qDoubleBlast, v2_scores, q_allow_empty):
         while True:
             try:
                 args = cmd_queue.get(True, 1)
-                WaterfallMethod.ProcessBlastHits(*args, d_pickle=d_pickle, qDoubleBlast=qDoubleBlast, v2_scores=v2_scores)
+                WaterfallMethod.ProcessBlastHits(*args, d_pickle=d_pickle, qDoubleBlast=qDoubleBlast, v2_scores=v2_scores, q_allow_empty=q_allow_empty)
             except queue.Empty:
                 return
             except Exception:
@@ -476,7 +484,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
         cmd_queue.put((seqsInfo, blastDir_list, Lengths, iSpeciesJob))
     files.FileHandler.GetPickleDir()  # create the pickle directory before the parallel processing to prevent a race condition
     runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits,
-                                   args=(cmd_queue, files.FileHandler.GetPickleDir(), options.qDoubleBlast, options.v2_scores))
+                                   args=(cmd_queue, files.FileHandler.GetPickleDir(), options.qDoubleBlast, options.v2_scores, q_unassigned))
                         for i_ in range(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()

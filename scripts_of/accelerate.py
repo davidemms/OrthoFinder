@@ -10,7 +10,7 @@ import multiprocessing as mp
 
 import numpy as np
 
-from . import util, files, parallel_task_manager, mcl, orthologues, sample_genes, fasta_writer
+from . import util, files, parallel_task_manager, mcl, orthologues, sample_genes, fasta_writer, tree
 
 
 class XcelerateConfig(object):
@@ -323,19 +323,20 @@ def ReadHOGs(din, fn_hogs, ids_rev):
     return ogs
 
 
-def write_unassigned_fasta(ogs_new_genes, speciesInfoObj):
+def write_unassigned_fasta(ogs_orig_list, ogs_new_genes, speciesInfoObj):
     assigned_genes = set.union(*ogs_new_genes.values())
+    assigned_genes.update(set.union(*[og for og in ogs_orig_list if len(og) > 1]))
     # Write out files for all unassigned genes
-    iSpeciesNew = list(range(speciesInfoObj.iFirstNewSpecies, speciesInfoObj.nSpAll))
-    for iSp in iSpeciesNew:
+    # iSpeciesNew = list(range(speciesInfoObj.iFirstNewSpecies, speciesInfoObj.nSpAll))
+    # for iSp in iSpeciesNew:
+    n_unassigned = []
+    for iSp in range(speciesInfoObj.nSpAll):
         fw = fasta_writer.FastaWriter(files.FileHandler.GetSpeciesFastaFN(iSp))
         unassigned = set(fw.SeqLists.keys()).difference(assigned_genes)
+        n_unassigned.append(len(unassigned))
         fw.WriteSeqsToFasta(unassigned, files.FileHandler.GetSpeciesUnassignedFastaFN(iSp, qForCreation=True))
+    return n_unassigned
 
-    # Run standard algorithm
-
-def clade_specific_orthogroups():
-    pass
 
 def sample_random(og, n_max):
     """
@@ -347,3 +348,23 @@ def sample_random(og, n_max):
         genes - list of genes
     """
     return random.sample(og, min(n_max, len(og)))
+
+
+def get_new_species_clades(rooted_species_tree_fn, core_species_ids, n_core_species=2):
+    """
+    Args:
+        rooted_species_tree_fn - ids format
+        core_species_ids: Set[str]
+        n_core_species - maximum number of core species in a 'new clade of species'. 1 is the minimum, but 2 makes more
+                         allowances for gene loss in one core species & still recovering associated orthogroups
+    """
+    core_species_ids = set(map(str, core_species_ids))
+    t = tree.Tree(rooted_species_tree_fn, format=1)
+    species_clades = []
+
+    def is_new_clade(node):
+        return len(core_species_ids.intersection(node.get_leaf_names())) <= n_core_species
+
+    for n in t.get_leaves(is_leaf_fn=is_new_clade):
+        species_clades.append(list(sorted(map(int, n.get_leaf_names()))))
+    return species_clades

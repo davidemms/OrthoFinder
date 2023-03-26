@@ -158,33 +158,58 @@ def GetNumberOfSequencesInFile(filename):
 
 """ Question: Do I want to do all BLASTs or just the required ones? It's got to be all BLASTs I think. They could potentially be 
 run after the clustering has finished."""
-def GetOrderedSearchCommands(seqsInfo, speciesInfoObj, qDoubleBlast, search_program, prog_caller, q_unassigned=False):
+def GetOrderedSearchCommands(seqsInfo, speciesInfoObj, qDoubleBlast, search_program, prog_caller, n_genes_per_species=None, q_new_species_unassigned_genes=False):
     """ Using the nSeq1 x nSeq2 as a rough estimate of the amount of work required for a given species-pair, returns the commands 
     ordered so that the commands predicted to take the longest come first. This allows the load to be balanced better when processing 
     the BLAST commands.
+    n_genes_per_species: List[int] - number of genes per species
     """
     iSpeciesPrevious = list(range(speciesInfoObj.iFirstNewSpecies))
     iSpeciesNew = list(range(speciesInfoObj.iFirstNewSpecies, speciesInfoObj.nSpAll))
-    if q_unassigned:
+    if q_new_species_unassigned_genes:
+        if n_genes_per_species is not None:
+            exclude = {isp for isp, n_genes in enumerate(n_genes_per_species) if n_genes == 0}
+            iSpeciesNew = list(set(iSpeciesNew).difference(exclude))
         speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew)]
+        taskSizes = [n_genes_per_species[i]*n_genes_per_species[j] for i,j in speciesPairs]
     else:
         speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew) if (qDoubleBlast or i <=j)] + \
                        [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesPrevious) if (qDoubleBlast or i <=j)] + \
                        [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew) if (qDoubleBlast or i <=j)]
-    taskSizes = [seqsInfo.nSeqsPerSpecies[i]*seqsInfo.nSeqsPerSpecies[j] for i,j in speciesPairs]
+        taskSizes = [seqsInfo.nSeqsPerSpecies[i]*seqsInfo.nSeqsPerSpecies[j] for i,j in speciesPairs]
     taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
     if search_program == "blast":
         commands = [" ".join(["blastp", "-outfmt", "6", "-evalue", "0.001",
-                              "-query", files.FileHandler.GetSpeciesUnassignedFastaFN(iFasta) if q_unassigned else files.FileHandler.GetSpeciesFastaFN(iFasta),
+                              "-query", files.FileHandler.GetSpeciesUnassignedFastaFN(iFasta) if q_new_species_unassigned_genes else files.FileHandler.GetSpeciesFastaFN(iFasta),
                               "-db", files.FileHandler.GetSpeciesDatabaseN(iDB),
                               "-out", files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)]) for iFasta, iDB in speciesPairs]
     else:
         commands = [prog_caller.GetSearchMethodCommand_Search(search_program,
-                        files.FileHandler.GetSpeciesUnassignedFastaFN(iFasta) if q_unassigned else files.FileHandler.GetSpeciesFastaFN(iFasta),
+                        files.FileHandler.GetSpeciesUnassignedFastaFN(iFasta) if q_new_species_unassigned_genes else files.FileHandler.GetSpeciesFastaFN(iFasta),
                         files.FileHandler.GetSpeciesDatabaseN(iDB, search_program),
                         files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)) for iFasta, iDB in speciesPairs]
     return commands
 
+
+def GetOrderedSearchCommands_clades(seqsInfo, speciesInfoObj, qDoubleBlast, search_program, prog_caller, n_genes_per_species, species_clades):
+    """
+    Search all species
+    """
+    exclude = {isp for isp, n_genes in enumerate(n_genes_per_species) if n_genes == 0}
+    for clade in species_clades:
+        clade = list(set(clade).difference(exclude))
+        speciesPairs = [(i, j) for i, j in itertools.product(clade, clade)]
+    if search_program == "blast":
+        commands = [" ".join(["blastp", "-outfmt", "6", "-evalue", "0.001",
+                              "-query", files.FileHandler.GetSpeciesUnassignedFastaFN(iFasta),
+                              "-db", files.FileHandler.GetSpeciesDatabaseN(iDB),
+                              "-out", files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)]) for iFasta, iDB in speciesPairs]
+    else:
+        commands = [prog_caller.GetSearchMethodCommand_Search(search_program,
+                        files.FileHandler.GetSpeciesUnassignedFastaFN(iFasta),
+                        files.FileHandler.GetSpeciesDatabaseN(iDB, search_program),
+                        files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)) for iFasta, iDB in speciesPairs]
+    return commands
 
 """
 OrthoFinder
@@ -856,10 +881,10 @@ def ProcessPreviousFiles(workingDir_list, qDoubleBlast, check_blast=True):
     return speciesInfo, speciesToUse_names
 
 # 6
-def CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned=False):
-    iSpeciesToDo = range(speciesInfoObj.iFirstNewSpecies, speciesInfoObj.nSpAll) if q_unassigned else range(max(speciesInfoObj.speciesToUse) + 1)
+def CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned_genes=False):
+    iSpeciesToDo = range(max(speciesInfoObj.speciesToUse) + 1)
     for iSp in iSpeciesToDo:
-        fn_fasta = files.FileHandler.GetSpeciesFastaFN(iSp)
+        fn_fasta = files.FileHandler.GetSpeciesUnassignedFastaFN(iSp) if q_unassigned_genes else files.FileHandler.GetSpeciesFastaFN(iSp)
         if options.search_program == "blast":
             command = " ".join(["makeblastdb", "-dbtype", "prot", "-in", fn_fasta, "-out", files.FileHandler.GetSpeciesDatabaseN(iSp)])
             util.PrintTime("Creating Blast database %d of %d" % (iSp + 1, len(iSpeciesToDo)))
@@ -872,13 +897,21 @@ def CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned=Fal
                 files.FileHandler.LogFailAndExit("ERROR: diamond makedb failed")
 
 # 7
-def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller, q_unassigned=False):
+def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller, q_new_species_unassigned_genes=False, n_genes_per_species=None, species_clades=None):
+    """
+    n_genes_per_species: List[int] - optional, for use with unassigned genes. If a species has zero unassigned genes, don't search with/agaisnt it.
+    """
     name_to_print = "BLAST" if options.search_program == "blast" else options.search_program
     if options.qStopAfterPrepare:
         util.PrintUnderline("%s commands that must be run" % name_to_print)
-    else:        
+    elif species_clades is not None:
+        util.PrintUnderline("Running %s searches for new clades between core species" % name_to_print)
+    else:
         util.PrintUnderline("Running %s all-versus-all" % name_to_print)
-    commands = GetOrderedSearchCommands(seqsInfo, speciessInfoObj, options.qDoubleBlast, options.search_program, prog_caller, q_unassigned)
+    if species_clades is None:
+        commands = GetOrderedSearchCommands(seqsInfo, speciessInfoObj, options.qDoubleBlast, options.search_program, prog_caller, n_genes_per_species, q_new_species_unassigned_genes=q_new_species_unassigned_genes)
+    else:
+        commands = GetOrderedSearchCommands_clades(seqsInfo, speciessInfoObj, options.qDoubleBlast, options.search_program, prog_caller, n_genes_per_species, species_clades)
     if options.qStopAfterPrepare:
         for command in commands:
             print(command)
@@ -913,9 +946,8 @@ def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller, q_unassigned=Fals
 # 9
 def GetOrthologues(speciesInfoObj, options, prog_caller):
     util.PrintUnderline("Analysing Orthogroups", True)
-
-    orthologues.OrthologuesWorkflow(speciesInfoObj.speciesToUse, 
-                                    speciesInfoObj.nSpAll, 
+    orthologues.OrthologuesWorkflow(speciesInfoObj.speciesToUse,
+                                    speciesInfoObj.nSpAll,
                                     prog_caller,
                                     options.msa_program,
                                     options.tree_program,
@@ -935,8 +967,94 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
                                     options.name,
                                     options.qSplitParaClades,
                                     options.save_space,
-                                    root_from_previous = options.root_from_previous)
+                                    root_from_previous = False)
     util.PrintTime("Done orthologues")
+
+
+def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, ogs_new_species):
+    """
+    Infer clade-specific orthogroups for the new species clades
+    n_unassigned: List[int] - number of unassigned genes per species
+    """
+    ogSet = orthologues.OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse,
+                                       speciesInfoObj.nSpAll, options.qAddSpeciesToIDs, idExtractor=util.FirstWordExtractor)
+    ogs = acc.get_original_orthogroups()
+    n_unassigned = acc.write_unassigned_fasta(ogs, ogs_new_species, speciesInfoObj)
+    clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, [])
+    gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML=None)
+
+    return_obj = orthologues.InferGeneAndSpeciesTrees(ogSet,
+                                          prog_caller, options.msa_program, options.tree_program,
+                                          options.nBlast, options.nProcessAlg, options.qDoubleBlast, options.qAddSpeciesToIDs,
+                                          options.qTrim, userSpeciesTree=None, qStopAfterSeqs=False, qStopAfterAlign=False, qMSA=options.qMSATrees,
+                                          qPhyldog=False, results_name=options.name, root_from_previous=True)
+    if return_obj is None:
+        return
+    spTreeFN_ids, qSpeciesTreeSupports = return_obj
+
+    if options.speciesTreeFN is None:
+        raise NotImplementedError("This functionality has not been implemented, please supply a rooted species tree")
+        # - root new trees with previously rooted trees
+        # - infer rooted species tree from rooted triplets
+        rooted_species_tree_fn = None
+    else:
+        util.PrintUnderline("Using user-supplied species tree")
+        spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
+        orthologues.ConvertUserSpeciesTree(options.speciesTreeFN, ogSet.SpeciesDict(), spTreeFN_ids)
+        rooted_species_tree_fn = spTreeFN_ids
+
+    # Identify clades for clade-specific orthogroup inference
+    iSpeciesCore = set(speciesInfoObj.get_original_species())
+    species_clades = acc.get_new_species_clades(rooted_species_tree_fn, iSpeciesCore)
+    util.PrintUnderline("Identifying clade-specific orthogroups for the following clades:", qHeavy=True)
+    species_dict = ogSet.SpeciesDict()
+    for i, clade in enumerate(species_clades):
+        print(str(i) + ": " + ", ".join([species_dict[str(isp)] for isp in clade]))
+
+    # - return to clade-specific orthogroup inference
+    CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned_genes=True)
+    # provide list of clades, only run these searches (and only if the fasta files are non-empty)
+    RunSearch(options, speciesInfoObj, seqsInfo, prog_caller, n_genes_per_species=n_unassigned, species_clades=species_clades)
+    # process the results files - only if they are present and non-empty
+    options.v2_scores = True
+    clustersFilename_pairs_unassigned = gathering.DoOrthogroups(options, speciesInfoObj, seqsInfo,
+                                                     speciesNamesDict, speciesXML=None, q_unassigned=True)
+    ogs_clade_specific = mcl.GetPredictedOGs(clustersFilename_pairs_unassigned)
+    clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific)
+
+    # Infer clade-specific orthogroup gene trees
+
+    # Call orthologues.InferOrthologs
+
+
+def clade_specific_orthogroups(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files):
+    ogs = acc.get_original_orthogroups()
+    ogs_new_species, _ = acc.assign_genes(results_files)
+    n_unassigned = acc.write_unassigned_fasta(ogs, ogs_new_species, speciesInfoObj)
+    CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned_genes=True)
+    RunSearch(options, speciesInfoObj, seqsInfo, prog_caller, n_genes_per_species=n_unassigned, q_new_species_unassigned_genes=True)
+
+    # Update info objects for clustering of only the new species
+    speciesInfoObj_for_unassigned = copy.deepcopy(speciesInfoObj)
+    speciesInfoObj_for_unassigned.speciesToUse = [iSp for iSp in speciesInfoObj.speciesToUse if iSp >= speciesInfoObj.iFirstNewSpecies]
+
+    nSpecies_unassigned = len(speciesInfoObj_for_unassigned.speciesToUse)
+    nSeqs_in_new_species = sum([seqsInfo.nSeqsPerSpecies[iSp] for iSp in speciesInfoObj_for_unassigned.speciesToUse])
+    n_offset = seqsInfo.seqStartingIndices[-nSpecies_unassigned]
+    starting_indicies = [n-n_offset for n in seqsInfo.seqStartingIndices[-nSpecies_unassigned:]]
+    seqsInfo_for_unassigned = util.SequencesInfo(
+        nSeqs = nSeqs_in_new_species,
+        nSpecies = nSpecies_unassigned,
+        speciesToUse = speciesInfoObj_for_unassigned.speciesToUse,
+        seqStartingIndices = starting_indicies,
+        nSeqsPerSpecies = seqsInfo.nSeqsPerSpecies
+    )
+    options.v2_scores = True
+    clustersFilename_pairs_unassigned = gathering.DoOrthogroups(options, speciesInfoObj_for_unassigned, seqsInfo_for_unassigned,
+                                                     speciesNamesDict, speciesXML=None, q_unassigned=True)
+    ogs_clade_specific = mcl.GetPredictedOGs(clustersFilename_pairs_unassigned)
+    clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific)
+    return clustersFilename_pairs
 
 def GetOrthologues_FromTrees(options):
     orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.nProcessAlg, options.speciesTreeFN,
@@ -1204,42 +1322,20 @@ def main(args=None):
             # Add genes to orthogroups
             results_files = acc.RunSearch(options, speciesInfoObj, fn_diamond_db, prog_caller)
             speciesNamesDict = SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN())
-            ogs = acc.get_original_orthogroups()
-            ogs_new_species, _ = acc.assign_genes(results_files)
-            clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, [])
 
-            # # Clade-specific genes
-            # ogs = acc.get_original_orthogroups()
-            # ogs_new_species, _ = acc.assign_genes(results_files)
-            # acc.write_unassigned_fasta(ogs_new_species, speciesInfoObj)
-            # CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned=True)
-            # RunSearch(options, speciesInfoObj, seqsInfo, prog_caller, q_unassigned=True)
-            #
-            # # Update info objects for clustering of only the new species
-            # speciesInfoObj_for_unassigned = copy.deepcopy(speciesInfoObj)
-            # speciesInfoObj_for_unassigned.speciesToUse = [iSp for iSp in speciesInfoObj.speciesToUse if iSp >= speciesInfoObj.iFirstNewSpecies]
-            #
-            # nSpecies_unassigned = len(speciesInfoObj_for_unassigned.speciesToUse)
-            # nSeqs_in_new_species = sum([seqsInfo.nSeqsPerSpecies[iSp] for iSp in speciesInfoObj_for_unassigned.speciesToUse])
-            # n_offset = seqsInfo.seqStartingIndices[-nSpecies_unassigned]
-            # starting_indicies = [n-n_offset for n in seqsInfo.seqStartingIndices[-nSpecies_unassigned:]]
-            # seqsInfo_for_unassigned = util.SequencesInfo(
-            #     nSeqs = nSeqs_in_new_species,
-            #     nSpecies = nSpecies_unassigned,
-            #     speciesToUse = speciesInfoObj_for_unassigned.speciesToUse,
-            #     seqStartingIndices = starting_indicies,
-            #     nSeqsPerSpecies = seqsInfo.nSeqsPerSpecies
-            # )
-            # options.v2_scores = True
-            # clustersFilename_pairs_unassigned = gathering.DoOrthogroups(options, speciesInfoObj_for_unassigned, seqsInfo_for_unassigned,
-            #                                                  speciesNamesDict, speciesXML=None, q_unassigned=True)
-            # ogs_clade_specific = mcl.GetPredictedOGs(clustersFilename_pairs_unassigned)
-            # clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific)
-
-            gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML=None)
-            if not options.qStopAfterGroups:
-                options.root_from_previous = True
-                GetOrthologues(speciesInfoObj, options, prog_caller)
+            # Clade-specific genes
+            orphan_genes_version = 2
+            if orphan_genes_version == 1:
+                # v1 - This is unsuitable, it does an all-v-all search of all unassigned genes. Although these should have
+                # been depleted of all genes that are not clade-specific, the resulting search still takes too long.
+                clustersFilename_pairs = clade_specific_orthogroups(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files)
+                gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML=None)
+                if not options.qStopAfterGroups:
+                    GetOrthologues(speciesInfoObj, options, prog_caller)
+            elif orphan_genes_version == 2:
+                # v2 - Infer rooted species tree from new rooted gene trees, identify new species-clades & search within these
+                ogs_new_species, _ = acc.assign_genes(results_files)
+                NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, ogs_new_species)
         else:
             raise NotImplementedError
             ptm = parallel_task_manager.ParallelTaskManager_singleton()
@@ -1259,11 +1355,3 @@ def main(args=None):
         raise
     ptm = parallel_task_manager.ParallelTaskManager_singleton()
     ptm.Stop()
-        
-        
-     
-
-    
-
-    
-
