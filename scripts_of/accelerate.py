@@ -235,7 +235,7 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", min_for_p
             q_hogs = False
             print("WARNING: Using MCL-based orthogroups as a fall-back")
             # util.Fail()
-    if q_hogs:
+    else:
         clusters_filename = list(glob.glob(wd + "clusters_OrthoFinder*id_pairs.txt"))
         if len(clusters_filename) == 0:
             print("ERROR: Can't find %s" % wd + "clusters_OrthoFinder*id_pairs.txt")

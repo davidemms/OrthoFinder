@@ -516,12 +516,18 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     return clustersFilename_pairs
 
 
-def post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML):
+def post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML, q_incremental=False):
+    """
+    Write OGs & statistics to results files, write Fasta files.
+    Args:
+        q_incremental - These are not the final orthogroups, don't write results
+    """
     ogs = mcl.GetPredictedOGs(clustersFilename_pairs)
     resultsBaseFilename = files.FileHandler.GetOrthogroupResultsFNBase()
     idsDict = mcl.MCL.WriteOrthogroupFiles(ogs, [files.FileHandler.GetSequenceIDsFN()], resultsBaseFilename,
                                            clustersFilename_pairs)
-    mcl.MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesInfoObj.speciesToUse, resultsBaseFilename)
+    if not q_incremental:
+        mcl.MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesInfoObj.speciesToUse, resultsBaseFilename)
 
     # Write Orthogroup FASTA files
     ogSet = orthologues.OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse,
@@ -533,10 +539,11 @@ def post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo
     if not os.path.exists(d_seqs): os.mkdir(d_seqs)
     treeGen.WriteFastaFiles(fastaWriter, ogSet.OGs(qInclAll=True), idsDict, False)
 
-    stats.Stats(ogs, speciesNamesDict, speciesInfoObj.speciesToUse, files.FileHandler.iResultsVersion)
-    if options.speciesXMLInfoFN:
-        mcl.MCL.WriteOrthoXML(speciesXML, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml",
-                              speciesInfoObj.speciesToUse)
-    print("")
-    util.PrintTime("Done orthogroups")
-    files.FileHandler.LogOGs()
+    if not q_incremental:
+        stats.Stats(ogs, speciesNamesDict, speciesInfoObj.speciesToUse, files.FileHandler.iResultsVersion)
+        if options.speciesXMLInfoFN:
+            mcl.MCL.WriteOrthoXML(speciesXML, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml",
+                                  speciesInfoObj.speciesToUse)
+        print("")
+        util.PrintTime("Done orthogroups")
+        files.FileHandler.LogOGs()

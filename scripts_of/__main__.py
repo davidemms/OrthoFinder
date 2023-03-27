@@ -134,6 +134,7 @@ def RunBlastDBCommand(command):
             print(stderr)
             
 def SpeciesNameDict(speciesIDsFN):
+    # type: (str) -> Dict[int, str]
     speciesNamesDict = dict()
     with open(speciesIDsFN, 'r') as speciesNamesFile:
         for line in speciesNamesFile:
@@ -538,7 +539,7 @@ def ProcessArgs(prog_caller, args):
                 print("ERROR: location '%s' for results directory '%s' does not exist.\n" % (path, newDir))
                 util.Fail()
         elif arg == "-s" or arg == "--speciestree":  
-            if options.speciesXMLInfoFN:
+            if options.speciesTreeFN:
                 print("Repeated argument: -s/--speciestree")
                 util.Fail()
             if len(args) == 0:
@@ -668,6 +669,9 @@ def ProcessArgs(prog_caller, args):
             util.Fail()
         if not options.qMSATrees:
             print("ERROR: --fast-add requires MSA trees, option '-M dendroblast' is invalid")
+            util.Fail()
+        if options.speciesTreeFN is None:
+            print("ERROR: --fast-add currently requires the species tree to be provided using '-s' option")
             util.Fail()
 
     if options.qStartFromFasta and (options.qStartFromTrees or options.qStartFromGroups):
@@ -971,29 +975,35 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
     util.PrintTime("Done orthologues")
 
 
-def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, ogs_new_species):
+def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files):
     """
     Infer clade-specific orthogroups for the new species clades
     n_unassigned: List[int] - number of unassigned genes per species
     """
     ogSet = orthologues.OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse,
                                        speciesInfoObj.nSpAll, options.qAddSpeciesToIDs, idExtractor=util.FirstWordExtractor)
+    # Get current orthogroups - original orthogroups plus genes assigned to them
     ogs = acc.get_original_orthogroups()
-    n_unassigned = acc.write_unassigned_fasta(ogs, ogs_new_species, speciesInfoObj)
+    ogs_new_species, _ = acc.assign_genes(results_files)
     clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, [])
-    gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML=None)
 
-    return_obj = orthologues.InferGeneAndSpeciesTrees(ogSet,
-                                          prog_caller, options.msa_program, options.tree_program,
-                                          options.nBlast, options.nProcessAlg, options.qDoubleBlast, options.qAddSpeciesToIDs,
-                                          options.qTrim, userSpeciesTree=None, qStopAfterSeqs=False, qStopAfterAlign=False, qMSA=options.qMSATrees,
-                                          qPhyldog=False, results_name=options.name, root_from_previous=True)
-    if return_obj is None:
-        return
-    spTreeFN_ids, qSpeciesTreeSupports = return_obj
+    # Infer gene trees
+    n_unassigned = acc.write_unassigned_fasta(ogs, ogs_new_species, speciesInfoObj)
+    # We write orthogroup & stats results files in the following code, which we should avoid & only do once all OGs are done.
+    gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options,
+                                          speciesXML=None, q_incremental=True)
 
+    # Get/Infer species tree
     if options.speciesTreeFN is None:
         raise NotImplementedError("This functionality has not been implemented, please supply a rooted species tree")
+        return_obj = orthologues.InferGeneAndSpeciesTrees(ogSet,
+                                                          prog_caller, options.msa_program, options.tree_program,
+                                                          options.nBlast, options.nProcessAlg, options.qDoubleBlast,
+                                                          options.qAddSpeciesToIDs,
+                                                          options.qTrim, userSpeciesTree=None, qStopAfterSeqs=False,
+                                                          qStopAfterAlign=False, qMSA=options.qMSATrees,
+                                                          qPhyldog=False, results_name=options.name,
+                                                          root_from_previous=True)
         # - root new trees with previously rooted trees
         # - infer rooted species tree from rooted triplets
         rooted_species_tree_fn = None
@@ -1011,7 +1021,7 @@ def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, spe
     for i, clade in enumerate(species_clades):
         print(str(i) + ": " + ", ".join([species_dict[str(isp)] for isp in clade]))
 
-    # - return to clade-specific orthogroup inference
+    # Clade-specific orthogroup inference
     CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned_genes=True)
     # provide list of clades, only run these searches (and only if the fasta files are non-empty)
     RunSearch(options, speciesInfoObj, seqsInfo, prog_caller, n_genes_per_species=n_unassigned, species_clades=species_clades)
@@ -1020,11 +1030,15 @@ def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, spe
     clustersFilename_pairs_unassigned = gathering.DoOrthogroups(options, speciesInfoObj, seqsInfo,
                                                      speciesNamesDict, speciesXML=None, q_unassigned=True)
     ogs_clade_specific = mcl.GetPredictedOGs(clustersFilename_pairs_unassigned)
+
     clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific)
 
     # Infer clade-specific orthogroup gene trees
-
-    # Call orthologues.InferOrthologs
+    clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific)
+    gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo,
+                                          speciesNamesDict, options, speciesXML=None)
+    if not options.qStopAfterGroups:
+        GetOrthologues(speciesInfoObj, options, prog_caller)
 
 
 def clade_specific_orthogroups(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files):
@@ -1227,7 +1241,7 @@ def main(args=None):
         options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault, user_specified_M = ProcessArgs(prog_caller, args)
         
         files.InitialiseFileHandler(options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault)     
-        print("Results directory: %s" % files.FileHandler.GetResultsDirectory1())
+        print("\nResults directory: %s" % files.FileHandler.GetResultsDirectory1())
 
         CheckDependencies(options, user_specified_M, prog_caller, files.FileHandler.GetWorkingDirectory1_Read()[0])
             
@@ -1313,7 +1327,6 @@ def main(args=None):
             util.PrintUnderline("Creating orthogroup profiles")
             wd_list = files.FileHandler.GetWorkingDirectory1_Read()
             fn_diamond_db = acc.prepare_accelerate_database(continuationDir, wd_list, speciesInfoObj.nSpAll)
-            # Process previous and new files, hopefully can reuse existing code
             print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, continuationDir))
             speciesInfoObj = ProcessesNewFasta(fastaDir, options.dna, speciesInfoObj, speciesToUse_names)
 
@@ -1321,10 +1334,10 @@ def main(args=None):
             seqsInfo = util.GetSeqsInfo(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # Add genes to orthogroups
             results_files = acc.RunSearch(options, speciesInfoObj, fn_diamond_db, prog_caller)
-            speciesNamesDict = SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN())
 
             # Clade-specific genes
             orphan_genes_version = 2
+            speciesNamesDict = SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN())
             if orphan_genes_version == 1:
                 # v1 - This is unsuitable, it does an all-v-all search of all unassigned genes. Although these should have
                 # been depleted of all genes that are not clade-specific, the resulting search still takes too long.
@@ -1334,8 +1347,7 @@ def main(args=None):
                     GetOrthologues(speciesInfoObj, options, prog_caller)
             elif orphan_genes_version == 2:
                 # v2 - Infer rooted species tree from new rooted gene trees, identify new species-clades & search within these
-                ogs_new_species, _ = acc.assign_genes(results_files)
-                NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, ogs_new_species)
+                NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files)
         else:
             raise NotImplementedError
             ptm = parallel_task_manager.ParallelTaskManager_singleton()

@@ -1066,7 +1066,7 @@ def InferGeneAndSpeciesTrees(ogSet,
     files.FileHandler.LogWorkingDirectoryTrees()
     qSpeciesTreeSupports = False if (userSpeciesTree or qMSA or qPhyldog) else qSTAG
 
-    return spTreeFN_ids, qSpeciesTreeSupports
+    return None if root_from_previous else spTreeFN_ids, qSpeciesTreeSupports
 
 
 def RootSpeciesTree(ogSet, spTreeFN_ids, qSpeciesTreeSupports,
