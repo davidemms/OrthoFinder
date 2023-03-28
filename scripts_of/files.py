@@ -394,6 +394,9 @@ class __Files_new_dont_manually_create__(object):
                         
     def GetSpeciesTreeIDsRootedFN(self):
         return self.wd_current + "SpeciesTree_rooted_ids.txt"
+
+    def GetCoreSpeciesTreeIDsRootedFN(self):
+        return self.wd_base[1] + "SpeciesTree_rooted_ids.txt"
             
     def GetSpeciesTreeResultsFN(self, i, qUnique):
         """
@@ -431,7 +434,10 @@ class __Files_new_dont_manually_create__(object):
         if qResults:
             return self.rd1 + "Gene_Trees/" 
         else:
-            return self.wd_trees + "Trees_ids/" 
+            return self.wd_trees + "Trees_ids/"
+
+    def GetAstralFilename(self):
+        return self.wd_trees + "astral_input.nk"
             
     def GetOGsReconTreeDir(self, qResults=False):
         if qResults:
@@ -503,7 +509,8 @@ class __Files_new_dont_manually_create__(object):
         # RefactorDS - need to change where it puts things
         if self.rd1 == None: raise Exception("No rd1") 
         self.wd_trees = self.wd_current
-        os.mkdir(self.rd1 + "Orthologues/")
+        d = self.rd1 + "Orthologues/"
+        if not os.path.exists(d): os.mkdir(d)
         if tree_generation_method == "msa":
             for i, d in enumerate([self.GetResultsSeqsDir(), self.wd_current + "Sequences_ids/", self.GetResultsAlignDir(), self.wd_current + "Alignments_ids/", self.GetResultsTreesDir(), self.wd_current + "Trees_ids/"]):
                 if stop_after == "seqs" and i == 2: break 

@@ -281,15 +281,16 @@ class TreesForOrthogroups(object):
         
     def WriteFastaFiles(self, fastaWriter, ogs, idDict, qBoth):
         # The results ones are now written by default after orthogroups, check they're not already there
-        if not os.path.exists(self.GetFastaFilename(0, True)):
-            for iOg, og in enumerate(ogs):
+        for iOg, og in enumerate(ogs):
+            if not os.path.exists(self.GetFastaFilename(iOg, True)):
                 fastaWriter.WriteSeqsToFasta_withNewAccessions(og, self.GetFastaFilename(iOg, True), idDict)
         if qBoth: 
             for iOg, og in enumerate(ogs):
-                fastaWriter.WriteSeqsToFasta(og, self.GetFastaFilename(iOg))
+                    if not os.path.exists(self.GetFastaFilename(iOg)):
+                        fastaWriter.WriteSeqsToFasta(og, self.GetFastaFilename(iOg))
               
-    def GetAlignmentCommandsAndNewFilenames(self, ogs):
-        iogs_align = [i for i, og in enumerate(ogs) if len(og) >= 2]
+    def GetAlignmentCommandsAndNewFilenames(self, ogs, i_og_restart=0):
+        iogs_align = [i for i, og in enumerate(ogs) if len(og) >= 2 and i >= i_og_restart]
         infn_list = [self.GetFastaFilename(i) for i in iogs_align]
         outfn_list = [self.GetAlignmentFilename(i) for i in iogs_align]
         id_list = ["OG%07d" % i for i in iogs_align]
@@ -313,7 +314,7 @@ class TreesForOrthogroups(object):
                     else:
                         outfile.write(line)
           
-    def DoTrees(self, ogs, ogMatrix, idDict, speciesIdDict, speciesToUse, nProcesses, qStopAfterSeqs, qStopAfterAlignments, qDoSpeciesTree, qTrim):
+    def DoTrees(self, ogs, ogMatrix, idDict, speciesIdDict, speciesToUse, nProcesses, qStopAfterSeqs, qStopAfterAlignments, qDoSpeciesTree, qTrim, i_og_restart=0):
         idDict.update(speciesIdDict) # same code will then also convert concatenated alignment for species tree
         # 0       
         resultsDirsFullPath = [files.FileHandler.GetResultsSeqsDir(), files.FileHandler.GetResultsAlignDir(), files.FileHandler.GetResultsTreesDir()]
@@ -330,7 +331,7 @@ class TreesForOrthogroups(object):
             concatenated_algn_fn = files.FileHandler.GetSpeciesTreeConcatAlignFN()
         else:
             iOgsForSpeciesTree = []
-        alignCommands_and_filenames, iogs_align = self.GetAlignmentCommandsAndNewFilenames(ogs)
+        alignCommands_and_filenames, iogs_align = self.GetAlignmentCommandsAndNewFilenames(ogs, i_og_restart)
         if qStopAfterAlignments:
             util.PrintUnderline("Inferring multiple sequence alignments")
             pc.RunParallelCommandsAndMoveResultsFile(nProcesses, alignCommands_and_filenames, False)

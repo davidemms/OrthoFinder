@@ -67,7 +67,7 @@ except ImportError:
 import warnings                                 # Y
 
 from . import blast_file_processor, files, mcl, util, matrices, orthologues, program_caller, trees_msa, \
-    split_ortholog_files, gathering
+    split_ortholog_files, gathering, astral, trees2ologs_of, tree
 from . import accelerate as acc
 
 # Get directory containing script/bundle
@@ -670,9 +670,6 @@ def ProcessArgs(prog_caller, args):
         if not options.qMSATrees:
             print("ERROR: --fast-add requires MSA trees, option '-M dendroblast' is invalid")
             util.Fail()
-        if options.speciesTreeFN is None:
-            print("ERROR: --fast-add currently requires the species tree to be provided using '-s' option")
-            util.Fail()
 
     if options.qStartFromFasta and (options.qStartFromTrees or options.qStartFromGroups):
         print("ERROR: Incompatible arguments, -f (start from fasta files) and" + (" -fg (start from orthogroups)" if options.qStartFromGroups else " -ft (start from trees)"))
@@ -710,6 +707,10 @@ def ProcessArgs(prog_caller, args):
         print("ERROR: Search program (%s) not configured in config.json file" % options.search_program)
         util.Fail()
 
+    util.PrintTime("Starting OrthoFinder %s" % util.version)    
+    print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
+    print("%d thread(s) for OrthoFinder algorithm\n" % options.nProcessAlg)
+
     if options.qFastAdd and not q_selected_msa_options:
         print("INFO: For --fast-add defaulting to 'mafft --memsave' to reduce RAM usage\n")
         options.msa_program = "mafft_memsave"
@@ -718,9 +719,6 @@ def ProcessArgs(prog_caller, args):
         print("INFO: For --fast-add defaulting to 'FastTree -fastest' to reduce RAM usage\n")
         options.tree_program = "fasttree_fastest"
 
-    util.PrintTime("Starting OrthoFinder %s" % util.version)    
-    print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
-    print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
     return options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault, user_specified_M
 
 def GetXMLSpeciesInfo(seqsInfoObj, options):
@@ -909,7 +907,7 @@ def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller, q_new_species_una
     if options.qStopAfterPrepare:
         util.PrintUnderline("%s commands that must be run" % name_to_print)
     elif species_clades is not None:
-        util.PrintUnderline("Running %s searches for new clades between core species" % name_to_print)
+        util.PrintUnderline("Running %s searches for new non-core species clades" % name_to_print)
     else:
         util.PrintUnderline("Running %s all-versus-all" % name_to_print)
     if species_clades is None:
@@ -948,7 +946,7 @@ def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller, q_new_species_una
                         shutil.rmtree(tmp_dir, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
 
 # 9
-def GetOrthologues(speciesInfoObj, options, prog_caller):
+def GetOrthologues(speciesInfoObj, options, prog_caller, i_og_restart=0):
     util.PrintUnderline("Analysing Orthogroups", True)
     orthologues.OrthologuesWorkflow(speciesInfoObj.speciesToUse,
                                     speciesInfoObj.nSpAll,
@@ -971,7 +969,8 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
                                     options.name,
                                     options.qSplitParaClades,
                                     options.save_space,
-                                    root_from_previous = False)
+                                    root_from_previous = False,
+                                    i_og_restart=i_og_restart)
     util.PrintTime("Done orthologues")
 
 
@@ -980,22 +979,22 @@ def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, spe
     Infer clade-specific orthogroups for the new species clades
     n_unassigned: List[int] - number of unassigned genes per species
     """
-    ogSet = orthologues.OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse,
-                                       speciesInfoObj.nSpAll, options.qAddSpeciesToIDs, idExtractor=util.FirstWordExtractor)
     # Get current orthogroups - original orthogroups plus genes assigned to them
     ogs = acc.get_original_orthogroups()
+    i_og_restart = len(ogs)  # Need to process the clade-specific orthogroups only
     ogs_new_species, _ = acc.assign_genes(results_files)
-    clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, [])
+    clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, [])  # this updates ogs
 
+    ogSet = orthologues.OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse,
+                                       speciesInfoObj.nSpAll, options.qAddSpeciesToIDs, idExtractor=util.FirstWordExtractor)
     # Infer gene trees
-    n_unassigned = acc.write_unassigned_fasta(ogs, ogs_new_species, speciesInfoObj)
+    n_unassigned = acc.write_unassigned_fasta(ogs, None, speciesInfoObj)
     # We write orthogroup & stats results files in the following code, which we should avoid & only do once all OGs are done.
     gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options,
                                           speciesXML=None, q_incremental=True)
 
     # Get/Infer species tree
     if options.speciesTreeFN is None:
-        raise NotImplementedError("This functionality has not been implemented, please supply a rooted species tree")
         return_obj = orthologues.InferGeneAndSpeciesTrees(ogSet,
                                                           prog_caller, options.msa_program, options.tree_program,
                                                           options.nBlast, options.nProcessAlg, options.qDoubleBlast,
@@ -1004,9 +1003,24 @@ def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, spe
                                                           qStopAfterAlign=False, qMSA=options.qMSATrees,
                                                           qPhyldog=False, results_name=options.name,
                                                           root_from_previous=True)
-        # - root new trees with previously rooted trees
-        # - infer rooted species tree from rooted triplets
-        rooted_species_tree_fn = None
+        # Infer species tree
+        astral_fn = files.FileHandler.GetAstralFilename()
+        astral.create_input_file(files.FileHandler.GetOGsTreeDir(), astral_fn)
+        species_tree_unrooted_fn = files.FileHandler.GetSpeciesTreeUnrootedFN()
+        parallel_task_manager.RunCommand(astral.get_astral_command(astral_fn, species_tree_unrooted_fn))
+
+        # Root it
+        core_rooted_species_tree = tree.Tree(files.FileHandler.GetCoreSpeciesTreeIDsRootedFN(), format=1)
+        species_to_speices_map = lambda x: x
+        rooted_species_tree_ids, qHaveSupport = trees2ologs_of.CheckAndRootTree(species_tree_unrooted_fn, core_rooted_species_tree, species_to_speices_map)
+        rooted_species_tree_fn = files.FileHandler.GetSpeciesTreeIDsRootedFN()
+        rooted_species_tree_ids.write(outfile=rooted_species_tree_fn)
+
+        spTreeUnrootedFN = files.FileHandler.GetSpeciesTreeResultsFN(None, True)
+        util.RenameTreeTaxa(rooted_species_tree_ids, spTreeUnrootedFN, ogSet.SpeciesDict(), qSupport=qHaveSupport, qFixNegatives=True)
+
+        labeled_tree_fn = files.FileHandler.GetSpeciesTreeResultsNodeLabelsFN()
+        util.RenameTreeTaxa(rooted_species_tree_ids, labeled_tree_fn, ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True, label='N')
     else:
         util.PrintUnderline("Using user-supplied species tree")
         spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
@@ -1020,6 +1034,7 @@ def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, spe
     species_dict = ogSet.SpeciesDict()
     for i, clade in enumerate(species_clades):
         print(str(i) + ": " + ", ".join([species_dict[str(isp)] for isp in clade]))
+    print("")
 
     # Clade-specific orthogroup inference
     CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned_genes=True)
@@ -1037,8 +1052,9 @@ def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, spe
     clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific)
     gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo,
                                           speciesNamesDict, options, speciesXML=None)
+    options.speciesTreeFN = files.FileHandler.GetSpeciesTreeResultsFN(None, True)
     if not options.qStopAfterGroups:
-        GetOrthologues(speciesInfoObj, options, prog_caller)
+        GetOrthologues(speciesInfoObj, options, prog_caller, i_og_restart)
 
 
 def clade_specific_orthogroups(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files):
@@ -1241,7 +1257,7 @@ def main(args=None):
         options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault, user_specified_M = ProcessArgs(prog_caller, args)
         
         files.InitialiseFileHandler(options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault)     
-        print("\nResults directory: %s" % files.FileHandler.GetResultsDirectory1())
+        print("Results directory: %s" % files.FileHandler.GetResultsDirectory1())
 
         CheckDependencies(options, user_specified_M, prog_caller, files.FileHandler.GetWorkingDirectory1_Read()[0])
             

@@ -107,7 +107,7 @@ class OrthoGroupsSet(object):
         self._extractor = idExtractor
         self.seqIDsEx = None
         self.ogs_all = None
-        self.iOgs4 = 0
+        self.iOgs4 = None
         self.speciesToUse = speciesToUse     # list of ints
         self.seqsInfo = util.GetSeqsInfo(orthofinderWorkingDir_list, self.speciesToUse, nSpAll)
         self.id_to_og = None
@@ -146,18 +146,18 @@ class OrthoGroupsSet(object):
         return self._Spec_SeqIDs
     
     def OGs(self, qInclAll=False):
-        if self.ogs_all != None:
+        if self.ogs_all is not None:
             if qInclAll:
                 return self.ogs_all
             else:
-                return self.ogs_all[:self.iOgs4]
+                return [self.ogs_all[i] for i in self.iOgs4]
         ogs = MCL.GetPredictedOGs(files.FileHandler.GetClustersFN())     
         self.ogs_all = [[Seq(g) for g in og] for og in ogs]   
-        self.iOgs4 = len(self.ogs_all) if len(self.ogs_all[-1]) >= 4 else next(i for i, og in enumerate(self.ogs_all) if len(og) < 4) 
+        self.iOgs4 = [i for i, og in enumerate(self.ogs_all) if len(og) >= 4]
         if qInclAll:
             return self.ogs_all
         else:
-            return self.ogs_all[:self.iOgs4]
+            return [self.ogs_all[i] for i in self.iOgs4]
         
     def OrthogroupMatrix(self):
         """ qReduce give a matrix with only as many columns as species for cases when 
@@ -939,6 +939,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
                        q_split_para_clades=False,
                        save_space=False,
                        root_from_previous=False,
+                       i_og_restart=0,
 ):
     ogSet = OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesToUse, nSpAll,
                            qAddSpeciesToIDs, idExtractor = util.FirstWordExtractor)
@@ -947,7 +948,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
                        program_caller, msa_method, tree_method,
                        nHighParallel, nLowParallel, qDoubleBlast, qAddSpeciesToIDs, qTrim,
                        userSpeciesTree, qStopAfterSeqs, qStopAfterAlign, qMSA, qPhyldog,
-                       results_name, root_from_previous)
+                       results_name, root_from_previous, i_og_restart)
     if return_obj is None:
         return
     spTreeFN_ids, qSpeciesTreeSupports = return_obj
@@ -960,7 +961,7 @@ def OrthologuesWorkflow(speciesToUse, nSpAll,
         return
     rooted_sp_tree, fn_rooted_sp_tree, q_multiple_roots, stride_dups = return_obj
 
-    InferOrthologs(ogSet, rooted_sp_tree, rooted_sp_tree, q_multiple_roots, qSpeciesTreeSupports, stride_dups,
+    InferOrthologs(ogSet, rooted_sp_tree, fn_rooted_sp_tree, q_multiple_roots, qSpeciesTreeSupports, stride_dups,
                    recon_method,
                        nHighParallel, nLowParallel, fewer_open_files,
                        userSpeciesTree, qPhyldog,
@@ -983,6 +984,7 @@ def InferGeneAndSpeciesTrees(ogSet,
                        qPhyldog = False,
                        results_name = "",
                        root_from_previous = False,
+                       i_og_restart=0,
 ):
     """
     1. Setup:
@@ -1011,8 +1013,8 @@ def InferGeneAndSpeciesTrees(ogSet,
     """
     qDB_SpeciesTree = False
     if userSpeciesTree:
-        util.PrintUnderline("Using user-supplied species tree") 
-        spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
+        if i_og_restart == 0: util.PrintUnderline("Using user-supplied species tree")
+        spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()  # save it as 'unrooted' but is copied directly to 'rooted' filename
         ConvertUserSpeciesTree(userSpeciesTree, ogSet.SpeciesDict(), spTreeFN_ids)
     
     if qMSA or qPhyldog:
@@ -1025,7 +1027,7 @@ def InferGeneAndSpeciesTrees(ogSet,
             util.RenameTreeTaxa(spTreeFN_ids, files.FileHandler.GetSpeciesTreeUnrootedFN(True), ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True)
         qDoMSASpeciesTree = (not qLessThanFourSpecies) and (not userSpeciesTree) and (not root_from_previous)
         util.PrintTime("Starting MSA/Trees")
-        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True), 
+        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True),
                                                ogSet.OrthogroupMatrix(), 
                                                ogSet.Spec_SeqDict(), 
                                                ogSet.SpeciesDict(), 
@@ -1034,7 +1036,8 @@ def InferGeneAndSpeciesTrees(ogSet,
                                                qStopAfterSeqs, 
                                                qStopAfterAlign or qPhyldog, 
                                                qDoSpeciesTree=qDoMSASpeciesTree,
-                                               qTrim=qTrim)
+                                               qTrim=qTrim,
+                                               i_og_restart=i_og_restart)
         util.PrintTime("Done MSA/Trees")
         if qDoMSASpeciesTree:
             spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()

@@ -324,8 +324,11 @@ def ReadHOGs(din, fn_hogs, ids_rev):
 
 
 def write_unassigned_fasta(ogs_orig_list, ogs_new_genes, speciesInfoObj):
-    assigned_genes = set.union(*ogs_new_genes.values())
-    assigned_genes.update(set.union(*[og for og in ogs_orig_list if len(og) > 1]))
+    if ogs_new_genes is not None:
+        assigned_genes = set.union(*ogs_new_genes.values())
+        assigned_genes.update(set.union(*[og for og in ogs_orig_list if len(og) > 1]))
+    else:
+        assigned_genes = set.union(*[og for og in ogs_orig_list if len(og) > 1])
     # Write out files for all unassigned genes
     # iSpeciesNew = list(range(speciesInfoObj.iFirstNewSpecies, speciesInfoObj.nSpAll))
     # for iSp in iSpeciesNew:

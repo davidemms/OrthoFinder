@@ -84,17 +84,19 @@ class RootMap(object):
         sp = self.GeneToSpecies(gene_name)
         if sp in self.setA: return True 
         elif sp in self.setB: return False
-        else: 
-            print(gene_name)
-            print(sp)
-            raise Exception
+        else: return None
+        # else:
+        #     print(gene_name)
+        #     print(sp)
+        #     raise Exception
         
 def StoreSpeciesSets(t, GeneMap, tag="sp_"):
     tag_up = tag + "up"
     tag_down = tag + "down"  
     for node in t.traverse('postorder'):
         if node.is_leaf():
-            node.add_feature(tag_down, {GeneMap(node.name)})
+            node_type = GeneMap(node.name)
+            node.add_feature(tag_down, set() if node_type is None else {node_type})
         elif node.is_root():
             continue
         else:

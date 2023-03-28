@@ -468,7 +468,7 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     q_unassigned: bool - Do orthogroups for unassigned genes after --fast-add (i.e. not for all species)
     """
     # Run Algorithm, cluster and output cluster files with original accessions
-    util.PrintUnderline("Running OrthoFinder algorithm")
+    util.PrintUnderline("Running OrthoFinder algorithm" + (" for clade-specific genes" if q_unassigned else ""))
     # it's important to free up the memory from python used for processing the genomes
     # before launching MCL because both use sizeable amounts of memory. The only
     # way I can find to do this is to launch the memory intensive python code
