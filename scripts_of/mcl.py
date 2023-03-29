@@ -92,7 +92,7 @@ def GetIDPair(speciesStartingIndices, singleID, speciesToUse):
             return "%d_%d" % (speciesToUse[i-1], singleID - speciesStartingIndices[i-1])
     return "%d_%d" % (speciesToUse[-1], singleID - speciesStartingIndices[len(speciesStartingIndices)-1]) 
 
-def ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, newFilename):
+def ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, newFilename, q_unassigned=False):
     with open(clustersFilename, 'r') as clusterFile, open(newFilename, "w") as output:
         header = True
         for line in clusterFile:
@@ -108,6 +108,9 @@ def ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, newFilename):
                 if line.find(")") != -1:
                     output.write(line)
                     break
+                if q_unassigned and not line.startswith(" ") and len(line.split()) == 3:
+                    # This is a single gene, not necessarily from this MCL clustering but here implicitly
+                    continue
                 if line[-2] == "$":
                     line = line[:-3]
                     appendDollar = True

@@ -157,8 +157,7 @@ def GetNumberOfSequencesInFile(filename):
             if line.startswith(">"): count+=1
     return count
 
-""" Question: Do I want to do all BLASTs or just the required ones? It's got to be all BLASTs I think. They could potentially be 
-run after the clustering has finished."""
+
 def GetOrderedSearchCommands(seqsInfo, speciesInfoObj, qDoubleBlast, search_program, prog_caller, n_genes_per_species=None, q_new_species_unassigned_genes=False):
     """ Using the nSeq1 x nSeq2 as a rough estimate of the amount of work required for a given species-pair, returns the commands 
     ordered so that the commands predicted to take the longest come first. This allows the load to be balanced better when processing 
@@ -197,9 +196,10 @@ def GetOrderedSearchCommands_clades(seqsInfo, speciesInfoObj, qDoubleBlast, sear
     Search all species
     """
     exclude = {isp for isp, n_genes in enumerate(n_genes_per_species) if n_genes == 0}
+    speciesPairs = []
     for clade in species_clades:
         clade = list(set(clade).difference(exclude))
-        speciesPairs = [(i, j) for i, j in itertools.product(clade, clade)]
+        speciesPairs.extend([(i, j) for i, j in itertools.product(clade, clade)])
     if search_program == "blast":
         commands = [" ".join(["blastp", "-outfmt", "6", "-evalue", "0.001",
                               "-query", files.FileHandler.GetSpeciesUnassignedFastaFN(iFasta),
@@ -993,16 +993,16 @@ def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, spe
     gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options,
                                           speciesXML=None, q_incremental=True)
 
+    orthologues.InferGeneAndSpeciesTrees(ogSet,
+                                          prog_caller, options.msa_program, options.tree_program,
+                                          options.nBlast, options.nProcessAlg, options.qDoubleBlast,
+                                          options.qAddSpeciesToIDs,
+                                          options.qTrim, userSpeciesTree=None, qStopAfterSeqs=False,
+                                          qStopAfterAlign=False, qMSA=options.qMSATrees,
+                                          qPhyldog=False, results_name=options.name,
+                                          root_from_previous=True)
     # Get/Infer species tree
     if options.speciesTreeFN is None:
-        return_obj = orthologues.InferGeneAndSpeciesTrees(ogSet,
-                                                          prog_caller, options.msa_program, options.tree_program,
-                                                          options.nBlast, options.nProcessAlg, options.qDoubleBlast,
-                                                          options.qAddSpeciesToIDs,
-                                                          options.qTrim, userSpeciesTree=None, qStopAfterSeqs=False,
-                                                          qStopAfterAlign=False, qMSA=options.qMSATrees,
-                                                          qPhyldog=False, results_name=options.name,
-                                                          root_from_previous=True)
         # Infer species tree
         astral_fn = files.FileHandler.GetAstralFilename()
         astral.create_input_file(files.FileHandler.GetOGsTreeDir(), astral_fn)
@@ -1046,10 +1046,10 @@ def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, spe
                                                      speciesNamesDict, speciesXML=None, q_unassigned=True)
     ogs_clade_specific = mcl.GetPredictedOGs(clustersFilename_pairs_unassigned)
 
-    clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific)
+    # OGs have had assigned genes added to them already
+    clustersFilename_pairs = acc.write_all_orthogroups(ogs, {}, ogs_clade_specific)
 
     # Infer clade-specific orthogroup gene trees
-    clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific)
     gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo,
                                           speciesNamesDict, options, speciesXML=None)
     options.speciesTreeFN = files.FileHandler.GetSpeciesTreeResultsFN(None, True)

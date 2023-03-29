@@ -114,7 +114,9 @@ def RunDlcpar(ogSet, speciesTreeFN, workingDir, nParallel, qDeepSearch):
     - run
     
     """
-    ogs = ogSet.OGs()
+    ogs = ogSet.OGsAll()
+    iogs4 = ogSet.Get_iOGs4()
+    ogs = [ogs[i] for i in iogs4]  # can rely on oredering for dlcpar
     nOGs = len(ogs)
     dlcparResultsDir = workingDir + 'dlcpar/'
     if not os.path.exists(dlcparResultsDir): os.mkdir(dlcparResultsDir)

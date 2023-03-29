@@ -151,7 +151,7 @@ def GetOrthogroupOccupancyInfo(m):
     nOrtho = list(map(float, nOrtho))
     return fractions, nOrtho
     
-def DetermineOrthogroupsForSpeciesTree(m, nOGsMin=100, nSufficient=1000, increase_required=2.):
+def DetermineOrthogroupsForSpeciesTree(m, iogs4, nOGsMin=100, nSufficient=1000, increase_required=2.):
     """Orthogroups can be used if at least a fraction f of the species in the orthogroup are single copy, f is determined as described 
     below. Species that aren't single copy are allowed in the orthogroup as long as there aren't too many (criterion is quite strict). 
     The presence of species with multiple copies suggests that the single copy species might actually have arisen from duplication 
@@ -179,6 +179,7 @@ def DetermineOrthogroupsForSpeciesTree(m, nOGsMin=100, nSufficient=1000, increas
             if p < 2*increase_required: break
     f = fractions[i-1]
     ogsToUse = SingleCopy_WithProbabilityTest(f-1e-5, m)
+    ogsToUse = [iogs4[i_] for i_ in ogsToUse]
     return ogsToUse, f   
 
 class MSA(object):
@@ -314,20 +315,22 @@ class TreesForOrthogroups(object):
                     else:
                         outfile.write(line)
           
-    def DoTrees(self, ogs, ogMatrix, idDict, speciesIdDict, speciesToUse, nProcesses, qStopAfterSeqs, qStopAfterAlignments, qDoSpeciesTree, qTrim, i_og_restart=0):
+    def DoTrees(self, ogSet, idDict, speciesIdDict, speciesToUse, nProcesses, qStopAfterSeqs, qStopAfterAlignments, qDoSpeciesTree, qTrim, i_og_restart=0):
         idDict.update(speciesIdDict) # same code will then also convert concatenated alignment for species tree
         # 0       
         resultsDirsFullPath = [files.FileHandler.GetResultsSeqsDir(), files.FileHandler.GetResultsAlignDir(), files.FileHandler.GetResultsTreesDir()]
         
         # 1.
         fastaWriter = FastaWriter(files.FileHandler.GetSpeciesSeqsDir(), speciesToUse)
+        ogs = ogSet.OGsAll()
         self.WriteFastaFiles(fastaWriter, ogs, idDict, True)
         if qStopAfterSeqs: return resultsDirsFullPath
 
         # 3
         # Get OGs to use for species tree
         if qDoSpeciesTree:
-            iOgsForSpeciesTree, fSingleCopy = DetermineOrthogroupsForSpeciesTree(ogMatrix)            
+            ogMatrix, iogs4 = ogSet.OrthogroupMatrix()
+            iOgsForSpeciesTree, fSingleCopy = DetermineOrthogroupsForSpeciesTree(ogMatrix, iogs4)
             concatenated_algn_fn = files.FileHandler.GetSpeciesTreeConcatAlignFN()
         else:
             iOgsForSpeciesTree = []
@@ -382,7 +385,7 @@ class TreesForOrthogroups(object):
             commands_and_filenames = [self.program_caller.GetTreeCommands(self.tree_program, [concatenated_algn_fn], [speciesTreeFN_ids], ["SpeciesTree"])]
             util.PrintUnderline("Inferring remaining multiple sequence alignments and gene trees") 
         else:
-            util.PrintUnderline("Inferring multiple sequence alignments and gene trees") 
+            util.PrintUnderline("Inferring multiple sequence alignments and gene trees")
 
         # Now continue as before
         iOgsForSpeciesTree = set(iOgsForSpeciesTree)                         

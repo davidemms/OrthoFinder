@@ -1109,7 +1109,7 @@ def DoOrthologuesForOrthoFinder(ogSet,
                         writer1.writerow(("Orthogroup", speciesDict[str(ogSet.speciesToUse[index1])], speciesDict[str(ogSet.speciesToUse[index2])]))
         InitialiseSuspectGenesDirs(nspecies, ogSet.speciesToUse, speciesDict)
         neighbours = GetSpeciesNeighbours(species_tree_rooted_labelled)
-        nOgs = len(ogSet.OGs()) 
+        iogs4 = ogSet.Get_iOGs4()
         reconTreesRenamedDir = files.FileHandler.GetOGsReconTreeDir(True)
         spec_seq_dict = ogSet.Spec_SeqDict()
         sp_to_index = {str(sp):i for i, sp in enumerate(ogSet.speciesToUse)}
@@ -1120,7 +1120,7 @@ def DoOrthologuesForOrthoFinder(ogSet,
             util.writerow(outfile_dups, ["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
             outfile_dups.flush()
             OrthologsFiles.flush_olog_files(ologs_file_handles, fewer_open_files)
-            ta = TreeAnalyser(nOgs, dResultsOrthologues, reconTreesRenamedDir, species_tree_rooted_labelled, 
+            ta = TreeAnalyser(len(iogs4), dResultsOrthologues, reconTreesRenamedDir, species_tree_rooted_labelled,
                               ogSet.speciesToUse, GeneToSpecies, SequenceDict, speciesDict, spec_seq_dict, 
                               neighbours, qNoRecon, outfile_dups, stride_dups, ologs_file_handles, 
                               putative_xenolog_file_handles, hog_writer, q_split_paralogous_clades, fewer_open_files=fewer_open_files)
@@ -1128,7 +1128,7 @@ def DoOrthologuesForOrthoFinder(ogSet,
             if n_parallel == 1:
                 nOrthologues_SpPair = util.nOrtho_sp(nspecies)
                 dummy_lock = mp.Lock()
-                for iog in range(nOgs):
+                for iog in iogs4:
                     results = ta.AnalyseTree(iog) 
                     if results is None:
                         continue
@@ -1151,7 +1151,7 @@ def DoOrthologuesForOrthoFinder(ogSet,
                 util.PrintTime("Done writing orthologs")
             else:
                 args_queue = mp.Queue()
-                for iog in range(nOgs):
+                for iog in iogs4:
                     args_queue.put(iog)
                 nOrthologues_SpPair = RunOrthologsParallel(ta, len(ogSet.speciesToUse), args_queue, n_parallel, fewer_open_files=fewer_open_files)
     except IOError as e:
@@ -1489,7 +1489,7 @@ def DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDirectory, GeneToSpecies, 
                 writer1 = csv.writer(outfile, delimiter="\t")
                 writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]))
     with OrthologsFiles(dResultsOrthologues, speciesDict, ogSet.speciesToUse, nSpecies, sp_to_index, save_space=True) as ologs_files_handles, putative_xenolog_file_handles:
-        nOgs = len(ogSet.OGs())
+        nOgs = len(ogSet.OGs4AssumeOrdered())
         nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
         with open(files.FileHandler.GetDuplicationsFN(), util.csv_write_mode) as outfile:
             dupWriter = csv.writer(outfile, delimiter="\t")

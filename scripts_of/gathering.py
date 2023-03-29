@@ -480,6 +480,8 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     util.PrintTime("Initial processing of each species")
     cmd_queue = mp.Queue()
     blastDir_list = files.FileHandler.GetBlastResultsDir()
+    if q_unassigned:
+        blastDir_list = blastDir_list[:1]  # only use latet directory with unassigned gene searches
     for iSpeciesJob in range(seqsInfo.nSpecies):  # The i-th job, not the OrthoFinder species ID
         cmd_queue.put((seqsInfo, blastDir_list, Lengths, iSpeciesJob))
     files.FileHandler.GetPickleDir()  # create the pickle directory before the parallel processing to prevent a race condition
@@ -508,7 +510,8 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
         "_I%0.1f" % options.mclInflation)
     graphFilename = files.FileHandler.GetGraphFilename()
     mcl.MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
-    mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)
+    # If processing unassigned, then ignore all 'unclustered' genes - they will include any genes not included in this search
+    mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs, q_unassigned)
 
     util.PrintUnderline("Writing orthogroups to file")
     if not q_unassigned:
@@ -537,7 +540,7 @@ def post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo
     fastaWriter = trees_msa.FastaWriter(files.FileHandler.GetSpeciesSeqsDir(), speciesInfoObj.speciesToUse)
     d_seqs = files.FileHandler.GetResultsSeqsDir()
     if not os.path.exists(d_seqs): os.mkdir(d_seqs)
-    treeGen.WriteFastaFiles(fastaWriter, ogSet.OGs(qInclAll=True), idsDict, False)
+    treeGen.WriteFastaFiles(fastaWriter, ogSet.OGsAll(), idsDict, False)
 
     if not q_incremental:
         stats.Stats(ogs, speciesNamesDict, speciesInfoObj.speciesToUse, files.FileHandler.iResultsVersion)

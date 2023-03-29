@@ -144,25 +144,30 @@ class OrthoGroupsSet(object):
         specs_ed = {k:v.replace(".", "_").replace(" ", "_") for k,v in specs.items()}
         self._Spec_SeqIDs = {seqID:specs_ed[seqID.split("_")[0]] + "_" + name for seqID, name in seqs.items()}
         return self._Spec_SeqIDs
-    
-    def OGs(self, qInclAll=False):
-        if self.ogs_all is not None:
-            if qInclAll:
-                return self.ogs_all
-            else:
-                return [self.ogs_all[i] for i in self.iOgs4]
-        ogs = MCL.GetPredictedOGs(files.FileHandler.GetClustersFN())     
-        self.ogs_all = [[Seq(g) for g in og] for og in ogs]   
-        self.iOgs4 = [i for i, og in enumerate(self.ogs_all) if len(og) >= 4]
-        if qInclAll:
-            return self.ogs_all
-        else:
-            return [self.ogs_all[i] for i in self.iOgs4]
-        
+
+    def Get_iOGs4(self):
+        if self.iOgs4 is None:
+            ogs = self.OGsAll()
+            self.iOgs4 = [i for i, og in enumerate(ogs) if len(og) >= 4]
+        return self.iOgs4
+
+    def OGsAll(self):
+        if self.ogs_all is None:
+            ogs = MCL.GetPredictedOGs(files.FileHandler.GetClustersFN())
+            self.ogs_all = [[Seq(g) for g in og] for og in ogs]
+        return self.ogs_all
+
+    def OGs4AssumeOrdered(self):
+        ogs_all = self.OGsAll()
+        iogs4 = self.Get_iOGs4()
+        return [ogs_all[i] for i in iogs4]
+
     def OrthogroupMatrix(self):
-        """ qReduce give a matrix with only as many columns as species for cases when 
+        """ qReduce give a matrix with only as many columns as species for cases when
         clustering has been performed on a subset of species"""
-        ogs = self.OGs()
+        ogs = self.OGsAll()
+        iogs4 = self.Get_iOGs4()
+        ogs = [ogs[i] for i in iogs4]
         iSpecies = sorted(set([gene.iSp for og in ogs for gene in og]))
         speciesIndexDict = {iSp:iCol for iCol, iSp in enumerate(iSpecies)}
         nSpecies = len(iSpecies)
@@ -172,12 +177,13 @@ class OrthoGroupsSet(object):
         for i_og, og in enumerate(ogs):
             for gene in og:
                 ogMatrix[i_og, speciesIndexDict[gene.iSp]] += 1
-        return ogMatrix
+        return ogMatrix, iogs4
         
     def ID_to_OG_Dict(self):
         if self.id_to_og != None:
             return self.id_to_og
-        self.id_to_og = {g.ToString():iog for iog, og in enumerate(self.OGs()) for g in og}
+        # Maybe shouldn't include unclustered genes:
+        self.id_to_og = {g.ToString():iog for iog, og in enumerate(self.OGsAll()) for g in og}
         return self.id_to_og
         
 # ==============================================================================================================================
@@ -291,7 +297,17 @@ class DendroBLASTTrees(object):
         """
         with warnings.catch_warnings():         
             warnings.simplefilter("ignore")
-            ogs = self.ogSet.OGs()
+            ogs_all = self.ogSet.OGsAll()
+            # DendroBLAST cannot be applied for --fast-add since we don't have hits between all genes, therefore can
+            # assume that orthogroups are ordered
+            lengths = [len(og) for og in ogs_all]
+            for iog in range(1, len(ogs_all)):
+                assert lengths[iog] <= lengths[iog-1], iog
+            try:
+                iog4 = next(i for i, og in enumerate(ogs_all) if len(og) < 4)
+            except:
+                iog4 = len(ogs_all)
+            ogs = ogs_all[:iog4]
             ogsPerSpecies = [[[(g, i) for i, g in enumerate(og) if g.iSp == iSp] for iSp in self.ogSet.seqsInfo.speciesToUse] for og in ogs]
             nGenes = [len(og) for og in ogs]
             nSeqs = self.ogSet.seqsInfo.nSeqsPerSpecies
@@ -433,9 +449,11 @@ class DendroBLASTTrees(object):
                 
     def PrepareGeneTreeCommand(self):
         cmds = []
-        ogs = self.ogSet.OGs()
+        ogs = self.ogSet.OGsAll()
         for iog in range(len(ogs)):
             nTaxa = len(ogs[iog])
+            if nTaxa < 4:
+                continue
             cmds.append([" ".join(["fastme", "-i", files.FileHandler.GetOGsDistMatFN(iog), "-o", files.FileHandler.GetOGsTreeFN(iog), "-N", "-w", "O"] + (["-s"] if nTaxa < 1000 else []))])
         return cmds
 
@@ -734,7 +752,7 @@ def WriteOrthologuesStats(ogSet, nOrtho_sp):
                 writer.writerow([og, ogCount[og], ogCount_50[og]])
 
 def TwoAndThreeGeneHOGs(ogSet, st_rooted_labelled, hog_writer):
-    ogs = ogSet.OGs(qInclAll=True)
+    ogs = ogSet.OGsAll()
     for iog, og in enumerate(ogs):
         n = len(og) 
         if n < 2 or n > 3: continue
@@ -752,7 +770,7 @@ def TwoAndThreeGeneHOGs(ogSet, st_rooted_labelled, hog_writer):
 def TwoAndThreeGeneOrthogroups(ogSet, resultsDir, save_space, fewer_open_files):
     speciesDict = ogSet.SpeciesDict()
     sequenceDict = ogSet.SequenceDict()
-    ogs = ogSet.OGs(qInclAll=True)
+    ogs = ogSet.OGsAll()
     nOrthologues_SpPair = util.nOrtho_sp(len(ogSet.speciesToUse))
     all_orthologues = []
     d_empty = defaultdict(list)
@@ -841,7 +859,11 @@ def ReconciliationAndOrthologues(
         dlcparResultsDir, dlcparLocusTreePat = trees2ologs_dlcpar.RunDlcpar(ogSet, speciesTree_ids_fn, workingDir, nHighParallel, qDeepSearch)
         util.PrintTime("Done DLCpar")
         spec_seq_dict = ogSet.Spec_SeqDict()
-        for iog in range(len(ogSet.OGs())):
+        ogs_all = ogSet.OGsAll()
+        for iog, og in enumerate(ogs_all):
+            if len(og) < 4:
+                # For dlpar analysis can rely on ordered orthogroups
+                break
             util.RenameTreeTaxa(dlcparResultsDir + dlcparLocusTreePat % iog, files.FileHandler.GetOGsReconTreeFN(iog), spec_seq_dict, qSupport=False, qFixNegatives=False, inFormat=8, label='n')
     
         # Orthologue lists
@@ -1027,8 +1049,7 @@ def InferGeneAndSpeciesTrees(ogSet,
             util.RenameTreeTaxa(spTreeFN_ids, files.FileHandler.GetSpeciesTreeUnrootedFN(True), ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True)
         qDoMSASpeciesTree = (not qLessThanFourSpecies) and (not userSpeciesTree) and (not root_from_previous)
         util.PrintTime("Starting MSA/Trees")
-        seqs_alignments_dirs = treeGen.DoTrees(ogSet.OGs(qInclAll=True),
-                                               ogSet.OrthogroupMatrix(), 
+        seqs_alignments_dirs = treeGen.DoTrees(ogSet,
                                                ogSet.Spec_SeqDict(), 
                                                ogSet.SpeciesDict(), 
                                                ogSet.speciesToUse, 
@@ -1059,7 +1080,7 @@ def InferGeneAndSpeciesTrees(ogSet,
                 userSpeciesTree = ConvertUserSpeciesTree(userSpeciesTree, ogSet.SpeciesDict(), files.FileHandler.GetSpeciesTreeUnrootedFN())
                 # not used for subsequent Phyldog steps
             util.PrintTime("Starting phyldog")
-            species_tree_ids_labelled_phyldog = wrapper_phyldog.RunPhyldogAnalysis(files.FileHandler.GetPhyldogWorkingDirectory(), ogSet.OGs(), speciesToUse, nHighParallel)
+            species_tree_ids_labelled_phyldog = wrapper_phyldog.RunPhyldogAnalysis(files.FileHandler.GetPhyldogWorkingDirectory(), ogSet.OGs4AssumeOrdered(), speciesToUse, nHighParallel)
             spTreeFN_ids = species_tree_ids_labelled_phyldog
     else:
         db = DendroBLASTTrees(ogSet, nLowParallel, nHighParallel, qDoubleBlast)
@@ -1155,7 +1176,7 @@ def RootSpeciesTree(ogSet, spTreeFN_ids, qSpeciesTreeSupports,
             util.RenameTreeTaxa(speciesTree_fn, labeled_tree_fn, ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True, label='N')
         idDict = ogSet.Spec_SeqDict()
         qHaveSupport = None 
-        for iog in range(len(ogSet.OGs())):
+        for iog in ogSet.Get_iOGs4():
             infn = files.FileHandler.GetOGsTreeFN(iog)
             if os.path.exists(infn):
                 if qHaveSupport is None: qHaveSupport = util.HaveSupportValues(infn)
