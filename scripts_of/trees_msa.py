@@ -300,6 +300,7 @@ class TreesForOrthogroups(object):
         
     def GetTreeCommands(self, alignmentsForTree, iogs_align, ogs):
         iogs_tree = [i for i in iogs_align if len(ogs[i]) >= 3]
+        alignmentsForTree = [alignmentsForTree[i] for i, iog in enumerate(iogs_align) if len(ogs[iog]) >= 3]  # Remove those to align with tree filenames
         outfn_list = [self.GetTreeFilename(i) for i in iogs_tree]
         id_list = ["OG%07d" % i for i in iogs_tree]
         nSeqs = [len(ogs[i]) for i in iogs_tree]
@@ -388,19 +389,20 @@ class TreesForOrthogroups(object):
             util.PrintUnderline("Inferring multiple sequence alignments and gene trees")
 
         # Now continue as before
-        iOgsForSpeciesTree = set(iOgsForSpeciesTree)                         
-        for i in range(len(treeCommands_and_filenames)):
-            if i in iOgsForSpeciesTree: continue
+        iOgsForSpeciesTree = set(iOgsForSpeciesTree)
+        iog_to_align_index = {iog: index for index, iog in enumerate(iogs_align)}
+        for i, iog in enumerate(iogs_tree):
+            if iog in iOgsForSpeciesTree: continue
             if qTrim:
-                commands_and_filenames.append([alignCommands_and_filenames[i], 
-                                            (trim_fn, alignmentFilesToUse[i]),
-                                            treeCommands_and_filenames[i]])
+                commands_and_filenames.append([alignCommands_and_filenames[iog_to_align_index[iog]],
+                                              (trim_fn, alignmentFilesToUse[iog_to_align_index[iog]]),
+                                              treeCommands_and_filenames[i]])
             else:
-                commands_and_filenames.append([alignCommands_and_filenames[i], 
-                                            treeCommands_and_filenames[i]])
-        for i in set(iogs_align).difference(iogs_tree):
-            if i in iOgsForSpeciesTree: continue
-            commands_and_filenames.append([alignCommands_and_filenames[i]])
+                commands_and_filenames.append([alignCommands_and_filenames[iog_to_align_index[iog]],
+                                              treeCommands_and_filenames[i]])
+        for iog in set(iogs_align).difference(iogs_tree):
+            if iog in iOgsForSpeciesTree: continue
+            commands_and_filenames.append([alignCommands_and_filenames[iog_to_align_index[iog]]])
         pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
         
         # Convert ids to accessions for MSA
