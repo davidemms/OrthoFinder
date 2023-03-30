@@ -398,7 +398,7 @@ class TreesForOrthogroups(object):
             else:
                 commands_and_filenames.append([alignCommands_and_filenames[i], 
                                             treeCommands_and_filenames[i]])
-        for i in set(iogs_tree).difference(iogs_align):
+        for i in set(iogs_align).difference(iogs_tree):
             if i in iOgsForSpeciesTree: continue
             commands_and_filenames.append([alignCommands_and_filenames[i]])
         pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
