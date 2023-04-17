@@ -17,8 +17,8 @@ def create_input_file(d, output_fn, n_skip=50):
             outfile.write(t.write(format=9) + "\n")
 
 
-def get_astral_command(astral_input, species_tree):
-    return " ".join(["astral-pro", "-i", astral_input, "-o", species_tree])
+def get_astral_command(astral_input, species_tree, threads):
+    return " ".join(["astral-pro", "-i", astral_input, "-o", species_tree, "-t", str(threads)])
 
 
 if __name__ == "__main__":

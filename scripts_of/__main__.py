@@ -1007,7 +1007,7 @@ def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, spe
         astral_fn = files.FileHandler.GetAstralFilename()
         astral.create_input_file(files.FileHandler.GetOGsTreeDir(), astral_fn)
         species_tree_unrooted_fn = files.FileHandler.GetSpeciesTreeUnrootedFN()
-        parallel_task_manager.RunCommand(astral.get_astral_command(astral_fn, species_tree_unrooted_fn))
+        parallel_task_manager.RunCommand(astral.get_astral_command(astral_fn, species_tree_unrooted_fn, options.nBlast))
 
         # Root it
         core_rooted_species_tree = tree.Tree(files.FileHandler.GetCoreSpeciesTreeIDsRootedFN(), format=1)

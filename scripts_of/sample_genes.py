@@ -230,10 +230,13 @@ def select_from_aligned(infn, n_sample, q_trim=True):
     M = embed(m)
     # print("embedding successful")
     # Cluster
-    if use_n_auto:
-        kmeans = cluster.KMeans(n_clusters=n_sample, random_state=0, n_init='auto').fit(M)
-    else:
-        kmeans = cluster.KMeans(n_clusters=n_sample, random_state=0).fit(M)
+    # Kmeans will warn if it finds fewer clusters than requested, ignore these warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        if use_n_auto:
+            kmeans = cluster.KMeans(n_clusters=n_sample, random_state=0, n_init='auto').fit(M)
+        else:
+            kmeans = cluster.KMeans(n_clusters=n_sample, random_state=0).fit(M)
     # print("clustering successful")
     labels = kmeans.predict(M)
     n_keep = len(ikeep)

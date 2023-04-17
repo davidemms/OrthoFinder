@@ -15,8 +15,7 @@ from . import util, files, parallel_task_manager, mcl, orthologues, sample_genes
 
 class XcelerateConfig(object):
     def __init__(self):
-        # use kmeans clustering to select 1/kmeans_divide genes per orthogroup (to a minimum of 20). Otherwise, use all.
-        self.kmeans_divide: Optional[int] = 10  # 10 is a good value if using this option
+        self.n_for_profiles: Optional[int] = 10  # 10 is a good value if using this option
 
 
 xcelerate_config = XcelerateConfig()
@@ -31,11 +30,11 @@ def check_for_orthoxcelerate(input_dir, speciesInfoObj):
 
 
 def prepare_accelerate_database(input_dir, wd_list, nSpAll):
-    if xcelerate_config.kmeans_divide is None:
+    if xcelerate_config.n_for_profiles is None:
         # create_shoot_db.create_full_database(input_dir, q_ids=True, subtrees_dir="")
         fn_diamond_db = create_profiles_database(input_dir, wd_list, nSpAll, selection="all", q_ids=True, subtrees_dir="")
     else:
-        fn_diamond_db = create_profiles_database(input_dir, wd_list, nSpAll, selection="kmeans", q_ids=True, divide=xcelerate_config.kmeans_divide, subtrees_dir="")
+        fn_diamond_db = create_profiles_database(input_dir, wd_list, nSpAll, selection="kmeans", q_ids=True, n_for_profile=xcelerate_config.n_for_profiles, subtrees_dir="")
     return fn_diamond_db
 
 
@@ -43,11 +42,14 @@ def RunSearch(options, speciessInfoObj, fn_diamond_db, prog_caller, q_one_query=
     name_to_print = "BLAST" if options.search_program == "blast" else options.search_program
     util.PrintUnderline("Running %s profiles search" % name_to_print)
     commands, results_files = GetOrderedSearchCommands(speciessInfoObj, fn_diamond_db, prog_caller, q_one_query=q_one_query, threads=options.nBlast)
-    if options.qStopAfterPrepare:
-        for command in commands:
-            print(command)
-        util.Success()
     print("Using %d thread(s)" % options.nBlast)
+    if q_one_query:
+        return_code = parallel_task_manager.RunCommand(commands[0], qPrintOnError=True)
+        if return_code != 0:
+            print("ERROR: DIAMOND search failed, see messages above")
+            util.Fail()
+        util.PrintTime("Done profiles search\n")
+        return results_files
     cmd_queue = mp.Queue()
     for iCmd, cmd in enumerate(commands):
         cmd_queue.put((iCmd+1, cmd))
@@ -58,7 +60,7 @@ def RunSearch(options, speciessInfoObj, fn_diamond_db, prog_caller, q_one_query=
         while proc.is_alive():
             proc.join()
     print("")
-    util.PrintTime("Done profiles search\n")
+    util.PrintTime(" Done profiles search\n")
     return results_files
 
 
@@ -191,15 +193,14 @@ def write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific):
     return clustersFilename_pairs
 
 
-def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", min_for_profile=20, q_ids=True, divide=10,
+def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", n_for_profile=20, q_ids=True,
                              subtrees_dir="", q_hogs=True):
     """
     Create a fasta file with profile genes from each orthogroup
     Args:
         din - Input OrthoFinder results directory
         selection - "kmeans|random|all"  - method to use for sampling genes from orthogroups
-        min_for_profile - The min number of genes to use from each orthogroup, when available
-        divide - Select `|genes| / divide` genes per orthogroup, as long as the number is greater than min_for_profile
+        n_for_profile - The number of genes to use from each orthogroup, when available
         q_ids - Convert subtrees (with user gene accessions) back to IDs for profiles database
     Notes:
     If the trees have been split into subtrees then profiles will be created for
@@ -217,7 +218,7 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", min_for_p
     if selection == "all":
         fn_fasta = wd + "profile_sequences%s.all.fa" % subtrees_label
     else:
-        fn_fasta = wd + "profile_sequences%s.d%d_min%d_%s.fa" % (subtrees_label, divide, min_for_profile, selection)
+        fn_fasta = wd + "profile_sequences%s.%d_%s.fa" % (subtrees_label, n_for_profile, selection)
     fn_diamond_db = fn_fasta + ".dmnd"
     if os.path.exists(fn_diamond_db):
         print("Profiles database already exists and will be reused: %s" % fn_diamond_db)
@@ -267,9 +268,7 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", min_for_p
             i_part = os.path.basename(fn).rsplit(".", 2)[1] if q_subtrees else None
             fw_temp = fasta_writer.FastaWriter(fn)
             n_in_og = len(fw_temp.SeqLists)
-            n_for_profile = n_in_og // divide
-            if n_for_profile < min_for_profile:
-                n_for_profile = min_for_profile
+            n_for_profile = min(n_in_og, n_for_profile)
             if selection == "kmeans" and len(fw_temp.SeqLists) > n_for_profile:
                 if q_subtrees:
                     # MSA needs to be modified
