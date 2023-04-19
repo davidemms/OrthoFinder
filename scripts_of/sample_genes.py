@@ -8,6 +8,7 @@ What to try?
 import os
 import random
 import argparse
+import warnings
 from collections import defaultdict
 
 import sklearn
@@ -260,7 +261,7 @@ def select_from_aligned(infn, n_sample, q_trim=True):
         # select some more to make it up to the total 
         not_used = set(range(n_keep)).difference(cluster_representative)
         cluster_representative.extend(random.sample(not_used, n_extra))
-        print("Found extra sequences. Have %d" % len(cluster_representative))
+        # print("Found extra sequences. Have %d" % len(cluster_representative))
     # print(cluster_representative)
     selected = [accs[d_new_old[i]] for i in cluster_representative]
     # print("|".join(selected))

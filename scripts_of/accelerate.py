@@ -182,12 +182,13 @@ def assign_genes(results_files):
     return ogs, species_group
 
 
-# def write_all_orthogroups(ogs: List[Set[str]], ogs_new_species: Dict[int, Set[str]], ogs_clade_specific: List[Set[str]]):
-def write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific):
+# def write_all_orthogroups(ogs: List[Set[str]], ogs_new_species: Dict[int, Set[str]], ogs_clade_specific: List[List[Set[str]]]):
+def write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific_lists):
     for iog, genes in ogs_new_species.items():
         ogs[iog].update(genes)
-    for og in ogs_clade_specific:
-        ogs.append(og)
+    for ogs_clade_specific in ogs_clade_specific_lists:
+        for og in ogs_clade_specific:
+            ogs.append(og)
     clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN()
     mcl.write_updated_clusters_file(ogs, clustersFilename_pairs)
     return clustersFilename_pairs
@@ -358,7 +359,9 @@ def get_new_species_clades(rooted_species_tree_fn, core_species_ids, n_core_spec
         rooted_species_tree_fn - ids format
         core_species_ids: Set[str]
         n_core_species - maximum number of core species in a 'new clade of species'. 1 is the minimum, but 2 makes more
-                         allowances for gene loss in one core species & still recovering associated orthogroups
+                         allowances for gene loss in one core species & still recovering associated orthogroup
+    Returns:
+        a list of sorted lists of species IDs
     """
     core_species_ids = set(map(str, core_species_ids))
     t = tree.Tree(rooted_species_tree_fn, format=1)
@@ -368,5 +371,7 @@ def get_new_species_clades(rooted_species_tree_fn, core_species_ids, n_core_spec
         return len(core_species_ids.intersection(node.get_leaf_names())) <= n_core_species
 
     for n in t.get_leaves(is_leaf_fn=is_new_clade):
-        species_clades.append(list(sorted(map(int, n.get_leaf_names()))))
+        species_group = list(sorted(map(int, n.get_leaf_names())))
+        if set(species_group).difference(core_species_ids):
+            species_clades.append(species_group)
     return species_clades

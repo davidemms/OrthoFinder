@@ -75,8 +75,6 @@ def GetPredictedOGs(clustersFilename):
                     og = set(y)
         if len(og) > 0:
             predictedOGs.append(og)
-    if not qContainsProfiles:
-        assert(len(predictedOGs) == int(nOGsString) + 1)
     return predictedOGs
     
 def GetSingleID(speciesStartingIndices, seq, speciesToUse): 

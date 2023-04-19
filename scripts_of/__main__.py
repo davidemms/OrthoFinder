@@ -974,7 +974,7 @@ def GetOrthologues(speciesInfoObj, options, prog_caller, i_og_restart=0):
     util.PrintTime("Done orthologues")
 
 
-def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files):
+def BetweenCoreOrthogroupsWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files):
     """
     Infer clade-specific orthogroups for the new species clades
     n_unassigned: List[int] - number of unassigned genes per species
@@ -1042,12 +1042,21 @@ def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, spe
     RunSearch(options, speciesInfoObj, seqsInfo, prog_caller, n_genes_per_species=n_unassigned, species_clades=species_clades)
     # process the results files - only if they are present and non-empty
     options.v2_scores = True
-    clustersFilename_pairs_unassigned = gathering.DoOrthogroups(options, speciesInfoObj, seqsInfo,
-                                                     speciesNamesDict, speciesXML=None, q_unassigned=True)
-    ogs_clade_specific = mcl.GetPredictedOGs(clustersFilename_pairs_unassigned)
+    n_clades = len(species_clades)
+    clustersFilename_pairs_unassigned_all = []
+    for i_clade, clade in enumerate(species_clades):
+        util.PrintUnderline("OrthoFinder clutering on new species clade %d of %d" % (i_clade+1, n_clades))
+        print(str(i) + ": " + ", ".join([species_dict[str(isp)] for isp in clade]))
+        speciesInfo_clade = copy.deepcopy(speciesInfoObj)
+        speciesInfo_clade.speciesToUse = clade
+        seqsInfo_clade = util.SeqsInfoRecompute(seqsInfo, clade)
+        clustersFilename_pairs_unassigned = gathering.DoOrthogroups(options, speciesInfo_clade, seqsInfo_clade,
+                                                         speciesNamesDict, speciesXML=None, i_unassigned=i_clade)
+        clustersFilename_pairs_unassigned_all.append(clustersFilename_pairs_unassigned)
+    ogs_clade_specific_list = [mcl.GetPredictedOGs(filename) for filename in clustersFilename_pairs_unassigned_all]
 
     # OGs have had assigned genes added to them already
-    clustersFilename_pairs = acc.write_all_orthogroups(ogs, {}, ogs_clade_specific)
+    clustersFilename_pairs = acc.write_all_orthogroups(ogs, {}, ogs_clade_specific_list)
 
     # Infer clade-specific orthogroup gene trees
     gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo,
@@ -1057,7 +1066,7 @@ def NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, spe
         GetOrthologues(speciesInfoObj, options, prog_caller, i_og_restart)
 
 
-def clade_specific_orthogroups(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files):
+def clade_specific_orthogroups_v1(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files):
     ogs = acc.get_original_orthogroups()
     ogs_new_species, _ = acc.assign_genes(results_files)
     n_unassigned = acc.write_unassigned_fasta(ogs, ogs_new_species, speciesInfoObj)
@@ -1083,7 +1092,7 @@ def clade_specific_orthogroups(speciesInfoObj, seqsInfo, options, prog_caller, s
     clustersFilename_pairs_unassigned = gathering.DoOrthogroups(options, speciesInfoObj_for_unassigned, seqsInfo_for_unassigned,
                                                      speciesNamesDict, speciesXML=None, q_unassigned=True)
     ogs_clade_specific = mcl.GetPredictedOGs(clustersFilename_pairs_unassigned)
-    clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific)
+    clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, [ogs_clade_specific])
     return clustersFilename_pairs
 
 def GetOrthologues_FromTrees(options):
@@ -1357,13 +1366,13 @@ def main(args=None):
             if orphan_genes_version == 1:
                 # v1 - This is unsuitable, it does an all-v-all search of all unassigned genes. Although these should have
                 # been depleted of all genes that are not clade-specific, the resulting search still takes too long.
-                clustersFilename_pairs = clade_specific_orthogroups(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files)
+                clustersFilename_pairs = clade_specific_orthogroups_v1(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files)
                 gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML=None)
                 if not options.qStopAfterGroups:
                     GetOrthologues(speciesInfoObj, options, prog_caller)
             elif orphan_genes_version == 2:
                 # v2 - Infer rooted species tree from new rooted gene trees, identify new species-clades & search within these
-                NewSpeciesCladesWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files)
+                BetweenCoreOrthogroupsWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files)
         else:
             raise NotImplementedError
             ptm = parallel_task_manager.ParallelTaskManager_singleton()

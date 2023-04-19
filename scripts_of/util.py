@@ -27,6 +27,7 @@ import gzip
 import os
 import sys
 import time
+import copy
 import numpy as np
 import subprocess
 import datetime
@@ -55,9 +56,52 @@ SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStar
 nSeqs: int - number of sequences in speciesToUse
 nSpecies: int - number in speciesToUse
 speciesToUse: List[int]
-seqStartingIndices: List[int] of size |speciesToUse|
+seqStartingIndices: List[int] of size |speciesToUse|, reindexed from zero according to the speices present
 nSeqsPerSpecies: Dict[int, int] - indexed by OrthoFinder species ID, info on all species, nto just those included in analysis
 """
+
+# Get Info from seqs IDs file?
+def GetSeqsInfo(inputDirectory_list, speciesToUse, nSpAll):
+    seqStartingIndices = [0]
+    nSeqs = 0
+    nSeqsPerSpecies = dict()
+    for iFasta in range(nSpAll):
+        for d in inputDirectory_list:
+            fastaFilename = d + "Species%d.fa" % iFasta
+            if os.path.exists(fastaFilename): break
+        n = 0
+        with open(fastaFilename) as infile:
+            for line in infile:
+                if len(line) > 1 and line[0] == ">":
+                    n += 1
+        nSeqsPerSpecies[iFasta] = n
+        if iFasta in speciesToUse:
+            nSeqs += n
+            seqStartingIndices.append(nSeqs)
+    seqStartingIndices = seqStartingIndices[:-1]
+    nSpecies = len(speciesToUse)
+    return SequencesInfo(nSeqs=nSeqs, nSpecies=nSpecies, speciesToUse=speciesToUse,
+                         seqStartingIndices=seqStartingIndices, nSeqsPerSpecies=nSeqsPerSpecies)
+
+def SeqsInfoRecompute(seqs_info_orig, new_species_to_use):
+    """
+    Args:
+        seqs_info_orig
+        new_species_to_use: List[int]
+    Recomputes SeqsInfo for a subset of species:
+    - speciesToUse updated
+    - seqStartingIndices recomputed
+    - nSeqs updated
+    - nSpecies updated
+    """
+    seqStartingIndices = [0]
+    for isp in new_species_to_use:
+        seqStartingIndices.append(seqStartingIndices[-1] + seqs_info_orig.nSeqsPerSpecies[isp])
+    nSeqs = seqStartingIndices[-1]
+    seqStartingIndices = seqStartingIndices[:-1]
+    return SequencesInfo(nSeqs=nSeqs, nSpecies=len(new_species_to_use), speciesToUse=new_species_to_use,
+                         seqStartingIndices=seqStartingIndices, nSeqsPerSpecies=seqs_info_orig.nSeqsPerSpecies)
+
 
 class SpeciesInfo(object):
     def __init__(self):
@@ -129,30 +173,8 @@ def SortArrayPairByFirst(useForSortAr, keepAlignedAr, qLargestFirst=False):
     sortedTuples = sorted(zip(useForSortAr, keepAlignedAr), reverse=qLargestFirst)
     useForSortAr = [i for i, j in sortedTuples]
     keepAlignedAr = [j for i, j in sortedTuples]
-    return useForSortAr, keepAlignedAr      
+    return useForSortAr, keepAlignedAr
 
-# Get Info from seqs IDs file?
-def GetSeqsInfo(inputDirectory_list, speciesToUse, nSpAll):
-    seqStartingIndices = [0]
-    nSeqs = 0
-    nSeqsPerSpecies = dict()
-    for iFasta in range(nSpAll):
-        for d in inputDirectory_list:
-            fastaFilename = d + "Species%d.fa" % iFasta
-            if os.path.exists(fastaFilename): break
-        n = 0
-        with open(fastaFilename) as infile:
-            for line in infile:
-                if len(line) > 1 and line[0] == ">":
-                    n+=1
-        nSeqsPerSpecies[iFasta] = n
-        if iFasta in speciesToUse:
-            nSeqs += n
-            seqStartingIndices.append(nSeqs)
-    seqStartingIndices = seqStartingIndices[:-1]
-    nSpecies = len(speciesToUse)
-    return SequencesInfo(nSeqs=nSeqs, nSpecies=nSpecies, speciesToUse=speciesToUse, seqStartingIndices=seqStartingIndices, nSeqsPerSpecies=nSeqsPerSpecies)
- 
 def GetSpeciesToUse(speciesIDsFN):
     """Returns species indices (int) to use and total number of species available """
     speciesToUse = []

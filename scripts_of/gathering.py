@@ -270,14 +270,14 @@ class WaterfallMethod:
                     return
 
     @staticmethod
-    def WriteGraphParallel(seqsInfo, nProcess):
+    def WriteGraphParallel(seqsInfo, nProcess, i_unassigned=None):
+        graphFN = files.FileHandler.GetGraphFilename(i_unassigned)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            with open(files.FileHandler.GetGraphFilename(), 'w') as graphFile:
+            with open(graphFN, 'w') as graphFile:
                 graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (seqsInfo.nSeqs, seqsInfo.nSeqs))
                 graphFile.write("\n(mclmatrix\nbegin\n\n")
             pool = mp.Pool(nProcess)
-            graphFN = files.FileHandler.GetGraphFilename()
             pool.map(WriteGraph_perSpecies, [(seqsInfo, graphFN, iSpec, files.FileHandler.GetPickleDir()) for iSpec in
                                              range(seqsInfo.nSpecies)])
             for iSp in range(seqsInfo.nSpecies):
@@ -287,6 +287,7 @@ class WaterfallMethod:
             pool.close()
             matrices.DeleteMatrices("B", files.FileHandler.GetPickleDir())
             matrices.DeleteMatrices("connect", files.FileHandler.GetPickleDir())
+        return graphFN
 
     @staticmethod
     def GetMostDistant_s(RBH, B, seqsInfo, iSpec):
@@ -304,8 +305,7 @@ class WaterfallMethod:
                 mostDistant[I] = np.minimum(B[kSpec][I, J], mostDistant[I])
         # anything that doesn't have an RBB, set to distance to the closest gene in another species. I.e. it will hit just that gene and all genes closer to it in the its own species
         I = mostDistant > 1e8
-        mostDistant[I] = bestHit[
-                             I] + 1e-6  # to connect to one in it's own species it must be closer than other species. We can deal with hits outside the species later
+        mostDistant[I] = bestHit[I] + 1e-6  # to connect to one in it's own species it must be closer than other species. We can deal with hits outside the species later
         return mostDistant
 
 
@@ -463,11 +463,9 @@ def GetSequenceLengths(seqsInfo):
     return sequenceLengths
 
 
-def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXML=None, q_unassigned=False):
-    """
-    q_unassigned: bool - Do orthogroups for unassigned genes after --fast-add (i.e. not for all species)
-    """
+def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXML=None, i_unassigned=None):
     # Run Algorithm, cluster and output cluster files with original accessions
+    q_unassigned = i_unassigned is not None
     util.PrintUnderline("Running OrthoFinder algorithm" + (" for clade-specific genes" if q_unassigned else ""))
     # it's important to free up the memory from python used for processing the genomes
     # before launching MCL because both use sizeable amounts of memory. The only
@@ -503,12 +501,11 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
 
     util.PrintTime("Connected putative homologues")
-    WaterfallMethod.WriteGraphParallel(seqsInfo, options.nProcessAlg)
+    graphFilename = WaterfallMethod.WriteGraphParallel(seqsInfo, options.nProcessAlg, i_unassigned)
 
     # 5b. MCL
     clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN(
-        "_I%0.1f" % options.mclInflation)
-    graphFilename = files.FileHandler.GetGraphFilename()
+        "_I%0.1f" % options.mclInflation, i_unassigned)
     mcl.MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
     # If processing unassigned, then ignore all 'unclustered' genes - they will include any genes not included in this search
     mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs, q_unassigned)

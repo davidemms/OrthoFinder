@@ -322,13 +322,16 @@ class __Files_new_dont_manually_create__(object):
             if os.path.exists(fn) or os.path.exists(fn + ".gz"): return fn
         raise Exception(fn + " not found")
         
-    def GetGraphFilename(self):
+    def GetGraphFilename(self, i_unassigned=None):
         if self.wd_current == None: raise Exception("No wd_current")
-        return self.wd_current + "%s_graph.txt" % self.fileIdentifierString
+        identifier = self.fileIdentifierString + ("" if i_unassigned is None else "_unassigned_clade_%d" % i_unassigned)
+        return self.wd_current + "%s_graph.txt" % identifier
         
-    def CreateUnusedClustersFN(self, mcl_inflation_str=""):
+    def CreateUnusedClustersFN(self, mcl_inflation_str="", i_unassigned=None):
         if self.wd_current == None: raise Exception("No wd_current")
-        self.clustersFilename, self.iResultsVersion = util.GetUnusedFilename(self.wd_current + "clusters_%s%s" % (self.fileIdentifierString, mcl_inflation_str), ".txt")
+        identifier = self.fileIdentifierString + ("" if i_unassigned is None else "_unassigned_clade_%d" % i_unassigned)
+        filename_suggestion = self.wd_current + "clusters_%s%s" % (identifier, mcl_inflation_str)
+        self.clustersFilename, self.iResultsVersion = util.GetUnusedFilename(filename_suggestion, ".txt")
         return self.clustersFilename, self.clustersFilename + "_id_pairs.txt"
         
     def SetClustersFN(self, pairsFN):

@@ -100,5 +100,5 @@ def GetBLAST6Scores(seqsInfo, blastDir_list, iSpecies, jSpecies, qExcludeSelfHit
         print("ERROR: Blast%d_%d.txt is corrupted" % (iSpecies, jSpecies))
         sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (d, iSpecies, jSpecies))
         sys.stderr.write("\t".join(row) + "\n")
-        raise 
+        raise
     return B
