@@ -52,6 +52,7 @@ from . import wrapper_phyldog
 from . import stag
 from . import files
 from . import parallel_task_manager
+from . import program_caller
 
 nThreads = util.nThreadsDefault
 
@@ -490,7 +491,7 @@ class DendroBLASTTrees(object):
                 cmds_trees = [[cmd_spTree]] + cmds_trees
         del ogMatrices
         util.PrintUnderline("Inferring gene and species trees" if qSpeciesTree else "Inferring gene trees")
-        parallel_task_manager.RunParallelOrderedCommandLists(self.nProcess_std, cmds_trees)
+        program_caller.RunParallelCommands(self.nProcess_std, cmds_trees, qListOfList=True)
         if qSTAG:
             # Trees must have been completed
             print("")

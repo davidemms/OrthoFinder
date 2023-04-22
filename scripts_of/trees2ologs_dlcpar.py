@@ -41,7 +41,7 @@ from collections import defaultdict
 from . import tree
 from . import util
 from . import files
-from . import parallel_task_manager
+from . import program_caller
 
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(_nsre, s)]
@@ -133,7 +133,8 @@ def RunDlcpar(ogSet, speciesTreeFN, workingDir, nParallel, qDeepSearch):
         dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -i %d --nprescreen 100 --nconverge %d' % (speciesTreeFN, geneMapFN, fn, i, n) for (fn, i, n) in zip(filenames, nIter, nNoImprov)]
     else:
         dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -x 1' % (speciesTreeFN, geneMapFN, fn) for fn in filenames]
-    parallel_task_manager.RunParallelOrderedCommandLists(nParallel, [[c] for c in dlcCommands])
+    program_caller.RunParallelCommands(nParallel, [[c] for c in dlcCommands], qListOfList=True)
+
     return dlcparResultsDir, "OG%07d_tree_id.dlcpar.locus.tree"
 
 

@@ -29,7 +29,7 @@
 from __future__ import absolute_import
 
 from . import parallel_task_manager
-ptm_initialised = parallel_task_manager.ParallelTaskManager_singleton()
+# ptm_initialised = parallel_task_manager.ParallelTaskManager_singleton()
 
 import os                                       # Y
 os.environ["OPENBLAS_NUM_THREADS"] = "1"    # fix issue with numpy/openblas. Will mean that single threaded options aren't automatically parallelised 
@@ -919,16 +919,10 @@ def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller, q_new_species_una
             print(command)
         util.Success()
     print("Using %d thread(s)" % options.nBlast)
-    util.PrintTime("This may take some time....")  
-    cmd_queue = mp.Queue()
-    for iCmd, cmd in enumerate(commands):
-        cmd_queue.put((iCmd+1, cmd))           
-    runningProcesses = [mp.Process(target=parallel_task_manager.Worker_RunCommand, args=(cmd_queue, options.nBlast, len(commands), True)) for i_ in range(options.nBlast)]
-    for proc in runningProcesses:
-        proc.start()
-    for proc in runningProcesses:
-        while proc.is_alive():
-            proc.join()
+    util.PrintTime("This may take some time....")
+    program_caller.RunParallelCommands(options.nBlast, commands, qListOfList=False,
+                                       q_print_on_error=True, q_always_print_stderr=False)
+
     # remove BLAST databases
     util.PrintTime("Done all-versus-all sequence search")
     if options.search_program == "blast":
@@ -1258,7 +1252,7 @@ def main(args=None):
         if args is None:
             args = sys.argv[1:]
         # Create PTM right at start
-        ptm_initialised = parallel_task_manager.ParallelTaskManager_singleton()
+        # ptm_initialised = parallel_task_manager.ParallelTaskManager_singleton()
         print("")
         print(("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version))
         prog_caller = GetProgramCaller()
