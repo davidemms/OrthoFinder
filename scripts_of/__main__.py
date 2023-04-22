@@ -364,6 +364,7 @@ class Options(object):#
         self.qMSATrees = True  # Updated default
         self.qAddSpeciesToIDs = True
         self.qTrim = True
+        self.gathering_version = (1, 0)    # < 3 is the original method
         self.search_program = "diamond"
         self.msa_program = "mafft"
         self.tree_program = "fasttree"
@@ -497,6 +498,11 @@ def ProcessArgs(prog_caller, args):
             except:
                 print("Incorrect argument for MCL inflation parameter: %s\n" % arg)
                 util.Fail()
+        elif arg == "-c1":
+            print("\nThe option 'c1' has been renamed '--c-homologs'")
+            util.Fail()
+        elif arg == "--c-homologs":
+            options.gathering_version = (3, 2)
         elif arg == "--save-space":
             options.save_space = True
         elif arg == "-x" or arg == "--orthoxml":  

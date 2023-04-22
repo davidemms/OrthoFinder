@@ -270,7 +270,7 @@ class WaterfallMethod:
                     return
 
     @staticmethod
-    def WriteGraphParallel(seqsInfo, nProcess, i_unassigned=None):
+    def WriteGraphParallel(seqsInfo, nProcess, i_unassigned=None, func=WriteGraph_perSpecies):
         graphFN = files.FileHandler.GetGraphFilename(i_unassigned)
         # Should use PTM?
         with warnings.catch_warnings():
@@ -279,7 +279,7 @@ class WaterfallMethod:
                 graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (seqsInfo.nSeqs, seqsInfo.nSeqs))
                 graphFile.write("\n(mclmatrix\nbegin\n\n")
             pool = mp.Pool(nProcess)
-            pool.map(WriteGraph_perSpecies, [(seqsInfo, graphFN, iSpec, files.FileHandler.GetPickleDir()) for iSpec in
+            pool.map(func, [(seqsInfo, graphFN, iSpec, files.FileHandler.GetPickleDir()) for iSpec in
                                              range(seqsInfo.nSpecies)])
             for iSp in range(seqsInfo.nSpecies):
                 subprocess.call("cat " + graphFN + "_%d" % iSp + " >> " + graphFN, shell=True)
@@ -495,28 +495,33 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
         proc.start()
     parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
 
-    cmd_queue = mp.Queue()
-    for iSpecies in range(seqsInfo.nSpecies):
-        cmd_queue.put((seqsInfo, iSpecies))
-    # args_list = [(cmd_queue, files.FileHandler.GetPickleDir(), options.v2_scores) for i_ in range(options.nProcessAlg)]
-    # parallel_task_manager.RunParallelMethods(WaterfallMethod.Worker_ConnectCognates, args_list, options.nProcessAlg)
-    runningProcesses = [
-        mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, files.FileHandler.GetPickleDir(), options.v2_scores))
-        for i_ in range(options.nProcessAlg)]
-    for proc in runningProcesses:
-        proc.start()
-    parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
+    if options.gathering_version < (3, 0):
+        cmd_queue = mp.Queue()
+        for iSpecies in range(seqsInfo.nSpecies):
+            cmd_queue.put((seqsInfo, iSpecies))
+        # args_list = [(cmd_queue, files.FileHandler.GetPickleDir(), options.v2_scores) for i_ in range(options.nProcessAlg)]
+        # parallel_task_manager.RunParallelMethods(WaterfallMethod.Worker_ConnectCognates, args_list, options.nProcessAlg)
+        runningProcesses = [
+            mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, files.FileHandler.GetPickleDir(), options.v2_scores))
+            for i_ in range(options.nProcessAlg)]
+        for proc in runningProcesses:
+            proc.start()
+        parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
 
-    util.PrintTime("Connected putative homologues")
-    graphFilename = WaterfallMethod.WriteGraphParallel(seqsInfo, options.nProcessAlg, i_unassigned)
+        util.PrintTime("Connected putative homologues")
+        graphFilename = WaterfallMethod.WriteGraphParallel(seqsInfo, options.nProcessAlg, i_unassigned)
 
-    # 5b. MCL
-    clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN(
-        "_I%0.1f" % options.mclInflation, i_unassigned)
-    mcl.MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
-    # If processing unassigned, then ignore all 'unclustered' genes - they will include any genes not included in this search
-    mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs, q_unassigned)
-
+        # 5b. MCL
+        clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN(
+            "_I%0.1f" % options.mclInflation, i_unassigned)
+        mcl.MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
+        # If processing unassigned, then ignore all 'unclustered' genes - they will include any genes not included in this search
+        mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs, q_unassigned)
+    elif options.gathering_version == (3, 2):
+        graphFilename = WaterfallMethod.WriteGraphParallel(seqsInfo, options.nProcessAlg, i_unassigned, WriteGraph_perSpecies_homology)
+        clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN("_I%0.1f" % options.mclInflation, i_unassigned)
+        mcl.MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
+        mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs, q_unassigned)
     util.PrintUnderline("Writing orthogroups to file")
     if not q_unassigned:
         post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML)
