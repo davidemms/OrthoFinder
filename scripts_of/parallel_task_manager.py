@@ -22,7 +22,7 @@
 #      improves orthogroup inference accuracy, Genome Biology 16:157
 #
 # For any enquiries send an email to David Emms
-# david_emms@hotmail.com 
+# david_emms@hotmail.com
 import os
 import sys
 import time
@@ -31,7 +31,9 @@ import datetime
 import traceback
 import subprocess
 import multiprocessing as mp
-try: 
+from concurrent.futures import ProcessPoolExecutor, wait, as_completed
+
+try:
     import queue
 except ImportError:
     import Queue as queue     
@@ -146,13 +148,6 @@ def RunCommand(command, qPrintOnError=False, qPrintStderr=True):
         popen.communicate()
         return popen.returncode
 
-def RunOrderedCommandList(commandList):
-    """ Run a list of commands """
-    FNULL = open(os.devnull, 'w')
-    for cmd in commandList:
-        popen = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=FNULL, close_fds=True, env=my_env)
-        popen.communicate()
-    
 def CanRunCommand(command, qAllowStderr = False, qPrint = True):
     if qPrint: PrintNoNewLine("Test can run \"%s\"" % command)       # print without newline
     capture = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
@@ -168,18 +163,6 @@ def CanRunCommand(command, qAllowStderr = False, qPrint = True):
         print("\nstderr:")        
         for l in stderr: print(l)
         return False
-        
-def Worker_RunCommand(cmd_queue, nProcesses, nToDo, qPrintOnError=False, qPrintStderr=True):
-    """ Run commands from queue until the queue is empty """
-    while True:
-        try:
-            i, command = cmd_queue.get(True, 1)
-            nDone = i - nProcesses + 1
-            if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
-                PrintTime("Done %d of %d" % (nDone, nToDo))
-            RunCommand(command, qPrintOnError=qPrintOnError, qPrintStderr=qPrintStderr)
-        except queue.Empty:
-            return   
 
 q_print_first_traceback_0 = False
 def Worker_RunCommands_And_Move(cmd_and_filename_queue, nProcesses, nToDo, qListOfLists, q_print_on_error, q_always_print_stderr):
@@ -230,23 +213,6 @@ def Worker_RunCommands_And_Move(cmd_and_filename_queue, nProcesses, nToDo, qList
         except:
             print("WARNING: Unknown caught unknown exception")
 
-                            
-def Worker_RunOrderedCommandList(cmd_queue, nProcesses, nToDo):
-    """ repeatedly takes items to process from the queue until it is empty at which point it returns. Does not take a new task
-        if it can't acquire queueLock as this indicates the queue is being rearranged.
-        
-        Writes each commands output and stderr to a file
-    """
-    while True:
-        try:
-            i, commandSet = cmd_queue.get(True, 1)
-            nDone = i - nProcesses + 1
-            if nDone >= 0 and divmod(nDone, 10 if nToDo <= 200 else 100 if nToDo <= 2000 else 1000)[1] == 0:
-                PrintTime("Done %d of %d" % (nDone, nToDo))
-            RunOrderedCommandList(commandSet)
-        except queue.Empty:
-            return   
-
 q_print_first_traceback_1 = False
 def Worker_RunMethod(Function, args_queue):
     while True:
@@ -269,25 +235,8 @@ def RunMethodParallel(Function, args_queue, nProcesses):
         proc.start()
     ManageQueue(runningProcesses, args_queue)
 
-""" TEMP """        
-def RunParallelCommands(nProcesses, commands):
-    """nProcesss - the number of processes to run in parallel
-    commands - list of commands to be run in parallel
-    """
-    # Setup the workers and run
-    cmd_queue = mp.Queue()
-    for i, cmd in enumerate(commands):
-        cmd_queue.put((i, cmd))
-    runningProcesses = [mp.Process(target=Worker_RunCommand, args=(cmd_queue, nProcesses, i+1)) for i_ in range(nProcesses)]
-    for proc in runningProcesses:
-        proc.start()
-    
-    for proc in runningProcesses:
-        while proc.is_alive():
-            proc.join(10.)
-            time.sleep(2)           
 
-def _I_Spawn_Processes(message_to_spawner, message_to_PTM, cmds_queue):
+def _I_Spawn_Processes(message_to_spawner, message_to_PTM):
     """
     Args:
         message_queue - for passing messages that a new queue of tasks should be started (PTM -> I_Space_Processes) or that the tasks are complete
@@ -302,35 +251,38 @@ def _I_Spawn_Processes(message_to_spawner, message_to_PTM, cmds_queue):
     """
     while True:
         try:
-            # peak in qoq - it is the only mehtod that tried to remove things from the queue
+            # peak in qoq - it is the only method that tried to remove things from the queue
             message = message_to_spawner.get(timeout=.1)
-            if message == None:
+            if message is None:
+                # Respond to request to terminate
                 return
             # In which case, thread has been informed that there are tasks in the queue.
-            nParallel, nTasks, qListOfLists = message
-            if qListOfLists:
-                runningProcesses = [mp.Process(target=Worker_RunOrderedCommandList, args = (cmds_queue, nParallel, nTasks)) for i_ in range(nParallel)]
-            else:
-                runningProcesses = [mp.Process(target=Worker_RunCommand, args = (cmds_queue, nParallel, nTasks)) for i_ in range(nParallel)]
-            for proc in runningProcesses:
-                proc.start()
-            for proc in runningProcesses:
-                while proc.is_alive():
-                    try:
-                        proc.join()
-                    except RuntimeError:
-                        pass
+            func, args_list, n_parallel = message
+            futures = []
+            n_to_do = len(args_list)
+            # Version 1: n worker threads for executing the method and a list of N arguments for calling the method
+            with ProcessPoolExecutor(n_parallel) as pool:
+                for args in args_list:
+                    futures.append(pool.submit(func, *args))
+                # for i, _ in as_completed(futures):
+                #     n_done = i+1
+                #     if n_done >= 0 and divmod(n_done, 10 if n_done <= 200 else 100 if n_done <= 2000 else 1000)[1] == 0:
+                #         PrintTime("Done %d of %d" % (n_done, n_to_do))
+            # Version 2: launch n worker threads each executing a worker method that takes tasks from a queue
+            with ProcessPoolExecutor(n_parallel) as pool:
+                for args in args_list:
+                    futures.append(pool.submit(func, *args))
+            wait(futures)
             message_to_PTM.put("Done")
             time.sleep(1)
         except queue.Empty:
-            time.sleep(1) # there wasn't anything this time, sleep then try again
+            time.sleep(1)  # there wasn't anything this time, sleep then try again
     pass
-    
 
 class ParallelTaskManager_singleton:
     """
     Creating new process requires forking parent process and can lea to very high RAM usage. One way to mitigate this is
-    to create the pool of processes as early in execution as possible so that the memeory footprint is low. The
+    to create the pool of processes as early in execution as possible so that the memory footprint is low. The
     ParallelTaskManager takes care of that, and can be used by calling `RunParallelOrderedCommandLists` above.
     Apr 2023 Update:
     When running external programs there is no need to use multiprocessing, multithreading is sufficient since new process
@@ -351,8 +303,7 @@ class ParallelTaskManager_singleton:
             # 'Done' (spawn_thread -> PTM) - the cmds from the cmd queue have completed
             # Anything else = (nParallel, nTasks) (PTM -> spawn_thread) - cmds (nTasks of them) have been placed in the cmd queue,
             #   they should be executed using nParallel threads
-            self.cmds_queue = mp.Queue()
-            self.manager_process = mp.Process(target=_I_Spawn_Processes, args=(self.message_to_spawner, self.message_to_PTM, self.cmds_queue))
+            self.manager_process = mp.Process(target=_I_Spawn_Processes, args=(self.message_to_spawner, self.message_to_PTM))
             self.manager_process.start()
     instance = None
 
@@ -360,18 +311,14 @@ class ParallelTaskManager_singleton:
         if not ParallelTaskManager_singleton.instance:
             ParallelTaskManager_singleton.instance = ParallelTaskManager_singleton.__Singleton()
 
-    def RunParallel(self, cmd_list, qListOfLists, nParallel):
+    def RunParallel(self, func, args_list, nParallel):
         """
         Args:
             cmd_list - list of commands or list of lists of commands (in which elements in inner list must be run in order)
-            qListOfLists - is cmd_lists a list of lists
             nParallel - number of parallel threads to use
             qShell - should the tasks be run in a shell
         """
-        nTasks = len(cmd_list)
-        for i, x in enumerate(cmd_list):
-            self.instance.cmds_queue.put((i, x))
-        self.instance.message_to_spawner.put((nParallel, nTasks, qListOfLists))
+        self.instance.message_to_spawner.put((func, args_list, nParallel))
         while True:
             try:
                 signal = self.instance.message_to_PTM.get()
@@ -385,12 +332,20 @@ class ParallelTaskManager_singleton:
         """Warning, cannot be restarted"""
         self.instance.message_to_spawner.put(None)
         self.instance.manager_process.join()
-        
+
+
+def RunParallelMethods(func, args_list, nProcesses):
+    """nProcesss - the number of processes to run in parallel
+    commands - list of lists of commands where the commands in the inner list are completed in order (the i_th won't run until
+    the i-1_th has finished).
+    """
+    ptm = ParallelTaskManager_singleton()
+    ptm.RunParallel(func, args_list, nProcesses)
 
 def Success():
     ptm = ParallelTaskManager_singleton()
     ptm.Stop()
-    sys.exit()        
+    sys.exit()
 
 def Fail():
     sys.stderr.flush()

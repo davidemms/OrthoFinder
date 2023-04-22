@@ -1325,7 +1325,10 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
 
 def RunOrthologsParallel(tree_analyser, nspecies, args_queue, nProcesses, fewer_open_files):
     results_queue = mp.Queue()
-    runningProcesses = [mp.Process(target=Worker_RunOrthologsMethod, args=(tree_analyser, nspecies, args_queue, results_queue, fewer_open_files)) for i_ in range(nProcesses)]
+    # Should use PTM?
+    args_list = [(tree_analyser, nspecies, args_queue, results_queue, fewer_open_files) for i_ in range(nProcesses)]
+    parallel_task_manager.RunParallelMethods(Worker_RunOrthologsMethod, args_list, nProcesses)
+    # runningProcesses = [mp.Process(target=Worker_RunOrthologsMethod, args=(tree_analyser, nspecies, args_queue, results_queue, fewer_open_files)) for i_ in range(nProcesses)]
     for proc in runningProcesses:
         proc.start()
     nOrthologues_SpPair = util.nOrtho_sp(nspecies)

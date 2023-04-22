@@ -14,7 +14,7 @@ from collections import defaultdict, Counter
 
 from . import util
 from . import tree as tree_lib
-from . import files, parallel_task_manager
+from . import files, program_caller
 
 def WriteGeneralOptions(filename, baseDir, qRunSingley, nOGs):
     x="""######## First, data files ########
@@ -214,7 +214,7 @@ def RunPhyldogAnalysis(phyldogDir, ogs, speciesToUse, nParallel):
     if qRunSingley:
         nOGs = len(ogs)
         cmds = [["mpirun -np 2 phyldog param=%s%s"  % (phyldogDir, "GeneralOptions_OG%07d.opt" % i)] for i in range(nOGs)]
-        parallel_task_manager.RunParallelCommands(nParallel, cmds)
+        program_caller.RunParallelCommands(nParallel, cmds, qListOfList=False)
     else:
         popen = subprocess.Popen("mpirun -np %d phyldog param=GeneralOptions.opt" % nParallel, shell=True, cwd=phyldogDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         popen.communicate()

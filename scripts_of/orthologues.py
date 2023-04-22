@@ -318,6 +318,7 @@ class DendroBLASTTrees(object):
             for iiSp, sp1 in enumerate(self.ogSet.seqsInfo.speciesToUse):
                 cmd_queue.put((iiSp, sp1, nSeqs[sp1]))
             worker_status_queue = mp.Queue()
+            # Should use PTM?
             runningProcesses = [mp.Process(target=Worker_OGMatrices_ReadBLASTAndUpdateDistances, args=(cmd_queue, worker_status_queue, iWorker, ogMatrices, nGenes, self.ogSet.seqsInfo, blastDir_list, ogsPerSpecies, self.qDoubleBlast)) for iWorker in range(self.nProcesses)]
             for proc in runningProcesses:
                 proc.start()
@@ -445,7 +446,7 @@ class DendroBLASTTrees(object):
                 values = " ".join(["%.6f" % v for v in V])   
                 outfile.write(values + "\n")       
         treeFN = files.FileHandler.GetSpeciesTreeUnrootedFN()
-        cmd = " ".join(["fastme", "-i", speciesMatrixFN, "-o", treeFN, "-N", "-w", "O"] + (["-s"] if n < 1000 else []))
+        cmd = ["fastme", "-i", speciesMatrixFN, "-o", treeFN, "-N", "-w", "O"] + (["-s"] if n < 1000 else [])
         return cmd, treeFN
                 
     def PrepareGeneTreeCommand(self):
@@ -515,7 +516,7 @@ class DendroBLASTTrees(object):
             D, spPairs = self.SpeciesTreeDistances(ogs, ogMatrices)
             del ogMatrices
             cmd_spTree, spTreeFN_ids = self.PrepareSpeciesTreeCommand(D, spPairs, True)
-            parallel_task_manager.RunOrderedCommandList([cmd_spTree])
+            parallel_task_manager.RunCommand(cmd_spTree, True, False)
         spTreeUnrootedFN = files.FileHandler.GetSpeciesTreeUnrootedFN(True) 
         util.RenameTreeTaxa(spTreeFN_ids, spTreeUnrootedFN, self.ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True)  
         return spTreeFN_ids

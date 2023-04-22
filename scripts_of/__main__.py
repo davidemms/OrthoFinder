@@ -24,12 +24,23 @@
 #
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
-
-# first import parallel task manager to minimise RAM overhead for small processes
 from __future__ import absolute_import
 
+# first import parallel task manager to minimise RAM overhead for small processes
+import multiprocessing as mp                    # optional  (problems on OpenBSD)
+import platform                                 # Y
+if __name__ == "__main__":
+    if platform.system() == "Darwin":
+        # https://github.com/davidemms/OrthoFinder/issues/570
+        # https://github.com/davidemms/OrthoFinder/issues/663
+        mp.set_start_method('fork')
+    # else:
+    #     # Should be more RAM efficient than fork and the time penalty
+    #     # should be very small as we never try to create many processes
+    #     mp.set_start_method('spawn')
+
 from . import parallel_task_manager
-# ptm_initialised = parallel_task_manager.ParallelTaskManager_singleton()
+ptm_initialised = parallel_task_manager.ParallelTaskManager_singleton()
 
 import os                                       # Y
 os.environ["OPENBLAS_NUM_THREADS"] = "1"    # fix issue with numpy/openblas. Will mean that single threaded options aren't automatically parallelised 
@@ -40,13 +51,6 @@ import subprocess                               # Y
 import glob                                     # Y
 import shutil                                   # Y
 import time                                     # Y
-import multiprocessing as mp                    # optional  (problems on OpenBSD)
-import platform                                 # Y
-if platform.system() == "Darwin":
-    # https://github.com/davidemms/OrthoFinder/issues/570
-    # https://github.com/davidemms/OrthoFinder/issues/663 
-    mp.set_start_method('fork')
-
 import itertools                                # Y
 import datetime                                 # Y
 from collections import Counter                 # Y
@@ -1251,8 +1255,8 @@ def main(args=None):
     try:
         if args is None:
             args = sys.argv[1:]
-        # Create PTM right at start
-        # ptm_initialised = parallel_task_manager.ParallelTaskManager_singleton()
+       # Create PTM right at start
+        ptm_initialised = parallel_task_manager.ParallelTaskManager_singleton()
         print("")
         print(("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version))
         prog_caller = GetProgramCaller()

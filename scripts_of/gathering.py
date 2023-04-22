@@ -196,15 +196,15 @@ class WaterfallMethod:
             util.PrintTime("Initial processing of species %d complete" % iSpecies)
 
     @staticmethod
-    def Worker_ProcessBlastHits(cmd_queue, d_pickle, qDoubleBlast, v2_scores, q_allow_empty):
+    def Worker_ProcessBlastHits(seqsInfo, blastDir_list, Lengths, cmd_queue, d_pickle, qDoubleBlast, v2_scores, q_allow_empty):
         while True:
             try:
-                args = cmd_queue.get(True, 1)
-                WaterfallMethod.ProcessBlastHits(*args, d_pickle=d_pickle, qDoubleBlast=qDoubleBlast, v2_scores=v2_scores, q_allow_empty=q_allow_empty)
+                iSpecies = cmd_queue.get(True, 1)
+                WaterfallMethod.ProcessBlastHits(seqsInfo, blastDir_list, Lengths, iSpecies, d_pickle=d_pickle,
+                                                 qDoubleBlast=qDoubleBlast, v2_scores=v2_scores, q_allow_empty=q_allow_empty)
             except queue.Empty:
                 return
             except Exception:
-                seqsInfo, _, _, iSpecies = args
                 i = seqsInfo.speciesToUse[iSpecies]
                 print("ERROR: Error processing files Blast%d_*" % i)
                 raise
@@ -272,6 +272,7 @@ class WaterfallMethod:
     @staticmethod
     def WriteGraphParallel(seqsInfo, nProcess, i_unassigned=None):
         graphFN = files.FileHandler.GetGraphFilename(i_unassigned)
+        # Should use PTM?
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             with open(graphFN, 'w') as graphFile:
@@ -481,10 +482,14 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     if q_unassigned:
         blastDir_list = blastDir_list[:1]  # only use latet directory with unassigned gene searches
     for iSpeciesJob in range(seqsInfo.nSpecies):  # The i-th job, not the OrthoFinder species ID
-        cmd_queue.put((seqsInfo, blastDir_list, Lengths, iSpeciesJob))
+        cmd_queue.put(iSpeciesJob)
     files.FileHandler.GetPickleDir()  # create the pickle directory before the parallel processing to prevent a race condition
+    # Should use PTM?
+    # args_list = [(seqsInfo, blastDir_list, Lengths, cmd_queue, files.FileHandler.GetPickleDir(), options.qDoubleBlast, options.v2_scores, q_unassigned)
+    #              for i_ in range(options.nProcessAlg)]
+    # parallel_task_manager.RunParallelMethods(WaterfallMethod.Worker_ProcessBlastHits, args_list, options.nProcessAlg)
     runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits,
-                                   args=(cmd_queue, files.FileHandler.GetPickleDir(), options.qDoubleBlast, options.v2_scores, q_unassigned))
+                                   args=(seqsInfo, blastDir_list, Lengths, cmd_queue, files.FileHandler.GetPickleDir(), options.qDoubleBlast, options.v2_scores, q_unassigned))
                         for i_ in range(options.nProcessAlg)]
     for proc in runningProcesses:
         proc.start()
@@ -493,6 +498,8 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
     cmd_queue = mp.Queue()
     for iSpecies in range(seqsInfo.nSpecies):
         cmd_queue.put((seqsInfo, iSpecies))
+    # args_list = [(cmd_queue, files.FileHandler.GetPickleDir(), options.v2_scores) for i_ in range(options.nProcessAlg)]
+    # parallel_task_manager.RunParallelMethods(WaterfallMethod.Worker_ConnectCognates, args_list, options.nProcessAlg)
     runningProcesses = [
         mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, files.FileHandler.GetPickleDir(), options.v2_scores))
         for i_ in range(options.nProcessAlg)]

@@ -10,7 +10,7 @@ import multiprocessing as mp
 
 import numpy as np
 
-from . import util, files, parallel_task_manager, mcl, orthologues, sample_genes, fasta_writer, tree
+from . import util, files, parallel_task_manager, mcl, orthologues, sample_genes, fasta_writer, tree, program_caller
 
 
 class XcelerateConfig(object):
@@ -53,12 +53,7 @@ def RunSearch(options, speciessInfoObj, fn_diamond_db, prog_caller, q_one_query=
     cmd_queue = mp.Queue()
     for iCmd, cmd in enumerate(commands):
         cmd_queue.put((iCmd+1, cmd))
-    runningProcesses = [mp.Process(target=parallel_task_manager.Worker_RunCommand, args=(cmd_queue, options.nBlast, len(commands), True)) for _ in range(options.nBlast)]
-    for proc in runningProcesses:
-        proc.start()
-    for proc in runningProcesses:
-        while proc.is_alive():
-            proc.join()
+    program_caller.RunParallelCommands(options.nBlast, commands, qListOfList=False, q_print_on_error=True)
     print("")
     util.PrintTime(" Done profiles search\n")
     return results_files
