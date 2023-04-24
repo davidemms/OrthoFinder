@@ -295,7 +295,7 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", n_for_pro
                 seq_convert[ss] = og_id_full + "_" + ss
     print("")
     fw.WriteSeqsToFasta_withNewAccessions(seq_write, fn_fasta, seq_convert)
-    parallel_task_manager.RunCommand(["diamond", "makedb", "--in", fn_fasta, "-d", fn_diamond_db], qPrintOnError=True)
+    parallel_task_manager.RunCommand(" ".join(["diamond", "makedb", "--in", fn_fasta, "-d", fn_diamond_db]), qPrintOnError=True, qPrintStderr=False)
     return fn_diamond_db
 
 
