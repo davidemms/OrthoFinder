@@ -38,7 +38,7 @@ def prepare_accelerate_database(input_dir, wd_list, nSpAll):
     return fn_diamond_db
 
 
-def RunSearch(options, speciessInfoObj, fn_diamond_db, prog_caller, q_one_query=True):
+def RunSearch(options, speciessInfoObj, fn_diamond_db, prog_caller, q_one_query=False):
     name_to_print = "BLAST" if options.search_program == "blast" else options.search_program
     util.PrintUnderline("Running %s profiles search" % name_to_print)
     commands, results_files = GetOrderedSearchCommands(speciessInfoObj, fn_diamond_db, prog_caller, q_one_query=q_one_query, threads=options.nBlast)
@@ -73,7 +73,7 @@ def GetOrderedSearchCommands(speciesInfoObj, diamond_db, prog_caller, q_one_quer
                 with open(files.FileHandler.GetSpeciesFastaFN(iFasta), 'r') as infile:
                     for line in infile:
                         outfile.write(line)
-                        outfile.write("\n")
+                    outfile.write("\n")
         results = wd + "Blast_all_sequences.txt"
         # commands = [prog_caller.GetSearchMethodCommand_Search(search_program, fn_single_fasta, diamond_db, results)]
         commands = ["diamond blastp --ignore-warnings -d %s -q %s -o %s --more-sensitive -p %d --quiet -e 0.001 --compress 1" % (diamond_db, fn_single_fasta, results, threads)]
