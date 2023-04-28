@@ -522,7 +522,6 @@ def DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXM
         clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN("_I%0.1f" % options.mclInflation, i_unassigned)
         mcl.MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
         mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs, q_unassigned)
-    util.PrintUnderline("Writing orthogroups to file")
     if not q_unassigned:
         post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML)
     return clustersFilename_pairs
@@ -536,6 +535,7 @@ def post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo
     """
     ogs = mcl.GetPredictedOGs(clustersFilename_pairs)
     resultsBaseFilename = files.FileHandler.GetOrthogroupResultsFNBase()
+    util.PrintUnderline("Writing orthogroups to file")
     idsDict = mcl.MCL.WriteOrthogroupFiles(ogs, [files.FileHandler.GetSequenceIDsFN()], resultsBaseFilename,
                                            clustersFilename_pairs)
     if not q_incremental:

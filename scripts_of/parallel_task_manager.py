@@ -196,11 +196,15 @@ def Worker_RunCommands_And_Move(cmd_and_filename_queue, nProcesses, nToDo, qList
                     fn = command
                     fn(fns)
                 else:
-                    RunCommand(command, qPrintOnError=q_print_on_error, qPrintStderr=q_always_print_stderr)
-                    if fns != None:
-                        actual, target = fns
-                        if os.path.exists(actual):
-                            os.rename(actual, target)
+                    if not isinstance(command, str):
+                        print("ERROR: Cannot run command: " + str(command))
+                        print("Please report this issue.")
+                    else:
+                        RunCommand(command, qPrintOnError=q_print_on_error, qPrintStderr=q_always_print_stderr)
+                        if fns != None:
+                            actual, target = fns
+                            if os.path.exists(actual):
+                                os.rename(actual, target)
         except queue.Empty:
             return     
         except Exception as e:

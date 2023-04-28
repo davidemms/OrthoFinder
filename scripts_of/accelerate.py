@@ -42,7 +42,6 @@ def RunSearch(options, speciessInfoObj, fn_diamond_db, prog_caller, q_one_query=
     name_to_print = "BLAST" if options.search_program == "blast" else options.search_program
     util.PrintUnderline("Running %s profiles search" % name_to_print)
     commands, results_files = GetOrderedSearchCommands(speciessInfoObj, fn_diamond_db, prog_caller, q_one_query=q_one_query, threads=options.nBlast)
-    print("Using %d thread(s)" % options.nBlast)
     if q_one_query:
         return_code = parallel_task_manager.RunCommand(commands[0], qPrintOnError=True)
         if return_code != 0:
@@ -54,8 +53,7 @@ def RunSearch(options, speciessInfoObj, fn_diamond_db, prog_caller, q_one_query=
     for iCmd, cmd in enumerate(commands):
         cmd_queue.put((iCmd+1, cmd))
     program_caller.RunParallelCommands(options.nBlast, commands, qListOfList=False, q_print_on_error=True)
-    print("")
-    util.PrintTime(" Done profiles search\n")
+    util.PrintTime(" Done profiles search")
     return results_files
 
 

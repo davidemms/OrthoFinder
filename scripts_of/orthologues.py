@@ -446,7 +446,7 @@ class DendroBLASTTrees(object):
                 values = " ".join(["%.6f" % v for v in V])   
                 outfile.write(values + "\n")       
         treeFN = files.FileHandler.GetSpeciesTreeUnrootedFN()
-        cmd = ["fastme", "-i", speciesMatrixFN, "-o", treeFN, "-N", "-w", "O"] + (["-s"] if n < 1000 else [])
+        cmd = " ".join(["fastme", "-i", speciesMatrixFN, "-o", treeFN, "-N", "-w", "O"] + (["-s"] if n < 1000 else []))
         return cmd, treeFN
                 
     def PrepareGeneTreeCommand(self):
@@ -639,7 +639,7 @@ def CanRunOrthologueDependencies(workingDir, qMSAGeneTrees, qPhyldog, qStopAfter
             success, stdout, stderr, cmd = program_caller.TestMSAMethod(msa_method, d_deps_test)
             if not success and msa_method.startswith("mafft"):
                 mafft_var = "MAFFT_BINARIES"
-                print("Trying OrthoFinder packaged version of MAFFT")
+                print("Trying OrthoFinder packaged version of MAFFT\n")
                 if mafft_var not in parallel_task_manager.my_env:
                     parallel_task_manager.my_env[mafft_var] = os.path.join(parallel_task_manager.__location__, 'bin/mafft/libexec/')
                     parallel_task_manager.my_env["PATH"] = parallel_task_manager.my_env["PATH"] + ":" + os.path.join(parallel_task_manager.__location__, 'bin/mafft/bin/')
