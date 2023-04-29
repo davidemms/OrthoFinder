@@ -142,8 +142,9 @@ class HogWriter(object):
         self.iHOG = defaultdict(int)
         self.species_tree = species_tree
         species_names = [sp_ids[i] for i in self.iSps]
-        for name in species_tree_node_names:
-            fn = files.FileHandler.GetHierarchicalOrthogroupsFN(name)
+        for name in species_tree_node_names + ["N0.ids"]:
+            q_results = not name.endswith(".ids")
+            fn = files.FileHandler.GetHierarchicalOrthogroupsFN(name, q_results=q_results)
             self.fhs[name] = open(fn, util.csv_write_mode)
             util.writerow(self.fhs[name], ["HOG", "OG", "Gene Tree Parent Clade"] + species_names)
             self.fhs[name].flush()
@@ -160,15 +161,29 @@ class HogWriter(object):
         return i
 
     def write_hog_genes(self, genes, sp_node_name_list, og_name):
+        """
+        Write two & three gene HOGs
+        Args:
+            genes - List[str]: list of gene ids
+            sp_node_name_list - List[str]: List of species tree node names
+            og_name - str: Name of orthogroup
+        """
         if len(sp_node_name_list) == 0: return
         genes_per_species = defaultdict(list)
+        genes_per_species_ids = defaultdict(list)
+        # split genes according to species, this will determine which genes get written to which hierarchical levels
         for g in genes:
             isp, _ = g.split("_")
             genes_per_species[isp].append(self.seq_ids[g])
+            genes_per_species_ids[isp].append(g)
         i_hogs = [self.get_hog_index(sp_node_name) for sp_node_name in sp_node_name_list]
-        row_genes = [", ".join(genes_per_species[isp]) for isp in self.iSps] 
+        row_genes = [", ".join(genes_per_species[isp]) for isp in self.iSps]
         for i_hog, sp_node_name in zip(i_hogs, sp_node_name_list):
             util.writerow(self.fhs[sp_node_name], ["%s.HOG%07d" % (sp_node_name, i_hog),  og_name, "-"] + row_genes)
+            if sp_node_name == "N0":
+                row_genes_ids = [", ".join(genes_per_species_ids[isp]) for isp in self.iSps]
+                util.writerow(self.fhs[sp_node_name + ".ids"], ["%s.HOG%07d" % (sp_node_name, i_hog),  og_name, "-"] + row_genes_ids)
+
 
 
     def write_clade_v2(self, n, og_name, split_paralogous_clades_from_same_hog = False):
@@ -205,7 +220,7 @@ class HogWriter(object):
         # get scl & remove HOGs that can't be written yet due to duplications
         # 0. Get the scl units below this node in the gene tree
         # I.e. get genes (referenced by species ID) below each scl (the relevant gene tree nodes)
-        genes_per_species_id = self.get_descendant_genes(n)
+        genes_ids_per_species_id = self.get_descendant_genes(n)
 
         # scl_mrca = {nn.sp_node for nn in scl if not nn.is_leaf()}
         if debug: print("Dups below: " + str(n.dups_below))
@@ -224,7 +239,7 @@ class HogWriter(object):
             return []
 
         if debug: print(hogs_to_write)
-        return self.get_hog_file_entries(hogs_to_write, genes_per_species_id, og_name, n.name)
+        return self.get_hog_file_entries(hogs_to_write, genes_ids_per_species_id, og_name, n.name)
 
     def get_descendant_genes(self, n):
         """
@@ -233,7 +248,7 @@ class HogWriter(object):
         Args:
             n - node under consideration
         Returns:
-            dict:sp_id (int)->string of genes, comma separated
+            dict:sp_id (int)->string of genes ids, comma separated
         """
         genes_per_species = defaultdict(list) # iCol (before 'name' columns) -> text string of genes
         genes = n.get_leaves()
@@ -242,17 +257,17 @@ class HogWriter(object):
             if "X" in g.features: continue
             q_have_legitimate_gene = True
             isp = int(g.name.split("_")[0])
-            genes_per_species[isp].append(self.seq_ids[g.name])
+            genes_per_species[isp].append(g.name)
         for k, v in genes_per_species.items():
             genes_per_species[k] = ", ".join(v)
         return genes_per_species
 
-    def get_hog_file_entries(self, hogs_to_write, genes_per_species_id, og_name, gt_node_name):
+    def get_hog_file_entries(self, hogs_to_write, genes_ids_per_species_id, og_name, gt_node_name):
         """
         Write the HOGs that can be determined from this gene tree node.
         Args:
             hogs_to_write - list of HOG names
-            genes_per_species_id - dict:sp_id (int)->str, comma separated list of genes
+            genes_ids_per_species_id - dict:sp_id (int)->str, comma separated list of gene ids
             og_name - OG name
             gt_node_name - gene tree node name
         Implementation:
@@ -266,18 +281,22 @@ class HogWriter(object):
             q_empty = True
             # 2. We know the scl, these are the 'taxonomic units' available (clades or individual species in species tree for this node of the gene tree)
             # Note there can be at most one of each. Only a subset of these will fall under this HOG.
-            units = self.hog_contents[h].intersection(genes_per_species_id.keys())
+            units = self.hog_contents[h].intersection(genes_ids_per_species_id.keys())
             # print("Units: " + str(units))
+            genes_row_ids = ["" for _ in self.iSps]
             genes_row = ["" for _ in self.iSps]
             # put the units into the row
             for isp in units:
                 # translate the species ID to the species column it should be in
                 # after accounting for removed species
-                genes_row[self.i_sp_to_index[isp]] = genes_per_species_id[isp]
+                genes_row_ids[self.i_sp_to_index[isp]] = genes_ids_per_species_id[isp]
+                genes_row[self.i_sp_to_index[isp]] = ", ".join(sorted([self.seq_ids[g] for g in genes_ids_per_species_id[isp].split(", ")]))
                 q_empty = False
             if not q_empty: 
                 # print((h, genes_row))
                 ret.append((h, [og_name, gt_node_name] + genes_row))
+                if h == "N0":
+                    ret.append(("N0.ids", [og_name, gt_node_name] + genes_row_ids))
                 # self.writers[h].writerow(["%s.HOG%07d" % (h, self.get_hog_index(h)),  og_name, gt_node_name] + genes_row)
         return ret
 
@@ -411,6 +430,10 @@ class HogWriter(object):
         return None
 
     def WriteCachedHOGs(self, cached_hogs, lock_hogs):
+        """
+        Args:
+            cached_hogs - List[Tuple[str,List]], of hog names and rows of
+        """
         d = defaultdict(list)
         for h, row in cached_hogs:
             d[h].append(row)

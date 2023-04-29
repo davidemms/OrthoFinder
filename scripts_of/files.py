@@ -428,9 +428,12 @@ class __Files_new_dont_manually_create__(object):
         d = util.FullAccession(self.GetSpeciesIDsFN()).GetIDToNameDict()
         return {k:v.rsplit(".",1)[0] for k,v in d.items()}
 
-    def GetHierarchicalOrthogroupsFN(self, sp_node_name):
-        return self.rd1 + "Phylogenetic_Hierarchical_Orthogroups/%s.tsv" % sp_node_name
-        
+    def GetHierarchicalOrthogroupsFN(self, sp_node_name, q_results=True):
+        if q_results:
+            return self.rd1 + "Phylogenetic_Hierarchical_Orthogroups/%s.tsv" % sp_node_name
+        else:
+            return self.GetWorkingDirectory_Write() + "%s.tsv" % sp_node_name
+
     """ ========================================================================================== """
             
     def GetOGsTreeDir(self, qResults=False):

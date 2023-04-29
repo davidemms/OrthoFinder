@@ -142,6 +142,7 @@ def ogs_from_diamond_results(fn_og_results_out, q_ignore_sub=False):
             # scores_all_genes[gene] = scores[0]
     return og_assignments, species_closest_hits
 
+
 def get_original_orthogroups():
     wd_input_clusters = files.FileHandler.GetWorkingDirectory1_Read()[1]  # first is the current working directory, second is the most recent of the input directories
     fn_clusters = glob.glob(wd_input_clusters + "clusters*_id_pairs.txt")
@@ -224,7 +225,7 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", n_for_pro
         try:
             ids_simple = og_set.SequenceDict()
             ids_simple_rev = {v: k for k, v in ids_simple.items()}
-            ogs = ReadHOGs(din, "N0.tsv", ids_simple_rev)
+            ogs = read_hogs(din, "N0.tsv", ids_simple_rev)
         except RuntimeError:
             print("ERROR: Cannot read HOGs file, please report this error: https://github.com/davidemms/OrthoFinder/issues")
             q_hogs = False
@@ -297,8 +298,18 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", n_for_pro
     return fn_diamond_db
 
 
-def ReadHOGs(din, fn_hogs, ids_rev):
-    fn = din + "Phylogenetic_Hierarchical_Orthogroups/" + fn_hogs
+class DummyIDs:
+    def __getitem__(self, arg):
+        return arg
+
+
+def read_hogs(din, fn_hogs, ids_rev):
+    fn_ids = din + "WorkingDirectory/N0.ids.tsv"
+    if os.path.exists(fn_ids) and False:
+        fn = fn_ids
+        ids_rev = DummyIDs
+    else:
+        fn = din + "Phylogenetic_Hierarchical_Orthogroups/" + fn_hogs
     if not os.path.exists(fn):
         print("ERROR: %s does not exist" % fn)
         raise RuntimeError
