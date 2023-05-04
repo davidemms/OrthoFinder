@@ -148,16 +148,23 @@ def RunCommand(command, qPrintOnError=False, qPrintStderr=True):
         popen.communicate()
         return popen.returncode
 
-def CanRunCommand(command, qAllowStderr = False, qPrint = True):
+def CanRunCommand(command, qAllowStderr = False, qPrint = True, qRequireStdout=True, qCheckReturnCode=False):
     if qPrint: PrintNoNewLine("Test can run \"%s\"" % command)       # print without newline
     capture = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
+    capture.wait()
     stdout = [x for x in capture.stdout]
     stderr = [x for x in capture.stderr]
-    if len(stdout) > 0 and (qAllowStderr or len(stderr) == 0):
+    if qCheckReturnCode:
+        return_code_check = (capture.returncode == 0)
+    else:
+        return_code_check = True
+    if (len(stdout) > 0 or not qRequireStdout) and (qAllowStderr or len(stderr) == 0) and return_code_check:
         if qPrint: print(" - ok")
         return True
     else:
         if qPrint: print(" - failed")
+        if not return_code_check:
+            print("Returned a non-zero code: %d" % capture.returncode)
         print("\nstdout:")        
         for l in stdout: print(l)
         print("\nstderr:")        

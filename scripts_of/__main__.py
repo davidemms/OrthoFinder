@@ -240,6 +240,21 @@ def CanRunMCL():
         program_caller.ProgramCaller.PrintDependencyCheckFailure(command)
         print("Please check MCL is installed and in the system path. See information above.\n")
         return False
+
+def CanRunASTRAL():
+    d_deps_test = files.FileHandler.GetDependenciesCheckDir()
+    fn_test = d_deps_test + "astral.input.nwk"
+    with open(fn_test, 'w') as outfile:
+        outfile.write("(((A:1,B:1):2,(C:1,D:1):2,E:3):4);")
+    fn_output = d_deps_test + "astral.output.nwk"
+    cmd = " ".join(["astral-pro", "-i", fn_test, "-o", fn_output, "-t", "2"])
+    if parallel_task_manager.CanRunCommand(cmd, qAllowStderr=True, qRequireStdout=False, qCheckReturnCode=True):
+        return True
+    else:
+        print("ERROR: Cannot run astral-pro")
+        program_caller.ProgramCaller.PrintDependencyCheckFailure(cmd)
+        print("Please check astral-pro is installed and that the executables are in the system path\n")
+        return False
     
 def GetProgramCaller():
     config_file = os.path.join(__location__, 'config.json') 
@@ -791,7 +806,7 @@ def CheckDependencies(options, user_specified_m, prog_caller, dirForTempFiles):
     util.PrintUnderline("Checking required programs are installed")
     if not user_specified_m:
         print("Running with the recommended MSA tree inference by default. To revert to legacy method use '-M dendroblast'.\n")
-    if (options.qStartFromFasta):
+    if options.qStartFromFasta or options.qFastAdd:
         if options.search_program == "blast":
             if not CanRunBLAST(): util.Fail()
         else:
@@ -817,6 +832,10 @@ def CheckDependencies(options, user_specified_m, prog_caller, dirForTempFiles):
             print("Dependencies have been met for inference of orthogroups but not for the subsequent orthologue inference.")
             print("Either install the required dependencies or use the option '-og' to stop the analysis after the inference of orthogroups.\n")
             util.Fail()
+    if options.qFastAdd:
+        if not CanRunASTRAL():
+            util.Fail()
+
 
 # 0
 def ProcessPreviousFiles(workingDir_list, qDoubleBlast, check_blast=True):
@@ -1209,13 +1228,6 @@ def CheckOptions(options, speciesToUse):
     if options.speciesTreeFN:
         expSpecies = list(SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN()).values())
         orthologues.CheckUserSpeciesTree(options.speciesTreeFN, expSpecies)
-        
-    if options.qStopAfterSeqs and (not options.qMSATrees):
-        print("ERROR: Must use '-M msa' option to generate sequence files for orthogroups")
-        util.Fail()
-    if options.qStopAfterAlignments and (not options.qMSATrees):
-        print("ERROR: Must use '-M msa' option to generate sequence files and infer multiple sequence alignments for orthogroups")
-        util.Fail()
 
     # check can open enough files
     n_extra = 50

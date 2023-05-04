@@ -304,7 +304,7 @@ class DummyIDs:
 
 
 def read_hogs(din, fn_hogs, ids_rev):
-    fn_ids = din + "WorkingDirectory/N0.ids.tsv"
+    fn_ids = din + "WorkingDirectory/%s.ids.tsv" % fn_hogs
     if os.path.exists(fn_ids) and False:
         fn = fn_ids
         ids_rev = DummyIDs
