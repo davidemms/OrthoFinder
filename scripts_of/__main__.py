@@ -220,7 +220,7 @@ def GetOrderedSearchCommands_clades(seqsInfo, speciesInfoObj, qDoubleBlast, sear
 OrthoFinder
 -------------------------------------------------------------------------------
 """   
-g_mclInflation = 1.5
+g_mclInflation = 1.2
 
 def CanRunBLAST():
     if parallel_task_manager.CanRunCommand("makeblastdb -help") and parallel_task_manager.CanRunCommand("blastp -help"):
