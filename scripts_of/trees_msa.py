@@ -317,6 +317,7 @@ class TreesForOrthogroups(object):
                         outfile.write(line)
           
     def DoTrees(self, ogSet, idDict, speciesIdDict, speciesToUse, nProcesses, qStopAfterSeqs, qStopAfterAlignments, qDoSpeciesTree, qTrim, i_og_restart=0):
+        print_on_error = True
         idDict.update(speciesIdDict) # same code will then also convert concatenated alignment for species tree
         # 0       
         resultsDirsFullPath = [files.FileHandler.GetResultsSeqsDir(), files.FileHandler.GetResultsAlignDir(), files.FileHandler.GetResultsTreesDir()]
@@ -338,7 +339,7 @@ class TreesForOrthogroups(object):
         alignCommands_and_filenames, iogs_align = self.GetAlignmentCommandsAndNewFilenames(ogs, i_og_restart)
         if qStopAfterAlignments:
             util.PrintUnderline("Inferring multiple sequence alignments")
-            pc.RunParallelCommandsAndMoveResultsFile(nProcesses, alignCommands_and_filenames, False)
+            pc.RunParallelCommandsAndMoveResultsFile(nProcesses, alignCommands_and_filenames, False, q_print_on_error=print_on_error)
             if qDoSpeciesTree:
                 CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn, fSingleCopy)
                 # write OGs used to file
@@ -376,7 +377,7 @@ class TreesForOrthogroups(object):
                 for i in iOgsForSpeciesTree:
                     commands_and_filenames.append([alignCommands_and_filenames[i],
                                                    treeCommands_and_filenames[i]])
-            pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
+            pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True, q_print_on_error=print_on_error)
             CreateConcatenatedAlignment(iOgsForSpeciesTree, ogs, self.GetAlignmentFilename, concatenated_algn_fn, fSingleCopy)
             # write OGs used to file
             dSpeciesTree = os.path.split(files.FileHandler.GetSpeciesTreeResultsFN(0, True))[0] + "/"
@@ -403,7 +404,7 @@ class TreesForOrthogroups(object):
         for iog in set(iogs_align).difference(iogs_tree):
             if iog in iOgsForSpeciesTree: continue
             commands_and_filenames.append([alignCommands_and_filenames[iog_to_align_index[iog]]])
-        pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True)
+        pc.RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, True, q_print_on_error=print_on_error)
         
         # Convert ids to accessions for MSA
         accessionAlignmentFNs = [self.GetAlignmentFilename(i, True) for i in iogs_align]

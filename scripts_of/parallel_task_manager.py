@@ -136,13 +136,13 @@ def RunCommand(command, qPrintOnError=False, qPrintStderr=True):
         if popen.returncode != 0:
             print(("\nERROR: external program called by OrthoFinder returned an error code: %d" % popen.returncode))
             print(("\nCommand: %s" % command))
-            print(("\nstdout\n------\n%s" % stdout))
-            print(("stderr\n------\n%s" % stderr))
+            print(("\nstdout:\n%s" % stdout))
+            print(("stderr:\n%s" % stderr))
         elif qPrintStderr and len(stderr) > 0 and not stderr_exempt(stderr):
             print("\nWARNING: program called by OrthoFinder produced output to stderr")
             print(("\nCommand: %s" % command))
-            print(("\nstdout\n------\n%s" % stdout))
-            print(("stderr\n------\n%s" % stderr))
+            print(("\nstdout:\n%s" % stdout))
+            print(("stderr:\n%s" % stderr))
         return popen.returncode
     else:
         popen.communicate()
