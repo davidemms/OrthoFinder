@@ -225,13 +225,13 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", n_for_pro
         try:
             ids_simple = og_set.SequenceDict()
             ids_simple_rev = {v: k for k, v in ids_simple.items()}
-            ogs = read_hogs(din, "N0.tsv", ids_simple_rev)
+            ogs = read_hogs(din, "N0", ids_simple_rev)
         except RuntimeError:
             print("ERROR: Cannot read HOGs file, please report this error: https://github.com/davidemms/OrthoFinder/issues")
             q_hogs = False
             print("WARNING: Using MCL-based orthogroups as a fall-back")
             # util.Fail()
-    else:
+    if not q_hogs:
         clusters_filename = list(glob.glob(wd + "clusters_OrthoFinder*id_pairs.txt"))
         if len(clusters_filename) == 0:
             print("ERROR: Can't find %s" % wd + "clusters_OrthoFinder*id_pairs.txt")
@@ -303,13 +303,15 @@ class DummyIDs:
         return arg
 
 
-def read_hogs(din, fn_hogs, ids_rev):
-    fn_ids = din + "WorkingDirectory/%s.ids.tsv" % fn_hogs
-    if os.path.exists(fn_ids) and False:
+def read_hogs(din, hog_name, ids_rev=None):
+    fn_ids = din + "WorkingDirectory/%s.ids.tsv" % hog_name
+    if os.path.exists(fn_ids):
         fn = fn_ids
-        ids_rev = DummyIDs
+        ids_rev = DummyIDs()
+    elif ids_rev is None:
+        return []
     else:
-        fn = din + "Phylogenetic_Hierarchical_Orthogroups/" + fn_hogs
+        fn = din + "Phylogenetic_Hierarchical_Orthogroups/%s.tsv" % hog_name
     if not os.path.exists(fn):
         print("ERROR: %s does not exist" % fn)
         raise RuntimeError

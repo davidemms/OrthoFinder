@@ -94,10 +94,11 @@ def Stats_SizeTable(writer_sum, writer_sp, properOGs, allGenesCounter, iSpecies,
         writer_sum.writerow([i, n.count(i)])
 
 
-def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion, q_fast_add=False):
+def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion, fastaWriter, ids_dict, q_fast_add=False):
     """ Top-level method for calculation of stats for the orthogroups"""
     allOgs = [[list(map(int, g.split("_"))) for g in og] for og in ogs]
     properOGs = [og for og in allOgs if len(og) > 1]
+    iogs_properOGs = [iog for iog, og in enumerate(allOgs) if len(og) > 1]
     allGenes = [g for og in allOgs for g in og]
     ogStatsResultsDir = files.FileHandler.GetOGsStatsResultsDirectory()
     filename_sp = ogStatsResultsDir + "Statistics_PerSpecies" + (
@@ -171,7 +172,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion, q_fast_add=False):
                              percentFormat % (100. * sum(iSpSpecificOGsGeneCounts) / nGenes)])
 
         # 'averages'
-        l = list(reversed(list(map(len, properOGs))))
+        l = list(sorted(list(map(len, properOGs))))
         writer_sum.writerow(["Mean orthogroup size", "%0.1f" % np.mean(l)])
         writer_sum.writerow(["Median orthogroup size", np.median(l)])
         L = np.cumsum(l)
@@ -187,7 +188,7 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion, q_fast_add=False):
         writer_sum.writerow(["O50 (all genes)", O50])
 
         # Single-copy orthogroups
-        ogMatrix = OrthogroupsMatrix(iSpecies, properOGs)
+        ogMatrix = OrthogroupsMatrix(iSpecies, properOGs)  # use iogs_properOGs for indexing
         nSpecies = len(iSpecies)
         nPresent = (ogMatrix > np.zeros((1, nSpecies))).sum(1)
         nCompleteOGs = list(nPresent).count(nSpecies)
@@ -196,14 +197,13 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion, q_fast_add=False):
         writer_sum.writerow(["Number of orthogroups with all species present", nCompleteOGs])
         writer_sum.writerow(["Number of single-copy orthogroups", nSingleCopy])
         with open(filename_single_copy, 'w') as outfile_singlecopy:
-            outfile_singlecopy.write("\n".join(["OG%07d" % i_ for i_ in singleCopyOGs]))
+            outfile_singlecopy.write("\n".join(["N0.HOG%07d" % iogs_properOGs[i_] for i_ in singleCopyOGs]))
         # Link single-copy orthologues
-        f = files.FileHandler.GetOGsSeqFN
-        in_fn = [f(i, True) for i in singleCopyOGs]
-        g_fmt = files.FileHandler.GetResultsSeqsDir_SingleCopy() + files.FileHandler.baseOgFormat + ".fa"
-        out_fn = [g_fmt % i for i in singleCopyOGs]
-        for i, o in zip(in_fn, out_fn):
-            shutil.copy(i, o)
+        g_fmt = files.FileHandler.GetResultsSeqsDir_SingleCopy() +  "N0.HOG%07d.fa"
+        for i in singleCopyOGs:
+            out_fn = g_fmt % iogs_properOGs[i]
+            og = ["%d_%d" % tuple(g) for g in properOGs[i]]
+            fastaWriter.WriteSeqsToFasta_withNewAccessions(og, out_fn, ids_dict)
 
         # Results filenames
         writer_sum.writerow(["Date", str(datetime.datetime.now()).split()[0]])
@@ -224,3 +224,12 @@ def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion, q_fast_add=False):
     if q_fast_add:
         print("The majority of genes have been assigned to existing orthogroups, however, the remaining clade-specific genes not seen in the core species were also analysed with the following results:")
     print(summaryText)
+
+
+def add_unassigned_genes(ogs, all_seq_ids):
+    """Extend OGs with unassigned genes as singletons"""
+    all_assigned = set([g for og in ogs for g in og])
+    unassigned = set(all_seq_ids).difference(all_assigned)
+    ogs.extend([{g,} for g in unassigned])
+    return ogs
+

@@ -552,7 +552,7 @@ def post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo
     treeGen.WriteFastaFiles(fastaWriter, ogSet.OGsAll(), idsDict, False)
 
     if not q_incremental:
-        stats.Stats(ogs, speciesNamesDict, speciesInfoObj.speciesToUse, files.FileHandler.iResultsVersion)
+        # stats.Stats(ogs, speciesNamesDict, speciesInfoObj.speciesToUse, files.FileHandler.iResultsVersion)
         if options.speciesXMLInfoFN:
             mcl.MCL.WriteOrthoXML(speciesXML, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml",
                                   speciesInfoObj.speciesToUse)

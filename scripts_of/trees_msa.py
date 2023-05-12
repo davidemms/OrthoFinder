@@ -42,7 +42,7 @@ from . import trim
 class FastaWriter(object):
     def __init__(self, fastaFileDir_list, speciesToUse):
         """
-        The ist of previous directories could include species that are no longer used,
+        The list of previous directories could include species that are no longer used,
         but not ones that are conflicting
         """
         self.SeqLists = dict()
@@ -77,8 +77,12 @@ class FastaWriter(object):
                     print(("ERROR: %s not found" % seq))
                                 
     def WriteSeqsToFasta_withNewAccessions(self, seqs, outFilename, idDict):
+        try:
+            seqs = [s.ToString() for s in seqs]
+        except:
+            pass
         with open(outFilename, 'w') as outFile:
-            for seq in self.SortSeqs([s.ToString() for s in seqs]):
+            for seq in self.SortSeqs(seqs):
                 if seq in self.SeqLists:
                     outFile.write(">%s\n" % idDict[seq])
                     outFile.write(self.SeqLists[seq])

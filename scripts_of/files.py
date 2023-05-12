@@ -227,11 +227,7 @@ class __Files_new_dont_manually_create__(object):
         
     def GetResultsDirectory1(self):
         if self.rd1 == None: raise Exception("No rd1")
-        return self.rd1 
-        
-    def GetResultsDirectory2(self):
-        if self.rd1 == None: raise Exception("No rd1")
-        return self.rd1 
+        return self.rd1
         
     def GetOrthologuesDirectory(self):
         """"Where the directories of species orthologues are"""
