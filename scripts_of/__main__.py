@@ -882,17 +882,17 @@ def ProcessPreviousFiles(workingDir_list, qDoubleBlast, check_blast=True):
     
     # check BLAST files
     if check_blast:
-        blast_fns_triangular = [files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies >= iSpecies]
+        blast_fns_triangular = [files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies, raise_exception=False) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies >= iSpecies]
         have_triangular = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_triangular]
         for qHave, fn in zip(have_triangular, blast_fns_triangular):
-            if not qHave: print("BLAST results file is missing: %s" % fn)
+            if not qHave: print("Required BLAST results file not found: %s" % fn)
 
         if qDoubleBlast:
-            blast_fns_remainder = [files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies < iSpecies]
+            blast_fns_remainder = [files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies, raise_exception=False) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies < iSpecies]
             have_remainder = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_remainder]
             if not (all(have_triangular) and all(have_remainder)):
                 for qHave, fn in zip(have_remainder, blast_fns_remainder):
-                    if not qHave: print("BLAST results file is missing: %s" % fn)
+                    if not qHave: print("Required BLAST results file not found: %s" % fn)
                 if not all(have_triangular):
                     files.FileHandler.LogFailAndExit()
                 else:
@@ -1349,8 +1349,9 @@ def main(args=None):
             if not options.qStopAfterGroups:
                 GetOrthologues(speciesInfoObj, options, prog_caller)
         elif options.qStartFromGroups:
-            # 0.  
-            speciesInfoObj, _ = ProcessPreviousFiles(continuationDir, options.qDoubleBlast)
+            # 0.
+            check_blast = not options.qMSATrees
+            speciesInfoObj, _ = ProcessPreviousFiles(continuationDir, options.qDoubleBlast, check_blast=check_blast)
             files.FileHandler.LogSpecies()
             options = CheckOptions(options, speciesInfoObj.speciesToUse)
             # 9

@@ -55,7 +55,7 @@ class __Files_new_dont_manually_create__(object):
         self.rd1 = None
         self.fileIdentifierString = "OrthoFinder"
         self.clustersFilename = None
-        self.iResultsVersion = None
+        self.iResultsVersion = 0
         self.nondefaultPickleDir = None
         self.speciesTreeRootedIDsFN = None
         self.multipleRootedSpeciesTreesDir = None
@@ -310,13 +310,16 @@ class __Files_new_dont_manually_create__(object):
     def GetBlastResultsDir(self):
         return self.wd_base
         
-    def GetBlastResultsFN(self, iSpeciesSearch, jSpeciesDB, qForCreation=False):
+    def GetBlastResultsFN(self, iSpeciesSearch, jSpeciesDB, qForCreation=False, raise_exception=True):
         if len(self.wd_base) == 0: raise Exception("No wd1")
         if qForCreation: return "%sBlast%d_%d.txt" % (self.wd_base[0], iSpeciesSearch, jSpeciesDB)     
         for d in self.wd_base:
             fn = "%sBlast%d_%d.txt" % (d, iSpeciesSearch, jSpeciesDB)
             if os.path.exists(fn) or os.path.exists(fn + ".gz"): return fn
-        raise Exception(fn + " not found")
+        if raise_exception:
+            raise Exception(fn + " not found")
+        else:
+            return "%sBlast%d_%d.txt" % (self.wd_base[0], iSpeciesSearch, jSpeciesDB)
         
     def GetGraphFilename(self, i_unassigned=None):
         if self.wd_current == None: raise Exception("No wd_current")

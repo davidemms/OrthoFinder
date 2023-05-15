@@ -166,10 +166,10 @@ class OrthoGroupsSet(object):
             self.ogs_all = [[Seq(g) for g in og] for og in ogs]
         return self.ogs_all
 
-    def OGs4AssumeOrdered(self):
-        ogs_all = self.OGsAll()
-        iogs4 = self.Get_iOGs4()
-        return [ogs_all[i] for i in iogs4]
+    # def OGs4AssumeOrdered(self):
+    #     ogs_all = self.OGsAll()
+    #     iogs4 = self.Get_iOGs4()
+    #     return [ogs_all[i] for i in iogs4]
 
     def OrthogroupMatrix(self):
         """ qReduce give a matrix with only as many columns as species for cases when
@@ -1123,7 +1123,7 @@ def InferGeneAndSpeciesTrees(ogSet,
                 # not used for subsequent Phyldog steps
             util.PrintTime("Starting phyldog")
             species_tree_ids_labelled_phyldog = wrapper_phyldog.RunPhyldogAnalysis(files.FileHandler.GetPhyldogWorkingDirectory(),
-                                                                                   ogSet.OGs4AssumeOrdered(), speciesToUse, nHighParallel)
+                                                                                   ogSet.Get_iOGs4(), ogSet.OGsAll(), speciesToUse, nHighParallel)
             spTreeFN_ids = species_tree_ids_labelled_phyldog
     else:
         db = DendroBLASTTrees(ogSet, nLowParallel, nHighParallel, qDoubleBlast)

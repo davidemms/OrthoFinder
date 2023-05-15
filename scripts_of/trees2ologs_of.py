@@ -1515,12 +1515,13 @@ def DoOrthologuesForOrthoFinder_Phyldog(ogSet, workingDirectory, GeneToSpecies, 
                 writer1 = csv.writer(outfile, delimiter="\t")
                 writer1.writerow(("Orthogroup", speciesDict[str(speciesIDs[index1])], speciesDict[str(speciesIDs[index2])]))
     with OrthologsFiles(dResultsOrthologues, speciesDict, ogSet.speciesToUse, nSpecies, sp_to_index, save_space=True) as ologs_files_handles, putative_xenolog_file_handles:
-        nOgs = len(ogSet.OGs4AssumeOrdered())
+        iogs4 = ogSet.Get_iOGs4()
+        nOgs = len(ogSet.Get_iOGs4())
         nOrthologues_SpPair = util.nOrtho_sp(nspecies) 
         with open(files.FileHandler.GetDuplicationsFN(), util.csv_write_mode) as outfile:
             dupWriter = csv.writer(outfile, delimiter="\t")
             dupWriter.writerow(["Orthogroup", "Species Tree Node", "Gene Tree Node", "Support", "Type",	"Genes 1", "Genes 2"])
-            for iog in range(nOgs):
+            for iog in ogSet.Get_iOGs4():
                 recon_tree = files.FileHandler.GetPhyldogOGResultsTreeFN(iog)
                 orthologues = GetOrthologues_from_phyldog_tree(iog, recon_tree, GeneToSpecies, dupsWriter=dupWriter, seqIDs=ogSet.Spec_SeqDict(), spIDs=ogSet.SpeciesDict())
                 allOrthologues = [(iog, orthologues)]

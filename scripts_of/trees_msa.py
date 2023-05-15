@@ -175,11 +175,11 @@ def DetermineOrthogroupsForSpeciesTree(m, iogs4, nOGsMin=100, nSufficient=1000, 
     for i in range(1, nSpecies):
         if nOrtho[i-1] < nOGsMin: continue
         if nOrtho[i-1] > nSufficient: break
-        p = ((nOrtho[i] - nOrtho[i-1])/nOrtho[i-1]) /  (-(fractions[i] - fractions[i-1])/fractions[i-1])
+        p = ((nOrtho[i] - nOrtho[i-1])/nOrtho[i-1]) / (-(fractions[i] - fractions[i-1])/fractions[i-1])
         if fractions[i] > 0.5:
             if p < increase_required: break
         else:
-            # if fewer than half the species are in any orthogroup then set highr bar for reducing fraction further
+            # if fewer than half the species are in any orthogroup then set higher bar for reducing fraction further
             if p < 2*increase_required: break
     f = fractions[i-1]
     ogsToUse = SingleCopy_WithProbabilityTest(f-1e-5, m)
