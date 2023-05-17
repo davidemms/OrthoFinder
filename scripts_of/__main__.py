@@ -277,8 +277,8 @@ def PrintHelp(prog_caller):
     # print("Add new species in <dir1> to previous run in <dir2> and run new analysis")
     # print("  orthofinder [options] -f <dir1> -b <dir2>")
     print("")
-    print("To add species quickly from <dir1> to a completed OrthoFinder analysis <dir2>")
-    print("  orthofinder [options] --fast-add <dir1> --core <dir2>")
+    print("To assign species from <dir1> to existing OrthoFinder orthogroups in <dir2>")
+    print("  orthofinder [options] --assign <dir1> --core <dir2>")
     print("") 
       
     print("OPTIONS:")
@@ -453,7 +453,7 @@ def ProcessArgs(prog_caller, args):
                 util.Fail()
             options.qStartFromBlast = True
             continuationDir = GetDirectoryArgument(arg, args)
-        elif arg == "--fast-add":
+        elif arg == "--assign":
             options.qFastAdd = True
             fastaDir = GetDirectoryArgument(arg, args)
         elif arg == "--core":
@@ -679,21 +679,21 @@ def ProcessArgs(prog_caller, args):
 
     # check argument combinations       
     if not (options.qStartFromFasta or options.qStartFromBlast or options.qStartFromGroups or options.qStartFromTrees or options.qFastAdd):
-        print("ERROR: Please specify the input directory for OrthoFinder using one of the options: '-f', '-b', '-fg' or '-ft', '--fast-add'.")
+        print("ERROR: Please specify the input directory for OrthoFinder using one of the options: '-f', '-b', '-fg' or '-ft', '--assign'.")
         util.Fail()
 
     if options.qFastAdd:
         if (options.qStartFromFasta or options.qStartFromBlast or options.qStartFromGroups or options.qStartFromTrees):
-            print("ERROR: Incompatible options used with --fast-add, cannot accept: '-f', '-b', '-fg' or '-ft'")
+            print("ERROR: Incompatible options used with --assign, cannot accept: '-f', '-b', '-fg' or '-ft'")
             util.Fail()
         if fastaDir is None:
-            print("ERROR: '--fast-add' required with option '--core'")
+            print("ERROR: '--assign' option also requires '--core' directory to be specified")
             util.Fail()
         if continuationDir is None:
-            print("ERROR: '--core' required with option '--fast-add'")
+            print("ERROR: '--core' option also requires '--assign' directory to be specified")
             util.Fail()
         if not options.qMSATrees:
-            print("ERROR: --fast-add requires MSA trees, option '-M dendroblast' is invalid")
+            print("ERROR: --assign requires MSA trees, option '-M dendroblast' is invalid")
             util.Fail()
 
     if options.qStartFromFasta and (options.qStartFromTrees or options.qStartFromGroups):
@@ -737,11 +737,11 @@ def ProcessArgs(prog_caller, args):
     print("%d thread(s) for OrthoFinder algorithm\n" % options.nProcessAlg)
 
     if options.qFastAdd and not q_selected_msa_options:
-        print("INFO: For --fast-add defaulting to 'mafft --memsave' to reduce RAM usage\n")
+        print("INFO: For --assign defaulting to 'mafft --memsave' to reduce RAM usage\n")
         options.msa_program = "mafft_memsave"
 
     if options.qFastAdd and not q_selected_tree_options:
-        print("INFO: For --fast-add defaulting to 'FastTree -fastest' to reduce RAM usage\n")
+        print("INFO: For --assign defaulting to 'FastTree -fastest' to reduce RAM usage\n")
         options.tree_program = "fasttree_fastest"
 
     return options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault, user_specified_M

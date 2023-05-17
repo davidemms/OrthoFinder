@@ -24,7 +24,7 @@ xcelerate_config = XcelerateConfig()
 def check_for_orthoxcelerate(input_dir, speciesInfoObj):
     # Add any specific checks required here
     if speciesInfoObj.speciesToUse != list(range(speciesInfoObj.nSpAll)):
-        print("ERROR: Removing species from 'core' results directory is not supported for a --fast-add analysis.")
+        print("ERROR: Removing species from 'core' results directory is not supported for an --assign analysis.")
         return False
     return True
 

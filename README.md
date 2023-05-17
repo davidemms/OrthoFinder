@@ -1,4 +1,7 @@
 
+### What's new
+**OrthoFinder version 3.0 has been released.** This makes possible considerably faster and larger analyses. To use it, run OrthoFinder on a small core set of species and then use the `--assign` option to add a large number of new species directly to the previous orthogroups.
+
 ### Interested in a single gene? Try SHOOT.bio, the phylogenetic search engine: https://SHOOT.bio
 
 SHOOT.bio searches your query sequence against a database of gene families and instantly provides you with a phylogenetic tree with your query sequence grafted into it. 
@@ -66,6 +69,8 @@ Thanks to Rosa Fernández & Jesus Lozano-Fernandez for organising this excellent
     - [Orthogroups allow you to analyse all of your data](#orthogroups-allow-you-to-analyse-all-of-your-data)
     - [Orthogroups allow you to define the unit of comparison](#orthogroups-allow-you-to-define-the-unit-of-comparison)
     - [Orthogroups are the only way to identify orthologs](#orthogroups-are-the-only-way-to-identify-orthologs)
+- [Scalable analyses with `--core` / `--assign`](#scalable-analyses-with---core----assign)
+  - [Runtime with `--assign`](#runtime-with---assign)
 - [Trees from MSA: `"-M msa"`](#trees-from-msa--m-msa)
 - [Advanced usage](#advanced-usage)
   - [Python Source Code Version](#python-source-code-version)
@@ -99,10 +104,15 @@ Thanks to Rosa Fernández & Jesus Lozano-Fernandez for organising this excellent
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## Getting started with OrthoFinder
-You can find a step-by-step tutorial here: [Downloading and checking OrthoFinder](https://davidemms.github.io/orthofinder_tutorials/downloading-and-checking-orthofinder.html) including **instructions for Mac**, for which Bioconda is recommended and **Windows**, for which the Windows Subsystem for Linux is recommended. There are also tutorials on that site which guide you through running your first analysis and exploring the results files. 
+You can find a step-by-step tutorial here: [Downloading and running OrthoFinder](https://davidemms.github.io/orthofinder_tutorials/downloading-and-running-orthofinder.html) including instructions for Mac, for which Bioconda is recommended and Windows, for which the Windows Subsystem for Linux is recommended. There are also tutorials on that site which guide you through running your first analysis and exploring the results files. 
 
 ### Installing OrthoFinder on Linux
-You can install OrthoFinder using Bioconda or download it directly from GitHub. These are the instructions for direct download, see the tutorials for other methods.
+The recommended way to install OrthoFinder is using conda:
+
+```conda install orthofinder -c bioconda```
+This will install OrthoFinder and all the required dependencies to run it.
+
+Alternatively, to download it directly:
 
 1. Download the latest release from github: https://github.com/davidemms/OrthoFinder/releases 
     * If you have python installed and the numpy and scipy libraries then download **OrthoFinder_source.tar.gz**.
@@ -114,7 +124,9 @@ You can install OrthoFinder using Bioconda or download it directly from GitHub. 
 
 4. Test you can run OrthoFinder: `python OrthoFinder_source/orthofinder.py -h` or `./OrthoFinder/orthofinder -h`. OrthoFinder should print its 'help' text. 
 
-5. That's it! You can now run OrthoFinder on a directory of protein sequence fasta files: e.g. `./OrthoFinder/orthofinder -f /OrthoFinder/ExampleData/`
+5. (To run large analyses with `--core`/`--assign`, you will need to install [ASTRAL-Pro](https://github.com/smirarab/ASTRAL) separately since it contains computer-architecture specific code. Or use conda, which will do this for.)
+
+6. That's it! You can now run OrthoFinder on a directory of protein sequence fasta files: e.g. `./OrthoFinder/orthofinder -f /OrthoFinder/ExampleData/`
 
 If you want to move the orthofinder executable to another location then you must also place the accompanying config.json file and bin/ directory in the same directory as the orthofinder executable.
 
@@ -258,6 +270,21 @@ It is important to note that with orthogroups you choose where to define the lim
 
 #### Orthogroups are the only way to identify orthologs
 Orthology is defined by phylogeny. It is not definable by amino acid content, codon bias, GC content or other measures of sequence similarity. Methods that use such scores to define orthologs in the absence of phylogeny can only provide guesses. The only way to be sure that the orthology assignment is correct is by conducting a phylogenetic reconstruction of all genes descended from a single gene the last common ancestor of the species under consideration. This set of genes is an orthogroup. Thus, the only way to define orthology is by analysing orthogroups.   
+
+## Scalable analyses with `--core` / `--assign`
+New in OrthoFinder version 3.0 is the ability to do larger scale analyses by assigning the genes from a large number of species directly to previous orthogroups from a set of core species. This avoids the all-v-all sequence search, which becomes very costly with large numbers of species. After the genes have been assigned, any unassigned genes are analysed for orthogroups for new clade specific orthogroups (i.e. those evolved more recently than orthogroups shared across the core species). The full OrthofFinder phylogenetic analysis is then run on the orthogroups to infer gene and species trees, orthologs, gene duplication events etc.
+
+To use this functionality:
+
+1. Perform a standard OrthoFinder run using MSA-based tree inference on a core set of species. Results from version 2 OrthoFinder can be used provided MSA-based tree inference was used (in version 3 this is the default).
+2. Run `orthofinder.py --core ORTHOFINDER_CORE_RESULTS --assign NEW_SPECIES`
+
+A guideline for the number of species for the core set is around 8-64 depending on the number of species to be added and their diversity. For a smaller OrthoFinder analysis of, for example, 16 species a core set of 4 or 5 species could be sufficient. 
+
+### Runtime with `--assign`
+A set of 80 vertebrate proteomes (1.7 million sequences) was analysed on an 2015 desktop PC (Intel Core i5-6500, 4 cores & 8 GB RAM) in 20 hours. 7 core species were used as this gave a reasonable sampling.
+
+It has been tested by adding 30 million sequences (equivalent to ~1,500 genomes of 20,000 sequences each) on a large server in approximately 1 week. Of this, the assignment of genes to existing orthogroups took approximately 2 hours (the analysis can be stopped here using the option `-og` / `--only-groups`) and the full phylogenetic orthology analysis took the remaining time. Large analyses such as these still require relatively large amounts of RAM (500 GB in this case), but this can be reduced at the cost of a longer runtime by using fewer parallel threads.
 
 ## Trees from MSA: `"-M msa"`
 The following is not required for the standard OrthoFinder use cases and are only needed if you want to infer maximum likelihood trees from multiple sequence alignments (MSA). This is more costly computationally but more accurate. By default, MAFFT is used for the alignment and FastTree for the tree inference. The option for this is, "-M msa". You should be careful using any other tree inference programs, such as IQTREE or RAxML, since inferring the gene trees for the complete set of orthogroups using anything that is not as quick as FastTree will require significant computational resources/time. The executables you wish to use should be in the system path. 
