@@ -261,7 +261,7 @@ def Worker_OGMatrices_ReadBLASTAndUpdateDistances(cmd_queue, worker_status_queue
                         for gi, i in og[iiSp]:
                             for gj, j in og[jjSp]:
                                     m[i][j] = 0.5*max(B[gi.iSeq, gj.iSeq], mins[gi.iSeq]) * maxes_inv[gi.iSeq]
-                del Bs, B, mins, maxes, m0, m1, maxes_inv, m    # significantly reduces RAM usage
+                del Bs, B, mins, maxes, m0, m1, maxes_inv    # significantly reduces RAM usage
                 worker_status_queue.put(("finish", iWorker, iiSp))
             except queue.Empty:
                 worker_status_queue.put(("empty", iWorker, None))
