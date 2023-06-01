@@ -1004,7 +1004,7 @@ def BetweenCoreOrthogroupsWorkflow(speciesInfoObj, seqsInfo, options, prog_calle
     """
     # Get current orthogroups - original orthogroups plus genes assigned to them
     ogs = acc.get_original_orthogroups()
-    i_og_restart = len(ogs)  # Need to process the clade-specific orthogroups only
+    i_og_restart = 0
     ogs_new_species, _ = acc.assign_genes(results_files)
     clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, [])  # this updates ogs
 
@@ -1016,22 +1016,24 @@ def BetweenCoreOrthogroupsWorkflow(speciesInfoObj, seqsInfo, options, prog_calle
         print("\nSpecies tree required for clade-speicfic orthogroups - skipping")
         return clustersFilename_pairs, i_og_restart
 
-    # Infer gene trees
     n_unassigned = acc.write_unassigned_fasta(ogs, None, speciesInfoObj)
-    # We write orthogroup & stats results files in the following code, which we should avoid & only do once all OGs are done.
-    gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options,
-                                          speciesXML=None, q_incremental=True)
 
-    orthologues.InferGeneAndSpeciesTrees(ogSet,
-                                          prog_caller, options.msa_program, options.tree_program,
-                                          options.nBlast, options.nProcessAlg, options.qDoubleBlast,
-                                          options.qAddSpeciesToIDs,
-                                          options.qTrim, userSpeciesTree=None, qStopAfterSeqs=False,
-                                          qStopAfterAlign=False, qMSA=options.qMSATrees,
-                                          qPhyldog=False, results_name=options.name,
-                                          root_from_previous=True)
     # Get/Infer species tree
     if options.speciesTreeFN is None:
+        # Infer gene trees
+        # We write orthogroup & stats results files in the following code, which we should avoid & only do once all OGs are done.
+        gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options,
+                                              speciesXML=None, q_incremental=True)
+
+        orthologues.InferGeneAndSpeciesTrees(ogSet,
+                                              prog_caller, options.msa_program, options.tree_program,
+                                              options.nBlast, options.nProcessAlg, options.qDoubleBlast,
+                                              options.qAddSpeciesToIDs,
+                                              options.qTrim, userSpeciesTree=None, qStopAfterSeqs=False,
+                                              qStopAfterAlign=False, qMSA=options.qMSATrees,
+                                              qPhyldog=False, results_name=options.name,
+                                              root_from_previous=True)
+
         # Infer species tree
         astral_fn = files.FileHandler.GetAstralFilename()
         astral.create_input_file(files.FileHandler.GetOGsTreeDir(), astral_fn)
@@ -1050,6 +1052,7 @@ def BetweenCoreOrthogroupsWorkflow(speciesInfoObj, seqsInfo, options, prog_calle
 
         labeled_tree_fn = files.FileHandler.GetSpeciesTreeResultsNodeLabelsFN()
         util.RenameTreeTaxa(rooted_species_tree_ids, labeled_tree_fn, ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True, label='N')
+        i_og_restart = len(ogs)  # Need to process the clade-specific orthogroups only
     else:
         util.PrintUnderline("Using user-supplied species tree")
         spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
@@ -1393,7 +1396,9 @@ def main(args=None):
                 # Infer clade-specific orthogroup gene trees
                 gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo,
                                                       speciesNamesDict, options, speciesXML=None)
-                options.speciesTreeFN = files.FileHandler.GetSpeciesTreeResultsFN(None, True)
+                if options.speciesTreeFN is None:
+                    # No user species tree, use the one we've just inferred
+                    options.speciesTreeFN = files.FileHandler.GetSpeciesTreeResultsFN(None, True)
             if not options.qStopAfterGroups:
                 GetOrthologues(speciesInfoObj, options, prog_caller, i_og_restart)
         else:

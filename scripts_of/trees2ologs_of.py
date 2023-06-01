@@ -1349,9 +1349,13 @@ def Worker_RunOrthologsMethod(tree_analyser, nspecies, args_queue, results_queue
 def RunOrthologsParallel(tree_analyser, nspecies, args_queue, nProcesses, fewer_open_files):
     results_queue = mp.Queue()
     # Should use PTM?
-    args_list = [(tree_analyser, nspecies, args_queue, results_queue, fewer_open_files) for i_ in range(nProcesses)]
-    parallel_task_manager.RunParallelMethods(Worker_RunOrthologsMethod, args_list, nProcesses)
-    # runningProcesses = [mp.Process(target=Worker_RunOrthologsMethod, args=(tree_analyser, nspecies, args_queue, results_queue, fewer_open_files)) for i_ in range(nProcesses)]
+    # Can't easily pass tree_analyser since holds a _io.TextWrapper, which can't be pickled. It should be inheritted
+    # by a process, hence the need to 1) fork 2) create the processes at this point rather than use ones created earlier.
+    # I don't think this is a major RAM using step so hopefully this is not too much of a cost to pay. The alternative
+    # is to work out a different way to take care of the parallel file writing.
+    # args_list = [(tree_analyser, nspecies, args_queue, results_queue, fewer_open_files) for i_ in range(nProcesses)]
+    # parallel_task_manager.RunParallelMethods(Worker_RunOrthologsMethod, args_list, nProcesses)
+    runningProcesses = [mp.Process(target=Worker_RunOrthologsMethod, args=(tree_analyser, nspecies, args_queue, results_queue, fewer_open_files)) for i_ in range(nProcesses)]
     for proc in runningProcesses:
         proc.start()
     nOrthologues_SpPair = util.nOrtho_sp(nspecies)
