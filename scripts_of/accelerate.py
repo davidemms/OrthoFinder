@@ -49,11 +49,8 @@ def RunSearch(options, speciessInfoObj, fn_diamond_db, prog_caller, q_one_query=
             util.Fail()
         util.PrintTime("Done profiles search\n")
         return results_files
-    cmd_queue = mp.Queue()
-    for iCmd, cmd in enumerate(commands):
-        cmd_queue.put((iCmd+1, cmd))
     program_caller.RunParallelCommands(options.nBlast, commands, qListOfList=False, q_print_on_error=True)
-    util.PrintTime(" Done profiles search")
+    util.PrintTime("Done profiles search")
     return results_files
 
 

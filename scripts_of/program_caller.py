@@ -31,6 +31,7 @@ import json
 import time
 import subprocess
 import multiprocessing as mp
+from queue import Queue
 
 PY2 = sys.version_info <= (3,)
 from . import util, parallel_task_manager
@@ -382,7 +383,7 @@ def RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, qL
                       of the inner list need to be run in the order they appear.
         q_print_on_error - If error code returend print stdout & stederr
     """
-    cmd_queue = mp.Queue()
+    cmd_queue = Queue()
     i = -1
     for i, cmd in enumerate(commands_and_filenames):
         cmd_queue.put((i, cmd))

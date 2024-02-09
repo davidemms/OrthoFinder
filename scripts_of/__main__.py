@@ -245,7 +245,8 @@ def CanRunASTRAL():
     d_deps_test = files.FileHandler.GetDependenciesCheckDir()
     fn_test = d_deps_test + "astral.input.nwk"
     with open(fn_test, 'w') as outfile:
-        outfile.write("(((A:1,B:1):2,(C:1,D:1):2,E:3):4);")
+        for _ in range(20):
+            outfile.write("(((A:1,B:1):2,(C:1,D:1):2,E:3):4);i\n")
     fn_output = d_deps_test + "astral.output.nwk"
     cmd = " ".join(["astral-pro", "-i", fn_test, "-o", fn_output, "-t", "2"])
     if parallel_task_manager.CanRunCommand(cmd, qAllowStderr=True, qRequireStdout=False, qCheckReturnCode=True):
