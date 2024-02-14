@@ -120,6 +120,16 @@ If you want to move the orthofinder executable to another location then you must
 
 OrthoFinder is written in python, but the bundled version does not require python to be installed on your computer. Both versions contain the programs OrthoFinder needs in order to run (in bin/), it will use these copies in preference to any of the same programs in your system path. You can delete the individual executables if you would prefer it not to do this. 
 
+#### Installing using conda
+
+You can follow these commands to install Orthofinder using conda:
+```
+conda create -n orthofinder -c conda-forge -c bioconda python scipy numpy diamond mafft fasttree mcl
+git clone https://github.com/davidemms/OrthoFinder.git
+cd Orthofinder
+python3 orthofinder.py -f ExampleData/
+```
+
 ### Installing OrthoFinder on Mac & Windows
 
 The easiest way to install OrthoFinder on Mac is using Bioconda:
