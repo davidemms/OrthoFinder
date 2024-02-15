@@ -124,7 +124,7 @@ OrthoFinder is written in python, but the bundled version does not require pytho
 
 You can follow these commands to install Orthofinder using conda:
 ```
-conda create -n orthofinder -c conda-forge -c bioconda python scipy numpy diamond mafft fasttree mcl
+conda create -n orthofinder -c conda-forge -c bioconda python scipy numpy diamond mafft fasttree mcl fastme
 git clone https://github.com/davidemms/OrthoFinder.git
 cd Orthofinder
 python3 orthofinder.py -f ExampleData/
