@@ -355,7 +355,7 @@ class WaterfallMethod:
                 ratios = np.multiply(Z[isp,:], Zr[jsp,:])
                 i_nonzeros = np.where(np.logical_and(np.isfinite(ratios), ratios > 0))  # only those which a score is availabe for both
                 if i_nonzeros[0].size == 0:
-                    rs[-1].append(1.)  # no conversion bertween this pair
+                    rs[-1].append(1.)  # no conversion between this pair
                 else:
                     ratios = ratios[i_nonzeros]
                     r = np.percentile(np.asarray(ratios), 100-p)

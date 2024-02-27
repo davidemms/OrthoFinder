@@ -118,7 +118,7 @@ class SpeciesInfo(object):
 
 
 picProtocol = 1
-version = "3.0.0"
+version = "3.0.1"
     
 def PrintNoNewLine(text):
     parallel_task_manager.PrintNoNewLine(text)

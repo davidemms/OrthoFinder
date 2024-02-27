@@ -32,10 +32,10 @@ def check_for_orthoxcelerate(input_dir, speciesInfoObj):
 def prepare_accelerate_database(input_dir, wd_list, nSpAll):
     if xcelerate_config.n_for_profiles is None:
         # create_shoot_db.create_full_database(input_dir, q_ids=True, subtrees_dir="")
-        fn_diamond_db = create_profiles_database(input_dir, wd_list, nSpAll, selection="all", q_ids=True, subtrees_dir="")
+        fn_diamond_db, q_hogs = create_profiles_database(input_dir, wd_list, nSpAll, selection="all", q_ids=True, subtrees_dir="")
     else:
-        fn_diamond_db = create_profiles_database(input_dir, wd_list, nSpAll, selection="kmeans", q_ids=True, n_for_profile=xcelerate_config.n_for_profiles, subtrees_dir="")
-    return fn_diamond_db
+        fn_diamond_db, q_hogs = create_profiles_database(input_dir, wd_list, nSpAll, selection="kmeans", q_ids=True, n_for_profile=xcelerate_config.n_for_profiles, subtrees_dir="")
+    return fn_diamond_db, q_hogs
 
 
 def RunSearch(options, speciessInfoObj, fn_diamond_db, prog_caller, q_one_query=False):
@@ -78,10 +78,10 @@ def GetOrderedSearchCommands(speciesInfoObj, diamond_db, prog_caller, q_one_quer
             search_program,
             files.FileHandler.GetSpeciesFastaFN(iFasta),
             diamond_db,
-            files.FileHandler.GetBlastResultsFN(iFasta, 0, qForCreation=True))
+            files.FileHandler.GetBlastResultsFN(iFasta, -1, qForCreation=True))
             for iFasta in iSpeciesNew
         ]
-        results_files = [files.FileHandler.GetBlastResultsFN(iFasta, 0, qForCreation=True) + ".gz" for iFasta in iSpeciesNew]
+        results_files = [files.FileHandler.GetBlastResultsFN(iFasta, -1, qForCreation=True) + ".gz" for iFasta in iSpeciesNew]
     return commands, results_files
 
 
@@ -208,13 +208,13 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", n_for_pro
     else:
         subtrees_label = ""
     if selection == "all":
-        fn_fasta = wd + "profile_sequences%s.all.fa" % subtrees_label
+        fn_fasta = wd + "profile_sequences%s.all.hogs.fa" % subtrees_label
     else:
-        fn_fasta = wd + "profile_sequences%s.%d_%s.fa" % (subtrees_label, n_for_profile, selection)
+        fn_fasta = wd + "profile_sequences%s.%d_%s.hogs.fa" % (subtrees_label, n_for_profile, selection)
     fn_diamond_db = fn_fasta + ".dmnd"
     if os.path.exists(fn_diamond_db):
         print("Profiles database already exists and will be reused: %s" % fn_diamond_db)
-        return fn_diamond_db
+        return fn_diamond_db, True
     og_set = orthologues.OrthoGroupsSet(wd_list, list(range(nSpAll)), nSpAll, True)
     ids = og_set.Spec_SeqDict()
     ids_rev = {v: k for k, v in ids.items()}
@@ -233,6 +233,7 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", n_for_pro
         if len(clusters_filename) == 0:
             print("ERROR: Can't find %s" % wd + "clusters_OrthoFinder*id_pairs.txt")
         ogs = mcl.GetPredictedOGs(clusters_filename[0])
+        fn_fasta = fn_fasta[:-7] + ".fa"
     fw = fasta_writer.FastaWriter(wd + "Species*fa", qGlob=True)
     seq_write = []
     seq_convert = dict()
@@ -292,7 +293,7 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", n_for_pro
     print("")
     fw.WriteSeqsToFasta_withNewAccessions(seq_write, fn_fasta, seq_convert)
     parallel_task_manager.RunCommand(" ".join(["diamond", "makedb", "--in", fn_fasta, "-d", fn_diamond_db]), qPrintOnError=True, qPrintStderr=False)
-    return fn_diamond_db
+    return fn_diamond_db, q_hogs
 
 
 class DummyIDs:

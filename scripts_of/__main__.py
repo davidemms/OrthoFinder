@@ -998,13 +998,16 @@ def GetOrthologues(speciesInfoObj, options, prog_caller, i_og_restart=0):
     util.PrintTime("Done orthologues")
 
 
-def BetweenCoreOrthogroupsWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files):
+def BetweenCoreOrthogroupsWorkflow(continuationDir, speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files, q_hogs):
     """
     Infer clade-specific orthogroups for the new species clades
     n_unassigned: List[int] - number of unassigned genes per species
     """
     # Get current orthogroups - original orthogroups plus genes assigned to them
-    ogs = acc.get_original_orthogroups()
+    if q_hogs:
+        ogs = acc.read_hogs(continuationDir, "N0")
+    else:
+        ogs = acc.get_original_orthogroups()
     i_og_restart = 0
     ogs_new_species, _ = acc.assign_genes(results_files)
     clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, [])  # this updates ogs
@@ -1373,7 +1376,7 @@ def main(args=None):
                 util.Fail()
             util.PrintUnderline("Creating orthogroup profiles")
             wd_list = files.FileHandler.GetWorkingDirectory1_Read()
-            fn_diamond_db = acc.prepare_accelerate_database(continuationDir, wd_list, speciesInfoObj.nSpAll)
+            fn_diamond_db, q_hogs = acc.prepare_accelerate_database(continuationDir, wd_list, speciesInfoObj.nSpAll)
             print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, continuationDir))
             speciesInfoObj = ProcessesNewFasta(fastaDir, options.dna, speciesInfoObj, speciesToUse_names)
 
@@ -1385,14 +1388,15 @@ def main(args=None):
             # Clade-specific genes
             orphan_genes_version = 2
             speciesNamesDict = SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN())
-            if orphan_genes_version == 1:
-                # v1 - This is unsuitable, it does an all-v-all search of all unassigned genes. Although these should have
-                # been depleted of all genes that are not clade-specific, the resulting search still takes too long.
-                clustersFilename_pairs, i_og_restart = clade_specific_orthogroups_v1(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files)
-                gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML=None)
-            elif orphan_genes_version == 2:
+            # if orphan_genes_version == 1:
+            #     # v1 - This is unsuitable, it does an all-v-all search of all unassigned genes. Although these should have
+            #     # been depleted of all genes that are not clade-specific, the resulting search still takes too long.
+            #     clustersFilename_pairs, i_og_restart = clade_specific_orthogroups_v1(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files, q_hogs)
+            #     raise Exception("If q_hjogs then should be reading the N0.tsv file, not the original clusters")
+            #     gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML=None)
+            if orphan_genes_version == 2:
                 # v2 - Infer rooted species tree from new rooted gene trees, identify new species-clades & search within these
-                clustersFilename_pairs, i_og_restart = BetweenCoreOrthogroupsWorkflow(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files)
+                clustersFilename_pairs, i_og_restart = BetweenCoreOrthogroupsWorkflow(continuationDir, speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files, q_hogs)
 
                 # Infer clade-specific orthogroup gene trees
                 gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo,
