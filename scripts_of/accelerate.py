@@ -186,7 +186,7 @@ def write_all_orthogroups(ogs, ogs_new_species, ogs_clade_specific_lists):
 
 
 def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", n_for_profile=20, q_ids=True,
-                             subtrees_dir="", q_hogs=True):
+                             subtrees_dir="", q_hogs=False):
     """
     Create a fasta file with profile genes from each orthogroup
     Args:
@@ -194,6 +194,8 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", n_for_pro
         selection - "kmeans|random|all"  - method to use for sampling genes from orthogroups
         n_for_profile - The number of genes to use from each orthogroup, when available
         q_ids - Convert subtrees (with user gene accessions) back to IDs for profiles database
+        q_hogs - The use of HOGs is currently not recommended due to the divergence of the resulting
+                 orthogroups from an analysis with the original method
     Notes:
     If the trees have been split into subtrees then profiles will be created for
     the subtrees instead.
@@ -207,14 +209,15 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", n_for_pro
         pat_sub_msa_glob = din + subtrees_dir + "/msa_sub/OG%07d.*.fa"
     else:
         subtrees_label = ""
+    fn_base = "profile_sequences.hogs" if q_hogs else "profile_sequences.hogs"
     if selection == "all":
-        fn_fasta = wd + "profile_sequences%s.all.hogs.fa" % subtrees_label
+        fn_fasta = wd + fn_base + ".%s.all.fa" % subtrees_label
     else:
-        fn_fasta = wd + "profile_sequences%s.%d_%s.hogs.fa" % (subtrees_label, n_for_profile, selection)
+        fn_fasta = wd + fn_base + ".%s.%d_%s.fa" % (subtrees_label, n_for_profile, selection)
     fn_diamond_db = fn_fasta + ".dmnd"
     if os.path.exists(fn_diamond_db):
         print("Profiles database already exists and will be reused: %s" % fn_diamond_db)
-        return fn_diamond_db, True
+        return fn_diamond_db, q_hogs
     og_set = orthologues.OrthoGroupsSet(wd_list, list(range(nSpAll)), nSpAll, True)
     ids = og_set.Spec_SeqDict()
     ids_rev = {v: k for k, v in ids.items()}
