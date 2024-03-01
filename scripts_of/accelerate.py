@@ -209,7 +209,7 @@ def create_profiles_database(din, wd_list, nSpAll, selection="kmeans", n_for_pro
         pat_sub_msa_glob = din + subtrees_dir + "/msa_sub/OG%07d.*.fa"
     else:
         subtrees_label = ""
-    fn_base = "profile_sequences.hogs" if q_hogs else "profile_sequences.hogs"
+    fn_base = "profile_sequences.hogs" if q_hogs else "profile_sequences"
     if selection == "all":
         fn_fasta = wd + fn_base + ".%s.all.fa" % subtrees_label
     else:
