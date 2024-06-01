@@ -68,6 +68,6 @@
     "last":{
     "program_type": "search",
     "db_cmd": "lastdb -p -cR01 OUTPUT INPUT",
-    "search_cmd": "lastal -f BlastTab+ -D 1e6 DATABASE INPUT | sed -n '/^#/!p' > OUTPUT"
+    "search_cmd": "lastal -f BlastTab+ -D 1e6 DATABASE INPUT | sed -n '/^#/!p' | gzip > OUTPUT.gz"
     }
 }
