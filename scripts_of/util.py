@@ -334,6 +334,11 @@ FastTree:
 BLAST protein alignment:
   Altschul, S.F., Gish, W., Miller, W., Myers, E.W. & Lipman, D.J. Basic local
   alignment search tool (1990) J. Mol. Biol. 215:403-410
+
+LAST protein alignment:
+  Kiełbasa, S.M., Wan, R., Sato, K., Horton, P. & Frith, M.C. Adaptive seeds tame
+  genomic sequence comparison. (2011) Genome Research, 21(3)
+  doi.org/10.1101/gr.113985.110
 """    
 
     with open(d + "Citation.txt", 'w') as outfile:
