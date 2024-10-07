@@ -357,7 +357,7 @@ def sample_random(og, n_max):
     Returns:
         genes - list of genes
     """
-    return random.sample(og, min(n_max, len(og)))
+    return random.sample(sorted(og), min(n_max, len(og)))
 
 
 def get_new_species_clades(rooted_species_tree_fn, core_species_ids, n_core_species=2):

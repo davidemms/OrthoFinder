@@ -260,7 +260,7 @@ def select_from_aligned(infn, n_sample, q_trim=True):
     if n_extra > 0:
         # select some more to make it up to the total 
         not_used = set(range(n_keep)).difference(cluster_representative)
-        cluster_representative.extend(random.sample(not_used, n_extra))
+        cluster_representative.extend(random.sample(sorted(not_used), n_extra))
         # print("Found extra sequences. Have %d" % len(cluster_representative))
     # print(cluster_representative)
     selected = [accs[d_new_old[i]] for i in cluster_representative]
