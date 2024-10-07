@@ -24,26 +24,33 @@
 #
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.com
+from __future__ import absolute_import
 
 # first import parallel task manager to minimise RAM overhead for small processes
-from __future__ import absolute_import
+import multiprocessing as mp                    # optional  (problems on OpenBSD)
+import platform                                 # Y
+if __name__ == "__main__":
+    if platform.system() == "Darwin":
+        # https://github.com/davidemms/OrthoFinder/issues/570
+        # https://github.com/davidemms/OrthoFinder/issues/663
+        mp.set_start_method('fork')
+    # else:
+    #     # Should be more RAM efficient than fork and the time penalty
+    #     # should be very small as we never try to create many processes
+    #     mp.set_start_method('spawn')
+
 from . import parallel_task_manager
+ptm_initialised = parallel_task_manager.ParallelTaskManager_singleton()
 
 import os                                       # Y
 os.environ["OPENBLAS_NUM_THREADS"] = "1"    # fix issue with numpy/openblas. Will mean that single threaded options aren't automatically parallelised 
 
 import sys                                      # Y
+import copy                                     # Y
 import subprocess                               # Y
 import glob                                     # Y
 import shutil                                   # Y
 import time                                     # Y
-import multiprocessing as mp                    # optional  (problems on OpenBSD)
-import platform
-if platform.system() == "Darwin":
-    # https://github.com/davidemms/OrthoFinder/issues/570
-    # https://github.com/davidemms/OrthoFinder/issues/663 
-    mp.set_start_method('fork')
-
 import itertools                                # Y
 import datetime                                 # Y
 from collections import Counter                 # Y
@@ -63,10 +70,9 @@ except ImportError:
     import Queue as queue                       # Y
 import warnings                                 # Y
 
-PY2 = sys.version_info <= (3,)
-csv_write_mode = 'wb' if PY2 else 'wt'
-
-from . import blast_file_processor, files, mcl, util, matrices, orthologues, program_caller, trees_msa, split_ortholog_files
+from . import blast_file_processor, files, mcl, util, matrices, orthologues, program_caller, trees_msa, \
+    split_ortholog_files, gathering, astral, trees2ologs_of, tree
+from . import accelerate as acc
 
 # Get directory containing script/bundle
 if getattr(sys, 'frozen', False):
@@ -103,8 +109,9 @@ if getattr(sys, 'frozen', False):
     if 'DYLD_LIBRARY_PATH_ORIG' in my_env:
         my_env['DYLD_LIBRARY_PATH'] = my_env['DYLD_LIBRARY_PATH_ORIG']  
     else:
-        my_env['DYLD_LIBRARY_PATH'] = ''      
-         
+        my_env['DYLD_LIBRARY_PATH'] = ''
+
+
 def RunBlastDBCommand(command):
     capture = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env, shell=True)
     stdout, stderr = capture.communicate()
@@ -131,6 +138,7 @@ def RunBlastDBCommand(command):
             print(stderr)
             
 def SpeciesNameDict(speciesIDsFN):
+    # type: (str) -> Dict[int, str]
     speciesNamesDict = dict()
     with open(speciesIDsFN, 'r') as speciesNamesFile:
         for line in speciesNamesFile:
@@ -140,256 +148,11 @@ def SpeciesNameDict(speciesIDsFN):
             short, full = line.split(": ")
             speciesNamesDict[int(short)] = full.rsplit(".", 1)[0]
     return speciesNamesDict
-    
-"""
-MCL
--------------------------------------------------------------------------------
-"""    
-class MCL:
-    @staticmethod
-    def CreateOGs(predictedOGs, outputFilename, idDict):
-        with open(outputFilename, 'w') as outputFile:
-            for iOg, og in enumerate(predictedOGs):
-                outputFile.write("OG%07d: " % iOg)
-                accessions = sorted([idDict[seq] for seq in og])
-                outputFile.write(" ".join(accessions))
-                outputFile.write("\n")
-      
-    @staticmethod
-    def prettify(elem):
-        """Return a pretty-printed XML string for the Element.
-        """
-        rough_string = ET.tostring(elem, 'utf-8')
-        reparsed = minidom.parseString(rough_string)
-        return reparsed.toprettyxml(indent="  ")
-       
-    @staticmethod         
-    def WriteOrthoXML(speciesInfo, predictedOGs, nSequencesDict, idDict, orthoxmlFilename, speciesToUse):
-        """ speciesInfo: ordered array for which each element has
-            fastaFilename, speciesName, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile
-        """
-        # Write OrthoXML file
-        root = ET.Element("orthoXML")
-        root.set('xsi:schemaLocation', "http://orthoXML.org/2011/ http://www.orthoxml.org/0.3/orthoxml.xsd")
-        root.set('originVersion', util.version)
-        root.set('origin', 'OrthoFinder')
-        root.set('version', "0.3")
-        root.set('xmlns:xsi', "http://www.w3.org/2001/XMLSchema-instance")
-        #notes = SubElement(root, 'notes')
-    
-        # Species: details of source of genomes and sequences they contain
-        speciesStartingIndices = []
-        iGene_all = 0
-        for iPos, thisSpeciesInfo in enumerate(speciesInfo):
-            iSpecies = speciesToUse[iPos]
-            nSeqs = nSequencesDict[iSpecies]
-            speciesNode = SubElement(root, 'species')
-            speciesNode.set('NCBITaxId', thisSpeciesInfo[2])           # required
-            speciesNode.set('name', thisSpeciesInfo[1])                # required
-            speciesDatabaseNode = SubElement(speciesNode, "database")
-            speciesDatabaseNode.set('name', thisSpeciesInfo[3])            # required
-            speciesDatabaseNode.set('version', thisSpeciesInfo[4])         # required
-    #            speciesDatabaseNode.set('geneLink', "")        # skip
-    #            speciesDatabaseNode.set('protLink', "")        # skip
-    #            speciesDatabaseNode.set('transcriptLink', "")  # skip
-            allGenesNode = SubElement(speciesDatabaseNode, "genes")
-            speciesStartingIndices.append(iGene_all)
-            for iGene_species in range(nSeqs):
-                geneNode = SubElement(allGenesNode, 'gene')
-                geneNode.set("geneId", idDict["%d_%d" % (iSpecies , iGene_species)])  
-                geneNode.set('id', str(iGene_all))       # required
-    #                geneNode.set("protID", "")  # skip
-                iGene_all += 1
-                
-        # Scores tag - unused
-    #            scoresNode = SubElement(root, 'scores')        # skip
-    
-        # Orthogroups
-        allGroupsNode = SubElement(root, 'groups')
-        for iOg, og in enumerate(predictedOGs):
-            groupNode = SubElement(allGroupsNode, 'orthologGroup')
-            groupNode.set('id', str(iOg))
-    #                groupScoreNode = SubElement(groupNode, 'score')    # skip
-    #                groupScoreNode.set('id', "")                       # skip
-    #                groupScoreNode.set('value', "")                    # skip
-    #                SubElement(groupNode, 'property')                  # skip
-            for seq in og:
-                geneNode = SubElement(groupNode, 'geneRef')
-                geneNode.set('id', str(mcl.GetSingleID(speciesStartingIndices, seq, speciesToUse)))
-    #                    SubElement(geneNode, 'score')                  # skip
-        with open(orthoxmlFilename, 'w') as orthoxmlFile:
-    #            ET.ElementTree(root).write(orthoxmlFile)
-            orthoxmlFile.write(MCL.prettify(root))
-        print("Orthogroups have been written to orthoxml file:\n   %s" % orthoxmlFilename)
-            
-    @staticmethod               
-    def RunMCL(graphFilename, clustersFilename, nProcesses, inflation):
-        command = " ".join(["mcl", graphFilename, "-I", str(inflation), "-o", clustersFilename, "-te", str(nProcesses), "-V", "all"])
-        parallel_task_manager.RunCommand(command, qPrintOnError=True)
-        util.PrintTime("Ran MCL")  
-    
-    @staticmethod
-    def WriteOrthogroupFiles(ogs, idsFilenames, resultsBaseFilename, clustersFilename_pairs):
-        outputFN = resultsBaseFilename + ".txt"
-        try:
-            fullDict = dict()
-            for idsFilename in idsFilenames:
-                idExtract = util.FirstWordExtractor(idsFilename)
-                idDict = idExtract.GetIDToNameDict()
-                fullDict.update(idDict)
-            MCL.CreateOGs(ogs, outputFN, fullDict)
-        except KeyError as e:
-            sys.stderr.write("ERROR: Sequence ID not found in %s\n" % idsFilename)
-            sys.stderr.write(str(e) + "\n")
-            files.FileHandler.LogFailAndExit(("ERROR: Sequence ID not found in %s\n" % idsFilename) + str(e) + "\n")        
-        except RuntimeError as error:
-            print(str(error))
-            if str(error).startswith("ERROR"):
-                err_text = "ERROR: %s contains a duplicate ID. The IDs for the orthogroups in %s will not be replaced with the sequence accessions. If %s was prepared manually then please check the IDs are correct. " % (idsFilename, clustersFilename_pairs, idsFilename)
-                files.FileHandler.LogFailAndExit(err_text)
-            else:
-                print("Tried to use only the first part of the accession in order to list the sequences in each orthogroup\nmore concisely but these were not unique. The full accession line will be used instead.\n")     
-                try:
-                    fullDict = dict()
-                    for idsFilename in idsFilenames:
-                        idExtract = util.FullAccession(idsFilename)
-                        idDict = idExtract.GetIDToNameDict()
-                        fullDict.update(idDict)
-                    MCL.CreateOGs(ogs, outputFN, fullDict)   
-                except:
-                    err_text = "ERROR: %s contains a duplicate ID. The IDs for the orthogroups in %s will not be replaced with the sequence accessions. This is probably because the same accession was used more than once in your input FASTA files. However, if %s was prepared manually then you may need to check that file instead." % (idsFilename, clustersFilename_pairs, idsFilename) 
-                    files.FileHandler.LogFailAndExit(err_text)
-        return fullDict
-    
-    @staticmethod
-    def CreateOrthogroupTable(ogs, 
-                              idToNameDict, 
-                              speciesNamesDict, 
-                              speciesToUse,
-                              resultsBaseFilename):
-        
-        nSpecies = len(speciesNamesDict) 
-        
-        ogs_names = [[idToNameDict[seq] for seq in og] for og in ogs]
-        ogs_ints = [[list(map(int, sequence.split("_"))) for sequence in og] for og in ogs]
-    
-        # write out
-        outputFilename = resultsBaseFilename + ".tsv"
-        outputFilename_counts = resultsBaseFilename + ".GeneCount.tsv"
-        singleGeneFilename = resultsBaseFilename + "_UnassignedGenes.tsv"
-        with open(outputFilename, csv_write_mode) as outputFile, open(singleGeneFilename, csv_write_mode) as singleGeneFile, open(outputFilename_counts, csv_write_mode) as outFile_counts:
-            fileWriter = csv.writer(outputFile, delimiter="\t")
-            fileWriter_counts = csv.writer(outFile_counts, delimiter="\t")
-            singleGeneWriter = csv.writer(singleGeneFile, delimiter="\t")
-            for writer in [fileWriter, singleGeneWriter]:
-                row = ["Orthogroup"] + [speciesNamesDict[index] for index in speciesToUse]
-                writer.writerow(row)
-            fileWriter_counts.writerow(row + ['Total'])
-            
-            for iOg, (og, og_names) in enumerate(zip(ogs_ints, ogs_names)):
-                ogDict = defaultdict(list)
-                row = ["OG%07d" % iOg]
-                thisOutputWriter = fileWriter
-                # separate it into sequences from each species
-                if len(og) == 1:
-                    row.extend(['' for x in range(nSpecies)])
-                    row[speciesToUse.index(og[0][0]) + 1] = og_names[0]
-                    thisOutputWriter = singleGeneWriter
-                else:
-                    for (iSpecies, iSequence), name in zip(og, og_names):
-                        ogDict[speciesToUse.index(iSpecies)].append(name)
-                    for iSpecies in range(nSpecies):
-                        row.append(", ".join(sorted(ogDict[iSpecies])))
-                    counts = Counter([iSpecies for iSpecies, _ in og])
-                    counts_row = [counts[iSpecies] for iSpecies in speciesToUse]
-                    fileWriter_counts.writerow(row[:1] + counts_row + [sum(counts_row)])
-                thisOutputWriter.writerow(row)
-
-"""
-scnorm
--------------------------------------------------------------------------------
-"""
-class scnorm:
-    @staticmethod
-    def loglinear(x, a, b):
-        return a*np.log10(x)+b     
-    
-    @staticmethod
-    def GetLengthArraysForMatrix(m, len_i, len_j):
-        I, J = m.nonzero()
-        scores = [v for row in m.data for v in row]     # use fact that it's lil
-        Li = np.array(len_i[I])
-        Lj = np.array(len_j[J])
-        return Li, Lj, scores
-        
-    @staticmethod
-    def GetTopPercentileOfScores(L, S, percentileToKeep):
-        # Get the top x% of hits at each length
-        nScores = len(S)
-        t_sort = sorted(zip(L, range(nScores)))
-        indices = [j for i, j in t_sort]
-        s_sorted = [S[i] for i in indices]
-        l_sorted = [L[i] for i in indices]
-        if nScores < 100:
-            # then we can't split them into bins, return all for fitting
-            return l_sorted, s_sorted
-        nInBins = 1000 if nScores > 5000 else (200 if nScores > 1000 else 20)
-        nBins, remainder = divmod(nScores, nInBins)
-        topScores = []
-        topLengths = []
-        for i in range(nBins):
-            first = i*nInBins
-            last = min((i+1)*nInBins-1, nScores - 1)
-            theseLengths = l_sorted[first:last+1]
-            theseScores = s_sorted[first:last+1]
-            cutOff = np.percentile(theseScores, percentileToKeep)
-            lengthsToKeep = [thisL for thisL, thisScore in zip(theseLengths, theseScores) if thisScore >= cutOff]
-            topLengths.extend(lengthsToKeep)
-            topScores.extend([thisScore for thisL, thisScore in zip(theseLengths, theseScores) if thisScore >= cutOff])
-        return topLengths, topScores
-        
-    @staticmethod
-    def CalculateFittingParameters(Lf, S):
-        pars,covar =  curve_fit(scnorm.loglinear, Lf, np.log10(S))
-        return pars
-           
-    @staticmethod   
-    def NormaliseScoresByLogLengthProduct(b, Lq, Lh, params): 
-        rangeq = list(range(len(Lq)))
-        rangeh = list(range(len(Lh)))
-        li_vals = Lq**(-params[0])
-        lj_vals = Lh**(-params[0])
-        li_matrix = sparse.csr_matrix((li_vals, (rangeq, rangeq)))
-        lj_matrix = sparse.csr_matrix((lj_vals, (rangeh, rangeh)))
-        return sparse.lil_matrix(10**(-params[1]) * li_matrix * b * lj_matrix)
 
 """
 RunInfo
 -------------------------------------------------------------------------------
-"""     
-
-def GetSequenceLengths(seqsInfo):                
-    sequenceLengths = []
-    for iSpecies, iFasta in enumerate(seqsInfo.speciesToUse):
-        sequenceLengths.append(np.zeros(seqsInfo.nSeqsPerSpecies[iFasta]))
-        fastaFilename = files.FileHandler.GetSpeciesFastaFN(iFasta)
-        currentSequenceLength = 0
-        iCurrentSequence = -1
-        qFirstLine = True
-        with open(fastaFilename) as infile:
-            for row in infile:
-                if len(row) > 1 and row[0] == ">":    
-                    if qFirstLine:
-                        qFirstLine = False
-                    else:
-                        sequenceLengths[iSpecies][iCurrentSequence] = currentSequenceLength
-                        currentSequenceLength = 0
-                    _, iCurrentSequence = util.GetIDPairFromString(row[1:])
-                else:
-                    currentSequenceLength += len(row.rstrip())
-        sequenceLengths[iSpecies][iCurrentSequence] = currentSequenceLength
-    return sequenceLengths
-  
+"""
 # Redundant?  
 def GetNumberOfSequencesInFile(filename):
     count = 0
@@ -398,415 +161,66 @@ def GetNumberOfSequencesInFile(filename):
             if line.startswith(">"): count+=1
     return count
 
-""" Question: Do I want to do all BLASTs or just the required ones? It's got to be all BLASTs I think. They could potentially be 
-run after the clustering has finished."""
-def GetOrderedSearchCommands(seqsInfo, speciesInfoObj, qDoubleBlast, search_program, prog_caller):
+
+def GetOrderedSearchCommands(seqsInfo, speciesInfoObj, qDoubleBlast, search_program, prog_caller, n_genes_per_species=None, q_new_species_unassigned_genes=False):
     """ Using the nSeq1 x nSeq2 as a rough estimate of the amount of work required for a given species-pair, returns the commands 
     ordered so that the commands predicted to take the longest come first. This allows the load to be balanced better when processing 
     the BLAST commands.
+    n_genes_per_species: List[int] - number of genes per species
     """
     iSpeciesPrevious = list(range(speciesInfoObj.iFirstNewSpecies))
     iSpeciesNew = list(range(speciesInfoObj.iFirstNewSpecies, speciesInfoObj.nSpAll))
-    speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew) if (qDoubleBlast or i <=j)] + \
-                   [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesPrevious) if (qDoubleBlast or i <=j)] + \
-                   [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew) if (qDoubleBlast or i <=j)] 
-    taskSizes = [seqsInfo.nSeqsPerSpecies[i]*seqsInfo.nSeqsPerSpecies[j] for i,j in speciesPairs]
+    if q_new_species_unassigned_genes:
+        if n_genes_per_species is not None:
+            exclude = {isp for isp, n_genes in enumerate(n_genes_per_species) if n_genes == 0}
+            iSpeciesNew = list(set(iSpeciesNew).difference(exclude))
+        speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew)]
+        taskSizes = [n_genes_per_species[i]*n_genes_per_species[j] for i,j in speciesPairs]
+    else:
+        speciesPairs = [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesNew) if (qDoubleBlast or i <=j)] + \
+                       [(i, j) for i, j in itertools.product(iSpeciesNew, iSpeciesPrevious) if (qDoubleBlast or i <=j)] + \
+                       [(i, j) for i, j in itertools.product(iSpeciesPrevious, iSpeciesNew) if (qDoubleBlast or i <=j)]
+        taskSizes = [seqsInfo.nSeqsPerSpecies[i]*seqsInfo.nSeqsPerSpecies[j] for i,j in speciesPairs]
     taskSizes, speciesPairs = util.SortArrayPairByFirst(taskSizes, speciesPairs, True)
     if search_program == "blast":
-        commands = [" ".join(["blastp", "-outfmt", "6", "-evalue", "0.001", "-query", files.FileHandler.GetSpeciesFastaFN(iFasta), "-db", files.FileHandler.GetSpeciesDatabaseN(iDB), "-out", files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)]) for iFasta, iDB in speciesPairs]
+        commands = [" ".join(["blastp", "-outfmt", "6", "-evalue", "0.001",
+                              "-query", files.FileHandler.GetSpeciesUnassignedFastaFN(iFasta) if q_new_species_unassigned_genes else files.FileHandler.GetSpeciesFastaFN(iFasta),
+                              "-db", files.FileHandler.GetSpeciesDatabaseN(iDB),
+                              "-out", files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)]) for iFasta, iDB in speciesPairs]
     else:
-        commands = [prog_caller.GetSearchMethodCommand_Search(search_program, files.FileHandler.GetSpeciesFastaFN(iFasta), files.FileHandler.GetSpeciesDatabaseN(iDB, search_program), files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)) for iFasta, iDB in speciesPairs]
-    return commands     
+        commands = [prog_caller.GetSearchMethodCommand_Search(search_program,
+                        files.FileHandler.GetSpeciesUnassignedFastaFN(iFasta) if q_new_species_unassigned_genes else files.FileHandler.GetSpeciesFastaFN(iFasta),
+                        files.FileHandler.GetSpeciesDatabaseN(iDB, search_program),
+                        files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)) for iFasta, iDB in speciesPairs]
+    return commands
 
-"""
-Matrices
--------------------------------------------------------------------------------
-""" 
-            
-def GetBH_s(pairwiseScoresMatrices, seqsInfo, iSpecies, tol=1e-3):
-    nSeqs_i = seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpecies]]
-    bestHitForSequence = -1*np.ones(nSeqs_i)
-    H = [None for i_ in range(seqsInfo.nSpecies)] # create array of Nones to be replace by matrices
-    for j in range(seqsInfo.nSpecies):
-        if iSpecies == j:
-            # identify orthologs then come back to paralogs
-            continue
-        W = pairwiseScoresMatrices[j]
-        I = []
-        J = []
-        for kRow in range(nSeqs_i):
-            values=W.getrowview(kRow)
-            if values.nnz == 0:
-                continue
-            m = max(values.data[0])
-            bestHitForSequence[kRow] = m if m > bestHitForSequence[kRow] else bestHitForSequence[kRow]
-            # get all above this value with tolerance
-            temp = [index for index, value in zip(values.rows[0], values.data[0]) if value > m - tol]
-            J.extend(temp)
-            I.extend(kRow * np.ones(len(temp), dtype=np.dtype(int)))
-        H[j] = sparse.csr_matrix((np.ones(len(I)), (I, J)), shape=W.get_shape())
-    # now look for paralogs
-    I = []
-    J = []
-    W = pairwiseScoresMatrices[iSpecies]
-    for kRow in range(nSeqs_i):
-        values=W.getrowview(kRow)
-        if values.nnz == 0:
-            continue
-        temp = [index for index, value in zip(values.rows[0], values.data[0]) if value > bestHitForSequence[kRow] - tol]
-        J.extend(temp)
-        I.extend(kRow * np.ones(len(temp), dtype=np.dtype(int)))
-    H[iSpecies] = sparse.csr_matrix((np.ones(len(I)), (I, J)), shape=W.get_shape())
-    return H
-    
-    
-"""
-WaterfallMethod
--------------------------------------------------------------------------------
-""" 
 
-def WriteGraph_perSpecies(args):
-    seqsInfo, graphFN, iSpec, d_pickle = args            
-    # calculate the 2-way connections for one query species
-    with open(graphFN + "_%d" % iSpec, 'w') as graphFile:
-        connect2 = []
-        for jSpec in range(seqsInfo.nSpecies):
-            m1 = matrices.LoadMatrix("connect", iSpec, jSpec, d_pickle)
-            m2tr = numeric.transpose(matrices.LoadMatrix("connect", jSpec, iSpec, d_pickle))
-            connect2.append(m1 + m2tr)
-            del m1, m2tr
-        B = matrices.LoadMatrixArray("B", seqsInfo, iSpec, d_pickle)
-        B_connect = matrices.MatricesAnd_s(connect2, B)
-        del B, connect2
-        
-        W = [b.sorted_indices().tolil() for b in B_connect]
-        del B_connect
-        for query in range(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]):
-            offset = seqsInfo.seqStartingIndices[iSpec]
-            graphFile.write("%d    " % (offset + query))
-            for jSpec in range(seqsInfo.nSpecies):
-                row = W[jSpec].getrowview(query)
-                jOffset = seqsInfo.seqStartingIndices[jSpec]
-                for j, value in zip(row.rows[0], row.data[0]):
-                    graphFile.write("%d:%.3f " % (j + jOffset, value))
-            graphFile.write("$\n")
-        if iSpec == (seqsInfo.nSpecies - 1): graphFile.write(")\n")
-        util.PrintTime("Written final scores for species %d to graph file" % iSpec)
-            
-            
-class WaterfallMethod:    
-    @staticmethod
-    def NormaliseScores(B, Lengths, iSpecies, jSpecies):    
-        Li, Lj, scores = scnorm.GetLengthArraysForMatrix(B, Lengths[iSpecies], Lengths[jSpecies])
-        Lf = Li * Lj     
-        topLf, topScores = scnorm.GetTopPercentileOfScores(Lf, scores, 95)   
-        if len(topScores) > 1:
-            fittingParameters = scnorm.CalculateFittingParameters(topLf, topScores)  
-            return scnorm.NormaliseScoresByLogLengthProduct(B, Lengths[iSpecies], Lengths[jSpecies], fittingParameters)
-        elif iSpecies == jSpecies and B.nnz == 0:
-            print("WARNING: THIS IS UNCOMMON, there are zero hits when searching the genes in species %d against itself. Check the input proteome contains all the genes from that species and check the search program is working (default is diamond)." % iSpecies)
-            return sparse.lil_matrix(B.get_shape())
-        else:
-            print("WARNING: Too few hits between species %d and species %d to normalise the scores, these hits will be ignored" % (iSpecies, jSpecies))
-            return sparse.lil_matrix(B.get_shape())
-            
-    @staticmethod
-    def ProcessBlastHits(seqsInfo, blastDir_list, Lengths, iSpecies, d_pickle, qDoubleBlast):
-        with warnings.catch_warnings():         
-            warnings.simplefilter("ignore")
-            # process up to the best hits for each species
-            Bi = []
-            for jSpecies in range(seqsInfo.nSpecies):
-                Bij = blast_file_processor.GetBLAST6Scores(seqsInfo, blastDir_list, seqsInfo.speciesToUse[iSpecies], seqsInfo.speciesToUse[jSpecies], qDoubleBlast=qDoubleBlast)  
-                Bij = WaterfallMethod.NormaliseScores(Bij, Lengths, iSpecies, jSpecies)
-                Bi.append(Bij)
-            matrices.DumpMatrixArray("B", Bi, iSpecies, d_pickle)
-            BH = GetBH_s(Bi, seqsInfo, iSpecies)
-            matrices.DumpMatrixArray("BH", BH, iSpecies, d_pickle)
-            util.PrintTime("Initial processing of species %d complete" % iSpecies)
-        
-    @staticmethod 
-    def Worker_ProcessBlastHits(cmd_queue, d_pickle, qDoubleBlast):
-        while True:
-            try:
-                args = cmd_queue.get(True, 1)
-                WaterfallMethod.ProcessBlastHits(*args, d_pickle=d_pickle, qDoubleBlast=qDoubleBlast)
-            except queue.Empty:
-                return 
-            except Exception:
-                seqsInfo, _, _, iSpecies = args
-                i = seqsInfo.speciesToUse[iSpecies]
-                print("ERROR: Error processing files Blast%d_*" % i)
-                raise
-
-    @staticmethod
-    def ConnectCognates(seqsInfo, iSpecies, d_pickle): 
-        # calculate RBH for species i
-        BHix = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies, d_pickle)
-        BHxi = matrices.LoadMatrixArray("BH", seqsInfo, iSpecies, d_pickle, row=False)
-        RBHi = matrices.MatricesAndTr_s(BHix, BHxi)   # twice as much work as before (only did upper triangular before)
-        del BHix, BHxi
-        B = matrices.LoadMatrixArray("B", seqsInfo, iSpecies, d_pickle)
-        connect = WaterfallMethod.ConnectAllBetterThanAnOrtholog_s(RBHi, B, seqsInfo, iSpecies) 
-        matrices.DumpMatrixArray("connect", connect, iSpecies, d_pickle)
-            
-    @staticmethod 
-    def Worker_ConnectCognates(cmd_queue, d_pickle):
-        with warnings.catch_warnings():         
-            warnings.simplefilter("ignore")
-            while True:
-                try:
-                    args = cmd_queue.get(True, 1)
-                    WaterfallMethod.ConnectCognates(*args, d_pickle=d_pickle)
-                except queue.Empty:
-                    return  
-                                   
-    @staticmethod
-    def WriteGraphParallel(seqsInfo, nProcess):
-        with warnings.catch_warnings():         
-            warnings.simplefilter("ignore")
-            with open(files.FileHandler.GetGraphFilename(), 'w') as graphFile:
-                graphFile.write("(mclheader\nmcltype matrix\ndimensions %dx%d\n)\n" % (seqsInfo.nSeqs, seqsInfo.nSeqs)) 
-                graphFile.write("\n(mclmatrix\nbegin\n\n") 
-            pool = mp.Pool(nProcess)
-            graphFN = files.FileHandler.GetGraphFilename()
-            pool.map(WriteGraph_perSpecies, [(seqsInfo, graphFN, iSpec, files.FileHandler.GetPickleDir()) for iSpec in range(seqsInfo.nSpecies)])
-            for iSp in range(seqsInfo.nSpecies):
-                subprocess.call("cat " + graphFN + "_%d" % iSp + " >> " + graphFN, shell=True)
-                os.remove(graphFN + "_%d" % iSp)
-            # Cleanup
-            pool.close()
-            matrices.DeleteMatrices("B", files.FileHandler.GetPickleDir()) 
-            matrices.DeleteMatrices("connect", files.FileHandler.GetPickleDir()) 
-    
-    @staticmethod
-    def GetMostDistant_s(RBH, B, seqsInfo, iSpec):
-        # most distant RBB - as cut-off for connecting to other genes
-        mostDistant = numeric.transpose(np.ones(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]])*1e9)
-        # Best hit in another species: species-specific paralogues will now be connected - closer than any gene in any other species
-        bestHit = numeric.transpose(np.zeros(seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]))
-        for kSpec in range(seqsInfo.nSpecies):
-            B[kSpec] = B[kSpec].tocsr()
-            if iSpec == kSpec:
-                continue
-            bestHit = np.maximum(bestHit, matrices.sparse_max_row(B[kSpec]))
-            I, J = RBH[kSpec].nonzero()
-            if len(I) > 0:
-                mostDistant[I] = np.minimum(B[kSpec][I, J], mostDistant[I])
-        # anything that doesn't have an RBB, set to distance to the closest gene in another species. I.e. it will hit just that gene and all genes closer to it in the its own species
-        I = mostDistant > 1e8
-        mostDistant[I] = bestHit[I] + 1e-6   # to connect to one in it's own species it must be closer than other species. We can deal with hits outside the species later 
-        return mostDistant
-
-    @staticmethod
-    def ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec):
-        connect = []
-        nSeqs_i = seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[iSpec]]
-        for jSpec in range(seqsInfo.nSpecies):
-            M=B[jSpec].tolil()
-            if iSpec != jSpec:
-                IIJJ = [(i,j) for i, (valueRow, indexRow) in enumerate(zip(M.data, M.rows)) for j, v in zip(indexRow, valueRow) if v >= mostDistant[i]]
-            else:
-                IIJJ = [(i,j) for i, (valueRow, indexRow) in enumerate(zip(M.data, M.rows)) for j, v in zip(indexRow, valueRow) if (i != j) and v >= mostDistant[i]]
-            II = [i for (i, j) in IIJJ]
-            JJ = [j for (i, j) in IIJJ]
-            onesArray = np.ones(len(IIJJ))
-            mat = sparse.csr_matrix( (onesArray,  (II, JJ)), shape=(nSeqs_i,  seqsInfo.nSeqsPerSpecies[seqsInfo.speciesToUse[jSpec]]))
-            connect.append(mat)
-        return connect
-    
-    @staticmethod
-    def ConnectAllBetterThanAnOrtholog_s(RBH, B, seqsInfo, iSpec):        
-        mostDistant = WaterfallMethod.GetMostDistant_s(RBH, B, seqsInfo, iSpec) 
-        connect = WaterfallMethod.ConnectAllBetterThanCutoff_s(B, mostDistant, seqsInfo, iSpec)
-        return connect
-
-"""
-Stats
--------------------------------------------------------------------------------
-"""
-def OrthogroupsMatrix(iSpecies, properOGs):
-    speciesIndexDict = {iSp:iCol for iCol, iSp in enumerate(iSpecies)}
-    nSpecies = len(iSpecies)
-    nGroups = len(properOGs)
-    # (i, j)-th entry of ogMatrix gives the number of genes from i in orthogroup j
-    ogMatrix = np.zeros((nGroups, nSpecies)) 
-    for i_og, og in enumerate(properOGs):
-        for species, _ in og:
-            ogMatrix[i_og, speciesIndexDict[species]] += 1
-    return ogMatrix
-  
-def Stats_SpeciesOverlaps(fn, speciesNamesDict, iSpecies, speciesPresence):
-    """ Number of orthogroups in which each species-pair is present. Called by Stats"""
-    with open(fn, csv_write_mode) as outfile:
-        writer = csv.writer(outfile, delimiter="\t")
-        writer.writerow([""] + [speciesNamesDict[index] for index in iSpecies])
-        for iSp in iSpecies:
-            overlap = [len([1 for og in speciesPresence if (iSp in og and jSp in og)]) for jSp in iSpecies]
-            writer.writerow([speciesNamesDict[iSp]] + overlap)
- 
-def Stats_SizeTable(writer_sum, writer_sp, properOGs, allGenesCounter, iSpecies, speciesPresence):
-    """ Overall and per-species histogram tables of orthogroup sizes. Called by Stats"""
-    bins=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 16, 21, 51, 101, 151, 201, 501, 1001, 9e99]
-    writer_sum.writerow([])
-    writer_sp.writerow([])
-    nGenesPerOG = [len(og) for og in properOGs]
-    nGenesPerOGPerSpecies = [[len([1 for g in og if g[0] == iSp]) for og in properOGs] for iSp in iSpecies]
-    counters_GenesPerOGPerSpecies = [Counter(spCount) for spCount in nGenesPerOGPerSpecies]
-    counters_GenesPerOG = Counter(nGenesPerOG)
-    nSp = len(iSpecies)
-    nOGs = len(properOGs)
-    nGenesTotal = sum([len(og) for og in properOGs])
-    percentFormat = "%0.1f"
-    writer_sum.writerow(["Average number of genes per-species in orthogroup", "Number of orthogroups", "Percentage of orthogroups", "Number of genes", "Percentage of genes"])
-    # Per-species tables
-    table_NO = [["Number of genes per-species in orthogroup"] + ["Number of orthogroups" for _ in iSpecies]]      # number of orthogroups
-    table_PO = [["Number of genes per-species in orthogroup"] + ["Percentage of orthogroups" for _ in iSpecies]]  # percentage of orthogroups
-    table_NG = [["Number of genes per-species in orthogroup"] + ["Number of genes" for _ in iSpecies]]            # Number of genes
-    table_PG = [["Number of genes per-species in orthogroup"] + ["Percentage of genes" for _ in iSpecies]]        # percentage of genes
-    for start, end in zip(bins, bins[1:]):
-        binName = "<1" if start == 0 else ("'%d" % start) if start+1 == end else "'%d+" % start if end == 9e99 else "%d-%d" % (start, end-1)
-        nOrthogroups = sum([count for size, count in counters_GenesPerOG.items() if start*nSp<=size<end*nSp])
-        nGenes = sum([size*count for size, count in counters_GenesPerOG.items() if start*nSp<=size<end*nSp])
-        row_sum = [binName, nOrthogroups, percentFormat % (100.*nOrthogroups/nOGs), nGenes, percentFormat % (100.*nGenes/nGenesTotal)]
-        writer_sum.writerow(row_sum)        
-        # Per-species stats
-        if binName == "<1": binName = "'0"
-        nOrthogroups_ps = [sum([number for size, number in c.items() if start<=size<end]) for c in counters_GenesPerOGPerSpecies]
-        nGenes_ps = [sum([size*number for size, number in c.items() if start<=size<end]) for c in counters_GenesPerOGPerSpecies]
-        table_NO.append([binName] + nOrthogroups_ps)
-        table_PO.append([binName] + [percentFormat % (100.*n/nOGs) for n in nOrthogroups_ps])
-        table_NG.append([binName] + nGenes_ps)
-        table_PG.append([binName] + [percentFormat % (100.*n/allGenesCounter[iSp]) for iSp, n in zip(iSpecies, nGenes_ps)])
-    writer_sp.writerow([])
-    for r in table_NO: writer_sp.writerow(r)
-    writer_sp.writerow([])
-    for r in table_PO: writer_sp.writerow(r)
-    writer_sp.writerow([])
-    for r in table_NG: writer_sp.writerow(r)
-    writer_sp.writerow([])
-    for r in table_PG: writer_sp.writerow(r)
-        
-    # Species presence
-    n = list(map(len, speciesPresence))
-    writer_sum.writerow([])
-    writer_sum.writerow(["Number of species in orthogroup", "Number of orthogroups"])
-    for i in range(1, nSp+1):
-        writer_sum.writerow([i, n.count(i)])
-
-def Stats(ogs, speciesNamesDict, iSpecies, iResultsVersion):
-    """ Top-level method for calculation of stats for the orthogroups"""
-    allOgs = [[list(map(int, g.split("_"))) for g in og] for og in ogs]
-    properOGs = [og for og in allOgs if len(og) > 1]
-    allGenes = [g for og in allOgs for g in og]
-    ogStatsResultsDir = files.FileHandler.GetOGsStatsResultsDirectory()
-    filename_sp = ogStatsResultsDir +  "Statistics_PerSpecies" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".tsv"
-    filename_sum = ogStatsResultsDir +  "Statistics_Overall" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".tsv"
-    filename_overlap = ogStatsResultsDir +  "Orthogroups_SpeciesOverlaps" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".tsv"
-    filename_single_copy = files.FileHandler.GetOrthogroupResultsFNBase() + "_SingleCopyOrthologues.txt"
-    percentFormat = "%0.1f"
-    with open(filename_sp, csv_write_mode) as outfile_species, open(filename_sum, csv_write_mode) as outfile_sum:
-        writer_sp = csv.writer(outfile_species, delimiter="\t")
-        writer_sum = csv.writer(outfile_sum, delimiter="\t")
-        # header
-        writer_sp.writerow([""] + [speciesNamesDict[index] for index in iSpecies])
-        
-        # Number of genes
-        allGenesCounter = Counter([g[0] for g in allGenes])
-        nGenes = sum(allGenesCounter.values())
-        writer_sum.writerow(["Number of species", len(iSpecies)])
-        writer_sp.writerow(["Number of genes"] + [allGenesCounter[iSp] for iSp in iSpecies])
-        writer_sum.writerow(["Number of genes", nGenes])
-        
-        # Number of assigned/unassigned genes
-        assignedGenesCounter = Counter([g[0] for og in properOGs for g in og])
-        nAssigned = sum(assignedGenesCounter.values())
-        writer_sp.writerow(["Number of genes in orthogroups"] + [assignedGenesCounter[iSp] for iSp in iSpecies])
-        writer_sum.writerow(["Number of genes in orthogroups"] + [nAssigned])
-        writer_sp.writerow(["Number of unassigned genes"] + [allGenesCounter[iSp] - assignedGenesCounter[iSp] for iSp in iSpecies])
-        writer_sum.writerow(["Number of unassigned genes"] + [nGenes - nAssigned])     
-        # Percentages
-        pAssigned = 100.*nAssigned/nGenes
-        writer_sp.writerow(["Percentage of genes in orthogroups"] + [percentFormat % (100.*assignedGenesCounter[iSp]/allGenesCounter[iSp]) for iSp in iSpecies])
-        writer_sum.writerow(["Percentage of genes in orthogroups", percentFormat % pAssigned])   
-        writer_sp.writerow(["Percentage of unassigned genes"] + [percentFormat % (100*(1.-(float(assignedGenesCounter[iSp])/allGenesCounter[iSp]))) for iSp in iSpecies])
-        writer_sum.writerow(["Percentage of unassigned genes", percentFormat % (100*(1.-(float(nAssigned)/nGenes)))])
-        
-        # Number of Orthogroups
-        speciesPresence = [set([g[0] for g in og]) for og in properOGs]
-        nOgs = len(properOGs)
-        writer_sum.writerow(["Number of orthogroups", nOgs])
-        writer_sp.writerow(["Number of orthogroups containing species"] + [sum([iSp in og_sp for og_sp in speciesPresence]) for iSp in iSpecies])
-        writer_sp.writerow(["Percentage of orthogroups containing species"] + [percentFormat % ((100.*sum([iSp in og_sp for og_sp in speciesPresence])/len(properOGs)) if len(properOGs) > 0 else 0.) for iSp in iSpecies])
-        
-        # Species specific orthogroups - orthogroups-based
-        speciesSpecificOGsCounter = Counter([next(iter(og_sp)) for og_sp in speciesPresence if len(og_sp) == 1])
-        writer_sp.writerow(["Number of species-specific orthogroups"] + [speciesSpecificOGsCounter[iSp] for iSp in iSpecies])
-        writer_sum.writerow(["Number of species-specific orthogroups", sum(speciesSpecificOGsCounter.values())])
-        
-        # Species specific orthogroups - gene-based
-        iSpeciesSpecificOGs = [i for i, og_sp in enumerate(speciesPresence) if len(og_sp) == 1] 
-        iSpSpecificOGsGeneCounts = [sum([len(properOGs[iog]) for iog in iSpeciesSpecificOGs if properOGs[iog][0][0] == iSp]) for iSp in iSpecies]
-        writer_sp.writerow(["Number of genes in species-specific orthogroups"] + iSpSpecificOGsGeneCounts)
-        writer_sum.writerow(["Number of genes in species-specific orthogroups", sum(iSpSpecificOGsGeneCounts)])
-        writer_sp.writerow(["Percentage of genes in species-specific orthogroups"] + [percentFormat % (100.*n_ss/allGenesCounter[iSp]) for n_ss, iSp in zip(iSpSpecificOGsGeneCounts, iSpecies)])
-        writer_sum.writerow(["Percentage of genes in species-specific orthogroups", percentFormat % (100.*sum(iSpSpecificOGsGeneCounts)/nGenes)])
-        
-        # 'averages'
-        l = list(reversed(list(map(len, properOGs))))
-        writer_sum.writerow(["Mean orthogroup size", "%0.1f" % np.mean(l)])
-        writer_sum.writerow(["Median orthogroup size", np.median(l)])
-        L = np.cumsum(l)
-        j, _ = next((i, x) for i, x in enumerate(L) if x > nAssigned/2)
-        writer_sum.writerow(["G50 (assigned genes)",l[j]])
-        l2 = list(reversed(list(map(len, ogs))))
-        L2 = np.cumsum(l2)
-        j2, _ = next((i, x) for i, x in enumerate(L2) if x > nGenes/2)
-        G50 = l2[j2]
-        writer_sum.writerow(["G50 (all genes)", G50])
-        writer_sum.writerow(["O50 (assigned genes)", len(l) - j])
-        O50 = len(l2) - j2
-        writer_sum.writerow(["O50 (all genes)", O50])
-        
-        # Single-copy orthogroups
-        ogMatrix = OrthogroupsMatrix(iSpecies, properOGs)
-        nSpecies = len(iSpecies)
-        nPresent = (ogMatrix > np.zeros((1, nSpecies))).sum(1)
-        nCompleteOGs = list(nPresent).count(nSpecies)
-        singleCopyOGs = (ogMatrix == np.ones((1, nSpecies))).all(1).nonzero()[0]   
-        nSingleCopy = len(singleCopyOGs)
-        writer_sum.writerow(["Number of orthogroups with all species present", nCompleteOGs])
-        writer_sum.writerow(["Number of single-copy orthogroups", nSingleCopy])
-        with open(filename_single_copy, 'w') as outfile_singlecopy:
-            outfile_singlecopy.write("\n".join(["OG%07d" % i_ for i_ in singleCopyOGs]))
-        # Link single-copy orthologues
-        f =  files.FileHandler.GetOGsSeqFN
-        in_fn = [f(i, True) for i in singleCopyOGs]
-        g_fmt = files.FileHandler.GetResultsSeqsDir_SingleCopy() + files.FileHandler.baseOgFormat + ".fa"
-        out_fn =[g_fmt % i for i in singleCopyOGs]
-        for i, o in zip(in_fn, out_fn):
-            shutil.copy(i, o)
-            
-        # Results filenames
-        writer_sum.writerow(["Date", str(datetime.datetime.now()).split()[0]])
-        writer_sum.writerow(["Orthogroups file", "Orthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + ".tsv"])
-        writer_sum.writerow(["Unassigned genes file", "Orthogroups" + ("" if iResultsVersion == 0 else "_%d" % iResultsVersion) + "_UnassignedGenes.tsv"])
-        writer_sum.writerow(["Per-species statistics", os.path.split(filename_sp)[1]])
-        writer_sum.writerow(["Overall statistics", os.path.split(filename_sum)[1]])
-        writer_sum.writerow(["Orthogroups shared between species", os.path.split(filename_overlap)[1]])
-        
-        # Sizes
-        Stats_SizeTable(writer_sum, writer_sp, properOGs, allGenesCounter, iSpecies, speciesPresence)
-        Stats_SpeciesOverlaps(filename_overlap, speciesNamesDict, iSpecies, speciesPresence)
-
-    summaryText = """OrthoFinder assigned %d genes (%0.1f%% of total) to %d orthogroups. Fifty percent of all genes were in orthogroups with %d or more genes (G50 was %d) and were contained in the largest %d orthogroups (O50 was %d). There were %d orthogroups with all species present and %d of these consisted entirely of single-copy genes.""" % (nAssigned, pAssigned, nOgs, G50, G50, O50, O50, nCompleteOGs, nSingleCopy)
-    print(summaryText)
+def GetOrderedSearchCommands_clades(seqsInfo, speciesInfoObj, qDoubleBlast, search_program, prog_caller, n_genes_per_species, species_clades):
+    """
+    Search all species
+    """
+    exclude = {isp for isp, n_genes in enumerate(n_genes_per_species) if n_genes == 0}
+    speciesPairs = []
+    for clade in species_clades:
+        clade = list(set(clade).difference(exclude))
+        speciesPairs.extend([(i, j) for i, j in itertools.product(clade, clade)])
+    if search_program == "blast":
+        commands = [" ".join(["blastp", "-outfmt", "6", "-evalue", "0.001",
+                              "-query", files.FileHandler.GetSpeciesUnassignedFastaFN(iFasta),
+                              "-db", files.FileHandler.GetSpeciesDatabaseN(iDB),
+                              "-out", files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)]) for iFasta, iDB in speciesPairs]
+    else:
+        commands = [prog_caller.GetSearchMethodCommand_Search(search_program,
+                        files.FileHandler.GetSpeciesUnassignedFastaFN(iFasta),
+                        files.FileHandler.GetSpeciesDatabaseN(iDB, search_program),
+                        files.FileHandler.GetBlastResultsFN(iFasta, iDB, qForCreation=True)) for iFasta, iDB in speciesPairs]
+    return commands
 
 """
 OrthoFinder
 -------------------------------------------------------------------------------
 """   
-g_mclInflation = 1.5
+g_mclInflation = 1.2
 
 def CanRunBLAST():
     if parallel_task_manager.CanRunCommand("makeblastdb -help") and parallel_task_manager.CanRunCommand("blastp -help"):
@@ -826,6 +240,22 @@ def CanRunMCL():
         program_caller.ProgramCaller.PrintDependencyCheckFailure(command)
         print("Please check MCL is installed and in the system path. See information above.\n")
         return False
+
+def CanRunASTRAL():
+    d_deps_test = files.FileHandler.GetDependenciesCheckDir()
+    fn_test = d_deps_test + "astral.input.nwk"
+    with open(fn_test, 'w') as outfile:
+        for _ in range(20):
+            outfile.write("(((A:1,B:1):2,(C:1,D:1):2,E:3):4);i\n")
+    fn_output = d_deps_test + "astral.output.nwk"
+    cmd = " ".join(["astral-pro", "-i", fn_test, "-o", fn_output, "-t", "2"])
+    if parallel_task_manager.CanRunCommand(cmd, qAllowStderr=True, qRequireStdout=False, qCheckReturnCode=True):
+        return True
+    else:
+        print("ERROR: Cannot run astral-pro")
+        program_caller.ProgramCaller.PrintDependencyCheckFailure(cmd)
+        print("Please check astral-pro is installed and that the executables are in the system path\n")
+        return False
     
 def GetProgramCaller():
     config_file = os.path.join(__location__, 'config.json') 
@@ -844,9 +274,12 @@ def PrintHelp(prog_caller):
     print("SIMPLE USAGE:") 
     print("Run full OrthoFinder analysis on FASTA format proteomes in <dir>")
     print("  orthofinder [options] -f <dir>")   
-    print("")          
-    print("Add new species in <dir1> to previous run in <dir2> and run new analysis")
-    print("  orthofinder [options] -f <dir1> -b <dir2>")
+    # print("")
+    # print("Add new species in <dir1> to previous run in <dir2> and run new analysis")
+    # print("  orthofinder [options] -f <dir1> -b <dir2>")
+    print("")
+    print("To assign species from <dir1> to existing OrthoFinder orthogroups in <dir2>")
+    print("  orthofinder [options] --assign <dir1> --core <dir2>")
     print("") 
       
     print("OPTIONS:")
@@ -854,7 +287,7 @@ def PrintHelp(prog_caller):
     print(" -a <int>        Number of parallel analysis threads")
     print(" -d              Input is DNA sequences")
     print(" -M <txt>        Method for gene tree inference. Options 'dendroblast' & 'msa'")
-    print("                 [Default = dendroblast]")
+    print("                 [Default = msa]")
     print(" -S <txt>        Sequence search program [Default = diamond]")
     print("                 Options: " + ", ".join(['blast'] + search_ops))
     print(" -A <txt>        MSA program, requires '-M msa' [Default = mafft]")
@@ -865,7 +298,7 @@ def PrintHelp(prog_caller):
 #    print("                 Options: of_recon, dlcpar, dlcpar_convergedsearch")
     print(" -s <file>       User-specified rooted species tree")
     print(" -I <int>        MCL inflation parameter [Default = %0.1f]" % g_mclInflation)
-    print(" --fewer-files   Only create one orthologs file per species")
+    print(" --save-space    Only create one compressed orthologs file per species")
     print(" -x <file>       Info for outputting results in OrthoXML format")
     print(" -p <dir>        Write the temporary pickle files to <dir>")
     print(" -1              Only perform one-way sequence search")
@@ -934,6 +367,7 @@ class Options(object):#
     def __init__(self):
         self.nBlast = util.nThreadsDefault
         self.nProcessAlg = None
+        self.qFastAdd = False  # Add species in near-linear time
         self.qStartFromBlast = False  # remove, just store BLAST to do
         self.qStartFromFasta = False  # local to argument checking
         self.qStartFromGroups = False
@@ -943,9 +377,10 @@ class Options(object):#
         self.qStopAfterSeqs = False
         self.qStopAfterAlignments = False
         self.qStopAfterTrees = False
-        self.qMSATrees = False
+        self.qMSATrees = True  # Updated default
         self.qAddSpeciesToIDs = True
         self.qTrim = True
+        self.gathering_version = (1, 0)    # < 3 is the original method
         self.search_program = "diamond"
         self.msa_program = "mafft"
         self.tree_program = "fasttree"
@@ -959,7 +394,9 @@ class Options(object):#
         self.mclInflation = g_mclInflation
         self.dna = False
         self.fewer_open_files = True  # By default only open O(n) orthologs files at a time
-        self.fewer_files = False  # On complete, have only one orthologs file per species
+        self.save_space = False  # On complete, have only one orthologs file per species
+        self.v2_scores = False
+        self.root_from_previous = False
 
     def what(self):
         for k, v in self.__dict__.items():
@@ -991,7 +428,9 @@ def ProcessArgs(prog_caller, args):
     resultsDir_nonDefault = None
     pickleDir_nonDefault = None
     q_selected_msa_options = False
+    q_selected_tree_options = False
     q_selected_search_option = False
+    user_specified_M = False
     
     """
     -f: store fastaDir
@@ -1014,6 +453,12 @@ def ProcessArgs(prog_caller, args):
                 print("Repeated argument: -b/--blast\n")
                 util.Fail()
             options.qStartFromBlast = True
+            continuationDir = GetDirectoryArgument(arg, args)
+        elif arg == "--assign":
+            options.qFastAdd = True
+            fastaDir = GetDirectoryArgument(arg, args)
+        elif arg == "--core":
+            options.qFastAdd = True
             continuationDir = GetDirectoryArgument(arg, args)
         elif arg == "-fg" or arg == "--from-groups":
             if options.qStartFromGroups:
@@ -1069,8 +514,13 @@ def ProcessArgs(prog_caller, args):
             except:
                 print("Incorrect argument for MCL inflation parameter: %s\n" % arg)
                 util.Fail()
-        elif arg == "--fewer-files":
-            options.fewer_files = True
+        elif arg == "-c1":
+            print("\nThe option 'c1' has been renamed '--c-homologs'")
+            util.Fail()
+        elif arg == "--c-homologs":
+            options.gathering_version = (3, 2)
+        elif arg == "--save-space":
+            options.save_space = True
         elif arg == "-x" or arg == "--orthoxml":  
             if options.speciesXMLInfoFN:
                 print("Repeated argument: -x/--orthoxml")
@@ -1115,13 +565,15 @@ def ProcessArgs(prog_caller, args):
                 print("ERROR: location '%s' for results directory '%s' does not exist.\n" % (path, newDir))
                 util.Fail()
         elif arg == "-s" or arg == "--speciestree":  
-            if options.speciesXMLInfoFN:
+            if options.speciesTreeFN:
                 print("Repeated argument: -s/--speciestree")
                 util.Fail()
             if len(args) == 0:
                 print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
             options.speciesTreeFN = args.pop(0)
+        elif arg == "--scores-v2":
+            options.v2_scores = True
         elif arg == "-S" or arg == "--search":
             choices = ['blast'] + prog_caller.ListSearchMethods()
             switch_used = arg
@@ -1137,6 +589,7 @@ def ProcessArgs(prog_caller, args):
                 util.Fail()
         elif arg == "-M" or arg == "--method":
             arg_M_or_msa = arg
+            user_specified_M = True
             if len(args) == 0:
                 print("Missing option for command line argument %s\n" % arg)
                 util.Fail()
@@ -1147,7 +600,8 @@ def ProcessArgs(prog_caller, args):
                 options.qPhyldog = True
                 options.recon_method = "phyldog"
                 options.qMSATrees = False
-            elif arg == "dendroblast": options.qMSATrees = False    
+            elif arg == "dendroblast":
+                options.qMSATrees = False
             else:
                 print("Invalid argument for option %s: %s" % (arg_M_or_msa, arg))
                 print("Valid options are 'dendroblast' and 'msa'\n")
@@ -1175,7 +629,7 @@ def ProcessArgs(prog_caller, args):
             arg = args.pop(0)
             if arg in choices:
                 options.tree_program = arg
-                q_selected_msa_options = True
+                q_selected_tree_options = True
             else:
                 print("Invalid argument for option %s: %s" % (switch_used, arg))
                 print("Valid options are: {%s}\n" % (", ".join(choices)))
@@ -1210,8 +664,8 @@ def ProcessArgs(prog_caller, args):
             util.Success()
         else:
             print("Unrecognised argument: %s\n" % arg)
-            util.Fail()    
-    
+            util.Fail()
+
     # set a default for number of algorithm threads
     if options.nProcessAlg is None:
         options.nProcessAlg = min(16, max(1, int(options.nBlast/8)))
@@ -1225,10 +679,24 @@ def ProcessArgs(prog_caller, args):
         util.Fail()  
 
     # check argument combinations       
-    if not (options.qStartFromFasta or options.qStartFromBlast or options.qStartFromGroups or options.qStartFromTrees):
-        print("ERROR: Please specify the input directory for OrthoFinder using one of the options: '-f', '-b', '-fg' or '-ft'.")
+    if not (options.qStartFromFasta or options.qStartFromBlast or options.qStartFromGroups or options.qStartFromTrees or options.qFastAdd):
+        print("ERROR: Please specify the input directory for OrthoFinder using one of the options: '-f', '-b', '-fg' or '-ft', '--assign'.")
         util.Fail()
-    
+
+    if options.qFastAdd:
+        if (options.qStartFromFasta or options.qStartFromBlast or options.qStartFromGroups or options.qStartFromTrees):
+            print("ERROR: Incompatible options used with --assign, cannot accept: '-f', '-b', '-fg' or '-ft'")
+            util.Fail()
+        if fastaDir is None:
+            print("ERROR: '--assign' option also requires '--core' directory to be specified")
+            util.Fail()
+        if continuationDir is None:
+            print("ERROR: '--core' option also requires '--assign' directory to be specified")
+            util.Fail()
+        if not options.qMSATrees:
+            print("ERROR: --assign requires MSA trees, option '-M dendroblast' is invalid")
+            util.Fail()
+
     if options.qStartFromFasta and (options.qStartFromTrees or options.qStartFromGroups):
         print("ERROR: Incompatible arguments, -f (start from fasta files) and" + (" -fg (start from orthogroups)" if options.qStartFromGroups else " -ft (start from trees)"))
         util.Fail()
@@ -1249,7 +717,7 @@ def ProcessArgs(prog_caller, args):
         print("ERROR: Argument '-oa' (stop after alignments) also requires option '-M msa'")
         util.Fail()     
 
-    if q_selected_msa_options and (not options.qMSATrees and not options.qPhyldog):
+    if (q_selected_msa_options or q_selected_tree_options) and (not options.qMSATrees and not options.qPhyldog):
         print("ERROR: Argument '-A' or '-T' (multiple sequence alignment/tree inference program) also requires option '-M msa'")
         util.Fail()       
         
@@ -1264,11 +732,20 @@ def ProcessArgs(prog_caller, args):
     if options.search_program not in (prog_caller.ListSearchMethods() + ['blast']):
         print("ERROR: Search program (%s) not configured in config.json file" % options.search_program)
         util.Fail()
-        
+
     util.PrintTime("Starting OrthoFinder %s" % util.version)    
     print("%d thread(s) for highly parallel tasks (BLAST searches etc.)" % options.nBlast)
-    print("%d thread(s) for OrthoFinder algorithm" % options.nProcessAlg)
-    return options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault            
+    print("%d thread(s) for OrthoFinder algorithm\n" % options.nProcessAlg)
+
+    if options.qFastAdd and not q_selected_msa_options:
+        print("INFO: For --assign defaulting to 'mafft --memsave' to reduce RAM usage\n")
+        options.msa_program = "mafft_memsave"
+
+    if options.qFastAdd and not q_selected_tree_options:
+        print("INFO: For --assign defaulting to 'FastTree -fastest' to reduce RAM usage\n")
+        options.tree_program = "fasttree_fastest"
+
+    return options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault, user_specified_M
 
 def GetXMLSpeciesInfo(seqsInfoObj, options):
     # speciesInfo:  name, NCBITaxID, sourceDatabaseName, databaseVersionFastaFile
@@ -1326,9 +803,11 @@ def IDsFileOK(filename):
                 return False, line
     return True, None
 
-def CheckDependencies(options, prog_caller, dirForTempFiles):
+def CheckDependencies(options, user_specified_m, prog_caller, dirForTempFiles):
     util.PrintUnderline("Checking required programs are installed")
-    if (options.qStartFromFasta):
+    if not user_specified_m:
+        print("Running with the recommended MSA tree inference by default. To revert to legacy method use '-M dendroblast'.\n")
+    if options.qStartFromFasta or options.qFastAdd:
         if options.search_program == "blast":
             if not CanRunBLAST(): util.Fail()
         else:
@@ -1341,7 +820,7 @@ def CheckDependencies(options, prog_caller, dirForTempFiles):
                 util.Fail()
     if (options.qStartFromFasta or options.qStartFromBlast) and not CanRunMCL():
         util.Fail()
-    if not (options.qStopAfterPrepare or options.qStopAfterSeqs or options.qStopAfterGroups):
+    if not (options.qStopAfterPrepare or options.qStopAfterSeqs or options.qStopAfterGroups or options.qStartFromTrees):
         if not orthologues.CanRunOrthologueDependencies(dirForTempFiles, 
                                                             options.qMSATrees, 
                                                             options.qPhyldog, 
@@ -1354,70 +833,13 @@ def CheckDependencies(options, prog_caller, dirForTempFiles):
             print("Dependencies have been met for inference of orthogroups but not for the subsequent orthologue inference.")
             print("Either install the required dependencies or use the option '-og' to stop the analysis after the inference of orthogroups.\n")
             util.Fail()
+    if options.qFastAdd:
+        if not CanRunASTRAL():
+            util.Fail()
 
-def DoOrthogroups(options, speciesInfoObj, seqsInfo):
-    # Run Algorithm, cluster and output cluster files with original accessions
-    util.PrintUnderline("Running OrthoFinder algorithm")
-    # it's important to free up the memory from python used for processing the genomes
-    # before launching MCL becuase both use sizeable ammounts of memory. The only
-    # way I can find to do this is to launch the memory intensive python code 
-    # as separate process that exits before MCL is launched.
-    Lengths = GetSequenceLengths(seqsInfo)
-    
-    # Process BLAST hits
-    util.PrintTime("Initial processing of each species")
-    cmd_queue = mp.Queue()
-    blastDir_list = files.FileHandler.GetBlastResultsDir()
-    for iSpecies in range(seqsInfo.nSpecies):
-        cmd_queue.put((seqsInfo, blastDir_list, Lengths, iSpecies))
-    files.FileHandler.GetPickleDir()     # create the pickle directory before the parallel processing to prevent a race condition
-    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ProcessBlastHits, args=(cmd_queue, files.FileHandler.GetPickleDir(), options.qDoubleBlast)) for i_ in range(options.nProcessAlg)]
-    for proc in runningProcesses:
-        proc.start()
-    parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
-    
-    cmd_queue = mp.Queue()
-    for iSpecies in range(seqsInfo.nSpecies):
-        cmd_queue.put((seqsInfo, iSpecies))
-    runningProcesses = [mp.Process(target=WaterfallMethod.Worker_ConnectCognates, args=(cmd_queue, files.FileHandler.GetPickleDir())) for i_ in range(options.nProcessAlg)]
-    for proc in runningProcesses:
-        proc.start()
-    parallel_task_manager.ManageQueue(runningProcesses, cmd_queue)
-    
-    util.PrintTime("Connected putative homologues") 
-    WaterfallMethod.WriteGraphParallel(seqsInfo, options.nProcessAlg)
-    
-    # 5b. MCL     
-    clustersFilename, clustersFilename_pairs = files.FileHandler.CreateUnusedClustersFN(options.mclInflation) 
-    graphFilename = files.FileHandler.GetGraphFilename() 
-    MCL.RunMCL(graphFilename, clustersFilename, options.nProcessAlg, options.mclInflation)
-    mcl.ConvertSingleIDsToIDPair(seqsInfo, clustersFilename, clustersFilename_pairs)   
-    
-    util.PrintUnderline("Writing orthogroups to file")
-    ogs = mcl.GetPredictedOGs(clustersFilename_pairs)
-    
-    resultsBaseFilename = files.FileHandler.GetOrthogroupResultsFNBase()
-    idsDict = MCL.WriteOrthogroupFiles(ogs, [files.FileHandler.GetSequenceIDsFN()], resultsBaseFilename, clustersFilename_pairs)
-    speciesNamesDict = SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN())
-    MCL.CreateOrthogroupTable(ogs, idsDict, speciesNamesDict, speciesInfoObj.speciesToUse, resultsBaseFilename)
-    
-    # Write Orthogroup FASTA files    
-    ogSet = orthologues.OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll, options.qAddSpeciesToIDs, idExtractor = util.FirstWordExtractor)
-    treeGen = trees_msa.TreesForOrthogroups(None, None, None)
-    fastaWriter = trees_msa.FastaWriter(files.FileHandler.GetSpeciesSeqsDir(), speciesInfoObj.speciesToUse)
-    d_seqs = files.FileHandler.GetResultsSeqsDir()
-    if not os.path.exists(d_seqs): os.mkdir(d_seqs)
-    treeGen.WriteFastaFiles(fastaWriter, ogSet.OGs(qInclAll=True), idsDict, False)
-    
-    Stats(ogs, speciesNamesDict, speciesInfoObj.speciesToUse, files.FileHandler.iResultsVersion)
-    if options.speciesXMLInfoFN:
-        MCL.WriteOrthoXML(speciesXML, ogs, seqsInfo.nSeqsPerSpecies, idsDict, resultsBaseFilename + ".orthoxml", speciesInfoObj.speciesToUse)
-    print("")
-    util.PrintTime("Done orthogroups")
-    files.FileHandler.LogOGs()
 
 # 0
-def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
+def ProcessPreviousFiles(workingDir_list, qDoubleBlast, check_blast=True):
     """Checks for:
     workingDir should be the WorkingDirectory containing Blast*.txt files
     
@@ -1434,7 +856,7 @@ def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
         err_text = "ERROR: Previous/Pre-calculated BLAST results directory does not exist: %s\n" % workingDir_list[0]
         files.FileHandler.LogFailAndExit(err_text)
         
-    speciesInfo = files.SpeciesInfo()
+    speciesInfo = util.SpeciesInfo()
     if not os.path.exists(files.FileHandler.GetSpeciesIDsFN()):
         err_text = "ERROR: %s file must be provided if using previously calculated BLAST results" % files.FileHandler.GetSpeciesIDsFN()
         files.FileHandler.LogFailAndExit(err_text)
@@ -1460,25 +882,26 @@ def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
         files.FileHandler.LogFailAndExit("ERROR: Not all expected fasta files are present. Index of last fasta file is %s but found %d fasta files.\n" % (lastFastaNumberString, len(previousFastaFiles)))
     
     # check BLAST files
-    blast_fns_triangular = [files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies >= iSpecies]
-    have_triangular = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_triangular]
-    for qHave, fn in zip(have_triangular, blast_fns_triangular):
-        if not qHave: print("BLAST results file is missing: %s" % fn)
-    
-    if qDoubleBlast:
-        blast_fns_remainder = [files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies < iSpecies]
-        have_remainder = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_remainder]
-        if not (all(have_triangular) and all(have_remainder)):
-            for qHave, fn in zip(have_remainder, blast_fns_remainder):
-                if not qHave: print("BLAST results file is missing: %s" % fn)
+    if check_blast:
+        blast_fns_triangular = [files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies, raise_exception=False) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies >= iSpecies]
+        have_triangular = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_triangular]
+        for qHave, fn in zip(have_triangular, blast_fns_triangular):
+            if not qHave: print("Required BLAST results file not found: %s" % fn)
+
+        if qDoubleBlast:
+            blast_fns_remainder = [files.FileHandler.GetBlastResultsFN(iSpecies, jSpecies, raise_exception=False) for iSpecies in speciesInfo.speciesToUse for jSpecies in speciesInfo.speciesToUse if jSpecies < iSpecies]
+            have_remainder = [(os.path.exists(fn) or os.path.exists(fn + ".gz")) for fn in blast_fns_remainder]
+            if not (all(have_triangular) and all(have_remainder)):
+                for qHave, fn in zip(have_remainder, blast_fns_remainder):
+                    if not qHave: print("Required BLAST results file not found: %s" % fn)
+                if not all(have_triangular):
+                    files.FileHandler.LogFailAndExit()
+                else:
+                    # would be able to do it using just one-way blast
+                    files.FileHandler.LogFailAndExit("ERROR: Required BLAST results files are present for using the one-way sequence search option (default) but not the double BLAST search ('-d' option)")
+        else:
             if not all(have_triangular):
                 files.FileHandler.LogFailAndExit()
-            else:
-                # would be able to do it using just one-way blast
-                files.FileHandler.LogFailAndExit("ERROR: Required BLAST results files are present for using the one-way sequence search option (default) but not the double BLAST search ('-d' option)")
-    else:
-        if not all(have_triangular):
-            files.FileHandler.LogFailAndExit()
                             
     # check SequenceIDs.txt and SpeciesIDs.txt files are present
     if not os.path.exists(files.FileHandler.GetSequenceIDsFN()):
@@ -1490,43 +913,46 @@ def ProcessPreviousFiles(workingDir_list, qDoubleBlast):
     return speciesInfo, speciesToUse_names
 
 # 6
-def CreateSearchDatabases(seqsInfoObj, options, prog_caller):
-    nDB = max(seqsInfoObj.speciesToUse) + 1
-    for iSp in range(nDB):
+def CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned_genes=False):
+    iSpeciesToDo = range(max(speciesInfoObj.speciesToUse) + 1)
+    for iSp in iSpeciesToDo:
+        fn_fasta = files.FileHandler.GetSpeciesUnassignedFastaFN(iSp) if q_unassigned_genes else files.FileHandler.GetSpeciesFastaFN(iSp)
         if options.search_program == "blast":
-            command = " ".join(["makeblastdb", "-dbtype", "prot", "-in", files.FileHandler.GetSpeciesFastaFN(iSp), "-out", files.FileHandler.GetSpeciesDatabaseN(iSp)])
-            util.PrintTime("Creating Blast database %d of %d" % (iSp + 1, nDB))
+            command = " ".join(["makeblastdb", "-dbtype", "prot", "-in", fn_fasta, "-out", files.FileHandler.GetSpeciesDatabaseN(iSp)])
+            util.PrintTime("Creating Blast database %d of %d" % (iSp + 1, len(iSpeciesToDo)))
             RunBlastDBCommand(command) 
         else:
-            command = prog_caller.GetSearchMethodCommand_DB(options.search_program, files.FileHandler.GetSpeciesFastaFN(iSp), files.FileHandler.GetSpeciesDatabaseN(iSp, options.search_program))
-            util.PrintTime("Creating %s database %d of %d" % (options.search_program, iSp + 1, nDB))
+            command = prog_caller.GetSearchMethodCommand_DB(options.search_program, fn_fasta, files.FileHandler.GetSpeciesDatabaseN(iSp, options.search_program))
+            util.PrintTime("Creating %s database %d of %d" % (options.search_program, iSp + 1, len(iSpeciesToDo)))
             ret_code = parallel_task_manager.RunCommand(command, qPrintOnError=True, qPrintStderr=False)
             if ret_code != 0:
                 files.FileHandler.LogFailAndExit("ERROR: diamond makedb failed")
 
 # 7
-def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller):
+def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller, q_new_species_unassigned_genes=False, n_genes_per_species=None, species_clades=None):
+    """
+    n_genes_per_species: List[int] - optional, for use with unassigned genes. If a species has zero unassigned genes, don't search with/agaisnt it.
+    """
     name_to_print = "BLAST" if options.search_program == "blast" else options.search_program
     if options.qStopAfterPrepare:
         util.PrintUnderline("%s commands that must be run" % name_to_print)
-    else:        
+    elif species_clades is not None:
+        util.PrintUnderline("Running %s searches for new non-core species clades" % name_to_print)
+    else:
         util.PrintUnderline("Running %s all-versus-all" % name_to_print)
-    commands = GetOrderedSearchCommands(seqsInfo, speciessInfoObj, options.qDoubleBlast, options.search_program, prog_caller)
+    if species_clades is None:
+        commands = GetOrderedSearchCommands(seqsInfo, speciessInfoObj, options.qDoubleBlast, options.search_program, prog_caller, n_genes_per_species, q_new_species_unassigned_genes=q_new_species_unassigned_genes)
+    else:
+        commands = GetOrderedSearchCommands_clades(seqsInfo, speciessInfoObj, options.qDoubleBlast, options.search_program, prog_caller, n_genes_per_species, species_clades)
     if options.qStopAfterPrepare:
         for command in commands:
             print(command)
         util.Success()
     print("Using %d thread(s)" % options.nBlast)
-    util.PrintTime("This may take some time....")  
-    cmd_queue = mp.Queue()
-    for iCmd, cmd in enumerate(commands):
-        cmd_queue.put((iCmd+1, cmd))           
-    runningProcesses = [mp.Process(target=parallel_task_manager.Worker_RunCommand, args=(cmd_queue, options.nBlast, len(commands), True)) for i_ in range(options.nBlast)]
-    for proc in runningProcesses:
-        proc.start()#
-    for proc in runningProcesses:
-        while proc.is_alive():
-            proc.join()
+    util.PrintTime("This may take some time....")
+    program_caller.RunParallelCommands(options.nBlast, commands, qListOfList=False,
+                                       q_print_on_error=True, q_always_print_stderr=False)
+
     # remove BLAST databases
     util.PrintTime("Done all-versus-all sequence search")
     if options.search_program == "blast":
@@ -1544,11 +970,10 @@ def RunSearch(options, speciessInfoObj, seqsInfo, prog_caller):
                         shutil.rmtree(tmp_dir, True)  # shutil / NFS bug - ignore errors, it's less crucial that the files are deleted
 
 # 9
-def GetOrthologues(speciesInfoObj, options, prog_caller):
+def GetOrthologues(speciesInfoObj, options, prog_caller, i_og_restart=0):
     util.PrintUnderline("Analysing Orthogroups", True)
-
-    orthologues.OrthologuesWorkflow(speciesInfoObj.speciesToUse, 
-                                    speciesInfoObj.nSpAll, 
+    orthologues.OrthologuesWorkflow(speciesInfoObj.speciesToUse,
+                                    speciesInfoObj.nSpAll,
                                     prog_caller,
                                     options.msa_program,
                                     options.tree_program,
@@ -1566,8 +991,140 @@ def GetOrthologues(speciesInfoObj, options, prog_caller):
                                     options.qMSATrees,
                                     options.qPhyldog,
                                     options.name,
-                                    options.qSplitParaClades)
+                                    options.qSplitParaClades,
+                                    options.save_space,
+                                    root_from_previous = False,
+                                    i_og_restart=i_og_restart)
     util.PrintTime("Done orthologues")
+
+
+def BetweenCoreOrthogroupsWorkflow(continuationDir, speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files, q_hogs):
+    """
+    Infer clade-specific orthogroups for the new species clades
+    n_unassigned: List[int] - number of unassigned genes per species
+    """
+    # Get current orthogroups - original orthogroups plus genes assigned to them
+    if q_hogs:
+        ogs = acc.read_hogs(continuationDir, "N0")
+    else:
+        ogs = acc.get_original_orthogroups()
+    i_og_restart = 0
+    ogs_new_species, _ = acc.assign_genes(results_files)
+    clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, [])  # this updates ogs
+
+    ogSet = orthologues.OrthoGroupsSet(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse,
+                                       speciesInfoObj.nSpAll, options.qAddSpeciesToIDs, idExtractor=util.FirstWordExtractor)
+
+    if options.qStopAfterGroups and options.speciesTreeFN is None:
+        # Can't infer clade-specific groups
+        print("\nSpecies tree required for clade-speicfic orthogroups - skipping")
+        return clustersFilename_pairs, i_og_restart
+
+    n_unassigned = acc.write_unassigned_fasta(ogs, None, speciesInfoObj)
+
+    # Get/Infer species tree
+    if options.speciesTreeFN is None:
+        # Infer gene trees
+        # We write orthogroup & stats results files in the following code, which we should avoid & only do once all OGs are done.
+        gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options,
+                                              speciesXML=None, q_incremental=True)
+
+        orthologues.InferGeneAndSpeciesTrees(ogSet,
+                                              prog_caller, options.msa_program, options.tree_program,
+                                              options.nBlast, options.nProcessAlg, options.qDoubleBlast,
+                                              options.qAddSpeciesToIDs,
+                                              options.qTrim, userSpeciesTree=None, qStopAfterSeqs=False,
+                                              qStopAfterAlign=False, qMSA=options.qMSATrees,
+                                              qPhyldog=False, results_name=options.name,
+                                              root_from_previous=True)
+
+        # Infer species tree
+        astral_fn = files.FileHandler.GetAstralFilename()
+        astral.create_input_file(files.FileHandler.GetOGsTreeDir(), astral_fn)
+        species_tree_unrooted_fn = files.FileHandler.GetSpeciesTreeUnrootedFN()
+        parallel_task_manager.RunCommand(astral.get_astral_command(astral_fn, species_tree_unrooted_fn, options.nBlast))
+
+        # Root it
+        core_rooted_species_tree = tree.Tree(files.FileHandler.GetCoreSpeciesTreeIDsRootedFN(), format=1)
+        species_to_speices_map = lambda x: x
+        rooted_species_tree_ids, qHaveSupport = trees2ologs_of.CheckAndRootTree(species_tree_unrooted_fn, core_rooted_species_tree, species_to_speices_map)
+        rooted_species_tree_fn = files.FileHandler.GetSpeciesTreeIDsRootedFN()
+        rooted_species_tree_ids.write(outfile=rooted_species_tree_fn)
+
+        spTreeUnrootedFN = files.FileHandler.GetSpeciesTreeResultsFN(None, True)
+        util.RenameTreeTaxa(rooted_species_tree_ids, spTreeUnrootedFN, ogSet.SpeciesDict(), qSupport=qHaveSupport, qFixNegatives=True)
+
+        labeled_tree_fn = files.FileHandler.GetSpeciesTreeResultsNodeLabelsFN()
+        util.RenameTreeTaxa(rooted_species_tree_ids, labeled_tree_fn, ogSet.SpeciesDict(), qSupport=False, qFixNegatives=True, label='N')
+        i_og_restart = len(ogs)  # Need to process the clade-specific orthogroups only
+    else:
+        util.PrintUnderline("Using user-supplied species tree")
+        spTreeFN_ids = files.FileHandler.GetSpeciesTreeUnrootedFN()
+        orthologues.ConvertUserSpeciesTree(options.speciesTreeFN, ogSet.SpeciesDict(), spTreeFN_ids)
+        rooted_species_tree_fn = spTreeFN_ids
+
+    # Identify clades for clade-specific orthogroup inference
+    iSpeciesCore = set(speciesInfoObj.get_original_species())
+    species_clades = acc.get_new_species_clades(rooted_species_tree_fn, iSpeciesCore)
+    util.PrintUnderline("Identifying clade-specific orthogroups for the following clades:", qHeavy=True)
+    species_dict = ogSet.SpeciesDict()
+    for i, clade in enumerate(species_clades):
+        print(str(i) + ": " + ", ".join([species_dict[str(isp)] for isp in clade]))
+    print("")
+
+    # Clade-specific orthogroup inference
+    CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned_genes=True)
+    # provide list of clades, only run these searches (and only if the fasta files are non-empty)
+    RunSearch(options, speciesInfoObj, seqsInfo, prog_caller, n_genes_per_species=n_unassigned, species_clades=species_clades)
+    # process the results files - only if they are present and non-empty
+    options.v2_scores = True
+    n_clades = len(species_clades)
+    clustersFilename_pairs_unassigned_all = []
+    for i_clade, clade in enumerate(species_clades):
+        util.PrintUnderline("OrthoFinder clutering on new species clade %d of %d" % (i_clade+1, n_clades))
+        print(str(i) + ": " + ", ".join([species_dict[str(isp)] for isp in clade]))
+        speciesInfo_clade = copy.deepcopy(speciesInfoObj)
+        speciesInfo_clade.speciesToUse = clade
+        seqsInfo_clade = util.SeqsInfoRecompute(seqsInfo, clade)
+        clustersFilename_pairs_unassigned = gathering.DoOrthogroups(options, speciesInfo_clade, seqsInfo_clade,
+                                                         speciesNamesDict, speciesXML=None, i_unassigned=i_clade)
+        clustersFilename_pairs_unassigned_all.append(clustersFilename_pairs_unassigned)
+    ogs_clade_specific_list = [mcl.GetPredictedOGs(filename) for filename in clustersFilename_pairs_unassigned_all]
+
+    # OGs have had assigned genes added to them already
+    clustersFilename_pairs = acc.write_all_orthogroups(ogs, {}, ogs_clade_specific_list)
+    return clustersFilename_pairs, i_og_restart
+
+
+def clade_specific_orthogroups_v1(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files):
+    ogs = acc.get_original_orthogroups()
+    i_og_restart = len(ogs)
+    ogs_new_species, _ = acc.assign_genes(results_files)
+    n_unassigned = acc.write_unassigned_fasta(ogs, ogs_new_species, speciesInfoObj)
+    CreateSearchDatabases(speciesInfoObj, options, prog_caller, q_unassigned_genes=True)
+    RunSearch(options, speciesInfoObj, seqsInfo, prog_caller, n_genes_per_species=n_unassigned, q_new_species_unassigned_genes=True)
+
+    # Update info objects for clustering of only the new species
+    speciesInfoObj_for_unassigned = copy.deepcopy(speciesInfoObj)
+    speciesInfoObj_for_unassigned.speciesToUse = [iSp for iSp in speciesInfoObj.speciesToUse if iSp >= speciesInfoObj.iFirstNewSpecies]
+
+    nSpecies_unassigned = len(speciesInfoObj_for_unassigned.speciesToUse)
+    nSeqs_in_new_species = sum([seqsInfo.nSeqsPerSpecies[iSp] for iSp in speciesInfoObj_for_unassigned.speciesToUse])
+    n_offset = seqsInfo.seqStartingIndices[-nSpecies_unassigned]
+    starting_indicies = [n-n_offset for n in seqsInfo.seqStartingIndices[-nSpecies_unassigned:]]
+    seqsInfo_for_unassigned = util.SequencesInfo(
+        nSeqs = nSeqs_in_new_species,
+        nSpecies = nSpecies_unassigned,
+        speciesToUse = speciesInfoObj_for_unassigned.speciesToUse,
+        seqStartingIndices = starting_indicies,
+        nSeqsPerSpecies = seqsInfo.nSeqsPerSpecies
+    )
+    options.v2_scores = True
+    clustersFilename_pairs_unassigned = gathering.DoOrthogroups(options, speciesInfoObj_for_unassigned, seqsInfo_for_unassigned,
+                                                     speciesNamesDict, speciesXML=None, i_unassigned=0)
+    ogs_clade_specific = mcl.GetPredictedOGs(clustersFilename_pairs_unassigned)
+    clustersFilename_pairs = acc.write_all_orthogroups(ogs, ogs_new_species, [ogs_clade_specific])
+    return clustersFilename_pairs, i_og_restart
 
 def GetOrthologues_FromTrees(options):
     orthologues.OrthologuesFromTrees(options.recon_method, options.nBlast, options.nProcessAlg, options.speciesTreeFN,
@@ -1610,7 +1167,7 @@ def ProcessesNewFasta(fastaDir, q_dna, speciesInfoObj_prev = None, speciesToUse_
         util.Fail()
     if speciesInfoObj_prev == None:
         # Then this is a new, clean analysis 
-        speciesInfoObj = files.SpeciesInfo()
+        speciesInfoObj = util.SpeciesInfo()
     else:
         speciesInfoObj = speciesInfoObj_prev
     iSeq = 0
@@ -1679,13 +1236,6 @@ def CheckOptions(options, speciesToUse):
     if options.speciesTreeFN:
         expSpecies = list(SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN()).values())
         orthologues.CheckUserSpeciesTree(options.speciesTreeFN, expSpecies)
-        
-    if options.qStopAfterSeqs and (not options.qMSATrees):
-        print("ERROR: Must use '-M msa' option to generate sequence files for orthogroups")
-        util.Fail()
-    if options.qStopAfterAlignments and (not options.qMSATrees):
-        print("ERROR: Must use '-M msa' option to generate sequence files and infer multiple sequence alignments for orthogroups")
-        util.Fail()
 
     # check can open enough files
     n_extra = 50
@@ -1731,17 +1281,18 @@ def main(args=None):
     try:
         if args is None:
             args = sys.argv[1:]
-        # Create PTM right at start
+       # Create PTM right at start
         ptm_initialised = parallel_task_manager.ParallelTaskManager_singleton()
         print("")
         print(("OrthoFinder version %s Copyright (C) 2014 David Emms\n" % util.version))
         prog_caller = GetProgramCaller()
         
-        options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault = ProcessArgs(prog_caller, args)  
+        options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault, user_specified_M = ProcessArgs(prog_caller, args)
         
         files.InitialiseFileHandler(options, fastaDir, continuationDir, resultsDir_nonDefault, pickleDir_nonDefault)     
-                    
-        CheckDependencies(options, prog_caller, files.FileHandler.GetWorkingDirectory1_Read()[0]) 
+        print("Results directory: %s" % files.FileHandler.GetResultsDirectory1())
+
+        CheckDependencies(options, user_specified_M, prog_caller, files.FileHandler.GetWorkingDirectory1_Read()[0])
             
         # if using previous Trees etc., check these are all present - Job for orthologues
         if options.qStartFromBlast and options.qStartFromFasta:
@@ -1755,15 +1306,15 @@ def main(args=None):
             # 4.
             seqsInfo = util.GetSeqsInfo(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # 5.
-            if options.speciesXMLInfoFN:   
-                speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
+            speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options) if options.speciesXMLInfoFN else None
             # 6.    
             util.PrintUnderline("Dividing up work for BLAST for parallel processing")
             CreateSearchDatabases(speciesInfoObj, options, prog_caller)
             # 7.  
             RunSearch(options, speciesInfoObj, seqsInfo, prog_caller)
             # 8.
-            DoOrthogroups(options, speciesInfoObj, seqsInfo)
+            speciesNamesDict = SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN())
+            gathering.DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXML)
             # 9.
             if not options.qStopAfterGroups:
                 GetOrthologues(speciesInfoObj, options, prog_caller)   
@@ -1776,15 +1327,15 @@ def main(args=None):
             # 4
             seqsInfo = util.GetSeqsInfo(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # 5.
-            if options.speciesXMLInfoFN:   
-                speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
+            speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options) if options.speciesXMLInfoFN else None
             # 6.    
             util.PrintUnderline("Dividing up work for BLAST for parallel processing")
             CreateSearchDatabases(speciesInfoObj, options, prog_caller)
             # 7. 
             RunSearch(options, speciesInfoObj, seqsInfo, prog_caller)
-            # 8.  
-            DoOrthogroups(options, speciesInfoObj, seqsInfo)    
+            # 8.
+            speciesNamesDict = SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN())
+            gathering.DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXML)
             # 9. 
             if not options.qStopAfterGroups:
                 GetOrthologues(speciesInfoObj, options, prog_caller)
@@ -1797,30 +1348,69 @@ def main(args=None):
             # 4.
             seqsInfo = util.GetSeqsInfo(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
             # 5.
-            if options.speciesXMLInfoFN:   
-                speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options)
-            # 8        
-            DoOrthogroups(options, speciesInfoObj, seqsInfo)    
+            speciesXML = GetXMLSpeciesInfo(speciesInfoObj, options) if options.speciesXMLInfoFN else None
+            # 8
+            speciesNamesDict = SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN())
+            gathering.DoOrthogroups(options, speciesInfoObj, seqsInfo, speciesNamesDict, speciesXML)
             # 9
             if not options.qStopAfterGroups:
                 GetOrthologues(speciesInfoObj, options, prog_caller)
         elif options.qStartFromGroups:
-            # 0.  
-            speciesInfoObj, _ = ProcessPreviousFiles(continuationDir, options.qDoubleBlast)
+            # 0.
+            check_blast = not options.qMSATrees
+            speciesInfoObj, _ = ProcessPreviousFiles(continuationDir, options.qDoubleBlast, check_blast=check_blast)
             files.FileHandler.LogSpecies()
             options = CheckOptions(options, speciesInfoObj.speciesToUse)
             # 9
             GetOrthologues(speciesInfoObj, options, prog_caller)
         elif options.qStartFromTrees:
-            speciesInfoObj, _ = ProcessPreviousFiles(files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast)
+            speciesInfoObj, _ = ProcessPreviousFiles(files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast, check_blast=False)
             files.FileHandler.LogSpecies()
             options = CheckOptions(options, speciesInfoObj.speciesToUse)
             GetOrthologues_FromTrees(options)
+        elif options.qFastAdd:
+            # Prepare previous directory as database
+            speciesInfoObj, speciesToUse_names = ProcessPreviousFiles(files.FileHandler.GetWorkingDirectory1_Read(), options.qDoubleBlast, check_blast=False)
+            # Check previous directory has been done with MSA trees
+            if not acc.check_for_orthoxcelerate(continuationDir, speciesInfoObj):
+                util.Fail()
+            util.PrintUnderline("Creating orthogroup profiles")
+            wd_list = files.FileHandler.GetWorkingDirectory1_Read()
+            fn_diamond_db, q_hogs = acc.prepare_accelerate_database(continuationDir, wd_list, speciesInfoObj.nSpAll)
+            print("\nAdding new species in %s to existing analysis in %s" % (fastaDir, continuationDir))
+            speciesInfoObj = ProcessesNewFasta(fastaDir, options.dna, speciesInfoObj, speciesToUse_names)
+
+            options = CheckOptions(options, speciesInfoObj.speciesToUse)
+            seqsInfo = util.GetSeqsInfo(files.FileHandler.GetWorkingDirectory1_Read(), speciesInfoObj.speciesToUse, speciesInfoObj.nSpAll)
+            # Add genes to orthogroups
+            results_files = acc.RunSearch(options, speciesInfoObj, fn_diamond_db, prog_caller)
+
+            # Clade-specific genes
+            orphan_genes_version = 2
+            speciesNamesDict = SpeciesNameDict(files.FileHandler.GetSpeciesIDsFN())
+            # if orphan_genes_version == 1:
+            #     # v1 - This is unsuitable, it does an all-v-all search of all unassigned genes. Although these should have
+            #     # been depleted of all genes that are not clade-specific, the resulting search still takes too long.
+            #     clustersFilename_pairs, i_og_restart = clade_specific_orthogroups_v1(speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files, q_hogs)
+            #     raise Exception("If q_hjogs then should be reading the N0.tsv file, not the original clusters")
+            #     gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo, speciesNamesDict, options, speciesXML=None)
+            if orphan_genes_version == 2:
+                # v2 - Infer rooted species tree from new rooted gene trees, identify new species-clades & search within these
+                clustersFilename_pairs, i_og_restart = BetweenCoreOrthogroupsWorkflow(continuationDir, speciesInfoObj, seqsInfo, options, prog_caller, speciesNamesDict, results_files, q_hogs)
+
+                # Infer clade-specific orthogroup gene trees
+                gathering.post_clustering_orthogroups(clustersFilename_pairs, speciesInfoObj, seqsInfo,
+                                                      speciesNamesDict, options, speciesXML=None)
+                if options.speciesTreeFN is None:
+                    # No user species tree, use the one we've just inferred
+                    options.speciesTreeFN = files.FileHandler.GetSpeciesTreeResultsFN(None, True)
+            if not options.qStopAfterGroups:
+                GetOrthologues(speciesInfoObj, options, prog_caller, i_og_restart)
         else:
             raise NotImplementedError
             ptm = parallel_task_manager.ParallelTaskManager_singleton()
             ptm.Stop()
-        if not options.fewer_files:
+        if not options.save_space and not options.qFastAdd:
             # split up the orthologs into one file per species-pair
             split_ortholog_files.split_ortholog_files(files.FileHandler.GetOrthologuesDirectory())
         d_results = os.path.normpath(files.FileHandler.GetResultsDirectory1()) + os.path.sep
@@ -1835,11 +1425,3 @@ def main(args=None):
         raise
     ptm = parallel_task_manager.ParallelTaskManager_singleton()
     ptm.Stop()
-        
-        
-     
-
-    
-
-    
-

@@ -472,7 +472,6 @@ def Resolve_Main(trees_fn_or_dir, out_dir, species_tree_rooted_fn, GeneToSpecies
         proc.start()
     for proc in runningProcesses:
         proc.join()
-    # parallel_task_manager.ManageQueue(runningProcesses, queue)
 
 if __name__ == "__main__":
     with Finalise():

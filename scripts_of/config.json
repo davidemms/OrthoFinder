@@ -12,6 +12,16 @@
     "program_type": "msa",
     "cmd_line": "muscle -in INPUT -out OUTPUT"
     },
+
+    "mafft_memsave":{
+    "program_type": "msa",
+    "cmd_line": "mafft --anysymbol --memsave INPUT > OUTPUT"
+    },
+
+    "fasttree_fastest":{
+    "program_type": "tree",
+    "cmd_line": "FastTree -fastest INPUT > OUTPUT"
+    },
         
     "raxml":{ 
     "program_type": "tree",
@@ -37,14 +47,14 @@
 
     "diamond":{ 
     "program_type": "search",
-    "db_cmd": "diamond makedb --ignore-warnings --in INPUT -d OUTPUT",
-    "search_cmd": "diamond blastp --ignore-warnings -d DATABASE -q INPUT -o OUTPUT --more-sensitive -p 1 --quiet -e 0.001 --compress 1"
+    "db_cmd": "diamond makedb --in INPUT -d OUTPUT",
+    "search_cmd": "diamond blastp -d DATABASE -q INPUT -o OUTPUT --more-sensitive -p 1 --quiet -e 0.001 --compress 1"
     },
 
     "diamond_ultra_sens":{ 
     "program_type": "search",
-    "db_cmd": "diamond makedb --ignore-warnings --in INPUT -d OUTPUT",
-    "search_cmd": "diamond blastp --ignore-warnings -d DATABASE -q INPUT -o OUTPUT --ultra-sensitive -p 1 --quiet -e 0.001 --compress 1"
+    "db_cmd": "diamond makedb --in INPUT -d OUTPUT",
+    "search_cmd": "diamond blastp -d DATABASE -q INPUT -o OUTPUT --ultra-sensitive -p 1 --quiet -e 0.001 --compress 1"
     },
         
     "blast_gz":{ 

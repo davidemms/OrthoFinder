@@ -5,6 +5,7 @@ import sys
 import shutil
 import argparse
 import itertools
+import subprocess
 import numpy as np
 import scipy.sparse
 
@@ -61,7 +62,18 @@ class MSA(object):
                 for i in range(0, len(seq), nChar):
                     outfile.write(seq[i:i+nChar] + "\n")
 
-def main(infn, outfn, f=0.1, n_min=500, c=0.75):
+def main(infn, outfn, f=0.1, n_min=500, c=0.75, exe=False):
+    if exe:
+        run_exe(infn, outfn, f, n_min, c)
+    else:
+        run_in_process(infn, outfn, f, n_min, c)
+
+def run_exe(infn, outfn, f, n_min, c):
+    """run trim in a separate process not forked from current process"""
+    subprocess.run(["python", __file__, "-c", str(c), infn, outfn, str(f), str(n_min)])
+
+
+def run_in_process(infn, outfn, f, n_min, c):
     """
     Trim the alignment file. Auto reduce f parameter if required. OrthoFinder default
     parameters are used by default.
@@ -123,7 +135,6 @@ def main(infn, outfn, f=0.1, n_min=500, c=0.75):
     msa.write_msa(i_keep[0], outfn)
     # write_msa(M, names, outfn)
     # print("%0.3f: %d->%d, %0.1f%% characters retained. Trimmed %s" % (f, length, i_keep[0].size, 100.*aa_after/aa_before, infn))
-
 
 def get_satifactory_f(gap_counts, aa_counts, N, f_orig, n_min, c, tol = 0.001):
     """

@@ -35,7 +35,7 @@ from . import util
 PY2 = sys.version_info <= (3,)       
 file_read_mode = 'rb' if PY2 else 'rt'
 
-def GetBLAST6Scores(seqsInfo, blastDir_list, iSpecies, jSpecies, qExcludeSelfHits = True, sep = "_", qDoubleBlast=True): 
+def GetBLAST6Scores(seqsInfo, blastDir_list, iSpecies, jSpecies, qExcludeSelfHits = True, sep = "_", qDoubleBlast=True, q_allow_empty=False):
     qSameSpecies = iSpecies==jSpecies
     qCheckForSelfHits = qExcludeSelfHits and qSameSpecies
     if not qDoubleBlast:
@@ -59,10 +59,14 @@ def GetBLAST6Scores(seqsInfo, blastDir_list, iSpecies, jSpecies, qExcludeSelfHit
     for d in blastDir_list:
         fn = d + "Blast%d_%d.txt" % (iSpeciesOpen, jSpeciesOpen)
         if os.path.exists(fn) or os.path.exists(fn + ".gz"): break
+    if q_allow_empty and not os.path.exists(fn) and not os.path.exists(fn + ".gz"):
+        return B
     try:
         with (gzip.open(fn + ".gz", file_read_mode) if os.path.exists(fn + ".gz") else open(fn, file_read_mode)) as blastfile:
             blastreader = csv.reader(blastfile, delimiter='\t')
-            for row in blastreader:    
+            for row in blastreader:
+                if len(row) == 0:
+                    continue
                 # Get hit and query IDs
                 try:
                     sequence1ID = int(row[iQ].split(sep, 2)[1])
@@ -96,5 +100,5 @@ def GetBLAST6Scores(seqsInfo, blastDir_list, iSpecies, jSpecies, qExcludeSelfHit
         print("ERROR: Blast%d_%d.txt is corrupted" % (iSpecies, jSpecies))
         sys.stderr.write("Malformatted line in %sBlast%d_%d.txt\nOffending line was:\n" % (d, iSpecies, jSpecies))
         sys.stderr.write("\t".join(row) + "\n")
-        raise 
-    return B  
+        raise
+    return B

@@ -14,9 +14,9 @@ from collections import defaultdict, Counter
 
 from . import util
 from . import tree as tree_lib
-from . import files, parallel_task_manager
+from . import files, program_caller
 
-def WriteGeneralOptions(filename, baseDir, qRunSingley, nOGs):
+def WriteGeneralOptions(filename, baseDir, qRunSingley, iogs4):
     x="""######## First, data files ########
 BASEDIR=%s
 
@@ -55,7 +55,7 @@ output.losses.tree.file=$(RESULT)$(DATA).LossTree
 
 use.quality.filters=false""" % baseDir
     if qRunSingley:
-        for i in range(nOGs):
+        for i in iogs4:
             base, ext = os.path.splitext(filename)
             og = "OG%07d" % i
             outFN = base + "_" + og + ext
@@ -64,7 +64,7 @@ use.quality.filters=false""" % baseDir
     else:
         with open(filename, 'w') as outfile: outfile.write(x)
 
-def WriteOGOptions(phyldogDir, nOGs, exclude):
+def WriteOGOptions(phyldogDir, iogs4, exclude):
     basedir = phyldogDir + "../"
     x = """######## First, data files ########
 
@@ -105,7 +105,7 @@ optimization.message_handler=none
 optimization.profiler=none
 optimization.reparametrization=no"""
     exclude = set(exclude)
-    for i in range(nOGs):
+    for i in iogs4:
         if i in exclude: continue
         ogName = "OG%07d" % i
         with open(phyldogDir + ogName + ".opt", 'w') as outfile: 
@@ -116,9 +116,10 @@ def WriteListSpecies(filename, speciesToUse):
         for i in speciesToUse:
             outfile.write("%d\n" % i)
 
-def WriteGeneMaps(outputDir, ogs, exclude):
+def WriteGeneMaps(outputDir, iogs4, ogs, exclude):
     exclude = set(exclude)
-    for i, og in enumerate(ogs):
+    for i in iogs4:
+        og = ogs[i]
         if i in exclude: continue
         genesForSpecies = defaultdict(list)
         for seq in og:
@@ -132,20 +133,21 @@ def WriteGeneMaps(outputDir, ogs, exclude):
 #    for i, og in enumerate(ogs):
 #        with open(          
 
-def CleanAlignmentsForPhyldog(phyldogDir, ogs):
+def CleanAlignmentsForPhyldog(phyldogDir, iogs4, ogs):
     """
     Remove * character
     Remove any orthogroups composed entierly of identical sequences
     Return alignments to be excluded
     """
     # 1. Remove * character
-    for i, og in enumerate(ogs):
+    for i in iogs4:
         for line in fileinput.FileInput(phyldogDir + "../Alignments_ids/OG%07d.fa" % i, inplace=True):
             if not line.startswith(">"): line=line.replace("*","-")
             sys.stdout.write(line)
     # 2. Remove any orthogroups composed entierly of identical sequences
     exclude = []
-    for i, og in enumerate(ogs):
+    for i in iogs4:
+        og = ogs[i]
         with open(phyldogDir + "../Alignments_ids/OG%07d.fa" % i, 'r') as infile:
             seqs = []
             for line in infile:
@@ -178,14 +180,14 @@ def ProcessSpeciesTree(phyldogDir):
     species_tree_rooted.write(outfile=ret_species_tree_fn)
     return ret_species_tree_fn
     
-def WriteStandardFiles(phyldogDir, speciesToUse, qRunSingley, nOGs):
-    WriteGeneralOptions(phyldogDir + "GeneralOptions.opt", phyldogDir + "../", qRunSingley, nOGs)
+def WriteStandardFiles(phyldogDir, speciesToUse, qRunSingley, iogs4):
+    WriteGeneralOptions(phyldogDir + "GeneralOptions.opt", phyldogDir + "../", qRunSingley, iogs4)
 #    with open(phyldogDir + "listGenes_generic.txt", 'w') as outfile: outfile.write(phyldogDir + "OG_generic.opt:1")
     WriteListSpecies(phyldogDir + "ListSpecies.txt", speciesToUse)
 
-def WriteListGenes(phyldogDir, nOGs, exclude, qRunSingley):
+def WriteListGenes(phyldogDir, iogs4, exclude, qRunSingley):
     if qRunSingley:
-        for i in range(nOGs):
+        for i in iogs4:
             if i in exclude: continue
             with open(phyldogDir + "ListGenes_OG%07d.opt" % i, 'w') as outfile:
                     outfile.write(phyldogDir + "OG%07d.opt:%s\n" % (i, str(os.stat( phyldogDir + "../Alignments_ids/OG%07d.fa" % i )[6])))   # phyldog prepareData.py method
@@ -197,24 +199,22 @@ def WriteListGenes(phyldogDir, nOGs, exclude, qRunSingley):
                 outfile.write(phyldogDir + "OG%07d.opt:%s\n" % (i, str(os.stat( phyldogDir + "../Alignments_ids/OG%07d.fa" % i )[6])))   # phyldog prepareData.py method
     
 
-def Setup(phyldogDir, ogs, speciesToUse, qRunSingley):
+def Setup(phyldogDir, iogs4, ogs, speciesToUse, qRunSingley):
     if not os.path.exists(phyldogDir): os.mkdir(phyldogDir)
     if not os.path.exists(phyldogDir + "Results/"): os.mkdir(phyldogDir + "Results/")
-    nOGs = len(ogs)
-    WriteStandardFiles(phyldogDir, speciesToUse, qRunSingley, nOGs)
-    exclude = CleanAlignmentsForPhyldog(phyldogDir, ogs)
-    WriteOGOptions(phyldogDir, nOGs, exclude)
-    WriteGeneMaps(phyldogDir, ogs, exclude)
-    WriteListGenes(phyldogDir, nOGs, exclude, qRunSingley)
+    WriteStandardFiles(phyldogDir, speciesToUse, qRunSingley, iogs4)
+    exclude = CleanAlignmentsForPhyldog(phyldogDir, iogs4, ogs)
+    WriteOGOptions(phyldogDir, iogs4, exclude)
+    WriteGeneMaps(phyldogDir, iogs4, ogs, exclude)
+    WriteListGenes(phyldogDir, iogs4, exclude, qRunSingley)
     
-def RunPhyldogAnalysis(phyldogDir, ogs, speciesToUse, nParallel):
+def RunPhyldogAnalysis(phyldogDir, iogs4, ogs, speciesToUse, nParallel):
     qRunSingley = True
-    Setup(phyldogDir, ogs, speciesToUse, qRunSingley)
+    Setup(phyldogDir, iogs4, ogs, speciesToUse, qRunSingley)
     start = time.time()
     if qRunSingley:
-        nOGs = len(ogs)
-        cmds = [["mpirun -np 2 phyldog param=%s%s"  % (phyldogDir, "GeneralOptions_OG%07d.opt" % i)] for i in range(nOGs)]
-        parallel_task_manager.RunParallelCommands(nParallel, cmds)
+        cmds = [["mpirun -np 2 phyldog param=%s%s" % (phyldogDir, "GeneralOptions_OG%07d.opt" % i)] for i in iogs4]
+        program_caller.RunParallelCommands(nParallel, cmds, qListOfList=False)
     else:
         popen = subprocess.Popen("mpirun -np %d phyldog param=GeneralOptions.opt" % nParallel, shell=True, cwd=phyldogDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         popen.communicate()

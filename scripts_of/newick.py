@@ -213,7 +213,7 @@ def read_newick(newick, root_node=None, format=0):
             return _read_node_data(nw, root_node, "single", format)
             
         elif not nw.startswith('(') or not nw.endswith(';'):
-            raise NewickError('Unexisting tree file or Malformed newick tree structure.')
+            raise NewickError('Unexisting tree file or Malformed newick tree structure: ' + newick[-200:])
         else:
             return _read_newick_from_string(nw, root_node, format)
 

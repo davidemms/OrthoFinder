@@ -41,10 +41,7 @@ from collections import defaultdict
 from . import tree
 from . import util
 from . import files
-from . import parallel_task_manager
-
-PY2 = sys.version_info <= (3,)
-csv_write_mode = 'wb' if PY2 else 'wt'
+from . import program_caller
 
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(_nsre, s)]
@@ -117,7 +114,9 @@ def RunDlcpar(ogSet, speciesTreeFN, workingDir, nParallel, qDeepSearch):
     - run
     
     """
-    ogs = ogSet.OGs()
+    ogs = ogSet.OGsAll()
+    iogs4 = ogSet.Get_iOGs4()
+    ogs = [ogs[i] for i in iogs4]  # can rely on oredering for dlcpar
     nOGs = len(ogs)
     dlcparResultsDir = workingDir + 'dlcpar/'
     if not os.path.exists(dlcparResultsDir): os.mkdir(dlcparResultsDir)
@@ -134,7 +133,8 @@ def RunDlcpar(ogSet, speciesTreeFN, workingDir, nParallel, qDeepSearch):
         dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -i %d --nprescreen 100 --nconverge %d' % (speciesTreeFN, geneMapFN, fn, i, n) for (fn, i, n) in zip(filenames, nIter, nNoImprov)]
     else:
         dlcCommands = ['dlcpar_search -s %s -S %s -D 1 -C 0.125 %s -I .txt -x 1' % (speciesTreeFN, geneMapFN, fn) for fn in filenames]
-    parallel_task_manager.RunParallelOrderedCommandLists(nParallel, [[c] for c in dlcCommands])
+    program_caller.RunParallelCommands(nParallel, [[c] for c in dlcCommands], qListOfList=True)
+
     return dlcparResultsDir, "OG%07d_tree_id.dlcpar.locus.tree"
 
 
@@ -218,7 +218,7 @@ def WriteOrthologues(resultsDir, spec1, spec2, orthologues, ogSet, nOrtho_sp, i,
     sequenceDict = ogSet.SequenceDict()
     d1 = resultsDir + "Orthologues_" + speciesDict[str(spec1)] + "/"
     d2 = resultsDir + "Orthologues_" + speciesDict[str(spec2)] + "/"
-    with open(d1 + '%s__v__%s.tsv' % (speciesDict[str(spec1)], speciesDict[str(spec2)]), csv_write_mode) as outfile1, open(d2 + '%s__v__%s.tsv' % (speciesDict[str(spec2)], speciesDict[str(spec1)]), csv_write_mode) as outfile2:
+    with open(d1 + '%s__v__%s.tsv' % (speciesDict[str(spec1)], speciesDict[str(spec2)]), util.csv_write_mode) as outfile1, open(d2 + '%s__v__%s.tsv' % (speciesDict[str(spec2)], speciesDict[str(spec1)]), util.csv_write_mode) as outfile2:
         writer1 = csv.writer(outfile1, delimiter="\t")
         writer2 = csv.writer(outfile2, delimiter="\t")
         writer1.writerow(("Orthogroup", speciesDict[str(spec1)], speciesDict[str(spec2)]))

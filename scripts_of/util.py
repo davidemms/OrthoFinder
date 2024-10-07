@@ -22,12 +22,12 @@
 #      improves orthogroup inference accuracy, Genome Biology 16:157
 #
 # For any enquiries send an email to David Emms
-# david_emms@hotmail.com 
-
-
+# david_emms@hotmail.com
+import gzip
 import os
 import sys
 import time
+import copy
 import numpy as np
 import subprocess
 import datetime
@@ -42,14 +42,83 @@ nThreadsDefault = mp.cpu_count()
 
 from . import tree, parallel_task_manager
 
+PY2 = sys.version_info <= (3,)
+csv_write_mode = 'wb' if PY2 else 'wt'
+csv_append_mode = 'ab' if PY2 else 'at'
+csv_read_mode = 'rb' if PY2 else 'rt'
+
 """
 Utilities
 -------------------------------------------------------------------------------
 """
-SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")    # speciesToUse - list of ints
+SequencesInfo = namedtuple("SequencesInfo", "nSeqs nSpecies speciesToUse seqStartingIndices nSeqsPerSpecies")
+"""
+nSeqs: int - number of sequences in speciesToUse
+nSpecies: int - number in speciesToUse
+speciesToUse: List[int]
+seqStartingIndices: List[int] of size |speciesToUse|, reindexed from zero according to the speices present
+nSeqsPerSpecies: Dict[int, int] - indexed by OrthoFinder species ID, info on all species, nto just those included in analysis
+"""
+
+# Get Info from seqs IDs file?
+def GetSeqsInfo(inputDirectory_list, speciesToUse, nSpAll):
+    seqStartingIndices = [0]
+    nSeqs = 0
+    nSeqsPerSpecies = dict()
+    for iFasta in range(nSpAll):
+        for d in inputDirectory_list:
+            fastaFilename = d + "Species%d.fa" % iFasta
+            if os.path.exists(fastaFilename): break
+        n = 0
+        with open(fastaFilename) as infile:
+            for line in infile:
+                if len(line) > 1 and line[0] == ">":
+                    n += 1
+        nSeqsPerSpecies[iFasta] = n
+        if iFasta in speciesToUse:
+            nSeqs += n
+            seqStartingIndices.append(nSeqs)
+    seqStartingIndices = seqStartingIndices[:-1]
+    nSpecies = len(speciesToUse)
+    return SequencesInfo(nSeqs=nSeqs, nSpecies=nSpecies, speciesToUse=speciesToUse,
+                         seqStartingIndices=seqStartingIndices, nSeqsPerSpecies=nSeqsPerSpecies)
+
+def SeqsInfoRecompute(seqs_info_orig, new_species_to_use):
+    """
+    Args:
+        seqs_info_orig
+        new_species_to_use: List[int]
+    Recomputes SeqsInfo for a subset of species:
+    - speciesToUse updated
+    - seqStartingIndices recomputed
+    - nSeqs updated
+    - nSpecies updated
+    """
+    seqStartingIndices = [0]
+    for isp in new_species_to_use:
+        seqStartingIndices.append(seqStartingIndices[-1] + seqs_info_orig.nSeqsPerSpecies[isp])
+    nSeqs = seqStartingIndices[-1]
+    seqStartingIndices = seqStartingIndices[:-1]
+    return SequencesInfo(nSeqs=nSeqs, nSpecies=len(new_species_to_use), speciesToUse=new_species_to_use,
+                         seqStartingIndices=seqStartingIndices, nSeqsPerSpecies=seqs_info_orig.nSeqsPerSpecies)
+
+
+class SpeciesInfo(object):
+    def __init__(self):
+        self.speciesToUse = []           #       seqsInfo.iSpeciesToUse   - which to include for this analysis
+        self.nSpAll = None               #       seqsInfo.nSpAll => 0, 1, ..., nSpAll - 1 are valid species indices
+        self.iFirstNewSpecies = None     #       iFirstNew   => (0, 1, ..., iFirstNew-1) are from previous and (iFirstNew, iFirstNew+1, ..., nSpecies-1) are the new species indices
+    def __str__(self):
+        return str((self.speciesToUse, self.nSpAll, self.iFirstNewSpecies))
+    def get_original_species(self):
+        if self.iFirstNewSpecies is None:
+            return self.speciesToUse
+        else:
+            return [iSp for iSp in  self.speciesToUse if iSp < self.iFirstNewSpecies]
+
 
 picProtocol = 1
-version = "2.5.5"
+version = "3.0.1"
     
 def PrintNoNewLine(text):
     parallel_task_manager.PrintNoNewLine(text)
@@ -104,30 +173,8 @@ def SortArrayPairByFirst(useForSortAr, keepAlignedAr, qLargestFirst=False):
     sortedTuples = sorted(zip(useForSortAr, keepAlignedAr), reverse=qLargestFirst)
     useForSortAr = [i for i, j in sortedTuples]
     keepAlignedAr = [j for i, j in sortedTuples]
-    return useForSortAr, keepAlignedAr      
+    return useForSortAr, keepAlignedAr
 
-# Get Info from seqs IDs file?
-def GetSeqsInfo(inputDirectory_list, speciesToUse, nSpAll):
-    seqStartingIndices = [0]
-    nSeqs = 0
-    nSeqsPerSpecies = dict()
-    for iFasta in range(nSpAll):
-        for d in inputDirectory_list:
-            fastaFilename = d + "Species%d.fa" % iFasta
-            if os.path.exists(fastaFilename): break
-        n = 0
-        with open(fastaFilename) as infile:
-            for line in infile:
-                if len(line) > 1 and line[0] == ">":
-                    n+=1
-        nSeqsPerSpecies[iFasta] = n
-        if iFasta in speciesToUse:
-            nSeqs += n
-            seqStartingIndices.append(nSeqs)
-    seqStartingIndices = seqStartingIndices[:-1]
-    nSpecies = len(speciesToUse)
-    return SequencesInfo(nSeqs=nSeqs, nSpecies=nSpecies, speciesToUse=speciesToUse, seqStartingIndices=seqStartingIndices, nSeqsPerSpecies=nSeqsPerSpecies)
- 
 def GetSpeciesToUse(speciesIDsFN):
     """Returns species indices (int) to use and total number of species available """
     speciesToUse = []
@@ -471,3 +518,13 @@ def writerow(fh, row):
 def getrow(row):
     # CSV format specifies CRLF line endings: https://tools.ietf.org/html/rfc4180
     return "\t".join(map(str, row)) + "\r\n"
+
+def version_parse_simple(sem_version):
+    return list(map(int, sem_version.split(".")[:3]))
+
+
+def file_open(filename_with_gz, mode, gz):
+    if gz:
+        return gzip.open(filename_with_gz + ".gz", mode)
+    else:
+        return open(filename_with_gz, mode)

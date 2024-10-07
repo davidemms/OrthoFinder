@@ -24,13 +24,14 @@
 #
 # For any enquiries send an email to David Emms
 # david_emms@hotmail.comhor: david
-
+import concurrent.futures
 import os
 import sys
 import json
 import time
 import subprocess
 import multiprocessing as mp
+from queue import Queue
 
 PY2 = sys.version_info <= (3,)
 from . import util, parallel_task_manager
@@ -348,7 +349,7 @@ LSQIGKLLRKDHTTVRHGIDKVEEELENDPNLKSFLDLFKN""")
         """Error message including environment & PATH if a dependency check fails
         """
         print("\nEnvironment:")
-        print(parallel_task_manager.my_env)
+        print({key: parallel_task_manager.my_env[key] for key in sorted(parallel_task_manager.my_env)})
         print("\nCommand:")
         print("export PATH=%s:" % parallel_task_manager.my_env['PATH'])
         print(cmd)
@@ -357,7 +358,17 @@ LSQIGKLLRKDHTTVRHGIDKVEEELENDPNLKSFLDLFKN""")
 
 # ========================================================================================================================
 
-def RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, qListOfList):
+def RunParallelCommands(nProcesses, commands, qListOfList, q_print_on_error=False, q_always_print_stderr=False):
+    if qListOfList:
+        commands_and_no_filenames = [[(cmd, None) for cmd in cmd_list] for cmd_list in commands]
+    else:
+        commands_and_no_filenames = [(cmd, None) for cmd in commands]
+    RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_no_filenames, qListOfList, q_print_on_error,
+                                          q_always_print_stderr)
+
+
+def RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, qListOfList, q_print_on_error=False,
+                                          q_always_print_stderr=False):
     """
     Calls the commands in parallel and if required moves the results file to the required new filename
     Args:
@@ -370,18 +381,20 @@ def RunParallelCommandsAndMoveResultsFile(nProcesses, commands_and_filenames, qL
         qListOfList - if False then commands_and_filenames is a list of (cmd, actual_target_fn) tuples
                       if True then commands_and_filenames is a list of lists of (cmd, actual_target_fn) tuples where the elements 
                       of the inner list need to be run in the order they appear.
+        q_print_on_error - If error code returend print stdout & stederr
     """
-    # Setup the workers and run
-    cmd_queue = mp.Queue()
+    cmd_queue = Queue()
     i = -1
     for i, cmd in enumerate(commands_and_filenames):
         cmd_queue.put((i, cmd))
-    runningProcesses = [mp.Process(target=parallel_task_manager.Worker_RunCommands_And_Move, args=(cmd_queue, nProcesses, i+1, qListOfList)) for _ in range(nProcesses)]
-    for proc in runningProcesses:
-        proc.start()
-    
-    for proc in runningProcesses:
-        while proc.is_alive():
-            proc.join(10.)
-            time.sleep(2)
-                  
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(parallel_task_manager.Worker_RunCommands_And_Move,
+                                   cmd_queue,
+                                   nProcesses,
+                                   i+1,
+                                   qListOfList,
+                                   q_print_on_error,
+                                   q_always_print_stderr=q_always_print_stderr)
+                   for _ in range(nProcesses)]
+    concurrent.futures.wait(futures)

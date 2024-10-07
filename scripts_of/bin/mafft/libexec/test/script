@@ -1,0 +1,37 @@
+mafft sample > x
+diff x sample.fftns2 >& /dev/null || exit 1
+
+mafft --maxiterate 100  sample > x
+diff x sample.fftnsi >& /dev/null || exit 1
+
+mafft --dpparttree sample > x
+diff x sample.dpparttree >& /dev/null || exit 1
+
+mafft --globalpair sample > x
+diff x sample.gins1 >& /dev/null || exit 1
+
+mafft --globalpair --maxiterate 100 sample > x
+diff x sample.ginsi >& /dev/null || exit 1
+
+mafft --allowshift --globalpair --maxiterate 100 sample > x
+diff x sample.ginsi.allowshift >& /dev/null || exit 1
+
+mafft --localpair sample > x
+diff x sample.lins1 >& /dev/null || exit 1
+
+mafft --localpair --maxiterate 100 sample > x
+diff x sample.linsi >& /dev/null || exit 1
+
+mafft --parttree sample > x
+diff x sample.parttree >& /dev/null || exit 1
+
+mafft-qinsi samplerna > x
+diff x samplerna.qinsi >& /dev/null || exit 1
+
+mafft-xinsi samplerna > x
+diff x samplerna.xinsi >& /dev/null || exit 1
+
+echo 'OK'
+rm x
+
+exit 0

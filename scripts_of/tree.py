@@ -638,6 +638,13 @@ class TreeNode(object):
         return [n for n in self.iter_descendants(strategy=strategy, \
                                                  is_leaf_fn=is_leaf_fn)]
 
+    def delete_traverse(self):
+        for node in self.traverse("postorder"):
+            if not node.is_root():
+                node.up.remove_child(node)
+            # node.delete()
+            del node
+
     def traverse(self, strategy="levelorder", is_leaf_fn=None):
         """
         Returns an iterator to traverse the tree structure under this

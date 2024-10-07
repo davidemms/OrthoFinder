@@ -42,7 +42,7 @@ exampleBlastDir = baseDir + "Input/SmallExampleDataset_ExampleBlastDir/"
 goldResultsDir_smallExample = baseDir + "ExpectedOutput/SmallExampleDataset/"
 goldPrepareBlastDir = baseDir + "ExpectedOutput/SmallExampleDataset_PreparedForBlast/"
 
-version = "2.5.5"
+version = "3.0.1"
 requiredBlastVersion = "2.2.28+"
 
 standard_new_files = ("Orthogroups.csv Orthogroups.GeneCount.csv SingleCopyOrthogroups.txt Orthogroups_UnassignedGenes.csv Orthogroups.txt clusters_OrthoFinder_I1.5.txt_id_pairs.txt clusters_OrthoFinder_I1.5.txt OrthoFinder_graph.txt Statistics_PerSpecies.csv Statistics_Overall.csv Orthogroups_SpeciesOverlaps.csv").split()
