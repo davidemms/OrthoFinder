@@ -124,7 +124,7 @@ Alternatively, to download it directly:
 
 4. Test you can run OrthoFinder: `python OrthoFinder_source/orthofinder.py -h` or `./OrthoFinder/orthofinder -h`. OrthoFinder should print its 'help' text. 
 
-5. (To run large analyses with `--core`/`--assign`, you will need to install [ASTRAL-Pro](https://github.com/smirarab/ASTRAL) separately since it contains computer-architecture specific code. Or use conda, which will do this for.)
+5. (To run large analyses with `--core`/`--assign`, you will need to install [ASTRAL-Pro](https://github.com/smirarab/ASTRAL) separately since it contains computer-architecture specific code. Or use conda, which will do this for you.)
 
 6. That's it! You can now run OrthoFinder on a directory of protein sequence fasta files: e.g. `./OrthoFinder/orthofinder -f /OrthoFinder/ExampleData/`
 
