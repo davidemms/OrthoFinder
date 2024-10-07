@@ -279,6 +279,12 @@ To use this functionality:
 1. Perform a standard OrthoFinder run using MSA-based tree inference on a core set of species. Results from version 2 OrthoFinder can be used provided MSA-based tree inference was used (in version 3 this is the default).
 2. Run `orthofinder.py --core ORTHOFINDER_CORE_RESULTS --assign NEW_SPECIES`
 
+E.g.
+```commandline
+orthofinder.py -f ExampleData/ -n Core
+orthofinder.py --core ExampleData/OrthoFinder/Results_Core/ --assign ExampleData/AdditionalSpecies
+```
+
 A guideline for the number of species for the core set is around 8-64 depending on the number of species to be added and their diversity. For a smaller OrthoFinder analysis of, for example, 16 species a core set of 4 or 5 species could be sufficient. 
 
 ### Runtime with `--assign`
