@@ -95,7 +95,8 @@ setup(
             'orthofinder=scripts_of.__main__:main',
             'primary_transcript=tools.primary_transcript:main',
             'make_ultrametric=tools.make_ultrametric:main',
-            'convert_orthofinder_tree_ids=tools.convert_orthofinder_tree_ids:main'
+            'convert_orthofinder_tree_ids=tools.convert_orthofinder_tree_ids:main',
+            'create_files_for_hogs=tools.create_files_for_hogs:main'
         ],
     },
 )
