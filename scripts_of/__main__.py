@@ -1048,6 +1048,9 @@ def BetweenCoreOrthogroupsWorkflow(continuationDir, speciesInfoObj, seqsInfo, op
         core_rooted_species_tree = tree.Tree(files.FileHandler.GetCoreSpeciesTreeIDsRootedFN(), format=1)
         species_to_speices_map = lambda x: x
         rooted_species_tree_ids, qHaveSupport = trees2ologs_of.CheckAndRootTree(species_tree_unrooted_fn, core_rooted_species_tree, species_to_speices_map)
+        if rooted_species_tree_ids is None:
+            print("ERROR: Species tree inference failed. Please check for errors and check the species tree files: \n%s \n%s" % (species_tree_unrooted_fn, core_rooted_species_tree))
+            util.Fail()
         rooted_species_tree_fn = files.FileHandler.GetSpeciesTreeIDsRootedFN()
         rooted_species_tree_ids.write(outfile=rooted_species_tree_fn)
 
