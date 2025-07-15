@@ -1,5 +1,17 @@
 
-### What's new
+# What's new
+**OrthoFinder has a new home: https://github.com/OrthoFinder/OrthoFinder**
+
+All future development and support will take place there. The future of OrthoFinder is being led by an awesome team:
+- Steve Kelly - PI
+- Laurie Belcher
+- Jonathan Holmes
+- Yi Liu
+
+and David Emms will continue in a supporting role.
+
+---
+
 **OrthoFinder version 3.0 has been released.** This makes possible considerably faster and larger analyses. To use it, run OrthoFinder on a small core set of species and then use the `--assign` option to add a large number of new species directly to the previous orthogroups.
 
 ### Interested in a single gene? Try SHOOT.bio, the phylogenetic search engine: https://SHOOT.bio
