@@ -153,7 +153,7 @@ via bioconda: `conda install orthofinder`
 The easiest way to run OrthoFinder on Windows is using the Windows Subsystem for Linux or Docker: [davidemms/orthofinder](https://hub.docker.com/r/davidemms/orthofinder): 
 
 ```
-docker pull davidemms/orthofinder
+docker pull davidemms/orthofinder:2.5.4
 docker run -it --rm davidemms/orthofinder orthofinder -h
 docker run --ulimit nofile=1000000:1000000 -it --rm -v /full/path/to/fastas:/input:Z davidemms/orthofinder orthofinder -f /input
 ```
