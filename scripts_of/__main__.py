@@ -1142,7 +1142,16 @@ def ProcessesNewFasta(fastaDir, q_dna, speciesInfoObj_prev = None, speciesToUse_
     if not os.path.exists(fastaDir):
         print("\nDirectory does not exist: %s" % fastaDir)
         util.Fail()
-    files_in_directory = sorted([f for f in os.listdir(fastaDir) if os.path.isfile(os.path.join(fastaDir,f))])
+
+    def points_to_file(file: str) -> bool:
+        full_path = os.path.join(fastaDir, file)
+        if os.path.isfile(full_path):
+            return True
+        if os.path.islink(full_path) and os.path.exists(full_path):
+            return True
+        return False
+
+    files_in_directory = sorted([f for f in os.listdir(fastaDir) if points_to_file(f)])
     originalFastaFilenames = []
     excludedFiles = []
     for f in files_in_directory:
